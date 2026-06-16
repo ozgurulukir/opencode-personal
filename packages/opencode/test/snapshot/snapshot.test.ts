@@ -1530,3 +1530,88 @@ test("revert handles large mixed batches across chunk boundaries", async () => {
     },
   })
 })
+
+// Regression: opencode is frequently launched from a project subdirectory, so
+// InstanceContext.directory (cwd) is a child of the git worktree root. Git emits
+// diff-files paths relative to the worktree root but resolves pathspecs against
+// the cwd. When the snapshot staged with cwd=directory, those worktree-relative
+// paths did not match and staging silently failed — freezing the index so every
+// track() returned the same tree hash and the "Modified Files" sidebar stayed
+// empty. These tests run the snapshot from a subdirectory (directory !== worktree).
+async function nestedBootstrap() {
+  return tmpdir({
+    git: true,
+    init: async (dir) => {
+      const unique = Math.random().toString(36).slice(2)
+      const aContent = `A${unique}`
+      const bContent = `B${unique}`
+      await Filesystem.write(`${dir}/a.txt`, aContent)
+      await Filesystem.write(`${dir}/b.txt`, bContent)
+      await $`mkdir -p ${dir}/nested`.quiet()
+      await Filesystem.write(`${dir}/nested/tracked.txt`, "original")
+      await $`git add .`.cwd(dir).quiet()
+      await $`git commit -m init`.cwd(dir).quiet()
+      return { aContent, bContent }
+    },
+  })
+}
+
+test("track reflects modified tracked file when launched from a subdirectory", async () => {
+  await using tmp = await nestedBootstrap()
+  const nested = path.join(tmp.path, "nested")
+  const tracked = fwd(tmp.path, "nested", "tracked.txt")
+
+  await WithInstance.provide({
+    directory: nested,
+    fn: async () => {
+      const before = await run(nested, (snapshot) => snapshot.track())
+      expect(before).toBeTruthy()
+
+      await Filesystem.write(tracked, "modified")
+
+      const after = await run(nested, (snapshot) => snapshot.track())
+      expect(after).not.toBe(before)
+    },
+  })
+})
+
+test("patch detects modified tracked file when launched from a subdirectory", async () => {
+  await using tmp = await nestedBootstrap()
+  const nested = path.join(tmp.path, "nested")
+  const tracked = fwd(tmp.path, "nested", "tracked.txt")
+
+  await WithInstance.provide({
+    directory: nested,
+    fn: async () => {
+      const before = await run(nested, (snapshot) => snapshot.track())
+      expect(before).toBeTruthy()
+
+      await Filesystem.write(tracked, "modified")
+
+      const patch = await run(nested, (snapshot) => snapshot.patch(before!))
+      expect(patch.files).toContain(tracked)
+    },
+  })
+})
+
+test("diffFull detects modified tracked file when launched from a subdirectory", async () => {
+  await using tmp = await nestedBootstrap()
+  const nested = path.join(tmp.path, "nested")
+  const tracked = fwd(tmp.path, "nested", "tracked.txt")
+
+  await WithInstance.provide({
+    directory: nested,
+    fn: async () => {
+      const before = await run(nested, (snapshot) => snapshot.track())
+      expect(before).toBeTruthy()
+
+      await Filesystem.write(tracked, "modified")
+
+      const after = await run(nested, (snapshot) => snapshot.track())
+      expect(after).toBeTruthy()
+
+      const diffs = await run(nested, (snapshot) => snapshot.diffFull(before!, after!))
+      expect(diffs.some((d) => d.file === fwd("nested", "tracked.txt"))).toBe(true)
+    },
+  })
+})
