@@ -34,4 +34,5 @@ tsconfig.tsbuildinfo
 # Personal/local config (not shared)
 .agents/
 opencode.jsonc
+mimocode.json
 plugins/
