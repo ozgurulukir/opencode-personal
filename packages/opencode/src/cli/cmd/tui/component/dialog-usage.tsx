@@ -3,7 +3,10 @@ import { useTheme } from "../context/theme"
 import { useDialog } from "@tui/ui/dialog"
 import { useSync } from "@tui/context/sync"
 import { useRouteData } from "@tui/context/route"
-import { For, Show, createMemo } from "solid-js"
+import { For, Show, createMemo, createResource } from "solid-js"
+import { fetchUsageReports } from "@/provider/usage/registry"
+import { resolveUsedFraction } from "@/provider/usage/types"
+import type { UsageReport, UsageLimit } from "@/provider/usage/types"
 
 export type DialogUsageProps = {}
 
@@ -13,8 +16,6 @@ type ModelBreakdown = {
   cost: number
   tokens: { input: number; output: number; reasoning: number; cacheRead: number; cacheWrite: number }
 }
-
-type ToolUsage = { tool: string; count: number }
 
 function formatNumber(num: number): string {
   if (num >= 1_000_000) return `${(num / 1_000_000).toFixed(1)}M`
@@ -27,10 +28,29 @@ function formatCost(cost: number): string {
   return `$${cost.toFixed(2)}`
 }
 
-function renderBar(fraction: number, width = 20): string {
+function renderBar(fraction: number | undefined, width = 24): string {
+  if (fraction === undefined) return `[${"·".repeat(width)}]`
   const clamped = Math.min(Math.max(fraction, 0), 1)
   const filled = Math.round(clamped * width)
-  return `${"█".repeat(filled)}${"░".repeat(Math.max(0, width - filled))}`
+  const pct = Math.round(clamped * 100)
+  return `[${"█".repeat(filled)}${"░".repeat(Math.max(0, width - filled))}] ${pct}%`
+}
+
+function formatDuration(ms: number): string {
+  const seconds = Math.max(0, Math.round(ms / 1000))
+  if (seconds < 60) return `${seconds}s`
+  const minutes = Math.round(seconds / 60)
+  if (minutes < 60) return `${minutes}m`
+  const hours = Math.round(minutes / 60)
+  if (hours < 48) return `${hours}h`
+  return `${Math.round(hours / 24)}d`
+}
+
+function formatProviderName(provider: string): string {
+  return provider
+    .split(/[-_]/g)
+    .map((part) => (part ? part[0].toUpperCase() + part.slice(1) : ""))
+    .join(" ")
 }
 
 export function DialogUsage() {
@@ -39,7 +59,15 @@ export function DialogUsage() {
   const dialog = useDialog()
   const route = useRouteData("session")
 
-  const stats = createMemo(() => {
+  const [providerReports] = createResource(async () => {
+    try {
+      return await fetchUsageReports()
+    } catch {
+      return [] as UsageReport[]
+    }
+  })
+
+  const sessionStats = createMemo(() => {
     if (!route) return null
     const messages = sync.data.message[route.sessionID] ?? []
 
@@ -100,11 +128,9 @@ export function DialogUsage() {
       .map(([tool, count]) => ({ tool, count }))
       .sort((a, b) => b.count - a.count)
 
-    const totalTokens = totalInput + totalOutput + totalReasoning + totalCacheRead + totalCacheWrite
-
     return {
       totalCost,
-      totalTokens,
+      totalTokens: totalInput + totalOutput + totalReasoning + totalCacheRead + totalCacheWrite,
       totalInput,
       totalOutput,
       totalReasoning,
@@ -127,9 +153,61 @@ export function DialogUsage() {
         </text>
       </box>
 
-      <Show when={stats()} fallback={<text fg={theme.textMuted}>No active session</text>}>
+      {/* Provider Quota Reports */}
+      <Show when={providerReports() && providerReports()!.length > 0}>
+        <For each={providerReports()}>
+          {(report: UsageReport) => (
+            <box gap={0}>
+              <text fg={theme.text} attributes={TextAttributes.BOLD}>
+                {formatProviderName(report.provider)}
+              </text>
+              <For each={report.limits}>
+                {(limit: UsageLimit) => {
+                  const fraction = resolveUsedFraction(limit)
+                  const window = limit.window?.label ?? limit.scope.windowId
+                  const tier = limit.scope.tier ? ` (${limit.scope.tier})` : ""
+                  const statusColor =
+                    limit.status === "exhausted"
+                      ? theme.error
+                      : limit.status === "warning"
+                        ? theme.warning
+                        : theme.success
+                  return (
+                    <box gap={0}>
+                      <text fg={theme.text}>
+                        {limit.label}
+                        {tier}
+                        {window ? ` — ${window}` : ""}
+                      </text>
+                      <text fg={statusColor}>{renderBar(fraction)}</text>
+                      <Show when={limit.window?.resetsAt && limit.window.resetsAt > Date.now()}>
+                        <text fg={theme.textMuted}>
+                          resets in {formatDuration(limit.window!.resetsAt! - Date.now())}
+                        </text>
+                      </Show>
+                      <Show when={report.metadata?.email}>
+                        <text fg={theme.textMuted}>{String(report.metadata!.email)}</text>
+                      </Show>
+                    </box>
+                  )
+                }}
+              </For>
+            </box>
+          )}
+        </For>
+      </Show>
+
+      <Show when={!providerReports() || providerReports()!.length === 0} fallback={<text fg={theme.textMuted}>─</text>}>
+        <text fg={theme.textMuted}>No provider quota data (requires OAuth auth)</text>
+      </Show>
+
+      {/* Session Usage */}
+      <Show when={sessionStats()} fallback={<text fg={theme.textMuted}>No active session</text>}>
         {(s) => (
           <>
+            <text fg={theme.text} attributes={TextAttributes.BOLD}>
+              Session
+            </text>
             <text fg={theme.text}>
               <b>Cost:</b> {formatCost(s().totalCost)}
               {"  "}
@@ -178,7 +256,7 @@ export function DialogUsage() {
                 Tools
               </text>
               <For each={s().tools.slice(0, 10)}>
-                {(t: ToolUsage) => {
+                {(t: { tool: string; count: number }) => {
                   const maxCount = s().tools[0]?.count ?? 1
                   const fraction = t.count / maxCount
                   return (
