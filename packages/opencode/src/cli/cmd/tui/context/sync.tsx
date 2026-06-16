@@ -33,52 +33,12 @@ import { emptyConsoleState, type ConsoleState } from "@/config/console-state"
 import path from "path"
 import { useKV } from "./kv"
 import { aggregateFailures } from "./aggregate-failures"
+import type { SyncStore } from "./sync-schema"
 
 export const { use: useSync, provider: SyncProvider } = createSimpleContext({
   name: "Sync",
   init: () => {
-    const [store, setStore] = createStore<{
-      status: "loading" | "partial" | "complete"
-      provider: Provider[]
-      provider_default: Record<string, string>
-      provider_next: ProviderListResponse
-      console_state: ConsoleState
-      provider_auth: Record<string, ProviderAuthMethod[]>
-      agent: Agent[]
-      command: Command[]
-      permission: {
-        [sessionID: string]: PermissionRequest[]
-      }
-      question: {
-        [sessionID: string]: QuestionRequest[]
-      }
-      config: Config
-      session: Session[]
-      session_status: {
-        [sessionID: string]: SessionStatus
-      }
-      session_diff: {
-        [sessionID: string]: Snapshot.FileDiff[]
-      }
-      todo: {
-        [sessionID: string]: Todo[]
-      }
-      message: {
-        [sessionID: string]: Message[]
-      }
-      part: {
-        [messageID: string]: Part[]
-      }
-      lsp: LspStatus[]
-      mcp: {
-        [key: string]: McpStatus
-      }
-      mcp_resource: {
-        [key: string]: McpResource
-      }
-      formatter: FormatterStatus[]
-      vcs: VcsInfo | undefined
-    }>({
+    const [store, setStore] = createStore<SyncStore>({
       provider_next: {
         all: [],
         default: {},
