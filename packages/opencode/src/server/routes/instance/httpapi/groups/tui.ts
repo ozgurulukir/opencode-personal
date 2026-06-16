@@ -1,4 +1,4 @@
-import { TuiEvent } from "@/cli/cmd/tui/event"
+import { TuiEvent, TuiPublishPayload } from "@/cli/cmd/tui/event"
 import { TuiRequest as TuiRequestPayload } from "@/server/shared/tui-control"
 import { Schema } from "effect"
 import { HttpApi, HttpApiEndpoint, HttpApiError, HttpApiGroup, OpenApi } from "effect/unstable/httpapi"
@@ -10,28 +10,7 @@ import { described } from "./metadata"
 
 const root = "/tui"
 export const CommandPayload = Schema.Struct({ command: Schema.String })
-const EventTuiPromptAppend = Schema.Struct({
-  type: Schema.Literal(TuiEvent.PromptAppend.type),
-  properties: TuiEvent.PromptAppend.properties,
-}).annotate({ identifier: "EventTuiPromptAppend" })
-const EventTuiCommandExecute = Schema.Struct({
-  type: Schema.Literal(TuiEvent.CommandExecute.type),
-  properties: TuiEvent.CommandExecute.properties,
-}).annotate({ identifier: "EventTuiCommandExecute" })
-const EventTuiToastShow = Schema.Struct({
-  type: Schema.Literal(TuiEvent.ToastShow.type),
-  properties: TuiEvent.ToastShow.properties,
-}).annotate({ identifier: "EventTuiToastShow" })
-const EventTuiSessionSelect = Schema.Struct({
-  type: Schema.Literal(TuiEvent.SessionSelect.type),
-  properties: TuiEvent.SessionSelect.properties,
-}).annotate({ identifier: "EventTuiSessionSelect" })
-export const TuiPublishPayload = Schema.Union([
-  EventTuiPromptAppend,
-  EventTuiCommandExecute,
-  EventTuiToastShow,
-  EventTuiSessionSelect,
-])
+export { TuiPublishPayload }
 
 export const TuiPaths = {
   appendPrompt: `${root}/append-prompt`,

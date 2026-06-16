@@ -51,3 +51,30 @@ export const TuiEvent = {
     }),
   ),
 }
+
+export const PromptAppendPayload = Schema.Struct({
+  type: Schema.Literal(TuiEvent.PromptAppend.type),
+  properties: TuiEvent.PromptAppend.properties,
+}).annotate({ identifier: "PromptAppendPayload" })
+
+export const CommandExecutePayload = Schema.Struct({
+  type: Schema.Literal(TuiEvent.CommandExecute.type),
+  properties: TuiEvent.CommandExecute.properties,
+}).annotate({ identifier: "CommandExecutePayload" })
+
+export const ToastShowPayload = Schema.Struct({
+  type: Schema.Literal(TuiEvent.ToastShow.type),
+  properties: TuiEvent.ToastShow.properties,
+}).annotate({ identifier: "ToastShowPayload" })
+
+export const SessionSelectPayload = Schema.Struct({
+  type: Schema.Literal(TuiEvent.SessionSelect.type),
+  properties: TuiEvent.SessionSelect.properties,
+}).annotate({ identifier: "SessionSelectPayload" })
+
+export const TuiPublishPayload = Schema.Union([
+  PromptAppendPayload,
+  CommandExecutePayload,
+  ToastShowPayload,
+  SessionSelectPayload,
+])
