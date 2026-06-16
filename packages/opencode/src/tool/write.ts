@@ -11,7 +11,7 @@ import { FileWatcher } from "../file/watcher"
 import { Format } from "../format"
 import { AppFileSystem } from "@opencode-ai/core/filesystem"
 import { InstanceState } from "@/effect/instance-state"
-import { trimDiff } from "./edit"
+import { trimDiff } from "./edit.replacer"
 import { assertExternalDirectoryEffect } from "./external-directory"
 import * as Bom from "@/util/bom"
 
