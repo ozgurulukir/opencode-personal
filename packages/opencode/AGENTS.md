@@ -1,4 +1,8 @@
-# opencode database guide
+# opencode package guide
+
+This package follows the root [AGENTS.md](../AGENTS.md) for general repo rules (style, testing, typecheck, technologies).
+
+This file covers package-specific conventions only.
 
 ## Database
 
