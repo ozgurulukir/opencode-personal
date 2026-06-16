@@ -2,12 +2,23 @@ import path from "path"
 import { Global } from "@opencode-ai/core/global"
 import type { UsageProvider, UsageReport, UsageCredential } from "./types"
 import { claudeUsageProvider } from "./claude"
+import { zaiUsageProvider } from "./zai"
 
 export * as UsageTypes from "./types"
 export { claudeUsageProvider } from "./claude"
+export { zaiUsageProvider } from "./zai"
+export { resolveUsedFraction } from "./types"
+export type { UsageReport, UsageLimit, UsageAmount, UsageWindow, UsageProvider, UsageCredential } from "./types"
 
 /** All registered usage providers. */
-const providers: UsageProvider[] = [claudeUsageProvider]
+const providers: UsageProvider[] = [claudeUsageProvider, zaiUsageProvider]
+
+/** Maps opencode provider IDs to usage provider IDs. */
+const PROVIDER_ID_MAP: Record<string, string> = {
+  anthropic: "anthropic",
+  "zai-coding-plan": "zai",
+  zai: "zai",
+}
 
 /** Auth entry from auth.json. */
 interface AuthEntry {
@@ -18,31 +29,33 @@ interface AuthEntry {
   accountId?: string
 }
 
-/** Read auth.json and convert to UsageCredential. */
-function readAuthCredentials(): Record<string, UsageCredential> {
+/** Read auth.json and convert to UsageCredential keyed by usage provider ID. */
+function readAuthCredentials(): { providerId: string; credential: UsageCredential }[] {
   const file = path.join(Global.Path.data, "auth.json")
+  let auth: Record<string, AuthEntry>
   try {
     const data = require("fs").readFileSync(file, "utf-8")
-    const auth = JSON.parse(data) as Record<string, AuthEntry>
-    const result: Record<string, UsageCredential> = {}
-    for (const [providerId, entry] of Object.entries(auth)) {
-      if (entry.type === "oauth" && entry.access) {
-        result[providerId] = {
-          type: "oauth",
-          accessToken: entry.access,
-          accountId: entry.accountId,
-        }
-      } else if (entry.type === "api" && entry.key) {
-        result[providerId] = {
-          type: "api_key",
-          apiKey: entry.key,
-        }
-      }
-    }
-    return result
+    auth = JSON.parse(data)
   } catch {
-    return {}
+    return []
   }
+
+  const result: { providerId: string; credential: UsageCredential }[] = []
+  for (const [opencodeId, entry] of Object.entries(auth)) {
+    const usageProviderId = PROVIDER_ID_MAP[opencodeId] ?? opencodeId
+    if (entry.type === "oauth" && entry.access) {
+      result.push({
+        providerId: usageProviderId,
+        credential: { type: "oauth", accessToken: entry.access, accountId: entry.accountId },
+      })
+    } else if ((entry.type === "api" || entry.type === "wellknown") && entry.key) {
+      result.push({
+        providerId: usageProviderId,
+        credential: { type: "api_key", apiKey: entry.key },
+      })
+    }
+  }
+  return result
 }
 
 /** Fetch usage reports from all providers that support the available credentials. */
@@ -50,11 +63,10 @@ export async function fetchUsageReports(): Promise<UsageReport[]> {
   const credentials = readAuthCredentials()
   const reports: UsageReport[] = []
 
-  for (const provider of providers) {
-    for (const [providerId, credential] of Object.entries(credentials)) {
+  for (const { providerId, credential } of credentials) {
+    for (const provider of providers) {
+      if (provider.id !== providerId) continue
       if (!provider.supports(credential)) continue
-      if (provider.id !== providerId && providerId !== "anthropic") continue
-
       try {
         const report = await provider.fetchUsage(credential)
         if (report) reports.push(report)
