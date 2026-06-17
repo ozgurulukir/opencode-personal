@@ -1,4 +1,5 @@
 import { TextAttributes } from "@opentui/core"
+import { useTerminalDimensions } from "@opentui/solid"
 import { useTheme } from "../context/theme"
 import { useDialog } from "@tui/ui/dialog"
 import { useSync } from "@tui/context/sync"
@@ -28,7 +29,7 @@ function formatCost(cost: number): string {
   return `$${cost.toFixed(2)}`
 }
 
-function renderBar(fraction: number | undefined, width = 24): string {
+function renderBar(fraction: number | undefined, width = 18): string {
   if (fraction === undefined) return `[${"·".repeat(width)}]`
   const clamped = Math.min(Math.max(fraction, 0), 1)
   const filled = Math.round(clamped * width)
@@ -58,6 +59,11 @@ export function DialogUsage() {
   const { theme } = useTheme()
   const dialog = useDialog()
   const route = useRouteData("session")
+  const dimensions = useTerminalDimensions()
+
+  // The dialog host offsets content down by ~1/4 of the terminal height, so the
+  // usable height for the body is the remainder minus the header row + paddings.
+  const bodyHeight = createMemo(() => Math.max(6, dimensions().height - Math.ceil(dimensions().height / 4) - 5))
 
   const [providerReports] = createResource(async () => {
     try {
@@ -153,127 +159,139 @@ export function DialogUsage() {
         </text>
       </box>
 
-      {/* Provider Quota Reports */}
-      <Show when={providerReports() && providerReports()!.length > 0}>
-        <For each={providerReports()}>
-          {(report: UsageReport) => (
-            <box gap={0}>
-              <text fg={theme.text} attributes={TextAttributes.BOLD}>
-                {formatProviderName(report.provider)}
-              </text>
-              <For each={report.limits}>
-                {(limit: UsageLimit) => {
-                  const fraction = resolveUsedFraction(limit)
-                  const window = limit.window?.label ?? limit.scope.windowId
-                  const tier = limit.scope.tier ? ` (${limit.scope.tier})` : ""
-                  const statusColor =
-                    limit.status === "exhausted"
-                      ? theme.error
-                      : limit.status === "warning"
-                        ? theme.warning
-                        : theme.success
-                  return (
-                    <box gap={0}>
-                      <text fg={theme.text}>
-                        {limit.label}
-                        {tier}
-                        {window ? ` — ${window}` : ""}
-                      </text>
-                      <text fg={statusColor}>{renderBar(fraction)}</text>
-                      <Show when={limit.window?.resetsAt && limit.window.resetsAt > Date.now()}>
-                        <text fg={theme.textMuted}>
-                          resets in {formatDuration(limit.window!.resetsAt! - Date.now())}
-                        </text>
-                      </Show>
-                      <Show when={report.metadata?.email}>
-                        <text fg={theme.textMuted}>{String(report.metadata!.email)}</text>
-                      </Show>
-                    </box>
-                  )
-                }}
-              </For>
-            </box>
-          )}
-        </For>
-      </Show>
-
-      <Show when={!providerReports() || providerReports()!.length === 0} fallback={<text fg={theme.textMuted}>─</text>}>
-        <text fg={theme.textMuted}>No provider quota data (requires OAuth auth)</text>
-      </Show>
-
-      {/* Session Usage */}
-      <Show when={sessionStats()} fallback={<text fg={theme.textMuted}>No active session</text>}>
-        {(s) => (
-          <>
-            <text fg={theme.text} attributes={TextAttributes.BOLD}>
-              Session
-            </text>
-            <text fg={theme.text}>
-              <b>Cost:</b> {formatCost(s().totalCost)}
-              {"  "}
-              <b>Messages:</b> {s().assistantCount}
-              {"  "}
-              <b>Total Tokens:</b> {formatNumber(s().totalTokens)}
-            </text>
-
-            <box flexDirection="row" gap={2}>
-              <text fg={theme.textMuted}>Input</text>
-              <text fg={theme.text}>{formatNumber(s().totalInput)}</text>
-              <text fg={theme.textMuted}>Output</text>
-              <text fg={theme.text}>{formatNumber(s().totalOutput)}</text>
-            </box>
-            <box flexDirection="row" gap={2}>
-              <text fg={theme.textMuted}>Cache R</text>
-              <text fg={theme.text}>{formatNumber(s().totalCacheRead)}</text>
-              <text fg={theme.textMuted}>Cache W</text>
-              <text fg={theme.text}>{formatNumber(s().totalCacheWrite)}</text>
-            </box>
-            <Show when={s().totalReasoning > 0}>
-              <text fg={theme.textMuted}>Reasoning: {formatNumber(s().totalReasoning)}</text>
-            </Show>
-
-            <Show when={s().models.length > 0}>
-              <text fg={theme.text} attributes={TextAttributes.BOLD}>
-                Models
-              </text>
-              <For each={s().models}>
-                {(m: ModelBreakdown) => (
-                  <box flexDirection="row" gap={1}>
-                    <text fg={theme.text} flexShrink={0}>
-                      <b>{m.model}</b>
+      <scrollbox height={bodyHeight()} scrollbarOptions={{ visible: true }}>
+        <box flexDirection="column" gap={1}>
+          {/* Provider Quota Reports */}
+          <Show when={providerReports() && providerReports()!.length > 0}>
+            <For each={providerReports()}>
+              {(report: UsageReport) => (
+                <box gap={0}>
+                  <box flexDirection="row" justifyContent="space-between" alignItems="center">
+                    <text fg={theme.text} attributes={TextAttributes.BOLD}>
+                      {formatProviderName(report.provider)}
                     </text>
-                    <text fg={theme.textMuted}>
-                      {m.messages} msgs · {formatCost(m.cost)} · in:{formatNumber(m.tokens.input)} out:
-                      {formatNumber(m.tokens.output)}
-                    </text>
+                    <Show when={report.metadata?.email}>
+                      <text fg={theme.textMuted}>{String(report.metadata!.email)}</text>
+                    </Show>
                   </box>
-                )}
-              </For>
-            </Show>
+                  <For each={report.limits}>
+                    {(limit: UsageLimit) => {
+                      const fraction = resolveUsedFraction(limit)
+                      const window = limit.window?.label ?? limit.scope.windowId
+                      const tier = limit.scope.tier ? ` (${limit.scope.tier})` : ""
+                      const statusColor =
+                        limit.status === "exhausted"
+                          ? theme.error
+                          : limit.status === "warning"
+                            ? theme.warning
+                            : theme.success
+                      const resets =
+                        limit.window?.resetsAt && limit.window.resetsAt > Date.now()
+                          ? ` · resets in ${formatDuration(limit.window!.resetsAt! - Date.now())}`
+                          : ""
+                      return (
+                        <box flexDirection="row" justifyContent="space-between" alignItems="center">
+                          <text fg={theme.text}>
+                            {limit.label}
+                            {tier}
+                            {window ? ` — ${window}` : ""}
+                            <Show when={resets}>
+                              <span style={{ fg: theme.textMuted }}>{resets}</span>
+                            </Show>
+                          </text>
+                          <text fg={statusColor}>{renderBar(fraction)}</text>
+                        </box>
+                      )
+                    }}
+                  </For>
+                </box>
+              )}
+            </For>
+          </Show>
 
-            <Show when={s().tools.length > 0}>
-              <text fg={theme.text} attributes={TextAttributes.BOLD}>
-                Tools
-              </text>
-              <For each={s().tools.slice(0, 10)}>
-                {(t: { tool: string; count: number }) => {
-                  const maxCount = s().tools[0]?.count ?? 1
-                  const fraction = t.count / maxCount
-                  return (
-                    <box flexDirection="row" gap={1}>
-                      <text fg={theme.text} flexShrink={0} style={{ width: 20 }}>
-                        {t.tool}
-                      </text>
-                      <text fg={theme.textMuted}>{renderBar(fraction)}</text>
-                      <text fg={theme.text}>{t.count}</text>
-                    </box>
-                  )
-                }}
-              </For>
-            </Show>
-          </>
-        )}
-      </Show>
+          <Show
+            when={!providerReports() || providerReports()!.length === 0}
+            fallback={<text fg={theme.textMuted}>─</text>}
+          >
+            <text fg={theme.textMuted}>No provider quota data (requires OAuth auth)</text>
+          </Show>
+
+          {/* Session Usage */}
+          <Show when={sessionStats()} fallback={<text fg={theme.textMuted}>No active session</text>}>
+            {(s) => (
+              <box flexDirection="column" gap={0}>
+                <text fg={theme.text} attributes={TextAttributes.BOLD}>
+                  Session
+                </text>
+                <text fg={theme.text}>
+                  <b>Cost:</b> {formatCost(s().totalCost)}
+                  {"  "}
+                  <b>Messages:</b> {s().assistantCount}
+                  {"  "}
+                  <b>Total Tokens:</b> {formatNumber(s().totalTokens)}
+                </text>
+
+                <box flexDirection="row" gap={2}>
+                  <text fg={theme.textMuted}>Input</text>
+                  <text fg={theme.text}>{formatNumber(s().totalInput)}</text>
+                  <text fg={theme.textMuted}>Output</text>
+                  <text fg={theme.text}>{formatNumber(s().totalOutput)}</text>
+                </box>
+                <box flexDirection="row" gap={2}>
+                  <text fg={theme.textMuted}>Cache R</text>
+                  <text fg={theme.text}>{formatNumber(s().totalCacheRead)}</text>
+                  <text fg={theme.textMuted}>Cache W</text>
+                  <text fg={theme.text}>{formatNumber(s().totalCacheWrite)}</text>
+                  <Show when={s().totalReasoning > 0}>
+                    <text fg={theme.textMuted}>Reasoning</text>
+                    <text fg={theme.text}>{formatNumber(s().totalReasoning)}</text>
+                  </Show>
+                </box>
+
+                <Show when={s().models.length > 0}>
+                  <text fg={theme.text} attributes={TextAttributes.BOLD}>
+                    Models
+                  </text>
+                  <For each={s().models}>
+                    {(m: ModelBreakdown) => (
+                      <box flexDirection="row" gap={1}>
+                        <text fg={theme.text} flexShrink={0}>
+                          <b>{m.model}</b>
+                        </text>
+                        <text fg={theme.textMuted}>
+                          {m.messages} msgs · {formatCost(m.cost)} · in:{formatNumber(m.tokens.input)} out:
+                          {formatNumber(m.tokens.output)}
+                        </text>
+                      </box>
+                    )}
+                  </For>
+                </Show>
+
+                <Show when={s().tools.length > 0}>
+                  <text fg={theme.text} attributes={TextAttributes.BOLD}>
+                    Tools
+                  </text>
+                  <For each={s().tools.slice(0, 10)}>
+                    {(t: { tool: string; count: number }) => {
+                      const maxCount = s().tools[0]?.count ?? 1
+                      const fraction = t.count / maxCount
+                      return (
+                        <box flexDirection="row" gap={1}>
+                          <text fg={theme.text} flexShrink={0} style={{ width: 20 }}>
+                            {t.tool}
+                          </text>
+                          <text fg={theme.textMuted}>{renderBar(fraction)}</text>
+                          <text fg={theme.text}>{t.count}</text>
+                        </box>
+                      )
+                    }}
+                  </For>
+                </Show>
+              </box>
+            )}
+          </Show>
+        </box>
+      </scrollbox>
     </box>
   )
 }
