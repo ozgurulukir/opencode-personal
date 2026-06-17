@@ -9,11 +9,13 @@ import { SyncEvent } from "../sync"
 import { Database } from "@/storage/db"
 import { NotFoundError } from "@/storage/storage"
 import { and } from "drizzle-orm"
+import { asc } from "drizzle-orm"
 import { desc } from "drizzle-orm"
 import { eq } from "drizzle-orm"
 import { inArray } from "drizzle-orm"
 import { lt } from "drizzle-orm"
 import { or } from "drizzle-orm"
+import { sql } from "drizzle-orm"
 import { MessageTable, PartTable, SessionTable } from "./session.sql"
 import * as ProviderError from "@/provider/error"
 import { iife } from "@/util/iife"
@@ -1070,6 +1072,63 @@ export function parts(message_id: MessageID) {
         messageID: row.message_id,
       }) as Part,
   )
+}
+
+// Cheap existence check used by summarize's early-return (replaces reading all messages).
+export function hasMessages(sessionID: SessionID): boolean {
+  const row = Database.use((db) =>
+    db.select({ id: MessageTable.id }).from(MessageTable).where(eq(MessageTable.session_id, sessionID)).limit(1).get(),
+  )
+  return row !== undefined
+}
+
+// Session-wide diff boundaries: the first `step-start` part snapshot (immutable after
+// step 1) and the last `step-finish` part snapshot. Replaces scanning every message.
+export function boundarySnapshots(sessionID: SessionID): { from?: string; to?: string } {
+  const pick = (type: string, direction: "asc" | "desc") =>
+    Database.use((db) =>
+      db
+        .select({ snapshot: sql<string | null>`${PartTable.data}->>'$.snapshot'`.as("snapshot") })
+        .from(PartTable)
+        .where(
+          and(
+            eq(PartTable.session_id, sessionID),
+            sql`${PartTable.data}->>'$.type' = ${type}`,
+            sql`${PartTable.data}->>'$.snapshot' IS NOT NULL`,
+          ),
+        )
+        .orderBy(direction === "asc" ? asc(PartTable.id) : desc(PartTable.id))
+        .limit(1)
+        .get(),
+    )
+  const fromRow = pick("step-start", "asc")
+  const toRow = pick("step-finish", "desc")
+  return { from: fromRow?.snapshot ?? undefined, to: toRow?.snapshot ?? undefined }
+}
+
+// The target user message + its assistant children (one turn), used for per-turn diffs.
+// Replaces `messages()` (full history) + filter.
+export function messagesForSummary(input: { sessionID: SessionID; messageID: MessageID }): WithParts[] {
+  const rows = Database.use((db) =>
+    db
+      .select()
+      .from(MessageTable)
+      .where(
+        and(
+          eq(MessageTable.session_id, input.sessionID),
+          or(
+            eq(MessageTable.id, input.messageID),
+            and(
+              sql`${MessageTable.data}->>'$.role' = 'assistant'`,
+              sql`${MessageTable.data}->>'$.parentID' = ${input.messageID}`,
+            ),
+          ),
+        ),
+      )
+      .orderBy(MessageTable.time_created, MessageTable.id)
+      .all(),
+  )
+  return hydrate(rows)
 }
 
 export function get(input: { sessionID: SessionID; messageID: MessageID }): WithParts {
