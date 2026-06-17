@@ -52,6 +52,7 @@ export interface Interface {
   readonly cleanup: () => Effect.Effect<void>
   readonly track: () => Effect.Effect<string | undefined>
   readonly patch: (hash: string) => Effect.Effect<Patch>
+  readonly diffNames: (from: string, to: string) => Effect.Effect<Patch>
   readonly restore: (snapshot: string) => Effect.Effect<void>
   readonly revert: (patches: Patch[]) => Effect.Effect<void>
   readonly diff: (hash: string) => Effect.Effect<string>
@@ -343,6 +344,36 @@ export const layer: Layer.Layer<
 
               return {
                 hash,
+                files: files
+                  .filter((item) => !ignored.has(item))
+                  .map((x) => path.join(state.worktree, x).replaceAll("\\", "/")),
+              }
+            }),
+          )
+        })
+
+        // Tree-to-tree changed-file list between two snapshot hashes. Unlike `patch`,
+        // it skips the add() staging step (caller passes both hashes), so it is the
+        // cheap path for the finish-step patch where `track()` just refreshed the index.
+        const diffNames = Effect.fnUntraced(function* (from: string, to: string) {
+          return yield* locked(
+            Effect.gen(function* () {
+              const result = yield* git(
+                [...quote, ...args(["diff", "--no-ext-diff", "--name-only", "--no-renames", from, to, "--", "."])],
+                { cwd: state.worktree },
+              )
+              if (result.code !== 0) {
+                log.warn("failed to diff names", { from, to, exitCode: result.code, stderr: result.stderr })
+                return { hash: from, files: [] as string[] }
+              }
+              const files = result.text
+                .trim()
+                .split("\n")
+                .map((x) => x.trim())
+                .filter(Boolean)
+              const ignored = yield* ignore(files)
+              return {
+                hash: from,
                 files: files
                   .filter((item) => !ignored.has(item))
                   .map((x) => path.join(state.worktree, x).replaceAll("\\", "/")),
@@ -738,7 +769,7 @@ export const layer: Layer.Layer<
           Effect.forkScoped,
         )
 
-        return { cleanup, track, patch, restore, revert, diff, diffFull }
+        return { cleanup, track, patch, diffNames, restore, revert, diff, diffFull }
       }),
     )
 
@@ -754,6 +785,9 @@ export const layer: Layer.Layer<
       }),
       patch: Effect.fn("Snapshot.patch")(function* (hash: string) {
         return yield* InstanceState.useEffect(state, (s) => s.patch(hash))
+      }),
+      diffNames: Effect.fn("Snapshot.diffNames")(function* (from: string, to: string) {
+        return yield* InstanceState.useEffect(state, (s) => s.diffNames(from, to))
       }),
       restore: Effect.fn("Snapshot.restore")(function* (snapshot: string) {
         return yield* InstanceState.useEffect(state, (s) => s.restore(snapshot))
