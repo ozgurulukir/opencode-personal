@@ -531,7 +531,12 @@ export const layer: Layer.Layer<
             })
             yield* session.updateMessage(ctx.assistantMessage)
             if (ctx.snapshot) {
-              const patch = yield* snapshot.patch(ctx.snapshot)
+              // track() just refreshed the index to `completedSnapshot`, so diff the two
+              // trees directly instead of re-staging via patch() (saves an add() pass).
+              const patch =
+                completedSnapshot != null
+                  ? yield* snapshot.diffNames(ctx.snapshot, completedSnapshot)
+                  : yield* snapshot.patch(ctx.snapshot)
               if (patch.files.length) {
                 yield* session.updatePart({
                   id: PartID.ascending(),
