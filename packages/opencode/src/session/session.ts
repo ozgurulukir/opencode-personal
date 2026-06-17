@@ -480,12 +480,13 @@ export type Patch = Types.DeepMutable<SyncEvent.Event<typeof Event.Updated>["dat
 const db = <T>(fn: (d: Parameters<typeof Database.use>[0] extends (trx: infer D) => any ? D : never) => T) =>
   Effect.sync(() => Database.use(fn))
 
-export const layer: Layer.Layer<Service, never, Bus.Service | Storage.Service | SyncEvent.Service> = Layer.effect(
+export const layer: Layer.Layer<Service, never, Bus.Service | Storage.Service | SyncEvent.Service | Snapshot.Service> = Layer.effect(
   Service,
   Effect.gen(function* () {
     const bus = yield* Bus.Service
     const storage = yield* Storage.Service
     const sync = yield* SyncEvent.Service
+    const snapshot = yield* Snapshot.Service
 
     const createNext = Effect.fn("Session.createNext")(function* (input: {
       id?: SessionID
@@ -725,7 +726,21 @@ export const layer: Layer.Layer<Service, never, Bus.Service | Storage.Service | 
     const diff = Effect.fn("Session.diff")(function* (sessionID: SessionID) {
       return yield* storage
         .read<Snapshot.FileDiff[]>(["session_diff", sessionID])
-        .pipe(Effect.orElseSucceed((): Snapshot.FileDiff[] => []))
+        .pipe(
+          // Cache miss (e.g. a freshly created session whose `summarize` has not
+          // run yet): recompute the diff from the session's snapshot boundaries
+          // and backfill the cache so subsequent reads are free. Without this,
+          // the "Modified Files" sidebar renders empty until the next summarize.
+          Effect.catch(() =>
+            Effect.gen(function* () {
+              const { from, to } = MessageV2.boundarySnapshots(sessionID)
+              if (!from || !to) return [] as Snapshot.FileDiff[]
+              const diffs = yield* snapshot.diffFull(from, to)
+              yield* storage.write(["session_diff", sessionID], diffs).pipe(Effect.ignore)
+              return diffs
+            }),
+          ),
+        )
     })
 
     const messages = Effect.fn("Session.messages")(function* (input: { sessionID: SessionID; limit?: number }) {
@@ -811,6 +826,7 @@ export const defaultLayer = layer.pipe(
   Layer.provide(Bus.layer),
   Layer.provide(Storage.defaultLayer),
   Layer.provide(SyncEvent.defaultLayer),
+  Layer.provide(Snapshot.defaultLayer),
 )
 
 function* listByProject(
