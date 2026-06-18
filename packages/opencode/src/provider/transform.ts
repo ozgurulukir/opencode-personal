@@ -4,6 +4,7 @@ import type { JSONSchema7 } from "@ai-sdk/provider"
 import type { JSONSchema } from "zod/v4/core"
 import type * as Provider from "./provider"
 import type * as ModelsDev from "./models"
+import type * as Auth from "@/auth"
 import { iife } from "@/util/iife"
 import { Flag } from "@opencode-ai/core/flag/flag"
 
@@ -21,6 +22,12 @@ export const OUTPUT_TOKEN_MAX = Flag.OPENCODE_EXPERIMENTAL_OUTPUT_TOKEN_MAX || 3
 
 export function sanitizeSurrogates(content: string) {
   return content.replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, "\uFFFD")
+}
+
+// OpenAI OAuth doesn't support `system` role messages — system prompt
+// must be passed via `instructions` in providerOptions instead.
+export function shouldUseInstructions(providerID: string, authInfo: Auth.Info | undefined): boolean {
+  return providerID === "openai" && authInfo?.type === "oauth"
 }
 
 // Maps npm package to the key the AI SDK expects for providerOptions
