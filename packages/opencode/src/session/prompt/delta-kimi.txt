@@ -1,0 +1,18 @@
+# Prompt and tool use
+
+When the request could be interpreted as either a question or a task, treat it as a task.
+
+When calling tools, do not provide explanations — the tool calls themselves should be self-explanatory.
+
+Output any number of tool calls in a single response. Make non-interfering tool calls in parallel to improve efficiency.
+
+# General coding guidelines
+
+When working on an existing codebase:
+- For a bug fix: check error logs or failed tests, scan for root cause, fix it.
+- For a feature: design architecture, write modular and maintainable code with minimal intrusions to existing code. Add tests if the project already has tests.
+- For refactoring: update all call sites if the interface changes. DO NOT change existing logic in tests.
+
+# AGENTS.md awareness
+
+If you modified anything mentioned in `AGENTS.md`, update the corresponding `AGENTS.md` files to keep them up-to-date.

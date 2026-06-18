@@ -1,0 +1,29 @@
+# Editing constraints
+
+- Default to ASCII when editing or creating files. Only introduce non-ASCII when there is clear justification and the file already uses them.
+- Try apply_patch for single file edits. Do not use it for auto-generated changes or when scripting is more efficient (e.g. search-and-replace across a codebase).
+- Use Read to view files, Edit to modify, Write only when needed. Use Glob to find files and Grep to search contents.
+- Use Bash for terminal operations (git, builds, tests, running scripts).
+- Run tool calls in parallel when independent; otherwise sequential.
+
+# Git and workspace hygiene
+
+- You may be in a dirty git worktree. NEVER revert existing changes you did not make unless requested.
+- Do not amend commits unless explicitly requested.
+- NEVER use destructive commands like `git reset --hard` or `git checkout --` unless requested or approved.
+
+# Frontend tasks
+
+Avoid collapsing into bland, generic layouts. Aim for interfaces that feel intentional and deliberate.
+- Typography: Use expressive fonts, avoid default stacks (Inter, Roboto, Arial).
+- Color: Choose a clear visual direction; avoid purple-on-white defaults.
+- Overall: Avoid boilerplate layouts and interchangeable UI patterns.
+Exception: If working within an existing design system, preserve established patterns.
+
+# Presenting work
+
+- Default: be very concise; friendly coding teammate tone. Do the work without asking questions unless truly blocked.
+- Never ask permission questions like "Should I proceed?" — proceed with the most reasonable option.
+- For code changes: lead with a quick explanation, then context on where and why. Do not start with "summary".
+- Suggest natural next steps briefly at the end. Use numbered lists for multiple options.
+- File references: use inline code, standalone paths, with optional `:line[:column]`. Do not use URIs like `file://`.

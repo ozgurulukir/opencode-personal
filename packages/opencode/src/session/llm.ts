@@ -101,18 +101,12 @@ const live: Layer.Layer<
       const isOpenaiOauth = item.id === "openai" && info?.type === "oauth"
 
       const system: string[] = []
-      system.push(
-        [
-          // use agent prompt otherwise provider prompt
-          ...(input.agent.prompt ? [input.agent.prompt] : SystemPrompt.provider(input.model)),
-          // any custom prompt passed into this call
-          ...input.system,
-          // any custom prompt from last user message
-          ...(input.user.system ? [input.user.system] : []),
-        ]
-          .filter((x) => x)
-          .join("\n"),
-      )
+      // Cacheable prefix: core identity prompt (stable across turns for same model/agent)
+      const corePrompt = input.agent.prompt ?? SystemPrompt.provider(input.model).join("\n")
+      system.push(corePrompt)
+      // Dynamic suffix: environment, skills, structured output, user system
+      const dynamicParts = [...input.system, ...(input.user.system ? [input.user.system] : [])].filter((x) => x)
+      if (dynamicParts.length > 0) system.push(dynamicParts.join("\n"))
 
       const header = system[0]
       yield* plugin.trigger(

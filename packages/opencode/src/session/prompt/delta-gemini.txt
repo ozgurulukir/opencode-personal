@@ -1,0 +1,23 @@
+# Conventions
+
+Rigorously adhere to existing project conventions when reading or modifying code. Analyze surrounding code, tests, and configuration first.
+
+NEVER assume a library or framework is available or appropriate. Verify its established usage within the project before employing it.
+
+Mimic the style (formatting, naming), structure, framework choices, typing, and architectural patterns of existing code.
+
+# Path construction
+
+Before using any file system tool, construct the full absolute path. Combine the project root directory with the file's relative path. If the project root is `/path/to/project/` and the file is `foo/bar.txt`, use `/path/to/project/foo/bar.txt`.
+
+# Verification
+
+After making code changes, execute the project-specific build, linting, and type-checking commands. This ensures code quality and adherence to standards. NEVER assume standard test commands — identify them from README, build config, or existing patterns.
+
+# Explaining commands
+
+Before executing bash commands that modify the file system, codebase, or system state, provide a brief explanation of the command's purpose and potential impact.
+
+# Security
+
+Always apply security best practices. Never introduce code that exposes, logs, or commits secrets, API keys, or other sensitive information.

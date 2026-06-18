@@ -273,7 +273,7 @@ export const layer = Layer.effect(
           messageID: userMessage.info.id,
           sessionID: userMessage.info.sessionID,
           type: "text",
-          text: `${BUILD_SWITCH}\n\nA plan file exists at ${plan}. You should execute on the plan defined within it`,
+          text: `${BUILD_SWITCH}\n<system-reminder>\nA plan file exists at ${plan}. You should execute on the plan defined within it\n</system-reminder>`,
           synthetic: true,
         })
         userMessage.parts.push(part)
@@ -1583,7 +1583,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
               instruction.system().pipe(Effect.orDie),
               MessageV2.toModelMessagesEffect(msgs, model),
             ])
-            const system = [...env, ...instructions, ...(skills ? [skills] : [])]
+            const system = [...env, ...(skills ? [skills] : [])]
             const format = lastUser.format ?? { type: "text" as const }
             if (format.type === "json_schema") system.push(STRUCTURED_OUTPUT_SYSTEM_PROMPT)
             const result = yield* handle.process({
@@ -1593,7 +1593,11 @@ NOTE: At any point in time through this workflow you should feel free to ask the
               sessionID,
               parentSessionID: session.parentID,
               system,
-              messages: [...modelMsgs, ...(isLastStep ? [{ role: "assistant" as const, content: MAX_STEPS }] : [])],
+              messages: [
+                ...(instructions.length > 0 ? [{ role: "user" as const, content: instructions.join("\n\n") }] : []),
+                ...modelMsgs,
+                ...(isLastStep ? [{ role: "assistant" as const, content: MAX_STEPS }] : []),
+              ],
               tools,
               model,
               toolChoice: format.type === "json_schema" ? "required" : undefined,
