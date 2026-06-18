@@ -1,4 +1,5 @@
 import { Npm } from "@opencode-ai/core/npm"
+import path from "path"
 import type { InstanceContext } from "../project/instance"
 import { Filesystem } from "@/util/filesystem"
 import { Process } from "@/util/process"
@@ -75,6 +76,12 @@ export const prettier: Info = {
         devDependencies?: Record<string, string>
       }>(item)
       if (json.dependencies?.prettier || json.devDependencies?.prettier) {
+        // Prefer the repo's own prettier binary: it matches the project's
+        // pinned version and config. Falling back to the opencode global cache
+        // (Npm.which, which installs latest) produces large format-only diffs
+        // when the repo pins an older prettier (e.g. repo 3.6.2 vs cache 3.8.3).
+        const localBin = path.join(path.dirname(item), "node_modules", ".bin", "prettier")
+        if (await Filesystem.exists(localBin)) return [localBin, "--write", "$FILE"]
         const bin = await Npm.which("prettier")
         if (bin) return [bin, "--write", "$FILE"]
       }
@@ -98,6 +105,10 @@ export const oxfmt: Info = {
         devDependencies?: Record<string, string>
       }>(item)
       if (json.dependencies?.oxfmt || json.devDependencies?.oxfmt) {
+        // Prefer the repo's own oxfmt binary (matches pinned version); fall back
+        // to the opencode global cache only if not installed locally.
+        const localBin = path.join(path.dirname(item), "node_modules", ".bin", "oxfmt")
+        if (await Filesystem.exists(localBin)) return [localBin, "$FILE"]
         const bin = await Npm.which("oxfmt")
         if (bin) return [bin, "$FILE"]
       }
@@ -144,6 +155,10 @@ export const biome: Info = {
     for (const config of configs) {
       const found = await Filesystem.findUp(config, context.directory, context.worktree)
       if (found.length > 0) {
+        // Prefer the repo's own biome binary (matches pinned version); fall back
+        // to the opencode global cache only if not installed locally.
+        const localBin = path.join(path.dirname(found[0]), "node_modules", ".bin", "biome")
+        if (await Filesystem.exists(localBin)) return [localBin, "format", "--write", "$FILE"]
         const bin = await Npm.which("@biomejs/biome")
         if (bin) return [bin, "format", "--write", "$FILE"]
       }

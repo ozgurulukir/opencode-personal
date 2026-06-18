@@ -269,4 +269,31 @@ describe("Format", () => {
       },
     ),
   )
+
+  // Regression: edit tool's format-on-edit produced large format-only diffs
+  // because prettier.enabled resolved the binary via Npm.which (opencode global
+  // cache, latest version) instead of the repo's pinned local node_modules.
+  // With repo 3.6.2 vs cache 3.8.3 this rewrote ~half the file on every edit.
+  it.live("prettier.enabled prefers repo-local node_modules binary", () =>
+    provideTmpdirInstance((dir) =>
+      Effect.gen(function* () {
+        yield* Effect.promise(() =>
+          Bun.write(`${dir}/package.json`, JSON.stringify({ devDependencies: { prettier: "3.6.2" } })),
+        )
+        yield* Effect.promise(async () => {
+          const fs = await import("fs/promises")
+          await fs.mkdir(`${dir}/node_modules/.bin`, { recursive: true })
+          // Fake executable; enabled() only checks existence, does not run it.
+          await fs.writeFile(`${dir}/node_modules/.bin/prettier`, "#!/bin/sh\n")
+        })
+
+        const cmd = yield* Effect.promise(() => Formatter.prettier.enabled({ directory: dir, worktree: dir }))
+        expect(cmd).not.toBe(false)
+        const [bin] = cmd as string[]
+        // Must resolve to the repo-local binary, not the opencode global cache.
+        expect(bin).toContain("node_modules/.bin/prettier")
+        expect(bin.startsWith(dir)).toBe(true)
+      }),
+    ),
+  )
 })
