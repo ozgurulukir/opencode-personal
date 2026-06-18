@@ -1,0 +1,3 @@
+# Default delta
+
+No provider-specific adjustments. The core prompt provides all necessary guidance.

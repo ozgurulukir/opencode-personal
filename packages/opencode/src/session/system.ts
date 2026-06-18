@@ -2,34 +2,37 @@ import { Context, Effect, Layer } from "effect"
 
 import { InstanceState } from "@/effect/instance-state"
 
-import PROMPT_ANTHROPIC from "./prompt/anthropic.txt"
-import PROMPT_DEFAULT from "./prompt/default.txt"
-import PROMPT_BEAST from "./prompt/beast.txt"
-import PROMPT_GEMINI from "./prompt/gemini.txt"
-import PROMPT_GPT from "./prompt/gpt.txt"
-import PROMPT_KIMI from "./prompt/kimi.txt"
-
-import PROMPT_CODEX from "./prompt/codex.txt"
-import PROMPT_TRINITY from "./prompt/trinity.txt"
+import PROMPT_CORE from "./prompt/core.txt"
+import PROMPT_DELTA_ANTHROPIC from "./prompt/delta-anthropic.txt"
+import PROMPT_DELTA_BEAST from "./prompt/delta-beast.txt"
+import PROMPT_DELTA_CODEX from "./prompt/delta-codex.txt"
+import PROMPT_DELTA_DEFAULT from "./prompt/delta-default.txt"
+import PROMPT_DELTA_GEMINI from "./prompt/delta-gemini.txt"
+import PROMPT_DELTA_GPT from "./prompt/delta-gpt.txt"
+import PROMPT_DELTA_KIMI from "./prompt/delta-kimi.txt"
+import PROMPT_DELTA_TRINITY from "./prompt/delta-trinity.txt"
 import type { Provider } from "@/provider/provider"
 import type { Agent } from "@/agent/agent"
 import { Permission } from "@/permission"
 import { Skill } from "@/skill"
 
-export function provider(model: Provider.Model) {
-  if (model.api.id.includes("gpt-4") || model.api.id.includes("o1") || model.api.id.includes("o3"))
-    return [PROMPT_BEAST]
-  if (model.api.id.includes("gpt")) {
-    if (model.api.id.includes("codex")) {
-      return [PROMPT_CODEX]
-    }
-    return [PROMPT_GPT]
+export function provider(model: Provider.Model): string[] {
+  const delta = matchDelta(model)
+  return [PROMPT_CORE, delta]
+}
+
+function matchDelta(model: Provider.Model): string {
+  const id = model.api.id
+  if (id.includes("gpt-4") || id.includes("o1") || id.includes("o3")) return PROMPT_DELTA_BEAST
+  if (id.includes("gpt")) {
+    if (id.includes("codex")) return PROMPT_DELTA_CODEX
+    return PROMPT_DELTA_GPT
   }
-  if (model.api.id.includes("gemini-")) return [PROMPT_GEMINI]
-  if (model.api.id.includes("claude")) return [PROMPT_ANTHROPIC]
-  if (model.api.id.toLowerCase().includes("trinity")) return [PROMPT_TRINITY]
-  if (model.api.id.toLowerCase().includes("kimi")) return [PROMPT_KIMI]
-  return [PROMPT_DEFAULT]
+  if (id.includes("gemini-")) return PROMPT_DELTA_GEMINI
+  if (id.includes("claude")) return PROMPT_DELTA_ANTHROPIC
+  if (id.toLowerCase().includes("trinity")) return PROMPT_DELTA_TRINITY
+  if (id.toLowerCase().includes("kimi")) return PROMPT_DELTA_KIMI
+  return PROMPT_DELTA_DEFAULT
 }
 
 export interface Interface {
@@ -50,14 +53,13 @@ export const layer = Layer.effect(
         return [
           [
             `You are powered by the model named ${model.api.id}. The exact model ID is ${model.providerID}/${model.api.id}`,
-            `Here is some useful information about the environment you are running in:`,
-            `<env>`,
+            `<environment>`,
             `  Working directory: ${ctx.directory}`,
             `  Workspace root folder: ${ctx.worktree}`,
             `  Is directory a git repo: ${ctx.project.vcs === "git" ? "yes" : "no"}`,
             `  Platform: ${process.platform}`,
             `  Today's date: ${new Date().toDateString()}`,
-            `</env>`,
+            `</environment>`,
           ].join("\n"),
         ]
       }),
@@ -68,11 +70,13 @@ export const layer = Layer.effect(
         const list = yield* skill.available(agent)
 
         return [
+          "<skills>",
           "Skills provide specialized instructions and workflows for specific tasks.",
           "Use the skill tool to load a skill when a task matches its description.",
           // the agents seem to ingest the information about skills a bit better if we present a more verbose
           // version of them here and a less verbose version in tool description, rather than vice versa.
           Skill.fmt(list, { verbose: true }),
+          "</skills>",
         ].join("\n")
       }),
     })
