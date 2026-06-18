@@ -4,6 +4,42 @@ This package follows the root [AGENTS.md](../AGENTS.md) for general repo rules (
 
 This file covers package-specific conventions only.
 
+## Prompt architecture
+
+System prompt uses a **shared core + provider delta** structure:
+
+- `session/prompt/core.txt` — universal identity, tone, task workflow, conventions, code style, system tags, instruction priority (69 lines)
+- `session/prompt/delta-*.txt` — provider-specific additions only (anthropic, beast, codex, default, gemini, gpt, kimi, trinity)
+- `session/system.ts:provider(model)` returns `[PROMPT_CORE, delta]`; `matchDelta(model)` selects the delta by model API ID
+
+**Assembly flow** (`session/llm.ts:103-128`):
+
+1. `system[0]` = core + delta (cacheable prefix, stable across turns for same model)
+2. `system[1]` = environment + skills (dynamic suffix, session-specific)
+3. Plugin transform hook may add entries; rejoin logic collapses back to 2-part structure if needed
+
+**AGENTS.md injection** (`session/prompt.ts:1580-1604`):
+
+- `instruction.system()` reads AGENTS.md/CLAUDE.md/CONTEXT.md from disk on every `runLoop` iteration (no caching)
+- Content is wrapped in `<instructions source="path">` tags and prepended as a **user message** (not system prompt)
+- Follows Claude Code / Codex CLI Instruction Hierarchy pattern: system prompt (priority 0) > AGENTS.md (priority 10)
+- AGENTS.md cannot override core safety rules
+
+**XML section markers** (consistent semantics, do not mix):
+
+- `<environment>` — runtime context (working dir, platform, date)
+- `<skills>` — available skills catalog (verbose in system prompt, brief in skill tool description)
+- `<instructions source="...">` — persistent project rules (AGENTS.md, CLAUDE.md)
+- `<system-reminder>` — transient status notifications (plan mode, build switch, max steps)
+
+**Conditional prompts** (injected into user/assistant messages, not system):
+
+- `plan.txt` — read-only plan mode reminder (`<system-reminder>` wrapped, user message)
+- `build-switch.txt` — plan-to-build transition (`<system-reminder>` wrapped, user message)
+- `max-steps.txt` — tool disable on step limit (raw text, assistant message)
+
+**Compaction**: AGENTS.md is never affected by compaction — it is re-read from disk and re-injected on every LLM API call. Only stored DB messages (actual user prompts and assistant replies) are compacted.
+
 ## Database
 
 - **Schema**: Drizzle schema lives in `src/**/*.sql.ts`.
