@@ -3686,3 +3686,25 @@ describe("ProviderTransform.providerOptions - ai-gateway-provider", () => {
     expect(result).toEqual({ openaiCompatible: { reasoningEffort: "high" } })
   })
 })
+
+describe("ProviderTransform.shouldUseInstructions", () => {
+  test("returns true for openai with oauth auth", () => {
+    expect(ProviderTransform.shouldUseInstructions("openai", { type: "oauth" } as any)).toBe(true)
+  })
+
+  test("returns false for openai with api auth", () => {
+    expect(ProviderTransform.shouldUseInstructions("openai", { type: "api" } as any)).toBe(false)
+  })
+
+  test("returns false for openai with no auth info", () => {
+    expect(ProviderTransform.shouldUseInstructions("openai", undefined)).toBe(false)
+  })
+
+  test("returns false for non-openai provider with oauth", () => {
+    expect(ProviderTransform.shouldUseInstructions("anthropic", { type: "oauth" } as any)).toBe(false)
+  })
+
+  test("returns false for non-openai provider with no auth", () => {
+    expect(ProviderTransform.shouldUseInstructions("anthropic", undefined)).toBe(false)
+  })
+})

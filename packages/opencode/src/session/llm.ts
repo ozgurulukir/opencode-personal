@@ -97,8 +97,7 @@ const live: Layer.Layer<
         { concurrency: "unbounded" },
       )
 
-      // TODO: move this to a proper hook
-      const isOpenaiOauth = item.id === "openai" && info?.type === "oauth"
+      const isOpenaiOauth = ProviderTransform.shouldUseInstructions(item.id, info)
 
       const system: string[] = []
       // Cacheable prefix: core identity prompt (stable across turns for same model/agent)

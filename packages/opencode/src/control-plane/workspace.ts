@@ -145,7 +145,6 @@ type SessionWarpError =
   | Vcs.PatchApplyError
   | HttpClientError.HttpClientError
 type WaitForSyncError = SyncTimeoutError | SyncAbortedError
-type SyncLoopError = SyncHttpError | HttpClientError.HttpClientError
 
 export interface Interface {
   readonly create: (input: CreateInput) => Effect.Effect<Info, CreateError>
@@ -176,7 +175,7 @@ export const layer = Layer.effect(
     const sync = yield* SyncEvent.Service
     const vcs = yield* Vcs.Service
     const connections = new Map<WorkspaceID, ConnectionStatus>()
-    const syncFibers = yield* FiberMap.make<WorkspaceID, void, SyncLoopError>()
+    const syncFibers = yield* FiberMap.make<WorkspaceID, void>()
 
     const setStatus = (id: WorkspaceID, status: ConnectionStatus["status"]) => {
       const prev = connections.get(id)
@@ -512,10 +511,8 @@ export const layer = Layer.effect(
       yield* FiberMap.run(
         syncFibers,
         space.id,
-        // TODO: look into `tapError` to set the status but still
-        // allow the fiber to fail and automatically get removed
         syncWorkspaceLoop(space).pipe(
-          Effect.catch((error) =>
+          Effect.tapError((error) =>
             Effect.sync(() => {
               setStatus(space.id, "error")
               log.warn("workspace listener failed", {
