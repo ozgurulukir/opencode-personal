@@ -138,6 +138,10 @@ const table = sqliteTable("session", {
 - Before splitting a god function, extract small single-responsibility modules first (e.g., cost, billing, auth, model validation) to reduce risk. `packages/console/app/src/routes/zen/util/handler.ts` went from 1132 to 468 lines via 9 extractions in `zen/util/`: cost.ts (65 lines), billing.ts (185 lines), usage.ts (207 lines), auth.ts (122 lines), provider-selector.ts (88 lines), model.ts (33 lines), reload.ts (39 lines), validation.ts (16 lines), http.ts (13 lines). Remaining nested functions: `authenticate`, `selectProvider`, `validateModelSettings`, `trackUsage`, `retriableRequest`.
 - Drizzle ORM type mismatches (e.g., `UserTable.userID`, `WorkspaceTable.workspaceID`) often require runtime `any` casts during extraction. Accept them as necessary boundary violations, not technical debt to immediately resolve.
 - Avoid sed for code extraction; prefer manual refactor or structural search tools (ast-grep) to prevent stray syntax artifacts.
+- System prompts use a shared core (`session/prompt/core.txt`) plus provider-specific deltas (`session/prompt/delta-*.txt`). Do not duplicate universal rules across deltas — put them in core.txt. Provider deltas contain only provider-specific guidance (TodoWrite emphasis for Claude, apply_patch for GPT, autonomous mode for GPT-4/o1/o3, etc.). Provider matching is in `system.ts:matchDelta()`.
+- AGENTS.md is injected as a **user message** (not system prompt) per the Instruction Hierarchy pattern (Claude Code / Codex CLI). It is re-read from disk on every LLM API call inside `runLoop` — no caching, so edits take effect immediately. See `session/prompt.ts:1580-1604` for the injection point.
+- System prompt assembly: `llm.ts:103-112` splits into cacheable prefix (`system[0]` = core + delta) and dynamic suffix (`system[1]` = environment + skills). The plugin transform hook and rejoin logic at `llm.ts:117-128` maintain the 2-part structure for prompt caching.
+- XML section markers are used consistently: `<environment>`, `<skills>` in system prompt; `<instructions source="...">` for AGENTS.md/CLAUDE.md; `<system-reminder>` for transient status (plan mode, build switch, max steps). Do not mix these tag semantics.
 
 ## Known Issues
 
@@ -145,7 +149,7 @@ const table = sqliteTable("session", {
 - `packages/console/app/src/routes/zen/util/billing.ts`, `reload.ts`, `usage.ts` require SST cloud resources (`ZEN_LITE_PRICE`, `ZEN_BLACK_PRICE`) — tests blocked in local environment without `sst dev`
 - Typecheck in `packages/web` requires `--skipLibCheck` due to astro/starlight type errors
 - Root `test` script always fails: `echo 'do not run tests from root' && exit 1`
-- `packages/opencode/src/session/prompt.ts:1421` — `runLoop` is a 510-line Effect-based infinite loop; future extraction target
+- `packages/opencode/src/session/prompt.ts:1422` — `runLoop` is a 510-line Effect-based infinite loop; future extraction target
 - Remaining `as any` casts (6 total) are in library internals: `packages/core/src/effect-zod.ts` (3, accessing Effect Schema annotations), `packages/slack/src/index.ts` (1, Slack message shape), `packages/opencode/src/plugin/index.ts` (1, plugin hook typing), `packages/desktop/src/main/index.ts` (1, Electron HTTP proxy), plus test files accessing Effect internals
 
 ## Notes
@@ -157,3 +161,5 @@ const table = sqliteTable("session", {
 - Provider files had 213 redundant `as any` casts removed in commit d82e6af by adding index signatures to `CommonRequest`/`CommonResponse` interfaces
 - Error handling: use `safeCatch` from `packages/opencode/src/util/error.ts` for promise error wrapping instead of manual try/catch; it logs context automatically
 - Message continuation: extracted 16-line `wrapMessageContinuation` to `packages/opencode/src/session/message-continuation.ts` — pure function mutating message parts in-place; operate on message array copy before calling
+- Provider usage feature: `packages/opencode/src/provider/usage/` contains types.ts (interfaces), claude.ts (Anthropic OAuth fetcher), zai.ts (ZAI API key fetcher), registry.ts (auth.json reader + dispatcher). `/usage` TUI dialog at `cli/cmd/tui/component/dialog-usage.tsx`.
+- Double compaction fix: overflow guard now checks `compaction_continue` metadata to prevent `Event.Compacted` double-fire (`session/prompt.ts:1501`)
