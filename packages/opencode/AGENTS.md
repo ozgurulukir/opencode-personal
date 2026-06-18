@@ -12,7 +12,7 @@ System prompt uses a **shared core + provider delta** structure:
 - `session/prompt/delta-*.txt` — provider-specific additions only (anthropic, beast, codex, default, gemini, gpt, kimi, trinity)
 - `session/system.ts:provider(model)` returns `[PROMPT_CORE, delta]`; `matchDelta(model)` selects the delta by model API ID
 
-**Assembly flow** (`session/llm.ts:103-128`):
+**Assembly flow** (`session/llm.ts:102-121`):
 
 1. `system[0]` = core + delta (cacheable prefix, stable across turns for same model)
 2. `system[1]` = environment + skills (dynamic suffix, session-specific)
@@ -175,6 +175,7 @@ See `specs/effect/migration.md` for the compact pattern reference and examples.
 ## Effect v4 beta API
 
 - `Effect.fork` and `Effect.forkDaemon` do not exist. Use `Effect.forkIn(scope)` to fork a fiber into a specific scope.
+- For fiber error handling in `FiberMap`, use `Effect.tapError` (observe + propagate) instead of `Effect.catch` (swallow). The error propagates, the fiber fails, and FiberMap auto-removes it. See `control-plane/workspace.ts:512`.
 
 ## Preferred Effect services
 

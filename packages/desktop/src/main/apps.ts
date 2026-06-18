@@ -27,10 +27,12 @@ export function wslPath(path: string, mode: "windows" | "linux" | null): string 
   const flag = mode === "windows" ? "-w" : "-u"
   try {
     if (path.startsWith("~")) {
-      const suffix = path.slice(1)
-      const cmd = `wslpath ${flag} "$HOME${suffix.replace(/"/g, '\\"')}"`
-      const output = execFileSync("wsl", ["-e", "sh", "-lc", cmd])
-      return output.toString().trim()
+      // Resolve $HOME separately (no user input), then pass the full path
+      // as an execFileSync argument to avoid shell injection via ~$(cmd)
+      const home = execFileSync("wsl", ["-e", "sh", "-lc", 'printf %s "$HOME"']).toString().trim()
+      return execFileSync("wsl", ["-e", "wslpath", flag, home + path.slice(1)])
+        .toString()
+        .trim()
     }
 
     const output = execFileSync("wsl", ["-e", "wslpath", flag, path])

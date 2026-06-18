@@ -1,8 +1,16 @@
 import { Message, Model, Part, Session, SnapshotFileDiff } from "@opencode-ai/sdk/v2"
 import { fn } from "@opencode-ai/core/util/fn"
 import { iife } from "@opencode-ai/core/util/iife"
+import { timingSafeEqual } from "node:crypto"
 import z from "zod"
 import { Storage } from "./storage"
+
+function constantTimeEqual(a: string, b: string): boolean {
+  const bufA = Buffer.from(a)
+  const bufB = Buffer.from(b)
+  if (bufA.length !== bufB.length) return false
+  return timingSafeEqual(bufA, bufB)
+}
 
 export namespace Share {
   export const Info = z.object({
@@ -131,7 +139,7 @@ export namespace Share {
   export const remove = fn(Info.pick({ id: true, secret: true }), async (body) => {
     const share = await get(body.id)
     if (!share) throw new Errors.NotFound(body.id)
-    if (share.secret !== body.secret) throw new Errors.InvalidSecret(body.id)
+    if (!constantTimeEqual(share.secret, body.secret)) throw new Errors.InvalidSecret(body.id)
     await Storage.remove(["share", body.id])
     const groups = await Promise.all([
       Storage.list({ prefix: ["share_snapshot", body.id] }),
@@ -152,7 +160,7 @@ export namespace Share {
     async (input) => {
       const share = await get(input.share.id)
       if (!share) throw new Errors.NotFound(input.share.id)
-      if (share.secret !== input.share.secret) throw new Errors.InvalidSecret(input.share.id)
+      if (!constantTimeEqual(share.secret, input.share.secret)) throw new Errors.InvalidSecret(input.share.id)
       const data = (await readSnapshot(input.share.id)) ?? (await legacy(input.share.id))
       await writeSnapshot(input.share.id, merge(data, input.data))
     },
@@ -170,7 +178,7 @@ export namespace Share {
     async (input) => {
       const share = await get(input.share.id)
       if (!share) throw new Errors.NotFound(input.share.id)
-      if (share.secret !== input.share.secret) throw new Errors.InvalidSecret(input.share.id)
+      if (!constantTimeEqual(share.secret, input.share.secret)) throw new Errors.InvalidSecret(input.share.id)
       const promises = []
       for (const item of input.data) {
         promises.push(
