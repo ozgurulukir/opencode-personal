@@ -211,6 +211,45 @@ Always structure your responses using clear markdown formatting:
   })
 })
 
+describe("ConfigMarkdown: FrontmatterError", () => {
+  test("FrontmatterError has correct shape", () => {
+    const err = new ConfigMarkdown.FrontmatterError({
+      path: "/some/file.md",
+      message: "Failed to parse YAML frontmatter: test error",
+    })
+    expect(err.constructor.name).toBe("ConfigFrontmatterError")
+    expect(err.data.path).toBe("/some/file.md")
+    expect(err.data.message).toContain("Failed to parse YAML frontmatter")
+  })
+
+  test("fallbackSanitization handles values with colons", () => {
+    const input = `---
+url: https://example.com:8080/path
+name: John: Smith
+---
+body`
+    const result = ConfigMarkdown.fallbackSanitization(input)
+    expect(result).toContain("|-")
+    expect(result).toContain("https://example.com:8080/path")
+    expect(result).toContain("John: Smith")
+  })
+
+  test("fallbackSanitization preserves quoted and empty values", () => {
+    const input = `---
+quoted: "has: colons"
+empty_val:
+single: 'also: colons'
+block: >
+---
+body`
+    const result = ConfigMarkdown.fallbackSanitization(input)
+    expect(result).toContain(`quoted: "has: colons"`)
+    expect(result).toContain("empty_val:")
+    expect(result).toContain(`single: 'also: colons'`)
+    expect(result).toContain("block: >")
+  })
+})
+
 describe("ConfigMarkdown: frontmatter has weird model id", async () => {
   const result = await ConfigMarkdown.parse(import.meta.dir + "/fixtures/weird-model-id.md")
 

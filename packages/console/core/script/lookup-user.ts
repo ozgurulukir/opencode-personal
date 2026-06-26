@@ -1,4 +1,4 @@
-import { Database, and, eq, sql } from "../src/drizzle/index.js"
+import { Database, and, eq, inArray, sql } from "../src/drizzle/index.js"
 import { AuthTable } from "../src/schema/auth.sql.js"
 import { UserTable } from "../src/schema/user.sql.js"
 import {
@@ -101,19 +101,35 @@ else {
       ),
   )
 
-  for (const user of users) {
-    await printWorkspace(user.workspaceID)
-  }
-}
-
-async function printWorkspace(workspaceID: string) {
-  const workspace = await Database.use((tx) =>
+  const workspaces = await Database.use((tx) =>
     tx
       .select()
       .from(WorkspaceTable)
-      .where(eq(WorkspaceTable.id, workspaceID))
-      .then((rows) => rows[0]),
+      .where(
+        inArray(
+          WorkspaceTable.id,
+          users.map((u) => u.workspaceID),
+        ),
+      ),
   )
+  const workspaceMap = new Map(workspaces.map((w) => [w.id, w]))
+
+  for (const user of users) {
+    const workspace = workspaceMap.get(user.workspaceID)
+    if (workspace) await printWorkspace(user.workspaceID, workspace)
+  }
+}
+
+async function printWorkspace(workspaceID: string, prefetched?: typeof WorkspaceTable.$inferSelect) {
+  const workspace =
+    prefetched ??
+    (await Database.use((tx) =>
+      tx
+        .select()
+        .from(WorkspaceTable)
+        .where(eq(WorkspaceTable.id, workspaceID))
+        .then((rows) => rows[0]),
+    ))
 
   printHeader(`Workspace "${workspace.name}" (${workspace.id})`)
 
