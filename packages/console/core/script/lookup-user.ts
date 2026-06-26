@@ -106,17 +106,14 @@ else {
       .select()
       .from(WorkspaceTable)
       .where(
-        inArray(
-          WorkspaceTable.id,
-          users.map((u) => u.workspaceID),
-        ),
+        inArray(WorkspaceTable.id, users.map((u: { workspaceID: string | null }) => u.workspaceID!).filter(Boolean)),
       ),
   )
   const workspaceMap = new Map(workspaces.map((w) => [w.id, w]))
 
   for (const user of users) {
-    const workspace = workspaceMap.get(user.workspaceID)
-    if (workspace) await printWorkspace(user.workspaceID, workspace)
+    const workspace = workspaceMap.get(user.workspaceID!)
+    if (workspace) await printWorkspace(user.workspaceID!, workspace)
   }
 }
 
@@ -129,7 +126,7 @@ async function printWorkspace(workspaceID: string, prefetched?: typeof Workspace
         .from(WorkspaceTable)
         .where(eq(WorkspaceTable.id, workspaceID))
         .then((rows) => rows[0]),
-    ))
+    ))!
 
   printHeader(`Workspace "${workspace.name}" (${workspace.id})`)
 
