@@ -129,8 +129,10 @@ async function resolveWindowsAppPath(appName: string): Promise<string | null> {
   if (key) {
     for (const path of paths) {
       const dirs = [dirname(path), dirname(dirname(path)), dirname(dirname(dirname(path)))]
-      const entries = await Promise.all(dirs.map((dir) => readdir(dir).catch((): string[] => [])))
-      for (const [dir, entriesList] of dirs.flatMap((dir, i) => (entries[i]!.length ? [[dir, entries[i]!]] : []))) {
+      const entries: string[][] = await Promise.all(dirs.map((dir) => readdir(dir).catch((): string[] => [])))
+      for (const [dir, entriesList] of dirs.flatMap((dir, i) =>
+        entries[i]!.length ? ([[dir, entries[i]!]] as [string, string[]][]) : [],
+      )) {
         for (const entry of entriesList) {
           const candidate = join(dir, entry)
           if (!hasExt(candidate, "exe")) continue
