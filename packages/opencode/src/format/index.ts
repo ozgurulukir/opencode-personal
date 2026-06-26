@@ -140,18 +140,17 @@ export const layer = Layer.effect(
         }
 
         if (cfg.formatter !== true) {
+          // ruff and uvformat are aliases for the shared python formatter; resolve
+          // them so disabling either disables the single underlying implementation.
+          const aliasMap: Record<string, string> = { ruff: "python", uvformat: "python", uv: "python" }
           for (const [name, item] of Object.entries(cfg.formatter)) {
-            const builtIn = Formatter[name as keyof typeof Formatter]
+            const resolved = aliasMap[name] ?? name
+            const builtIn = Formatter[resolved as keyof typeof Formatter]
 
-            // Ruff and uv are both the same formatter, so disabling either should disable both.
-            if (["ruff", "uv"].includes(name) && (cfg.formatter.ruff?.disabled || cfg.formatter.uv?.disabled)) {
-              // TODO combine formatters so shared backends like Ruff/uv don't need linked disable handling here.
-              delete formatters.ruff
-              delete formatters.uv
-              continue
-            }
             if (item.disabled) {
-              delete formatters[name]
+              // Disabling an alias disables the python formatter (and therefore all aliases).
+              if (resolved === "python") delete formatters.python
+              else delete formatters[name]
               continue
             }
             const info = mergeDeep(builtIn ?? { extensions: [] }, item)

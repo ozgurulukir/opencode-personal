@@ -496,13 +496,11 @@ async function getCustomThemes() {
   ]
 
   const result: Record<string, ThemeJson> = {}
-  for (const dir of directories) {
-    for (const item of await Glob.scan("themes/*.json", {
-      cwd: dir,
-      absolute: true,
-      dot: true,
-      symlink: true,
-    })) {
+  const scans = directories.map((dir) =>
+    Glob.scan("themes/*.json", { cwd: dir, absolute: true, dot: true, symlink: true }),
+  )
+  for (const items of await Promise.all(scans)) {
+    for (const item of items) {
       const name = path.basename(item, ".json")
       const theme = await Filesystem.readJson(item)
       if (isTheme(theme)) result[name] = theme

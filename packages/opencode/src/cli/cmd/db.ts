@@ -28,6 +28,16 @@ const QueryCommand = cmd({
   handler: async (args: { query?: string; format: string }) => {
     const query = args.query as string | undefined
     if (query) {
+      // Guard against mutating statements — this is a read-only debug tool.
+      const normalized = query.trim().toUpperCase()
+      if (
+        /^\s*(INSERT|UPDATE|DELETE|REPLACE|ALTER|DROP|CREATE|TRUNCATE|ATTACH|DETACH|VACUUM|PRAGMA|BEGIN|COMMIT|ROLLBACK|SAVEPOINT|RELEASE)\b/.test(
+          normalized,
+        )
+      ) {
+        UI.error("Only read queries are allowed in this command. Use the sqlite3 shell (no --query) for full access.")
+        process.exit(1)
+      }
       const db = new BunDatabase(Database.Path, { readonly: true })
       try {
         const result = db.query(query).all() as Record<string, unknown>[]

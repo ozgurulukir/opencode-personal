@@ -1276,11 +1276,11 @@ const layer: Layer.Layer<
         for (const [id, provider] of Object.entries(database)) {
           const providerID = ProviderID.make(id)
           if (disabled.has(providerID)) continue
-          const apiKey = provider.env.map((item) => envs[item]).find(Boolean)
+          const apiKey = provider.env.find((item) => envs[item])
           if (!apiKey) continue
           mergeProvider(providerID, {
             source: "env",
-            key: provider.env.length === 1 ? apiKey : undefined,
+            key: provider.env.length === 1 ? envs[apiKey] : undefined,
           })
         }
 
