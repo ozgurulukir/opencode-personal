@@ -18,6 +18,7 @@ import { Filesystem } from "@/util/filesystem"
 import { disposeAllInstances, provideInstance, TestInstance, tmpdirScoped } from "../fixture/fixture"
 import { testEffect } from "../lib/effect"
 import { Reference } from "@/reference/reference"
+import { Git } from "@/git"
 
 const FIXTURES_DIR = path.join(import.meta.dir, "fixtures")
 
@@ -45,6 +46,7 @@ const it = testEffect(
     LSP.defaultLayer,
     Reference.defaultLayer,
     Truncate.defaultLayer,
+    Git.defaultLayer,
   ),
 )
 
