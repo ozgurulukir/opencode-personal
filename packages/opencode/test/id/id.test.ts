@@ -46,6 +46,29 @@ test("timestamp round-trips through ascending ID with small timestamp", () => {
   expect(timestamp(id)).toBe(known)
 })
 
+// ---- edge cases ----
+
+test("generateID throws on mismatched prefix", () => {
+  expect(() => ascending("message", "ses_abc123def45600")).toThrow("does not start with msg")
+})
+
+test("generateID returns given ID when prefix matches", () => {
+  const given = ascending("session")
+  expect(ascending("session", given)).toBe(given)
+})
+
+test("ascending with timestamp 0 produces valid ID", () => {
+  const id = create("evt", "ascending", 0)
+  expect(id.startsWith("evt_")).toBe(true)
+  expect(timestamp(id)).toBe(0)
+})
+
+test("descending produces different output than ascending for same timestamp", () => {
+  const asc = create("evt", "ascending", 1_000_000_000)
+  const desc = create("evt", "descending", 1_000_000_000)
+  expect(asc).not.toBe(desc)
+})
+
 // ---- namespace export ----
 
 test("Identifier namespace re-exports the public API", () => {

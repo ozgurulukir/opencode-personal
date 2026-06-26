@@ -147,9 +147,7 @@ export namespace Share {
       Storage.list({ prefix: ["share_event", body.id] }),
       Storage.list({ prefix: ["share_data", body.id] }),
     ])
-    for (const item of groups.flat()) {
-      await Storage.remove(item)
-    }
+    await Promise.all(groups.flat().map((item) => Storage.remove(item)))
   })
 
   export const sync = fn(

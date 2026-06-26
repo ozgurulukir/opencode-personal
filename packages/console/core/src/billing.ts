@@ -384,16 +384,15 @@ export namespace Billing {
         })
         if (intents.data.length === 0) throw e
 
-        for (const intent of intents.data) {
-          // get checkout session
-          const sessions = await Billing.stripe().checkout.sessions.list({
-            customer: billing.customerID!,
-            payment_intent: intent.id,
-          })
-
-          // delete pending payment intent
-          await Billing.stripe().checkout.sessions.expire(sessions.data[0].id)
-        }
+        await Promise.all(
+          intents.data.map(async (intent) => {
+            const sessions = await Billing.stripe().checkout.sessions.list({
+              customer: billing.customerID!,
+              payment_intent: intent.id,
+            })
+            if (sessions.data[0]) await Billing.stripe().checkout.sessions.expire(sessions.data[0].id)
+          }),
+        )
 
         const session = await createSession()
         return session.url
