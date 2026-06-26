@@ -243,7 +243,11 @@ export function BasicTool(props: BasicToolProps) {
 
 function label(input: Record<string, unknown> | undefined) {
   const keys = ["description", "query", "url", "filePath", "path", "pattern", "name"]
-  return keys.map((key) => input?.[key]).find((value): value is string => typeof value === "string" && value.length > 0)
+  for (const key of keys) {
+    const value = input?.[key]
+    if (typeof value === "string" && value.length > 0) return value
+  }
+  return undefined
 }
 
 function args(input: Record<string, unknown> | undefined) {

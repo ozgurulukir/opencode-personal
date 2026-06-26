@@ -24,17 +24,13 @@ export function resolveAppPath(appName: string) {
 export function wslPath(path: string, mode: "windows" | "linux" | null): string {
   if (process.platform !== "win32") return path
 
+  // Reject null bytes to prevent injection via exec arguments.
+  if (path.includes("\0")) {
+    throw new Error("Path contains null bytes")
+  }
+
   const flag = mode === "windows" ? "-w" : "-u"
   try {
-    if (path.startsWith("~")) {
-      // Resolve $HOME separately (no user input), then pass the full path
-      // as an execFileSync argument to avoid shell injection via ~$(cmd)
-      const home = execFileSync("wsl", ["-e", "sh", "-lc", 'printf %s "$HOME"']).toString().trim()
-      return execFileSync("wsl", ["-e", "wslpath", flag, home + path.slice(1)])
-        .toString()
-        .trim()
-    }
-
     const output = execFileSync("wsl", ["-e", "wslpath", flag, path])
     return output.toString().trim()
   } catch (error) {
@@ -133,21 +129,18 @@ async function resolveWindowsAppPath(appName: string): Promise<string | null> {
   if (key) {
     for (const path of paths) {
       const dirs = [dirname(path), dirname(dirname(path)), dirname(dirname(dirname(path)))]
-      for (const dir of dirs) {
-        try {
-          for (const entry of await readdir(dir)) {
-            const candidate = join(dir, entry)
-            if (!hasExt(candidate, "exe")) continue
-            const stem = entry.replace(/\.exe$/i, "")
-            const name = stem
-              .split("")
-              .filter((value: string) => /[a-z0-9]/i.test(value))
-              .map((value: string) => value.toLowerCase())
-              .join("")
-            if (name.includes(key) || key.includes(name)) return candidate
-          }
-        } catch {
-          continue
+      const entries = await Promise.all(dirs.map((dir) => readdir(dir).catch((): string[] => [])))
+      for (const [dir, entriesList] of dirs.flatMap((dir, i) => (entries[i]!.length ? [[dir, entries[i]!]] : []))) {
+        for (const entry of entriesList) {
+          const candidate = join(dir, entry)
+          if (!hasExt(candidate, "exe")) continue
+          const stem = entry.replace(/\.exe$/i, "")
+          const name = stem
+            .split("")
+            .filter((value: string) => /[a-z0-9]/i.test(value))
+            .map((value: string) => value.toLowerCase())
+            .join("")
+          if (name.includes(key) || key.includes(name)) return candidate
         }
       }
     }

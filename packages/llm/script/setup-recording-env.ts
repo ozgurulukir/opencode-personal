@@ -346,7 +346,13 @@ const promptVars = (provider: Provider) => provider.vars.filter((item) => !item.
 const processEnv = (): Env =>
   Object.fromEntries(Object.entries(process.env).filter((entry): entry is [string, string] => entry[1] !== undefined))
 
-const envValue = (env: Env, names: ReadonlyArray<string>) => names.map((name) => env[name]).find(Boolean) ?? ""
+const envValue = (env: Env, names: ReadonlyArray<string>) => {
+  for (const name of names) {
+    const value = env[name]
+    if (value) return value
+  }
+  return ""
+}
 
 const envWithValues = (fileEnv: Env, values: Env): Env => ({
   ...processEnv(),

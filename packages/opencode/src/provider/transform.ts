@@ -63,72 +63,72 @@ function sdkKey(npm: string): string | undefined {
   return undefined
 }
 
-// TODO: fix this stupid inefficient dogshit function
 function normalizeMessages(
   msgs: ModelMessage[],
   model: Provider.Model,
   _options: Record<string, unknown>,
 ): ModelMessage[] {
-  const sanitizeToolResultOutput = (content: ToolResultPart) => {
+  const sanitizeToolResultOutput = (content: ToolResultPart): ToolResultPart => {
     if (content.output.type === "text" || content.output.type === "error-text") {
-      content.output.value = sanitizeSurrogates(content.output.value)
+      return { ...content, output: { ...content.output, value: sanitizeSurrogates(content.output.value) } }
     }
     if (content.output.type === "content") {
-      content.output.value = content.output.value.map((item) => {
-        if (item.type === "text") {
-          item.text = sanitizeSurrogates(item.text)
-        }
-        return item
-      })
+      return {
+        ...content,
+        output: {
+          ...content.output,
+          value: content.output.value.map((item) =>
+            item.type === "text" ? { ...item, text: sanitizeSurrogates(item.text) } : item,
+          ),
+        },
+      }
     }
     return content
   }
 
-  msgs = msgs.map((msg) => {
+  msgs = msgs.map((msg): ModelMessage => {
     switch (msg.role) {
       case "tool":
         if (!Array.isArray(msg.content)) return msg
-        msg.content = msg.content.map((content) => {
-          if (content.type === "tool-result") {
-            return sanitizeToolResultOutput(content)
-          }
-          return content
-        })
-        return msg
+        return {
+          ...msg,
+          content: msg.content.map((content) =>
+            content.type === "tool-result" ? sanitizeToolResultOutput(content) : content,
+          ),
+        }
 
       case "system":
-        msg.content = sanitizeSurrogates(msg.content)
-        return msg
+        return { ...msg, content: sanitizeSurrogates(msg.content) }
 
       case "user":
         if (typeof msg.content === "string") {
-          msg.content = sanitizeSurrogates(msg.content)
-        } else {
-          msg.content = msg.content.map((content) => {
-            if (content.type === "text") {
-              content.text = sanitizeSurrogates(content.text)
-            }
-            return content
-          })
+          return { ...msg, content: sanitizeSurrogates(msg.content) }
         }
-        return msg
+        return {
+          ...msg,
+          content: msg.content.map((content) =>
+            content.type === "text" ? { ...content, text: sanitizeSurrogates(content.text) } : content,
+          ),
+        }
 
       case "assistant":
         if (typeof msg.content === "string") {
-          msg.content = sanitizeSurrogates(msg.content)
-        } else {
-          msg.content = msg.content.map((content) => {
+          return { ...msg, content: sanitizeSurrogates(msg.content) }
+        }
+        return {
+          ...msg,
+          content: msg.content.map((content) => {
             if (content.type === "text" || content.type === "reasoning") {
-              content.text = sanitizeSurrogates(content.text)
+              return { ...content, text: sanitizeSurrogates(content.text) }
             }
             if (content.type === "tool-result") {
               return sanitizeToolResultOutput(content)
             }
             return content
-          })
+          }),
         }
-        return msg
     }
+    return msg
   })
 
   // Anthropic rejects messages with empty content - filter out empty string messages
