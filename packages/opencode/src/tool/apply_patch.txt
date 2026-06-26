@@ -27,7 +27,12 @@ Example patch:
 *** End Patch
 ```
 
-It is important to remember:
-
 - You must include a header with your intended action (Add/Delete/Update)
 - You must prefix new lines with `+` even when creating a new file
+
+### Hunk Application and Self-Healing
+Hunks within a patch are evaluated and applied atomically. If a specific hunk fails to match or apply, it will be skipped and reported in the tool's warning output under "Warning: The following hunks failed to apply and were skipped:", but other clean hunks in the same file or other files will still apply successfully.
+If you receive warnings about skipped/failed hunks:
+- Do not assume the entire patch failed.
+- Read the modified file or get the updated diff/status to inspect what succeeded.
+- Re-read the skipped sections using the `read` tool if needed, and issue a corrected patch containing only the failed hunks with corrected line offsets or matching context.

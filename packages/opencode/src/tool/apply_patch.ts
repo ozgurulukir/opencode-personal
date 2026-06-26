@@ -14,22 +14,43 @@ import DESCRIPTION from "./apply_patch.txt"
 import { File } from "../file"
 import { Format } from "../format"
 import * as Bom from "@/util/bom"
+import { Todo } from "../session/todo"
 
 export const Parameters = Schema.Struct({
   patchText: Schema.String.annotate({ description: "The full patch text that describes all changes to be made" }),
 })
 
-export const ApplyPatchTool = Tool.define(
+export type Metadata = {
+  diff: string
+  files: Array<{
+    filePath: string
+    relativePath: string
+    type: "add" | "delete" | "move" | "update"
+    patch: string
+    additions: number
+    deletions: number
+    movePath?: string
+  }>
+  diagnostics: Record<string, any>
+  failedHunks: Array<{ path: string; error: string }>
+}
+
+export const ApplyPatchTool = Tool.define<
+  typeof Parameters,
+  Metadata,
+  LSP.Service | AppFileSystem.Service | Format.Service | Bus.Service | Todo.Service
+>(
   "apply_patch",
   Effect.gen(function* () {
     const lsp = yield* LSP.Service
     const afs = yield* AppFileSystem.Service
     const format = yield* Format.Service
     const bus = yield* Bus.Service
+    const todo = yield* Todo.Service
 
     const run = Effect.fn("ApplyPatchTool.execute")(function* (
       params: Schema.Schema.Type<typeof Parameters>,
-      ctx: Tool.Context,
+      ctx: Tool.Context<Metadata>,
     ) {
       if (!params.patchText) {
         return yield* Effect.fail(new Error("patchText is required"))
@@ -69,120 +90,135 @@ export const ApplyPatchTool = Tool.define(
 
       let totalDiff = ""
 
+      const failedHunks: Array<{ path: string; error: string }> = []
+
       for (const hunk of hunks) {
         const filePath = path.resolve(instance.directory, hunk.path)
-        yield* assertExternalDirectoryEffect(ctx, filePath)
+        try {
+          yield* assertExternalDirectoryEffect(ctx, filePath)
 
-        switch (hunk.type) {
-          case "add": {
-            const oldContent = ""
-            const newContent =
-              hunk.contents.length === 0 || hunk.contents.endsWith("\n") ? hunk.contents : `${hunk.contents}\n`
-            const next = Bom.split(newContent)
-            const diff = trimDiff(createTwoFilesPatch(filePath, filePath, oldContent, next.text))
+          switch (hunk.type) {
+            case "add": {
+              const oldContent = ""
+              const newContent =
+                hunk.contents.length === 0 || hunk.contents.endsWith("\n") ? hunk.contents : `${hunk.contents}\n`
+              const next = Bom.split(newContent)
+              const diff = trimDiff(createTwoFilesPatch(filePath, filePath, oldContent, next.text))
 
-            let additions = 0
-            let deletions = 0
-            for (const change of diffLines(oldContent, next.text)) {
-              if (change.added) additions += change.count || 0
-              if (change.removed) deletions += change.count || 0
+              let additions = 0
+              let deletions = 0
+              for (const change of diffLines(oldContent, next.text)) {
+                if (change.added) additions += change.count || 0
+                if (change.removed) deletions += change.count || 0
+              }
+
+              fileChanges.push({
+                filePath,
+                oldContent,
+                newContent: next.text,
+                type: "add",
+                diff,
+                additions,
+                deletions,
+                bom: next.bom,
+              })
+
+              totalDiff += diff + "\n"
+              break
             }
 
-            fileChanges.push({
-              filePath,
-              oldContent,
-              newContent: next.text,
-              type: "add",
-              diff,
-              additions,
-              deletions,
-              bom: next.bom,
-            })
+            case "update": {
+              // Check if file exists for update
+              const stats = yield* afs.stat(filePath).pipe(Effect.catch(() => Effect.succeed(undefined)))
+              if (!stats || stats.type === "Directory") {
+                failedHunks.push({
+                  path: hunk.path,
+                  error: `Failed to read file to update: ${filePath} (not found or directory)`,
+                })
+                break
+              }
 
-            totalDiff += diff + "\n"
-            break
-          }
+              const source = yield* Bom.readFile(afs, filePath)
+              const oldContent = source.text
+              let newContent = oldContent
+              let bom = source.bom
 
-          case "update": {
-            // Check if file exists for update
-            const stats = yield* afs.stat(filePath).pipe(Effect.catch(() => Effect.succeed(undefined)))
-            if (!stats || stats.type === "Directory") {
-              return yield* Effect.fail(
-                new Error(`apply_patch verification failed: Failed to read file to update: ${filePath}`),
-              )
+              // Apply the update chunks to get new content
+              try {
+                const fileUpdate = Patch.deriveNewContentsFromChunks(filePath, hunk.chunks)
+                newContent = fileUpdate.content
+                bom = fileUpdate.bom
+              } catch (error) {
+                failedHunks.push({
+                  path: hunk.path,
+                  error: `Failed to derive contents from chunks: ${error}`,
+                })
+                break
+              }
+
+              const diff = trimDiff(createTwoFilesPatch(filePath, filePath, oldContent, newContent))
+
+              let additions = 0
+              let deletions = 0
+              for (const change of diffLines(oldContent, newContent)) {
+                if (change.added) additions += change.count || 0
+                if (change.removed) deletions += change.count || 0
+              }
+
+              const movePath = hunk.move_path ? path.resolve(instance.directory, hunk.move_path) : undefined
+              yield* assertExternalDirectoryEffect(ctx, movePath)
+
+              fileChanges.push({
+                filePath,
+                oldContent,
+                newContent,
+                type: hunk.move_path ? "move" : "update",
+                movePath,
+                diff,
+                additions,
+                deletions,
+                bom,
+              })
+
+              totalDiff += diff + "\n"
+              break
             }
 
-            const source = yield* Bom.readFile(afs, filePath)
-            const oldContent = source.text
-            let newContent = oldContent
-            let bom = source.bom
-
-            // Apply the update chunks to get new content
-            try {
-              const fileUpdate = Patch.deriveNewContentsFromChunks(filePath, hunk.chunks)
-              newContent = fileUpdate.content
-              bom = fileUpdate.bom
-            } catch (error) {
-              return yield* Effect.fail(new Error(`apply_patch verification failed: ${error}`))
-            }
-
-            const diff = trimDiff(createTwoFilesPatch(filePath, filePath, oldContent, newContent))
-
-            let additions = 0
-            let deletions = 0
-            for (const change of diffLines(oldContent, newContent)) {
-              if (change.added) additions += change.count || 0
-              if (change.removed) deletions += change.count || 0
-            }
-
-            const movePath = hunk.move_path ? path.resolve(instance.directory, hunk.move_path) : undefined
-            yield* assertExternalDirectoryEffect(ctx, movePath)
-
-            fileChanges.push({
-              filePath,
-              oldContent,
-              newContent,
-              type: hunk.move_path ? "move" : "update",
-              movePath,
-              diff,
-              additions,
-              deletions,
-              bom,
-            })
-
-            totalDiff += diff + "\n"
-            break
-          }
-
-          case "delete": {
-            const source = yield* Bom.readFile(afs, filePath).pipe(
-              Effect.catch((error) =>
-                Effect.fail(
-                  new Error(
-                    `apply_patch verification failed: ${error instanceof Error ? error.message : String(error)}`,
+            case "delete": {
+              const source = yield* Bom.readFile(afs, filePath).pipe(
+                Effect.catch((error) =>
+                  Effect.fail(
+                    new Error(
+                      `Failed to read file to delete: ${error instanceof Error ? error.message : String(error)}`,
+                    ),
                   ),
                 ),
-              ),
-            )
-            const contentToDelete = source.text
-            const deleteDiff = trimDiff(createTwoFilesPatch(filePath, filePath, contentToDelete, ""))
+              )
+              const contentToDelete = source.text
+              const deleteDiff = trimDiff(createTwoFilesPatch(filePath, filePath, contentToDelete, ""))
 
-            const deletions = contentToDelete.split("\n").length
+              const deletions = contentToDelete.split("\n").length
 
-            fileChanges.push({
-              filePath,
-              oldContent: contentToDelete,
-              newContent: "",
-              type: "delete",
-              diff: deleteDiff,
-              additions: 0,
-              deletions,
-              bom: source.bom,
-            })
+              fileChanges.push({
+                filePath,
+                oldContent: contentToDelete,
+                newContent: "",
+                type: "delete",
+                diff: deleteDiff,
+                additions: 0,
+                deletions,
+                bom: source.bom,
+              })
 
-            totalDiff += deleteDiff + "\n"
-            break
+              totalDiff += deleteDiff + "\n"
+              break
+            }
           }
+        } catch (error) {
+          failedHunks.push({
+            path: hunk.path,
+            error: error instanceof Error ? error.message : String(error),
+          })
         }
       }
 
@@ -266,6 +302,9 @@ export const ApplyPatchTool = Tool.define(
       }
       const diagnostics = yield* lsp.diagnostics()
 
+      // Autoclose completed todos based on applied diff hunks
+      yield* todo.autoclose(ctx.sessionID, fileChanges)
+
       // Generate output summary
       const summaryLines = fileChanges.map((change) => {
         if (change.type === "add") {
@@ -278,6 +317,11 @@ export const ApplyPatchTool = Tool.define(
         return `M ${path.relative(instance.worktree, target).replaceAll("\\", "/")}`
       })
       let output = `Success. Updated the following files:\n${summaryLines.join("\n")}`
+
+      if (failedHunks.length > 0) {
+        output += `\n\nWarning: The following hunks failed to apply and were skipped:\n` +
+          failedHunks.map((h) => `- ${h.path}: ${h.error}`).join("\n")
+      }
 
       for (const change of fileChanges) {
         if (change.type === "delete") continue
@@ -294,6 +338,7 @@ export const ApplyPatchTool = Tool.define(
           diff: totalDiff,
           files,
           diagnostics,
+          failedHunks,
         },
         output,
       }
@@ -302,7 +347,7 @@ export const ApplyPatchTool = Tool.define(
     return {
       description: DESCRIPTION,
       parameters: Parameters,
-      execute: (params: Schema.Schema.Type<typeof Parameters>, ctx: Tool.Context) =>
+      execute: (params: Schema.Schema.Type<typeof Parameters>, ctx: Tool.Context<Metadata>) =>
         run(params, ctx).pipe(Effect.orDie),
     }
   }),

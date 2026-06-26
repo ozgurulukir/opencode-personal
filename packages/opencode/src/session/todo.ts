@@ -34,6 +34,7 @@ export const Event = {
 export interface Interface {
   readonly update: (input: { sessionID: SessionID; todos: Info[] }) => Effect.Effect<void>
   readonly get: (sessionID: SessionID) => Effect.Effect<Info[]>
+  readonly autoclose: (sessionID: SessionID, fileChanges: Array<{ filePath: string; diff: string }>) => Effect.Effect<void>
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/SessionTodo") {}
@@ -76,8 +77,38 @@ export const layer = Layer.effect(
         priority: row.priority,
       }))
     })
+    const autoclose = Effect.fn("Todo.autoclose")(function* (sessionID: SessionID, fileChanges: Array<{ filePath: string; diff: string }>) {
+      const currentTodos = yield* get(sessionID)
+      if (currentTodos.length === 0) return
 
-    return Service.of({ update, get })
+      let updated = false
+      const nextTodos = currentTodos.map((todo) => {
+        if (todo.status === "completed" || todo.status === "cancelled") return todo
+
+        // Simple keyword-based semantic matching in diffs
+        const contentLower = todo.content.toLowerCase()
+        const words = contentLower.split(/\s+/).filter((w) => w.length > 3)
+        if (words.length === 0) return todo
+
+        // Check if all significant words appear in any of the diffs
+        const match = fileChanges.some((change) => {
+          const diffLower = change.diff.toLowerCase()
+          return words.every((word) => diffLower.includes(word))
+        })
+
+        if (match) {
+          updated = true
+          return { ...todo, status: "completed" }
+        }
+        return todo
+      })
+
+      if (updated) {
+        yield* update({ sessionID, todos: nextTodos })
+      }
+    })
+
+    return Service.of({ update, get, autoclose })
   }),
 )
 

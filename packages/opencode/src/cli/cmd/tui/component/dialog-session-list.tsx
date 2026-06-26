@@ -27,6 +27,7 @@ export function DialogSessionList() {
   const sdk = useSDK()
   const toast = useToast()
   const [toDelete, setToDelete] = createSignal<string>()
+  const [deletingID, setDeletingID] = createSignal<string>()
   const [search, setSearch] = createDebouncedSignal("", 150)
   const deleteHint = useCommandShortcut("session.delete")
 
@@ -168,6 +169,7 @@ export function DialogSessionList() {
           category = "Today"
         }
         const isDeleting = toDelete() === x.id
+        const isDeletingProcess = deletingID() === x.id
         const status = sync.data.session_status?.[x.id]
         const isWorking = status?.type === "busy" || status?.type === "retry"
         return {
@@ -176,7 +178,7 @@ export function DialogSessionList() {
           value: x.id,
           category,
           footer,
-          gutter: isWorking ? () => <Spinner /> : undefined,
+          gutter: isDeletingProcess ? () => <Spinner /> : (isWorking ? () => <Spinner /> : undefined),
         }
       })
   })
@@ -210,6 +212,7 @@ export function DialogSessionList() {
             if (toDelete() === option.value) {
               const session = sessions().find((item) => item.id === option.value)
               const status = session?.workspaceID ? project.workspace.status(session.workspaceID) : undefined
+              setDeletingID(option.value)
 
               try {
                 const result = await sdk.client.session.delete({
@@ -226,6 +229,7 @@ export function DialogSessionList() {
                     })
                   }
                   setToDelete(undefined)
+                  setDeletingID(undefined)
                   return
                 }
               } catch (err) {
@@ -239,6 +243,7 @@ export function DialogSessionList() {
                   })
                 }
                 setToDelete(undefined)
+                setDeletingID(undefined)
                 return
               }
               if (status && status !== "connected") {
@@ -246,6 +251,7 @@ export function DialogSessionList() {
               }
               if (search()) await refetch()
               setToDelete(undefined)
+              setDeletingID(undefined)
               return
             }
             setToDelete(option.value)

@@ -13,6 +13,7 @@ import { Bus } from "../../src/bus"
 import { Truncate } from "@/tool/truncate"
 import { tmpdir } from "../fixture/fixture"
 import { SessionID, MessageID } from "../../src/session/schema"
+import { Todo } from "../../src/session/todo"
 
 const runtime = ManagedRuntime.make(
   Layer.mergeAll(
@@ -22,6 +23,7 @@ const runtime = ManagedRuntime.make(
     Bus.layer,
     Truncate.defaultLayer,
     Agent.defaultLayer,
+    Todo.defaultLayer,
   ),
 )
 
@@ -341,9 +343,9 @@ describe("tool.apply_patch freeform", () => {
       fn: async () => {
         const patchText = "*** Begin Patch\n*** Update File: missing.txt\n@@\n-nope\n+better\n*** End Patch"
 
-        await expect(execute({ patchText }, ctx)).rejects.toThrow(
-          "apply_patch verification failed: Failed to read file to update",
-        )
+        const result = await execute({ patchText }, ctx)
+        expect(result.metadata.failedHunks.length).toBeGreaterThan(0)
+        expect(result.metadata.failedHunks[0].error).toContain("Failed to read file to update")
       },
     })
   })
@@ -405,7 +407,9 @@ describe("tool.apply_patch freeform", () => {
 
         const patchText = "*** Begin Patch\n*** Update File: modify.txt\n@@\n-missing\n+changed\n*** End Patch"
 
-        await expect(execute({ patchText }, ctx)).rejects.toThrow("apply_patch verification failed")
+        const result = await execute({ patchText }, ctx)
+        expect(result.metadata.failedHunks.length).toBeGreaterThan(0)
+        expect(result.metadata.failedHunks[0].error).toContain("Failed to derive contents")
         expect(await fs.readFile(target, "utf-8")).toBe("line1\nline2\n")
       },
     })
@@ -421,10 +425,12 @@ describe("tool.apply_patch freeform", () => {
         const patchText =
           "*** Begin Patch\n*** Add File: created.txt\n+hello\n*** Update File: missing.txt\n@@\n-old\n+new\n*** End Patch"
 
-        await expect(execute({ patchText }, ctx)).rejects.toThrow()
+        const result = await execute({ patchText }, ctx)
+        expect(result.metadata.failedHunks.length).toBeGreaterThan(0)
+        expect(result.metadata.failedHunks[0].error).toContain("Failed to read file to update")
 
         const createdPath = path.join(fixture.path, "created.txt")
-        await expect(fs.readFile(createdPath, "utf-8")).rejects.toThrow()
+        expect(await fs.readFile(createdPath, "utf-8")).toBe("hello\n")
       },
     })
   })
@@ -459,7 +465,9 @@ describe("tool.apply_patch freeform", () => {
 
         const patchText = "*** Begin Patch\n*** Update File: two_chunks.txt\n@@\n-b\n+B\n\n-d\n+D\n*** End Patch"
 
-        await expect(execute({ patchText }, ctx)).rejects.toThrow()
+        const result = await execute({ patchText }, ctx)
+        expect(result.metadata.failedHunks.length).toBeGreaterThan(0)
+        expect(result.metadata.failedHunks[0].error).toContain("Failed to derive contents")
         expect(await fs.readFile(target, "utf-8")).toBe("a\nb\nc\nd\n")
       },
     })

@@ -521,7 +521,7 @@ export function Session() {
         name: "compact",
         aliases: ["summarize"],
       },
-      run: () => {
+      run: async () => {
         const selectedModel = local.model.current()
         if (!selectedModel) {
           toast.show({
@@ -531,11 +531,47 @@ export function Session() {
           })
           return
         }
-        void sdk.client.session.summarize({
-          sessionID: route.sessionID,
-          modelID: selectedModel.modelID,
-          providerID: selectedModel.providerID,
+        
+        const confirmed = await DialogConfirm.show(
+          dialog,
+          "Compact Session",
+          "Are you sure you want to compact this session? (This will summarize past messages to save context and might hide some message details.)"
+        )
+        if (!confirmed) return
+
+        toast.show({
+          variant: "info",
+          message: "Compacting session...",
+          duration: 3000,
         })
+
+        try {
+          const result = await sdk.client.session.summarize({
+            sessionID: route.sessionID,
+            modelID: selectedModel.modelID,
+            providerID: selectedModel.providerID,
+          })
+          
+          if (result.error) {
+            toast.show({
+              variant: "error",
+              title: "Failed to compact session",
+              message: errorMessage(result.error),
+            })
+          } else {
+            toast.show({
+              variant: "success",
+              message: "Session compacted successfully",
+              duration: 3000,
+            })
+          }
+        } catch (err) {
+          toast.show({
+            variant: "error",
+            title: "Failed to compact session",
+            message: errorMessage(err),
+          })
+        }
         dialog.clear()
       },
     },

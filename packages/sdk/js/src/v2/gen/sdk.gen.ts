@@ -13,6 +13,7 @@ import type {
   AuthRemoveResponses,
   AuthSetErrors,
   AuthSetResponses,
+  CommandExecutePayload,
   CommandListResponses,
   Config as Config3,
   ConfigGetResponses,
@@ -20,10 +21,6 @@ import type {
   ConfigUpdateErrors,
   ConfigUpdateResponses,
   EventSubscribeResponses,
-  EventTuiCommandExecute2,
-  EventTuiPromptAppend2,
-  EventTuiSessionSelect2,
-  EventTuiToastShow2,
   ExperimentalConsoleGetErrors,
   ExperimentalConsoleGetResponses,
   ExperimentalConsoleListOrgsErrors,
@@ -94,6 +91,7 @@ import type {
   ProjectUpdateErrors,
   ProjectUpdateResponses,
   Prompt,
+  PromptAppendPayload,
   ProviderAuthResponses,
   ProviderListResponses,
   ProviderOauthAuthorizeErrors,
@@ -151,6 +149,7 @@ import type {
   SessionPromptResponses,
   SessionRevertErrors,
   SessionRevertResponses,
+  SessionSelectPayload,
   SessionShareErrors,
   SessionShareResponses,
   SessionShellErrors,
@@ -176,6 +175,7 @@ import type {
   SyncStealErrors,
   SyncStealResponses,
   TextPartInput,
+  ToastShowPayload,
   ToolIdsErrors,
   ToolIdsResponses,
   ToolListErrors,
@@ -4757,7 +4757,7 @@ export class Tui extends HeyApiClient {
     parameters?: {
       directory?: string
       workspace?: string
-      body?: EventTuiPromptAppend2 | EventTuiCommandExecute2 | EventTuiToastShow2 | EventTuiSessionSelect2
+      body?: PromptAppendPayload | CommandExecutePayload | ToastShowPayload | SessionSelectPayload
     },
     options?: Options<never, ThrowOnError>,
   ) {

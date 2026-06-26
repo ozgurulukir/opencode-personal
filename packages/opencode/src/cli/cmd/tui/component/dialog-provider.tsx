@@ -15,6 +15,7 @@ import { useToast } from "../ui/toast"
 import { isConsoleManagedProvider } from "@tui/util/provider-origin"
 import { useConnected } from "./use-connected"
 import { useBindings } from "../keymap"
+import { Spinner } from "./spinner"
 
 const PROVIDER_PRIORITY: Record<string, number> = {
   opencode: 0,
@@ -284,7 +285,10 @@ function AutoMethod(props: AutoMethodProps) {
         <Link href={props.authorization.url} fg={theme.primary} />
         <text fg={theme.textMuted}>{props.authorization.instructions}</text>
       </box>
-      <text fg={theme.textMuted}>Waiting for authorization...</text>
+      <box flexDirection="row" gap={1}>
+        <Spinner />
+        <text fg={theme.textMuted}>Waiting for authorization...</text>
+      </box>
       <text fg={theme.text}>
         c <span style={{ fg: theme.textMuted }}>copy</span>
       </text>

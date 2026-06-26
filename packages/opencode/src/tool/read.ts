@@ -12,6 +12,7 @@ import { assertExternalDirectoryEffect } from "./external-directory"
 import { Instruction } from "../session/instruction"
 import { isPdfAttachment, sniffAttachmentMime } from "@/util/media"
 import { Reference } from "@/reference/reference"
+import { Git } from "@/git"
 
 const DEFAULT_READ_LIMIT = 2000
 const MAX_LINE_LENGTH = 2000
@@ -34,6 +35,9 @@ export const Parameters = Schema.Struct({
   limit: Schema.optional(NonNegativeInt).annotate({
     description: "The maximum number of lines to read (defaults to 2000)",
   }),
+  onlyHunks: Schema.optional(Schema.Boolean).annotate({
+    description: "If true, only returns lines that contain code hunks modified in git or current changes, along with a few lines of context",
+  }),
 })
 
 export const ReadTool = Tool.define(
@@ -43,6 +47,7 @@ export const ReadTool = Tool.define(
     const instruction = yield* Instruction.Service
     const lsp = yield* LSP.Service
     const reference = yield* Reference.Service
+    const git = yield* Git.Service
     const scope = yield* Scope.Scope
 
     const miss = Effect.fn("ReadTool.miss")(function* (filepath: string) {
@@ -247,9 +252,33 @@ export const ReadTool = Tool.define(
         return yield* Effect.fail(new Error(`Cannot read binary file: ${filepath}`))
       }
 
-      const file = yield* Effect.promise(() =>
-        lines(filepath, { limit: params.limit ?? DEFAULT_READ_LIMIT, offset: params.offset || 1 }),
-      )
+      let file: { raw: string[]; count: number; cut: boolean; more: boolean; offset: number }
+      let diffText = ""
+
+      if (params.onlyHunks) {
+        const isTracked = yield* git.hasHead(instance.directory).pipe(Effect.orElseSucceed(() => false))
+        if (isTracked) {
+          const relPath = path.relative(instance.directory, filepath)
+          const patchResult = yield* git.patch(instance.directory, "HEAD", relPath).pipe(
+            Effect.orElseSucceed(() => ({ text: "", truncated: false })),
+          )
+          diffText = patchResult.text
+        }
+        
+        const ranges = getChangedRanges(diffText)
+        if (ranges.length > 0) {
+          file = yield* Effect.promise(() => linesWithHunks(filepath, ranges))
+        } else {
+          file = yield* Effect.promise(() =>
+            lines(filepath, { limit: params.limit ?? DEFAULT_READ_LIMIT, offset: params.offset || 1 }),
+          )
+        }
+      } else {
+        file = yield* Effect.promise(() =>
+          lines(filepath, { limit: params.limit ?? DEFAULT_READ_LIMIT, offset: params.offset || 1 }),
+        )
+      }
+
       if (file.count < file.offset && !(file.count === 0 && file.offset === 1)) {
         return yield* Effect.fail(
           new Error(`Offset ${file.offset} is out of range for this file (${file.count} lines)`),
@@ -257,7 +286,11 @@ export const ReadTool = Tool.define(
       }
 
       let output = [`<path>${filepath}</path>`, `<type>file</type>`, "<content>\n"].join("\n")
-      output += file.raw.map((line, i) => `${i + file.offset}: ${line}`).join("\n")
+      if (params.onlyHunks && file.offset === 1 && diffText !== "") {
+        output += file.raw.join("\n")
+      } else {
+        output += file.raw.map((line, i) => `${i + file.offset}: ${line}`).join("\n")
+      }
 
       const last = file.offset + file.raw.length - 1
       const next = last + 1
@@ -339,4 +372,78 @@ async function lines(filepath: string, opts: { limit: number; offset: number }) 
   }
 
   return { raw, count, cut, more, offset: opts.offset }
+}
+
+function getChangedRanges(diffText: string): Array<{ start: number; end: number }> {
+  const ranges: Array<{ start: number; end: number }> = []
+  const lines = diffText.split("\n")
+  for (const line of lines) {
+    if (line.startsWith("@@ ")) {
+      const match = line.match(/@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@/)
+      if (match) {
+        const start = parseInt(match[1], 10)
+        const length = match[2] ? parseInt(match[2], 10) : 1
+        ranges.push({ start, end: start + (length > 0 ? length - 1 : 0) })
+      }
+    }
+  }
+  return ranges
+}
+
+async function linesWithHunks(filepath: string, ranges: Array<{ start: number; end: number }>, contextLines = 3) {
+  const stream = createReadStream(filepath, { encoding: "utf8" })
+  const rl = createInterface({
+    input: stream,
+    crlfDelay: Infinity,
+  })
+
+  // Expand ranges with context padding and merge overlapping ones
+  const expanded = ranges.map(r => ({
+    start: Math.max(1, r.start - contextLines),
+    end: r.end + contextLines
+  })).sort((a, b) => a.start - b.start)
+
+  const merged: Array<{ start: number; end: number }> = []
+  for (const r of expanded) {
+    if (merged.length === 0) {
+      merged.push(r)
+    } else {
+      const last = merged[merged.length - 1]
+      if (r.start <= last.end + 1) {
+        last.end = Math.max(last.end, r.end)
+      } else {
+        merged.push(r)
+      }
+    }
+  }
+
+  const raw: string[] = []
+  let count = 0
+  let bytes = 0
+  let cut = false
+  
+  try {
+    for await (const text of rl) {
+      count += 1
+      
+      // Check if current line falls into any of the merged ranges
+      const inRange = merged.some(r => count >= r.start && count <= r.end)
+      if (!inRange) continue
+
+      const line = text.length > MAX_LINE_LENGTH ? text.substring(0, MAX_LINE_LENGTH) + MAX_LINE_SUFFIX : text
+      const size = Buffer.byteLength(line, "utf-8") + (raw.length > 0 ? 1 : 0)
+      if (bytes + size > MAX_BYTES) {
+        cut = true
+        break
+      }
+
+      raw.push(`${count}: ${line}`)
+      bytes += size
+    }
+  } finally {
+    rl.close()
+    stream.destroy()
+  }
+
+  return { raw, count, cut, more: false, offset: 1 }
 }
