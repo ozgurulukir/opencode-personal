@@ -145,7 +145,7 @@ export const ApplyPatchTool = Tool.define<
 
               // Apply the update chunks to get new content
               try {
-                const fileUpdate = Patch.deriveNewContentsFromChunks(filePath, hunk.chunks)
+                const fileUpdate = Patch.deriveNewContentsFromChunks(filePath, hunk.chunks, source)
                 newContent = fileUpdate.content
                 bom = fileUpdate.bom
               } catch (error) {
@@ -319,7 +319,8 @@ export const ApplyPatchTool = Tool.define<
       let output = `Success. Updated the following files:\n${summaryLines.join("\n")}`
 
       if (failedHunks.length > 0) {
-        output += `\n\nWarning: The following hunks failed to apply and were skipped:\n` +
+        output +=
+          `\n\nWarning: The following hunks failed to apply and were skipped:\n` +
           failedHunks.map((h) => `- ${h.path}: ${h.error}`).join("\n")
       }
 

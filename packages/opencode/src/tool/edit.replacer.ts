@@ -4,6 +4,8 @@
 // https://github.com/google-gemini/gemini-cli/blob/main/packages/core/src/utils/editCorrector.ts
 // https://github.com/cline/cline/blob/main/evals/diff-edits/diff-apply/diff-06-26-25.ts
 
+import { findPattern, Comparators } from "./matcher"
+
 export type Replacer = (content: string, find: string) => Generator<string, void, unknown>
 
 // Similarity thresholds for block anchor fallback matching
@@ -39,40 +41,25 @@ export const LineTrimmedReplacer: Replacer = function* (content, find) {
   const originalLines = content.split("\n")
   const searchLines = find.split("\n")
 
-  if (searchLines[searchLines.length - 1] === "") {
-    searchLines.pop()
+  const idx = findPattern(originalLines, searchLines, 0, Comparators.trim)
+  if (idx !== -1) {
+    yield blockSubstring(content, originalLines, idx, idx + searchLines.length - 1)
   }
+}
 
-  for (let i = 0; i <= originalLines.length - searchLines.length; i++) {
-    let matches = true
-
-    for (let j = 0; j < searchLines.length; j++) {
-      const originalTrimmed = originalLines[i + j].trim()
-      const searchTrimmed = searchLines[j].trim()
-
-      if (originalTrimmed !== searchTrimmed) {
-        matches = false
-        break
-      }
-    }
-
-    if (matches) {
-      let matchStartIndex = 0
-      for (let k = 0; k < i; k++) {
-        matchStartIndex += originalLines[k].length + 1
-      }
-
-      let matchEndIndex = matchStartIndex
-      for (let k = 0; k < searchLines.length; k++) {
-        matchEndIndex += originalLines[i + k].length
-        if (k < searchLines.length - 1) {
-          matchEndIndex += 1 // Add newline character except for the last line
-        }
-      }
-
-      yield content.substring(matchStartIndex, matchEndIndex)
+function blockSubstring(content: string, lines: string[], startLine: number, endLine: number): string {
+  let start = 0
+  for (let k = 0; k < startLine; k++) {
+    start += lines[k].length + 1
+  }
+  let end = start
+  for (let k = startLine; k <= endLine; k++) {
+    end += lines[k].length
+    if (k < endLine) {
+      end += 1
     }
   }
+  return content.substring(start, end)
 }
 
 export const BlockAnchorReplacer: Replacer = function* (content, find) {
@@ -142,18 +129,7 @@ export const BlockAnchorReplacer: Replacer = function* (content, find) {
     }
 
     if (similarity >= SINGLE_CANDIDATE_SIMILARITY_THRESHOLD) {
-      let matchStartIndex = 0
-      for (let k = 0; k < startLine; k++) {
-        matchStartIndex += originalLines[k].length + 1
-      }
-      let matchEndIndex = matchStartIndex
-      for (let k = startLine; k <= endLine; k++) {
-        matchEndIndex += originalLines[k].length
-        if (k < endLine) {
-          matchEndIndex += 1 // Add newline character except for the last line
-        }
-      }
-      yield content.substring(matchStartIndex, matchEndIndex)
+      yield blockSubstring(content, originalLines, startLine, endLine)
     }
     return
   }
@@ -195,18 +171,7 @@ export const BlockAnchorReplacer: Replacer = function* (content, find) {
   // Threshold judgment
   if (maxSimilarity >= MULTIPLE_CANDIDATES_SIMILARITY_THRESHOLD && bestMatch) {
     const { startLine, endLine } = bestMatch
-    let matchStartIndex = 0
-    for (let k = 0; k < startLine; k++) {
-      matchStartIndex += originalLines[k].length + 1
-    }
-    let matchEndIndex = matchStartIndex
-    for (let k = startLine; k <= endLine; k++) {
-      matchEndIndex += originalLines[k].length
-      if (k < endLine) {
-        matchEndIndex += 1
-      }
-    }
-    yield content.substring(matchStartIndex, matchEndIndex)
+    yield blockSubstring(content, originalLines, startLine, endLine)
   }
 }
 
