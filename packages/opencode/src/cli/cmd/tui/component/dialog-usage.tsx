@@ -25,15 +25,18 @@ function formatNumber(num: number): string {
 }
 
 function formatCost(cost: number): string {
-  if (cost < 0.01) return `$${cost.toFixed(6)}`
+  if (cost === 0) return "$0.00"
+  if (cost < 0.01) return `$${cost.toFixed(4)}`
   return `$${cost.toFixed(2)}`
 }
 
 function renderBar(fraction: number | undefined, width = 18): string {
-  if (fraction === undefined) return `[${"·".repeat(width)}]`
+  if (fraction === undefined) return `[${"░".repeat(width)}]   —`
   const clamped = Math.min(Math.max(fraction, 0), 1)
   const filled = Math.round(clamped * width)
   const pct = Math.round(clamped * 100)
+    .toString()
+    .padStart(3)
   return `[${"█".repeat(filled)}${"░".repeat(Math.max(0, width - filled))}] ${pct}%`
 }
 
@@ -162,58 +165,56 @@ export function DialogUsage() {
       <scrollbox height={bodyHeight()} scrollbarOptions={{ visible: true }}>
         <box flexDirection="column" gap={1}>
           {/* Provider Quota Reports */}
-          <Show when={providerReports() && providerReports()!.length > 0}>
-            <For each={providerReports()}>
-              {(report: UsageReport) => (
-                <box gap={0}>
-                  <box flexDirection="row" justifyContent="space-between" alignItems="center">
-                    <text fg={theme.text} attributes={TextAttributes.BOLD}>
-                      {formatProviderName(report.provider)}
-                    </text>
-                    <Show when={report.metadata?.email}>
-                      <text fg={theme.textMuted}>{String(report.metadata!.email)}</text>
-                    </Show>
+          <Show when={!providerReports.loading} fallback={<text fg={theme.textMuted}>Loading provider usage…</text>}>
+            <Show
+              when={providerReports()?.length}
+              fallback={<text fg={theme.textMuted}>No provider quota data (requires OAuth auth)</text>}
+            >
+              <For each={providerReports()}>
+                {(report: UsageReport) => (
+                  <box gap={0}>
+                    <box flexDirection="row" justifyContent="space-between" alignItems="center">
+                      <text fg={theme.text} attributes={TextAttributes.BOLD}>
+                        {formatProviderName(report.provider)}
+                      </text>
+                      <Show when={report.metadata?.email}>
+                        <text fg={theme.textMuted}>{String(report.metadata!.email)}</text>
+                      </Show>
+                    </box>
+                    <For each={report.limits}>
+                      {(limit: UsageLimit) => {
+                        const fraction = resolveUsedFraction(limit)
+                        const window = limit.window?.label ?? limit.scope.windowId
+                        const tier = limit.scope.tier ? ` (${limit.scope.tier})` : ""
+                        const statusColor =
+                          limit.status === "exhausted"
+                            ? theme.error
+                            : limit.status === "warning"
+                              ? theme.warning
+                              : theme.success
+                        const resets =
+                          limit.window?.resetsAt && limit.window.resetsAt > Date.now()
+                            ? ` · resets in ${formatDuration(limit.window!.resetsAt! - Date.now())}`
+                            : ""
+                        return (
+                          <box flexDirection="row" justifyContent="space-between" alignItems="center">
+                            <text fg={theme.text}>
+                              {limit.label}
+                              {tier}
+                              {window ? ` — ${window}` : ""}
+                              <Show when={resets}>
+                                <span style={{ fg: theme.textMuted }}>{resets}</span>
+                              </Show>
+                            </text>
+                            <text fg={statusColor}>{renderBar(fraction)}</text>
+                          </box>
+                        )
+                      }}
+                    </For>
                   </box>
-                  <For each={report.limits}>
-                    {(limit: UsageLimit) => {
-                      const fraction = resolveUsedFraction(limit)
-                      const window = limit.window?.label ?? limit.scope.windowId
-                      const tier = limit.scope.tier ? ` (${limit.scope.tier})` : ""
-                      const statusColor =
-                        limit.status === "exhausted"
-                          ? theme.error
-                          : limit.status === "warning"
-                            ? theme.warning
-                            : theme.success
-                      const resets =
-                        limit.window?.resetsAt && limit.window.resetsAt > Date.now()
-                          ? ` · resets in ${formatDuration(limit.window!.resetsAt! - Date.now())}`
-                          : ""
-                      return (
-                        <box flexDirection="row" justifyContent="space-between" alignItems="center">
-                          <text fg={theme.text}>
-                            {limit.label}
-                            {tier}
-                            {window ? ` — ${window}` : ""}
-                            <Show when={resets}>
-                              <span style={{ fg: theme.textMuted }}>{resets}</span>
-                            </Show>
-                          </text>
-                          <text fg={statusColor}>{renderBar(fraction)}</text>
-                        </box>
-                      )
-                    }}
-                  </For>
-                </box>
-              )}
-            </For>
-          </Show>
-
-          <Show
-            when={!providerReports() || providerReports()!.length === 0}
-            fallback={<text fg={theme.textMuted}>─</text>}
-          >
-            <text fg={theme.textMuted}>No provider quota data (requires OAuth auth)</text>
+                )}
+              </For>
+            </Show>
           </Show>
 
           {/* Session Usage */}
@@ -232,21 +233,37 @@ export function DialogUsage() {
                 </text>
 
                 <box flexDirection="row" gap={2}>
-                  <text fg={theme.textMuted}>Input</text>
-                  <text fg={theme.text}>{formatNumber(s().totalInput)}</text>
-                  <text fg={theme.textMuted}>Output</text>
+                  <text fg={theme.textMuted} style={{ width: 8 }}>
+                    Input
+                  </text>
+                  <text fg={theme.text} style={{ width: 10 }}>
+                    {formatNumber(s().totalInput)}
+                  </text>
+                  <text fg={theme.textMuted} style={{ width: 8 }}>
+                    Output
+                  </text>
                   <text fg={theme.text}>{formatNumber(s().totalOutput)}</text>
                 </box>
                 <box flexDirection="row" gap={2}>
-                  <text fg={theme.textMuted}>Cache R</text>
-                  <text fg={theme.text}>{formatNumber(s().totalCacheRead)}</text>
-                  <text fg={theme.textMuted}>Cache W</text>
+                  <text fg={theme.textMuted} style={{ width: 8 }}>
+                    Cache R
+                  </text>
+                  <text fg={theme.text} style={{ width: 10 }}>
+                    {formatNumber(s().totalCacheRead)}
+                  </text>
+                  <text fg={theme.textMuted} style={{ width: 8 }}>
+                    Cache W
+                  </text>
                   <text fg={theme.text}>{formatNumber(s().totalCacheWrite)}</text>
-                  <Show when={s().totalReasoning > 0}>
-                    <text fg={theme.textMuted}>Reasoning</text>
-                    <text fg={theme.text}>{formatNumber(s().totalReasoning)}</text>
-                  </Show>
                 </box>
+                <Show when={s().totalReasoning > 0}>
+                  <box flexDirection="row" gap={2}>
+                    <text fg={theme.textMuted} style={{ width: 8 }}>
+                      Reasoning
+                    </text>
+                    <text fg={theme.text}>{formatNumber(s().totalReasoning)}</text>
+                  </box>
+                </Show>
 
                 <Show when={s().models.length > 0}>
                   <text fg={theme.text} attributes={TextAttributes.BOLD}>
@@ -255,12 +272,17 @@ export function DialogUsage() {
                   <For each={s().models}>
                     {(m: ModelBreakdown) => (
                       <box flexDirection="row" gap={1}>
-                        <text fg={theme.text} flexShrink={0}>
-                          <b>{m.model}</b>
+                        <text fg={theme.text} flexShrink={0} style={{ width: 26 }}>
+                          {m.model}
+                        </text>
+                        <text fg={theme.textMuted} style={{ width: 9 }}>
+                          {m.messages} msgs
+                        </text>
+                        <text fg={theme.text} style={{ width: 9 }}>
+                          {formatCost(m.cost)}
                         </text>
                         <text fg={theme.textMuted}>
-                          {m.messages} msgs · {formatCost(m.cost)} · in:{formatNumber(m.tokens.input)} out:
-                          {formatNumber(m.tokens.output)}
+                          {formatNumber(m.tokens.input)} in · {formatNumber(m.tokens.output)} out
                         </text>
                       </box>
                     )}
