@@ -70,8 +70,8 @@ describe("findPattern", () => {
     expect(findPattern(dupes, ["a", "b"], 0, Comparators.exact)).toBe(0)
   })
 
-  test("drops trailing empty line from pattern", () => {
-    expect(findPattern(lines, ["beta", "gamma", ""], 0, Comparators.exact)).toBe(1)
+  test("does not match when trailing empty line present", () => {
+    expect(findPattern(lines, ["beta", "gamma", ""], 0, Comparators.exact)).toBe(-1)
   })
 
   test("returns -1 for empty pattern", () => {
@@ -123,8 +123,8 @@ describe("findPatternBackward", () => {
     expect(findPatternBackward(["a"], ["a", "b"], Comparators.exact)).toBe(-1)
   })
 
-  test("drops trailing empty line from pattern", () => {
-    expect(findPatternBackward(lines, ["beta", "gamma", ""], Comparators.exact)).toBe(3)
+  test("does not match when trailing empty line present", () => {
+    expect(findPatternBackward(lines, ["beta", "gamma", ""], Comparators.exact)).toBe(-1)
   })
 
   test("matches single-line pattern at end", () => {

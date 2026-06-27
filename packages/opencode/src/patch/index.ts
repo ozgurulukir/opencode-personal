@@ -1,5 +1,5 @@
 import * as Bom from "../util/bom"
-import { Comparators, findPattern, findPatternBackward, type Comparator } from "../tool/matcher"
+import { Comparators, findPattern, findExactPattern, findPatternBackward, type Comparator } from "../tool/matcher"
 
 export type Hunk =
   | { type: "add"; path: string; contents: string }
@@ -252,13 +252,15 @@ function computeReplacements(
       continue
     }
 
-    // Try to match old lines in the file
+    // Try to match old lines in the file.
+    // LLM patches often have a trailing empty line that doesn't exist in the file.
+    // Strip it from both pattern (for matching) and newSlice (for replacement content)
+    // so the splice lengths stay consistent.
     let pattern = chunk.old_lines
     let newSlice = chunk.new_lines
     let found = seekSequence(originalLines, pattern, lineIndex, chunk.is_end_of_file)
 
-    // Retry without trailing empty line if not found
-    if (found === -1 && pattern.length > 0 && pattern[pattern.length - 1] === "") {
+    if (found === -1 && pattern.length > 1 && pattern[pattern.length - 1] === "") {
       pattern = pattern.slice(0, -1)
       if (newSlice.length > 0 && newSlice[newSlice.length - 1] === "") {
         newSlice = newSlice.slice(0, -1)
@@ -299,44 +301,14 @@ function applyReplacements(lines: string[], replacements: Array<[number, number,
   return result
 }
 
-function tryExactPrefilter(lines: string[], pattern: string[], startIndex: number, eof: boolean): number {
-  if (eof) {
-    const result = findPatternBackward(lines, pattern, Comparators.exact)
-    if (result >= startIndex) return result
-  }
-
-  if (pattern[0] === "") return -1
-  const content = lines.join("\n")
-  const prefix = startIndex > 0 ? lines.slice(0, startIndex).join("\n").length + 1 : 0
-  const searchTarget = pattern[0] + "\n"
-  let from = prefix
-  while (from < content.length) {
-    const idx = content.indexOf(searchTarget, from)
-    if (idx === -1) break
-    if (idx === 0 || content[idx - 1] === "\n") {
-      const lineIdx = content.substring(0, idx).split("\n").length - 1
-      if (lineIdx <= lines.length - pattern.length) {
-        let matches = true
-        for (let j = 1; j < pattern.length; j++) {
-          if (lines[lineIdx + j] !== pattern[j]) {
-            matches = false
-            break
-          }
-        }
-        if (matches) return lineIdx
-      }
-    }
-    from = idx + searchTarget.length
-  }
-  return -1
-}
-
 function seekSequence(lines: string[], pattern: string[], startIndex: number, eof = false): number {
   if (pattern.length === 0) return -1
 
-  const exact = tryExactPrefilter(lines, pattern, startIndex, eof)
+  // Pass 1: exact match with indexOf prefilter (O(n+m))
+  const exact = findExactPattern(lines, pattern, startIndex, eof)
   if (exact !== -1) return exact
 
+  // Pass 2-4: fuzzy comparators (rstrip → trim → normalized)
   for (const compare of [Comparators.rstrip, Comparators.trim, Comparators.normalized] as const) {
     const result = findPattern(lines, pattern, startIndex, compare)
     if (result !== -1) return result

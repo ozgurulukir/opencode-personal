@@ -41,6 +41,10 @@ export const LineTrimmedReplacer: Replacer = function* (content, find) {
   const originalLines = content.split("\n")
   const searchLines = find.split("\n")
 
+  if (searchLines[searchLines.length - 1] === "") {
+    searchLines.pop()
+  }
+
   const idx = findPattern(originalLines, searchLines, 0, Comparators.trim)
   if (idx !== -1) {
     yield blockSubstring(content, originalLines, idx, idx + searchLines.length - 1)

@@ -17,13 +17,12 @@ export const Comparators = {
 export type Comparator = (a: string, b: string) => boolean
 
 export function findPattern(lines: string[], pattern: string[], startIndex: number, compare: Comparator): number {
-  const search = pattern[pattern.length - 1] === "" ? pattern.slice(0, -1) : pattern
-  if (search.length === 0) return -1
+  if (pattern.length === 0) return -1
 
-  for (let i = startIndex; i <= lines.length - search.length; i++) {
+  for (let i = startIndex; i <= lines.length - pattern.length; i++) {
     let matches = true
-    for (let j = 0; j < search.length; j++) {
-      if (!compare(lines[i + j], search[j])) {
+    for (let j = 0; j < pattern.length; j++) {
+      if (!compare(lines[i + j], pattern[j])) {
         matches = false
         break
       }
@@ -33,15 +32,48 @@ export function findPattern(lines: string[], pattern: string[], startIndex: numb
   return -1
 }
 
-export function findPatternBackward(lines: string[], pattern: string[], compare: Comparator): number {
-  const search = pattern[pattern.length - 1] === "" ? pattern.slice(0, -1) : pattern
-  if (search.length === 0) return -1
+export function findExactPattern(lines: string[], pattern: string[], startIndex: number, eof: boolean): number {
+  if (pattern.length === 0) return -1
 
-  const fromEnd = lines.length - search.length
+  if (eof) {
+    const back = findPatternBackward(lines, pattern, Comparators.exact)
+    if (back >= startIndex) return back
+  }
+
+  if (pattern[0] === "") return -1
+  const content = lines.join("\n")
+  const prefix = startIndex > 0 ? lines.slice(0, startIndex).join("\n").length + 1 : 0
+  const searchTarget = pattern[0] + "\n"
+  let from = prefix
+  while (from < content.length) {
+    const idx = content.indexOf(searchTarget, from)
+    if (idx === -1) break
+    if (idx === 0 || content[idx - 1] === "\n") {
+      const lineIdx = content.substring(0, idx).split("\n").length - 1
+      if (lineIdx <= lines.length - pattern.length) {
+        let matches = true
+        for (let j = 1; j < pattern.length; j++) {
+          if (lines[lineIdx + j] !== pattern[j]) {
+            matches = false
+            break
+          }
+        }
+        if (matches) return lineIdx
+      }
+    }
+    from = idx + searchTarget.length
+  }
+  return -1
+}
+
+export function findPatternBackward(lines: string[], pattern: string[], compare: Comparator): number {
+  if (pattern.length === 0) return -1
+
+  const fromEnd = lines.length - pattern.length
   if (fromEnd < 0) return -1
 
-  for (let j = 0; j < search.length; j++) {
-    if (!compare(lines[fromEnd + j], search[j])) return -1
+  for (let j = 0; j < pattern.length; j++) {
+    if (!compare(lines[fromEnd + j], pattern[j])) return -1
   }
   return fromEnd
 }
