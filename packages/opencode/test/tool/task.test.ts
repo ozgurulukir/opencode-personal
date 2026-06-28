@@ -11,6 +11,8 @@ import { ModelID, ProviderID } from "../../src/provider/schema"
 import { TaskTool, type TaskPromptOps } from "../../src/tool/task"
 import { Truncate } from "@/tool/truncate"
 import { ToolRegistry } from "@/tool/registry"
+import { SearchService } from "@/search/search"
+import { EmbeddingService } from "@/search/embedding"
 import { disposeAllInstances } from "../fixture/fixture"
 import { testEffect } from "../lib/effect"
 
@@ -31,6 +33,15 @@ const it = testEffect(
     Session.defaultLayer,
     Truncate.defaultLayer,
     ToolRegistry.defaultLayer,
+    Layer.succeed(SearchService, {
+      index: () => Effect.void,
+      search: () => Effect.succeed([]),
+      reset: Effect.void,
+    }),
+    Layer.succeed(EmbeddingService, {
+      embed: () => Effect.succeed([]),
+      dimension: 384,
+    }),
   ),
 )
 

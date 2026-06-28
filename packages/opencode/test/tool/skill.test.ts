@@ -8,6 +8,8 @@ import type { Tool } from "@/tool/tool"
 import { Instance } from "../../src/project/instance"
 import { SkillTool } from "../../src/tool/skill"
 import { ToolRegistry } from "@/tool/registry"
+import { SearchService } from "@/search/search"
+import { EmbeddingService } from "@/search/embedding"
 import { disposeAllInstances, provideTmpdirInstance } from "../fixture/fixture"
 import { SessionID, MessageID } from "../../src/session/schema"
 import { testEffect } from "../lib/effect"
@@ -28,7 +30,21 @@ afterEach(async () => {
 
 const node = CrossSpawnSpawner.defaultLayer
 
-const it = testEffect(Layer.mergeAll(ToolRegistry.defaultLayer, node))
+const it = testEffect(
+  Layer.mergeAll(
+    ToolRegistry.defaultLayer,
+    node,
+    Layer.succeed(SearchService, {
+      index: () => Effect.void,
+      search: () => Effect.succeed([]),
+      reset: Effect.void,
+    }),
+    Layer.succeed(EmbeddingService, {
+      embed: () => Effect.succeed([]),
+      dimension: 384,
+    }),
+  ),
+)
 
 describe("tool.skill", () => {
   it.live("execute returns skill content block with files", () =>
