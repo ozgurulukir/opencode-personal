@@ -1,10 +1,17 @@
 import * as Bom from "../util/bom"
-import { Comparators, findPattern, findExactPattern, findPatternBackward, type Comparator } from "../tool/matcher"
+import {
+  Comparators,
+  findPattern,
+  findPatternAmbiguity,
+  findExactPattern,
+  findPatternBackward,
+  type Comparator,
+} from "../tool/matcher"
 
 export type Hunk =
   | { type: "add"; path: string; contents: string }
   | { type: "delete"; path: string }
-  | { type: "update"; path: string; move_path?: string; chunks: UpdateFileChunk[] }
+  | { type: "update"; path: string; move_path?: string; force?: boolean; chunks: UpdateFileChunk[] }
 
 export interface UpdateFileChunk {
   old_lines: string[]
@@ -17,7 +24,7 @@ export interface UpdateFileChunk {
 function parsePatchHeader(
   lines: string[],
   startIdx: number,
-): { filePath: string; movePath?: string; nextIdx: number } | null {
+): { filePath: string; movePath?: string; force?: boolean; nextIdx: number } | null {
   const line = lines[startIdx]
 
   if (line.startsWith("*** Add File:")) {
@@ -33,15 +40,21 @@ function parsePatchHeader(
   if (line.startsWith("*** Update File:")) {
     const filePath = line.slice("*** Update File:".length).trim()
     let movePath: string | undefined
+    let force: boolean | undefined
     let nextIdx = startIdx + 1
 
-    // Check for move directive
-    if (nextIdx < lines.length && lines[nextIdx].startsWith("*** Move to:")) {
+    // Check for move directive (force variant must be tested first — "Force Move to"
+    // does not start with "Move to" but is a distinct keyword)
+    if (nextIdx < lines.length && lines[nextIdx].startsWith("*** Force Move to:")) {
+      movePath = lines[nextIdx].slice("*** Force Move to:".length).trim()
+      force = true
+      nextIdx++
+    } else if (nextIdx < lines.length && lines[nextIdx].startsWith("*** Move to:")) {
       movePath = lines[nextIdx].slice("*** Move to:".length).trim()
       nextIdx++
     }
 
-    return filePath ? { filePath, movePath, nextIdx } : null
+    return filePath ? { filePath, movePath, force, nextIdx } : null
   }
 
   return null
@@ -82,9 +95,20 @@ function parseUpdateFileChunks(lines: string[], startIdx: number): { chunks: Upd
         } else if (changeLine.startsWith("+")) {
           // Add line - only in new
           newLines.push(changeLine.substring(1))
+        } else {
+          // Inside a chunk, any non-prefix line is malformed. Blank lines are
+          // the only exception (LLMs sometimes emit them between changes).
+          if (changeLine.trim() !== "") {
+            throw new Error(`Malformed patch line in update body: ${changeLine}`)
+          }
         }
 
         i++
+      }
+
+      // Reject empty hunks early — they signal a parser bug or LLM confusion
+      if (oldLines.length === 0 && newLines.length === 0 && !isEndOfFile) {
+        throw new Error(`Empty hunk${contextLine ? ` (context: ${contextLine})` : ""}`)
       }
 
       chunks.push({
@@ -94,6 +118,10 @@ function parseUpdateFileChunks(lines: string[], startIdx: number): { chunks: Upd
         is_end_of_file: isEndOfFile || undefined,
       })
     } else {
+      // Between chunks: only blank lines are allowed. Anything else is malformed.
+      if (lines[i].trim() !== "") {
+        throw new Error(`Malformed patch line in update body: ${lines[i]}`)
+      }
       i++
     }
   }
@@ -179,6 +207,7 @@ export function parsePatch(patchText: string): { hunks: Hunk[] } {
         type: "update",
         path: header.filePath,
         move_path: header.movePath,
+        force: header.force,
         chunks,
       })
       i = nextIdx
@@ -233,6 +262,13 @@ function computeReplacements(
   let lineIndex = 0
 
   for (const chunk of chunks) {
+    // Track whether the LLM provided @@ context for this chunk. When context
+    // is present, lineIndex is narrowed (line 242 below), so we accept the
+    // first match without ambiguity checking. Without context, fuzzy matches
+    // must be unique in the rest of the file to avoid silent wrong-location
+    // edits.
+    const requireUnique = !chunk.change_context
+
     // Handle context-based seeking
     if (chunk.change_context) {
       const contextIdx = seekSequence(originalLines, [chunk.change_context], lineIndex)
@@ -258,14 +294,14 @@ function computeReplacements(
     // so the splice lengths stay consistent.
     let pattern = chunk.old_lines
     let newSlice = chunk.new_lines
-    let found = seekSequence(originalLines, pattern, lineIndex, chunk.is_end_of_file)
+    let found = seekSequence(originalLines, pattern, lineIndex, chunk.is_end_of_file, requireUnique)
 
     if (found === -1 && pattern.length > 1 && pattern[pattern.length - 1] === "") {
       pattern = pattern.slice(0, -1)
       if (newSlice.length > 0 && newSlice[newSlice.length - 1] === "") {
         newSlice = newSlice.slice(0, -1)
       }
-      found = seekSequence(originalLines, pattern, lineIndex, chunk.is_end_of_file)
+      found = seekSequence(originalLines, pattern, lineIndex, chunk.is_end_of_file, requireUnique)
     }
 
     if (found !== -1) {
@@ -278,6 +314,22 @@ function computeReplacements(
 
   // Sort replacements by index to apply in order
   replacements.sort((a, b) => a[0] - b[0])
+
+  // Defensive invariant: replacements must not overlap. lineIndex monotonic
+  // advancement in the loop above normally prevents this; the check exists
+  // to catch regressions in lineIndex logic or custom chunk flows and to
+  // document the contract that callers can rely on non-overlapping ranges.
+  for (let k = 1; k < replacements.length; k++) {
+    const prev = replacements[k - 1]
+    const curr = replacements[k]
+    // Pure insertions (length 0) at the same position are allowed — they
+    // represent sequential inserts, not range conflicts.
+    if (curr[0] < prev[0] + prev[1]) {
+      throw new Error(
+        `Overlapping hunks in ${filePath}: chunk at line ${curr[0]} overlaps previous chunk at line ${prev[0]} (length ${prev[1]})`,
+      )
+    }
+  }
 
   return replacements
 }
@@ -301,7 +353,13 @@ function applyReplacements(lines: string[], replacements: Array<[number, number,
   return result
 }
 
-function seekSequence(lines: string[], pattern: string[], startIndex: number, eof = false): number {
+function seekSequence(
+  lines: string[],
+  pattern: string[],
+  startIndex: number,
+  eof = false,
+  requireUnique = false,
+): number {
   if (pattern.length === 0) return -1
 
   // Pass 1: exact match with indexOf prefilter (O(n+m))
@@ -310,8 +368,18 @@ function seekSequence(lines: string[], pattern: string[], startIndex: number, eo
 
   // Pass 2-4: fuzzy comparators (rstrip → trim → normalized)
   for (const compare of [Comparators.rstrip, Comparators.trim, Comparators.normalized] as const) {
-    const result = findPattern(lines, pattern, startIndex, compare)
-    if (result !== -1) return result
+    if (requireUnique) {
+      // Stop at the second match to detect ambiguity without scanning the
+      // whole rest of the file unnecessarily.
+      const { position, ambiguous } = findPatternAmbiguity(lines, pattern, startIndex, compare)
+      if (ambiguous) {
+        throw new Error(`Ambiguous fuzzy match for ${JSON.stringify(pattern[0])}. Provide @@ context to disambiguate.`)
+      }
+      if (position !== -1) return position
+    } else {
+      const result = findPattern(lines, pattern, startIndex, compare)
+      if (result !== -1) return result
+    }
     if (eof) {
       const back = findPatternBackward(lines, pattern, compare)
       if (back >= startIndex) return back
