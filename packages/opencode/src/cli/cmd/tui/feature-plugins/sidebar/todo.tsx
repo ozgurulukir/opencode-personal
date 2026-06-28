@@ -1,5 +1,5 @@
 import type { TuiPlugin, TuiPluginApi } from "@opencode-ai/plugin/tui"
-import type { InternalTuiPlugin } from "../../plugin/internal"
+import type { InternalTuiPlugin } from "../../plugin/internal-types"
 import { createMemo, For, Show, createSignal } from "solid-js"
 import { TodoItem } from "../../component/todo-item"
 

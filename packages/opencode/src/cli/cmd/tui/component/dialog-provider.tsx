@@ -1,6 +1,7 @@
 import { createMemo, createSignal, onMount, Show } from "solid-js"
+import { useLocal } from "@tui/context/local"
 import { useSync } from "@tui/context/sync"
-import { map, pipe, sortBy } from "remeda"
+import { map, pipe, flatMap, entries, filter, sortBy, take } from "remeda"
 import { DialogSelect } from "@tui/ui/dialog-select"
 import { useDialog } from "@tui/ui/dialog"
 import { useSDK } from "../context/sdk"
@@ -9,13 +10,14 @@ import { Link } from "../ui/link"
 import { useTheme } from "../context/theme"
 import { TextAttributes } from "@opentui/core"
 import type { ProviderAuthAuthorization, ProviderAuthMethod } from "@opencode-ai/sdk/v2"
-import { DialogModel } from "./dialog-model"
 import * as Clipboard from "@tui/util/clipboard"
 import { useToast } from "../ui/toast"
 import { isConsoleManagedProvider } from "@tui/util/provider-origin"
 import { useConnected } from "./use-connected"
 import { useBindings } from "../keymap"
 import { Spinner } from "./spinner"
+import { DialogVariant } from "./dialog-variant"
+import * as fuzzysort from "fuzzysort"
 
 const PROVIDER_PRIORITY: Record<string, number> = {
   opencode: 0,
@@ -108,6 +110,59 @@ export function createDialogProviderOptions() {
         "Provider ids must start with a lowercase letter or number and only use lowercase letters, numbers, hyphens, and underscores",
     })
     return promptCustomProviderID()
+  }
+
+  async function PromptsMethod(props: {
+    dialog: ReturnType<typeof useDialog>
+    prompts: NonNullable<ProviderAuthMethod["prompts"]>[number][]
+  }): Promise<Record<string, string> | null> {
+    const inputs: Record<string, string> = {}
+    for (const prompt of props.prompts) {
+      if (prompt.when) {
+        const value = inputs[prompt.when.key]
+        if (value === undefined) continue
+        const matches = prompt.when.op === "eq" ? value === prompt.when.value : value !== prompt.when.value
+        if (!matches) continue
+      }
+
+      if (prompt.type === "select") {
+        const value = await new Promise<string | null>((resolve) => {
+          props.dialog.replace(
+            () => (
+              <DialogSelect
+                title={prompt.message}
+                options={prompt.options.map((x) => ({
+                  title: x.label,
+                  value: x.value,
+                  description: x.hint,
+                }))}
+                onSelect={(option) => resolve(option.value)}
+              />
+            ),
+            () => resolve(null),
+          )
+        })
+        if (value === null) return null
+        inputs[prompt.key] = value
+        continue
+      }
+
+      const value = await new Promise<string | null>((resolve) => {
+        props.dialog.replace(
+          () => (
+            <DialogPrompt
+              title={prompt.message}
+              placeholder={prompt.placeholder}
+              onConfirm={(value) => resolve(value)}
+            />
+          ),
+          () => resolve(null),
+        )
+      })
+      if (value === null) return null
+      inputs[prompt.key] = value
+    }
+    return inputs
   }
 
   const options = createMemo(() => {
@@ -222,10 +277,181 @@ export function createDialogProviderOptions() {
   return options
 }
 
+// ── DialogModel ──────────────────────────────────────────────────────────────
+
+export function DialogModel(props: { providerID?: string }) {
+  const local = useLocal()
+  const sync = useSync()
+  const dialog = useDialog()
+  const [query, setQuery] = createSignal("")
+
+  const connected = useConnected()
+  const providers = createDialogProviderOptions()
+
+  const showExtra = createMemo(() => connected() && !props.providerID)
+
+  const options = createMemo(() => {
+    const needle = query().trim()
+    const showSections = showExtra() && needle.length === 0
+    const favorites = connected() ? local.model.favorite() : []
+    const recents = local.model.recent()
+
+    function toOptions(items: typeof favorites, category: string) {
+      if (!showSections) return []
+      return items.flatMap((item) => {
+        const provider = sync.data.provider.find((x) => x.id === item.providerID)
+        if (!provider) return []
+        const model = provider.models[item.modelID]
+        if (!model) return []
+        return [
+          {
+            key: item,
+            value: { providerID: provider.id, modelID: model.id },
+            title: model.name ?? item.modelID,
+            description: provider.name,
+            category,
+            disabled: provider.id === "opencode" && model.id.includes("-nano"),
+            footer: model.cost?.input === 0 && provider.id === "opencode" ? "Free" : undefined,
+            onSelect: () => {
+              onSelect(provider.id, model.id)
+            },
+          },
+        ]
+      })
+    }
+
+    const favoriteOptions = toOptions(favorites, "Favorites")
+    const recentOptions = toOptions(
+      recents.filter(
+        (item) => !favorites.some((fav) => fav.providerID === item.providerID && fav.modelID === item.modelID),
+      ),
+      "Recent",
+    )
+
+    const providerOptions = pipe(
+      sync.data.provider,
+      sortBy(
+        (provider) => provider.id !== "opencode",
+        (provider) => provider.name,
+      ),
+      flatMap((provider) =>
+        pipe(
+          provider.models,
+          entries(),
+          filter(([_, info]) => info.status !== "deprecated"),
+          filter(([_, info]) => (props.providerID ? info.providerID === props.providerID : true)),
+          map(([model, info]) => ({
+            value: { providerID: provider.id, modelID: model },
+            title: info.name ?? model,
+            description: favorites.some((item) => item.providerID === provider.id && item.modelID === model)
+              ? "(Favorite)"
+              : undefined,
+            category: connected() ? provider.name : undefined,
+            disabled: provider.id === "opencode" && model.includes("-nano"),
+            footer: info.cost?.input === 0 && provider.id === "opencode" ? "Free" : undefined,
+            onSelect() {
+              onSelect(provider.id, model)
+            },
+          })),
+          filter((x) => {
+            if (!showSections) return true
+            if (favorites.some((item) => item.providerID === x.value.providerID && item.modelID === x.value.modelID))
+              return false
+            if (recents.some((item) => item.providerID === x.value.providerID && item.modelID === x.value.modelID))
+              return false
+            return true
+          }),
+          sortBy(
+            (x) => x.footer !== "Free",
+            (x) => x.title,
+          ),
+        ),
+      ),
+    )
+
+    const popularProviders = !connected()
+      ? pipe(
+          providers(),
+          map((option) => ({
+            ...option,
+            category: "Popular providers",
+          })),
+          take(6),
+        )
+      : []
+
+    if (needle) {
+      return [
+        ...fuzzysort.go(needle, providerOptions, { keys: ["title", "category"] }).map((x) => x.obj),
+        ...fuzzysort.go(needle, popularProviders, { keys: ["title"] }).map((x) => x.obj),
+      ]
+    }
+
+    return [...favoriteOptions, ...recentOptions, ...providerOptions, ...popularProviders]
+  })
+
+  const provider = createMemo(() =>
+    props.providerID ? sync.data.provider.find((x) => x.id === props.providerID) : null,
+  )
+
+  const title = createMemo(() => {
+    const value = provider()
+    if (!value) return "Select model"
+    return value.name
+  })
+
+  function onSelect(providerID: string, modelID: string) {
+    local.model.set({ providerID, modelID }, { recent: true })
+    const list = local.model.variant.list()
+    const cur = local.model.variant.selected()
+    if (cur === "default" || (cur && list.includes(cur))) {
+      dialog.clear()
+      return
+    }
+    if (list.length > 0) {
+      dialog.replace(() => <DialogVariant />)
+      return
+    }
+    dialog.clear()
+  }
+
+  return (
+    <DialogSelect<ReturnType<typeof options>[number]["value"]>
+      options={options()}
+      actions={[
+        {
+          command: "model.dialog.provider",
+          title: connected() ? "Connect provider" : "View all providers",
+          onTrigger() {
+            dialog.replace(() => <DialogProvider />)
+          },
+        },
+        {
+          command: "model.dialog.favorite",
+          title: "Favorite",
+          disabled: !connected(),
+          onTrigger: (option) => {
+            local.model.toggleFavorite(option.value as { providerID: string; modelID: string })
+          },
+        },
+      ]}
+      onFilter={setQuery}
+      flat={true}
+      skipFilter={true}
+      title={title()}
+      current={local.model.current()}
+    />
+  )
+}
+
+// ── DialogProvider ───────────────────────────────────────────────────────────
+
 export function DialogProvider() {
   const options = createDialogProviderOptions()
   return <DialogSelect title="Connect a provider" options={options()} />
 }
+
+// ── Auth flow sub-components ─────────────────────────────────────────────────
 
 interface AutoMethodProps {
   index: number
@@ -407,54 +633,4 @@ function ApiMethod(props: ApiMethodProps) {
       }}
     />
   )
-}
-
-interface PromptsMethodProps {
-  dialog: ReturnType<typeof useDialog>
-  prompts: NonNullable<ProviderAuthMethod["prompts"]>[number][]
-}
-async function PromptsMethod(props: PromptsMethodProps) {
-  const inputs: Record<string, string> = {}
-  for (const prompt of props.prompts) {
-    if (prompt.when) {
-      const value = inputs[prompt.when.key]
-      if (value === undefined) continue
-      const matches = prompt.when.op === "eq" ? value === prompt.when.value : value !== prompt.when.value
-      if (!matches) continue
-    }
-
-    if (prompt.type === "select") {
-      const value = await new Promise<string | null>((resolve) => {
-        props.dialog.replace(
-          () => (
-            <DialogSelect
-              title={prompt.message}
-              options={prompt.options.map((x) => ({
-                title: x.label,
-                value: x.value,
-                description: x.hint,
-              }))}
-              onSelect={(option) => resolve(option.value)}
-            />
-          ),
-          () => resolve(null),
-        )
-      })
-      if (value === null) return null
-      inputs[prompt.key] = value
-      continue
-    }
-
-    const value = await new Promise<string | null>((resolve) => {
-      props.dialog.replace(
-        () => (
-          <DialogPrompt title={prompt.message} placeholder={prompt.placeholder} onConfirm={(value) => resolve(value)} />
-        ),
-        () => resolve(null),
-      )
-    })
-    if (value === null) return null
-    inputs[prompt.key] = value
-  }
-  return inputs
 }
