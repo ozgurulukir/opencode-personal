@@ -3,7 +3,7 @@ import os from "node:os"
 import path from "node:path"
 import z from "zod"
 import { Filesystem } from "@/util/filesystem"
-import type { EditorSelection } from "./editor"
+import type { EditorSelection } from "./editor-selection"
 
 const ZedEditorRowSchema = z.object({
   item_kind: z.string(),

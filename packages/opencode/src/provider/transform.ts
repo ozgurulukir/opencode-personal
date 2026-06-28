@@ -2,7 +2,7 @@ import type { ModelMessage, ToolResultPart } from "ai"
 import { mergeDeep, unique } from "remeda"
 import type { JSONSchema7 } from "@ai-sdk/provider"
 import type { JSONSchema } from "zod/v4/core"
-import type * as Provider from "./provider"
+import type { Model } from "./model"
 import type * as ModelsDev from "./models"
 import type * as Auth from "@/auth"
 import { iife } from "@/util/iife"
@@ -63,11 +63,7 @@ function sdkKey(npm: string): string | undefined {
   return undefined
 }
 
-function normalizeMessages(
-  msgs: ModelMessage[],
-  model: Provider.Model,
-  _options: Record<string, unknown>,
-): ModelMessage[] {
+function normalizeMessages(msgs: ModelMessage[], model: Model, _options: Record<string, unknown>): ModelMessage[] {
   const sanitizeToolResultOutput = (content: ToolResultPart): ToolResultPart => {
     if (content.output.type === "text" || content.output.type === "error-text") {
       return { ...content, output: { ...content.output, value: sanitizeSurrogates(content.output.value) } }
@@ -346,7 +342,7 @@ function normalizeMessages(
   return msgs
 }
 
-function applyCaching(msgs: ModelMessage[], model: Provider.Model): ModelMessage[] {
+function applyCaching(msgs: ModelMessage[], model: Model): ModelMessage[] {
   const system = msgs.filter((msg) => msg.role === "system").slice(0, 2)
   const final = msgs.filter((msg) => msg.role !== "system").slice(-2)
 
@@ -397,7 +393,7 @@ function applyCaching(msgs: ModelMessage[], model: Provider.Model): ModelMessage
   return msgs
 }
 
-function unsupportedParts(msgs: ModelMessage[], model: Provider.Model): ModelMessage[] {
+function unsupportedParts(msgs: ModelMessage[], model: Model): ModelMessage[] {
   return msgs.map((msg) => {
     if (msg.role !== "user" || !Array.isArray(msg.content)) return msg
 
@@ -435,7 +431,7 @@ function unsupportedParts(msgs: ModelMessage[], model: Provider.Model): ModelMes
   })
 }
 
-export function message(msgs: ModelMessage[], model: Provider.Model, options: Record<string, unknown>) {
+export function message(msgs: ModelMessage[], model: Model, options: Record<string, unknown>) {
   msgs = unsupportedParts(msgs, model)
   msgs = normalizeMessages(msgs, model, options)
   if (
@@ -482,7 +478,7 @@ export function message(msgs: ModelMessage[], model: Provider.Model, options: Re
   return msgs
 }
 
-export function temperature(model: Provider.Model) {
+export function temperature(model: Model) {
   const id = model.id.toLowerCase()
   if (id.includes("qwen")) return 0.55
   if (id.includes("claude")) return undefined
@@ -500,7 +496,7 @@ export function temperature(model: Provider.Model) {
   return undefined
 }
 
-export function topP(model: Provider.Model) {
+export function topP(model: Model) {
   const id = model.id.toLowerCase()
   if (id.includes("qwen")) return 1
   if (["minimax-m2", "gemini", "kimi-k2.5", "kimi-k2p5", "kimi-k2-5"].some((s) => id.includes(s))) {
@@ -509,7 +505,7 @@ export function topP(model: Provider.Model) {
   return undefined
 }
 
-export function topK(model: Provider.Model) {
+export function topK(model: Model) {
   const id = model.id.toLowerCase()
   if (id.includes("minimax-m2")) {
     if (["m2.", "m25", "m21"].some((s) => id.includes(s))) return 40
@@ -633,7 +629,7 @@ function googleSmallThinkingConfig(apiId: string) {
   return { thinkingBudget: googleThinkingBudgetMax(apiId) === 32_768 ? 128 : 0 }
 }
 
-export function variants(model: Provider.Model): Record<string, Record<string, any>> {
+export function variants(model: Model): Record<string, Record<string, any>> {
   if (!model.capabilities.reasoning) return {}
 
   const id = model.id.toLowerCase()
@@ -1048,7 +1044,7 @@ export function variants(model: Provider.Model): Record<string, Record<string, a
 }
 
 export function options(input: {
-  model: Provider.Model
+  model: Model
   sessionID: string
   providerOptions?: Record<string, any>
 }): Record<string, any> {
@@ -1191,7 +1187,7 @@ export function options(input: {
   return result
 }
 
-export function smallOptions(model: Provider.Model) {
+export function smallOptions(model: Model) {
   if (
     model.providerID === "openai" ||
     model.api.npm === "@ai-sdk/openai" ||
@@ -1234,7 +1230,7 @@ const SLUG_OVERRIDES: Record<string, string> = {
   amazon: "bedrock",
 }
 
-export function providerOptions(model: Provider.Model, options: { [x: string]: any }) {
+export function providerOptions(model: Model, options: { [x: string]: any }) {
   if (model.api.npm === "@ai-sdk/gateway") {
     // Gateway providerOptions are split across two namespaces:
     // - `gateway`: gateway-native routing/caching controls (order, only, byok, etc.)
@@ -1284,11 +1280,11 @@ export function providerOptions(model: Provider.Model, options: { [x: string]: a
   return { [key]: options }
 }
 
-export function maxOutputTokens(model: Provider.Model): number {
+export function maxOutputTokens(model: Model): number {
   return Math.min(model.limit.output, OUTPUT_TOKEN_MAX) || OUTPUT_TOKEN_MAX
 }
 
-export function schema(model: Provider.Model, schema: JSONSchema.BaseSchema | JSONSchema7): JSONSchema7 {
+export function schema(model: Model, schema: JSONSchema.BaseSchema | JSONSchema7): JSONSchema7 {
   /*
   if (["openai", "azure"].includes(providerID)) {
     if (schema.type === "object" && schema.properties) {

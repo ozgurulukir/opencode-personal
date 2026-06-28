@@ -1,6 +1,6 @@
 import { sqliteTable, text, integer, index, primaryKey } from "drizzle-orm/sqlite-core"
 import { ProjectTable } from "../project/project.sql"
-import type { MessageV2 } from "./message-v2"
+import type { Info, Part } from "./message.schema"
 import type { SessionMessage } from "../v2/session-message"
 import type { Snapshot } from "../snapshot"
 import type { Permission } from "../permission"
@@ -9,8 +9,8 @@ import type { SessionID, MessageID, PartID } from "./schema"
 import type { WorkspaceID } from "../control-plane/schema"
 import { Timestamps } from "../storage/schema.sql"
 
-type PartData = Omit<MessageV2.Part, "id" | "sessionID" | "messageID">
-type InfoData = Omit<MessageV2.Info, "id" | "sessionID">
+type PartData = Omit<Part, "id" | "sessionID" | "messageID">
+type InfoData = Omit<Info, "id" | "sessionID">
 type SessionMessageData = Omit<(typeof SessionMessage.Message)["Encoded"], "type" | "id">
 
 export const SessionTable = sqliteTable(

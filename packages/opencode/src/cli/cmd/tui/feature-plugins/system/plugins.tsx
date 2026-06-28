@@ -1,5 +1,5 @@
 import type { TuiPlugin, TuiPluginApi, TuiPluginStatus } from "@opencode-ai/plugin/tui"
-import type { InternalTuiPlugin } from "../../plugin/internal"
+import type { InternalTuiPlugin } from "../../plugin/internal-types"
 import { useTerminalDimensions } from "@opentui/solid"
 import { fileURLToPath } from "url"
 import { DialogSelect, type DialogSelectOption } from "@tui/ui/dialog-select"
