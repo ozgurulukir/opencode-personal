@@ -291,7 +291,32 @@ describe("tool.apply_patch freeform", () => {
     })
   })
 
-  test("moves file overwriting existing destination", async () => {
+  test("moves file overwriting existing destination with Force Move to", async () => {
+    await using fixture = await tmpdir()
+    const { ctx } = makeCtx()
+
+    await WithInstance.provide({
+      directory: fixture.path,
+      fn: async () => {
+        const original = path.join(fixture.path, "old", "name.txt")
+        const destination = path.join(fixture.path, "renamed", "dir", "name.txt")
+        await fs.mkdir(path.dirname(original), { recursive: true })
+        await fs.mkdir(path.dirname(destination), { recursive: true })
+        await fs.writeFile(original, "from\n", "utf-8")
+        await fs.writeFile(destination, "existing\n", "utf-8")
+
+        const patchText =
+          "*** Begin Patch\n*** Update File: old/name.txt\n*** Force Move to: renamed/dir/name.txt\n@@\n-from\n+new\n*** End Patch"
+
+        await execute({ patchText }, ctx)
+
+        await expect(fs.readFile(original, "utf-8")).rejects.toThrow()
+        expect(await fs.readFile(destination, "utf-8")).toBe("new\n")
+      },
+    })
+  })
+
+  test("refuses move overwrite without Force flag", async () => {
     await using fixture = await tmpdir()
     const { ctx } = makeCtx()
 
@@ -308,10 +333,14 @@ describe("tool.apply_patch freeform", () => {
         const patchText =
           "*** Begin Patch\n*** Update File: old/name.txt\n*** Move to: renamed/dir/name.txt\n@@\n-from\n+new\n*** End Patch"
 
-        await execute({ patchText }, ctx)
+        const result = await execute({ patchText }, ctx)
 
-        await expect(fs.readFile(original, "utf-8")).rejects.toThrow()
-        expect(await fs.readFile(destination, "utf-8")).toBe("new\n")
+        expect(result.metadata.failedHunks.length).toBe(1)
+        expect(result.metadata.failedHunks[0].error).toContain("Move destination exists")
+        expect(result.metadata.failedHunks[0].error).toContain("Force Move to")
+        // Both source and destination preserved unchanged
+        expect(await fs.readFile(original, "utf-8")).toBe("from\n")
+        expect(await fs.readFile(destination, "utf-8")).toBe("existing\n")
       },
     })
   })
@@ -617,6 +646,119 @@ EOF`
         await execute({ patchText }, ctx)
         // Result has ASCII quotes because that's what the patch specifies
         expect(await fs.readFile(target, "utf-8")).toBe(`He said "hi"\nsome${emDash}dash\nend\n`)
+      },
+    })
+  })
+
+  test("rejects overlapping hunks in same file", async () => {
+    await using fixture = await tmpdir()
+    const { ctx } = makeCtx()
+
+    await WithInstance.provide({
+      directory: fixture.path,
+      fn: async () => {
+        const target = path.join(fixture.path, "overlap.txt")
+        await fs.writeFile(target, "a\nb\nc\n", "utf-8")
+
+        // Two chunks targeting the same range. lineIndex advancing normally
+        // would make the second chunk's pattern unfindable, but we want the
+        // overlap invariant check to catch it explicitly with a clear error
+        // if future changes ever bypass the lineIndex monotonic assumption.
+        // Direct test of `computeReplacements` overlap guard via patch that
+        // uses context to reset lineIndex backward (not currently possible,
+        // so this test documents the defensive contract).
+        const patchText = "*** Begin Patch\n*** Update File: overlap.txt\n@@\n-a\n+A\n@@\n-a\n+B\n*** End Patch"
+
+        const result = await execute({ patchText }, ctx)
+        // Second chunk fails to find "a" because lineIndex advanced — this is
+        // the existing protection. The defensive overlap check would catch
+        // the case if lineIndex logic ever regressed.
+        expect(result.metadata.failedHunks.length).toBeGreaterThan(0)
+        expect(result.metadata.failedHunks[0].error).toContain("Failed to derive contents")
+        // File unchanged
+        expect(await fs.readFile(target, "utf-8")).toBe("a\nb\nc\n")
+      },
+    })
+  })
+
+  test("rejects ambiguous fuzzy match without context", async () => {
+    await using fixture = await tmpdir()
+    const { ctx } = makeCtx()
+
+    await WithInstance.provide({
+      directory: fixture.path,
+      fn: async () => {
+        const target = path.join(fixture.path, "ambiguous.txt")
+        // File has two lines that match under trim comparator after exact match fails
+        await fs.writeFile(target, "  value\nother\n  value\n", "utf-8")
+
+        // Patch's old_lines "value" has no leading spaces → exact match fails,
+        // trim pass finds TWO matches → ambiguous
+        const patchText = "*** Begin Patch\n*** Update File: ambiguous.txt\n@@\n-value\n+changed\n*** End Patch"
+
+        const result = await execute({ patchText }, ctx)
+        expect(result.metadata.failedHunks.length).toBeGreaterThan(0)
+        expect(result.metadata.failedHunks[0].error).toContain("Ambiguous")
+        expect(result.metadata.failedHunks[0].error).toContain("@@")
+        // File unchanged
+        expect(await fs.readFile(target, "utf-8")).toBe("  value\nother\n  value\n")
+      },
+    })
+  })
+
+  test("accepts ambiguous fuzzy match when @@ context disambiguates", async () => {
+    await using fixture = await tmpdir()
+    const { ctx } = makeCtx()
+
+    await WithInstance.provide({
+      directory: fixture.path,
+      fn: async () => {
+        const target = path.join(fixture.path, "ctx_disambig.txt")
+        // Two "  value" lines, with a distinguishing context line "marker_b" before the second
+        await fs.writeFile(target, "  value\nmarker_a\n  value\nmarker_b\n  value\n", "utf-8")
+
+        // Patch with @@ context narrows lineIndex, so ambiguity check is skipped
+        const patchText =
+          "*** Begin Patch\n*** Update File: ctx_disambig.txt\n@@ marker_b\n-  value\n+changed\n*** End Patch"
+
+        await execute({ patchText }, ctx)
+        // Should match the value AFTER marker_b
+        expect(await fs.readFile(target, "utf-8")).toBe("  value\nmarker_a\n  value\nmarker_b\nchanged\n")
+      },
+    })
+  })
+
+  test("rejects malformed line in update body", async () => {
+    await using fixture = await tmpdir()
+    const { ctx } = makeCtx()
+
+    await WithInstance.provide({
+      directory: fixture.path,
+      fn: async () => {
+        const patchText =
+          "*** Begin Patch\n*** Update File: foo.txt\n@@\n-old\n+new\nthis is not a valid line\n@@\n-other\n+other2\n*** End Patch"
+
+        await expect(execute({ patchText }, ctx)).rejects.toThrow("Malformed patch line")
+      },
+    })
+  })
+
+  test("rejects empty hunk with no changes", async () => {
+    await using fixture = await tmpdir()
+    const { ctx } = makeCtx()
+
+    await WithInstance.provide({
+      directory: fixture.path,
+      fn: async () => {
+        const target = path.join(fixture.path, "empty_hunk.txt")
+        await fs.writeFile(target, "a\nb\n", "utf-8")
+
+        // Two @@ markers back-to-back, second is empty
+        const patchText = "*** Begin Patch\n*** Update File: empty_hunk.txt\n@@\n-a\n+A\n@@\n@@\n-b\n+B\n*** End Patch"
+
+        await expect(execute({ patchText }, ctx)).rejects.toThrow("Empty hunk")
+        // File unchanged
+        expect(await fs.readFile(target, "utf-8")).toBe("a\nb\n")
       },
     })
   })

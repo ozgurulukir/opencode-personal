@@ -166,7 +166,20 @@ export const ApplyPatchTool = Tool.define<
               }
 
               const movePath = hunk.move_path ? path.resolve(instance.directory, hunk.move_path) : undefined
-              yield* assertExternalDirectoryEffect(ctx, movePath)
+              if (movePath) {
+                yield* assertExternalDirectoryEffect(ctx, movePath)
+                // Refuse to silently overwrite an existing destination unless the
+                // patch explicitly uses *** Force Move to:. Without this gate, an
+                // LLM hallucinating a move target can destroy user data.
+                const destStats = yield* afs.stat(movePath).pipe(Effect.catch(() => Effect.succeed(undefined)))
+                if (destStats && !hunk.force) {
+                  failedHunks.push({
+                    path: hunk.path,
+                    error: `Move destination exists: ${movePath}. Use *** Force Move to: to overwrite.`,
+                  })
+                  break
+                }
+              }
 
               fileChanges.push({
                 filePath,

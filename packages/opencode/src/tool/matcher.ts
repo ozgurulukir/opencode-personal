@@ -32,6 +32,37 @@ export function findPattern(lines: string[], pattern: string[], startIndex: numb
   return -1
 }
 
+/**
+ * Like findPattern, but stops as soon as a second match is found. Used to
+ * detect ambiguity without scanning the whole file when only uniqueness
+ * matters. Returns the first match position and whether more than one
+ * match exists in [startIndex, end].
+ */
+export function findPatternAmbiguity(
+  lines: string[],
+  pattern: string[],
+  startIndex: number,
+  compare: Comparator,
+): { position: number; ambiguous: boolean } {
+  if (pattern.length === 0) return { position: -1, ambiguous: false }
+
+  let position = -1
+  for (let i = startIndex; i <= lines.length - pattern.length; i++) {
+    let matches = true
+    for (let j = 0; j < pattern.length; j++) {
+      if (!compare(lines[i + j], pattern[j])) {
+        matches = false
+        break
+      }
+    }
+    if (matches) {
+      if (position === -1) position = i
+      else return { position, ambiguous: true }
+    }
+  }
+  return { position, ambiguous: false }
+}
+
 export function findExactPattern(lines: string[], pattern: string[], startIndex: number, eof: boolean): number {
   if (pattern.length === 0) return -1
 
