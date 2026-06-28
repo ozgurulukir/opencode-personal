@@ -26,6 +26,8 @@ import { Ripgrep } from "@/file/ripgrep"
 import * as Truncate from "@/tool/truncate"
 import { InstanceState } from "@/effect/instance-state"
 import { Reference } from "@/reference/reference"
+import { SearchService } from "@/search/search"
+import { EmbeddingService } from "@/search/embedding"
 
 const node = CrossSpawnSpawner.defaultLayer
 const originalExperimentalScout = Flag.OPENCODE_EXPERIMENTAL_SCOUT
@@ -53,6 +55,19 @@ const registryLayer = ToolRegistry.layer.pipe(
   Layer.provide(node),
   Layer.provide(Ripgrep.defaultLayer),
   Layer.provide(Truncate.defaultLayer),
+  Layer.provide(
+    Layer.succeed(SearchService, {
+      index: () => Effect.void,
+      search: () => Effect.succeed([]),
+      reset: Effect.void,
+    }),
+  ),
+  Layer.provide(
+    Layer.succeed(EmbeddingService, {
+      embed: () => Effect.succeed([]),
+      dimension: 384,
+    }),
+  ),
 )
 
 const it = testEffect(Layer.mergeAll(registryLayer, node))

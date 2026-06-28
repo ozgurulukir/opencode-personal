@@ -40,6 +40,7 @@ import { ConfigPlugin } from "./plugin"
 import { ConfigProvider } from "./provider"
 import { ConfigReference } from "./reference"
 import { ConfigServer } from "./server"
+import { SearchInfo } from "./search"
 import { ConfigSkills } from "./skills"
 import { ConfigVariable } from "./variable"
 import { Npm } from "@opencode-ai/core/npm"
@@ -301,6 +302,9 @@ export const Info = Schema.Struct({
       }),
     }),
   ),
+  search: Schema.optional(SearchInfo).annotate({
+    description: "Search and semantic search configuration",
+  }),
 })
   .annotate({ identifier: "Config" })
   .pipe(

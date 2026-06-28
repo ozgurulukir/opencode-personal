@@ -1,0 +1,7 @@
+- Semantic search over workspace files using vector embeddings
+- Finds conceptually similar code, not just exact keyword or regex matches
+- Useful for discovering how a concept is implemented when you don't know exact names
+- Requires the workspace to be indexed first — call index_workspace before using this tool
+- Returns ranked code snippets with file paths and relevance scores
+- Use grep for exact pattern matching (regex, symbols, strings)
+- Use semantic_search for conceptual queries (e.g. "how authentication works", "error handling patterns")

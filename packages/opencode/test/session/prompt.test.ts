@@ -47,6 +47,8 @@ import * as Database from "../../src/storage/db"
 import { Ripgrep } from "../../src/file/ripgrep"
 import { Format } from "../../src/format"
 import { Reference } from "../../src/reference/reference"
+import { SearchService } from "@/search/search"
+import { EmbeddingService } from "@/search/embedding"
 import { provideTmpdirInstance, provideTmpdirServer } from "../fixture/fixture"
 import { testEffect } from "../lib/effect"
 import { reply, TestLLMServer } from "../lib/llm-server"
@@ -190,6 +192,19 @@ function makeHttp() {
     Layer.provideMerge(todo),
     Layer.provideMerge(question),
     Layer.provideMerge(deps),
+    Layer.provide(
+      Layer.succeed(SearchService, {
+        index: () => Effect.void,
+        search: () => Effect.succeed([]),
+        reset: Effect.void,
+      }),
+    ),
+    Layer.provide(
+      Layer.succeed(EmbeddingService, {
+        embed: () => Effect.succeed([]),
+        dimension: 384,
+      }),
+    ),
   )
   const trunc = Truncate.layer.pipe(Layer.provideMerge(deps))
   const proc = SessionProcessor.layer.pipe(

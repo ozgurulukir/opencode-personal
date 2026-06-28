@@ -1,0 +1,6 @@
+- Index the workspace for semantic search by chunking files and generating embeddings
+- Call this once before using semantic_search, or when significant code changes have been made
+- Scans source files (.ts, .js, .py, .rs, .go, .md, etc.), chunks them, and stores vector embeddings
+- Uses local embedding model by default (no API key required); or OpenAI if configured
+- Returns the number of files and chunks indexed
+- This operation may take 10-60 seconds depending on workspace size
