@@ -137,19 +137,7 @@ const live: Layer.Layer<
       }
 
       const isWorkflow = language instanceof GitLabWorkflowLanguageModel
-      const messages = isOpenaiOauth
-        ? input.messages
-        : isWorkflow
-          ? input.messages
-          : [
-              ...system.map(
-                (x): ModelMessage => ({
-                  role: "system",
-                  content: x,
-                }),
-              ),
-              ...input.messages,
-            ]
+      const messages = input.messages
 
       const params = yield* plugin.trigger(
         "chat.params",
@@ -381,6 +369,7 @@ const live: Layer.Layer<
           ...headers,
         },
         maxRetries: input.retries ?? 0,
+        system: isOpenaiOauth || isWorkflow ? undefined : system.map((x) => ({ role: "system" as const, content: x })),
         messages,
         model: wrapLanguageModel({
           model: language,
