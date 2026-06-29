@@ -101,6 +101,8 @@ function parseUpdateFileChunks(lines: string[], startIdx: number): { chunks: Upd
           if (changeLine.trim() !== "") {
             throw new Error(`Malformed patch line in update body: ${changeLine}`)
           }
+          oldLines.push("")
+          newLines.push("")
         }
 
         i++
@@ -263,14 +265,20 @@ function computeReplacements(
 
   for (const chunk of chunks) {
     // Track whether the LLM provided @@ context for this chunk. When context
-    // is present, lineIndex is narrowed (line 242 below), so we accept the
+    // is present, lineIndex is narrowed (line 278 below), so we accept the
     // first match without ambiguity checking. Without context, fuzzy matches
     // must be unique in the rest of the file to avoid silent wrong-location
     // edits.
-    const requireUnique = !chunk.change_context
+    let requireUnique = !chunk.change_context
 
     // Handle context-based seeking
     if (chunk.change_context) {
+      // If the context itself is ambiguous, force requireUnique to be true for old_lines
+      const { ambiguous } = findPatternAmbiguity(originalLines, [chunk.change_context], lineIndex, Comparators.normalized)
+      if (ambiguous) {
+        requireUnique = true
+      }
+
       const contextIdx = seekSequence(originalLines, [chunk.change_context], lineIndex)
       if (contextIdx === -1) {
         throw new Error(`Failed to find context '${chunk.change_context}' in ${filePath}`)
@@ -300,6 +308,15 @@ function computeReplacements(
       pattern = pattern.slice(0, -1)
       if (newSlice.length > 0 && newSlice[newSlice.length - 1] === "") {
         newSlice = newSlice.slice(0, -1)
+      }
+      found = seekSequence(originalLines, pattern, lineIndex, chunk.is_end_of_file, requireUnique)
+    }
+
+    // If still not found, try to strip a leading empty line if present
+    if (found === -1 && pattern.length > 1 && pattern[0] === "") {
+      pattern = pattern.slice(1)
+      if (newSlice.length > 0 && newSlice[0] === "") {
+        newSlice = newSlice.slice(1)
       }
       found = seekSequence(originalLines, pattern, lineIndex, chunk.is_end_of_file, requireUnique)
     }

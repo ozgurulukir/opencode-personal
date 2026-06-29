@@ -762,4 +762,51 @@ EOF`
       },
     })
   })
+
+  test("matches with leading empty line in hunk", async () => {
+    await using fixture = await tmpdir()
+    const { ctx } = makeCtx()
+
+    await WithInstance.provide({
+      directory: fixture.path,
+      fn: async () => {
+        const target = path.join(fixture.path, "leading_empty.txt")
+        await fs.writeFile(target, "line1\nline2\n", "utf-8")
+
+        // Hunk starts with a leading empty line that isn't actually in the file segment we target
+        const patchText =
+          "*** Begin Patch\n*** Update File: leading_empty.txt\n@@\n\n-line2\n+changed\n*** End Patch"
+
+        await execute({ patchText }, ctx)
+        expect(await fs.readFile(target, "utf-8")).toBe("line1\nchanged\n")
+      },
+    })
+  })
+
+  test("rejects when context is ambiguous and old lines are also ambiguous", async () => {
+    await using fixture = await tmpdir()
+    const { ctx } = makeCtx()
+
+    await WithInstance.provide({
+      directory: fixture.path,
+      fn: async () => {
+        const target = path.join(fixture.path, "ambiguous_ctx.txt")
+        // File has two identical blocks, each with the same context "}" and same old lines "  value"
+        // We put leading spaces on value so it only matches fuzzily (via trim) and triggers requireUnique check.
+        await fs.writeFile(target, "}\n  value\n}\n  value\n", "utf-8")
+
+        // Patch specifies a context "}" which exists twice, and old line "value" which matches fuzzily.
+        // It should reject as ambiguous because context is ambiguous and old lines are also ambiguous.
+        const patchText =
+          "*** Begin Patch\n*** Update File: ambiguous_ctx.txt\n@@ }\n-value\n+changed\n*** End Patch"
+
+        const result = await execute({ patchText }, ctx)
+        expect(result.metadata.failedHunks.length).toBeGreaterThan(0)
+        expect(result.metadata.failedHunks[0].error).toContain("Ambiguous")
+        expect(await fs.readFile(target, "utf-8")).toBe("}\n  value\n}\n  value\n")
+      },
+    })
+  })
 })
+
+

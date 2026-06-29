@@ -66,6 +66,26 @@ describe("Patch namespace", () => {
       }
     })
 
+    test("should parse empty lines inside update body as empty context lines", () => {
+      const patchText = `*** Begin Patch
+*** Update File: existing.txt
+@@
+ old line
+
++added line
+*** End Patch`
+
+      const result = Patch.parsePatch(patchText)
+      expect(result.hunks).toHaveLength(1)
+      const hunk = result.hunks[0]
+      expect(hunk.type).toBe("update")
+      if (hunk.type === "update") {
+        expect(hunk.chunks).toHaveLength(1)
+        expect(hunk.chunks[0].old_lines).toEqual(["old line", ""])
+        expect(hunk.chunks[0].new_lines).toEqual(["old line", "", "added line"])
+      }
+    })
+
     test("should throw error for invalid patch format", () => {
       const invalidPatch = `This is not a valid patch`
 
@@ -73,3 +93,4 @@ describe("Patch namespace", () => {
     })
   })
 })
+
