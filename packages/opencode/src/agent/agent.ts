@@ -464,19 +464,12 @@ export const layer = Layer.effect(
           },
           temperature: 0.3,
           messages: [
-            ...(isOpenaiOauth
-              ? []
-              : system.map(
-                  (item): ModelMessage => ({
-                    role: "system",
-                    content: item,
-                  }),
-                )),
             {
               role: "user",
               content: `Create an agent configuration based on this request: "${input.description}".\n\nIMPORTANT: The following identifiers already exist and must NOT be used: ${existing.map((i) => i.name).join(", ")}\n  Return ONLY the JSON object, no other text, do not wrap in backticks`,
             },
           ],
+          system: isOpenaiOauth ? undefined : system.map((item) => ({ role: "system" as const, content: item })),
           model: language,
           schema: z.object({
             identifier: z.string(),
