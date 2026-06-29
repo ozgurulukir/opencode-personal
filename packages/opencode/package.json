@@ -12,6 +12,7 @@
     "test:httpapi": "bun run script/httpapi-exercise.ts --mode coverage --fail-on-missing --fail-on-skip && bun run script/httpapi-exercise.ts --mode auth --fail-on-missing --fail-on-skip && bun run script/httpapi-exercise.ts --mode effect --fail-on-missing --fail-on-skip",
     "build": "bun run script/build.ts",
     "fix-node-pty": "bun run script/fix-node-pty.ts",
+    "copy-wasm-glue": "bun run script/copy-wasm-glue.mjs",
     "dev": "bun run --conditions=browser ./src/index.ts",
     "dev:temporary": "bun run --conditions=browser ./src/temporary.ts",
     "db": "bun drizzle-kit"
@@ -52,6 +53,10 @@
     "@parcel/watcher-linux-x64-musl": "2.5.1",
     "@parcel/watcher-win32-arm64": "2.5.1",
     "@parcel/watcher-win32-x64": "2.5.1",
+    "@zvec/bindings-darwin-arm64": "0.5.0",
+    "@zvec/bindings-linux-arm64": "0.5.0",
+    "@zvec/bindings-linux-x64": "0.5.0",
+    "@zvec/bindings-win32-x64": "0.5.0",
     "@standard-schema/spec": "1.0.0",
     "@tsconfig/bun": "catalog:",
     "@types/babel__core": "7.20.5",
@@ -170,7 +175,7 @@
   },
   "optionalDependencies": {
     "@zvec/zvec": "0.5.0",
-    "@xenova/transformers": "2.17.2"
+    "onnxruntime-web": "1.27.0"
   },
   "overrides": {
     "drizzle-orm": "catalog:"

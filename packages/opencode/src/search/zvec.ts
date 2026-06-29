@@ -1,29 +1,56 @@
 import { Effect, Layer, Context } from "effect"
+import { createHash } from "node:crypto"
 import { AppFileSystem } from "@opencode-ai/core/filesystem"
+import * as Log from "@opencode-ai/core/util/log"
 import { SearchService, type SearchResult, type SearchServiceInterface } from "./search"
 import { InstanceState } from "@/effect/instance-state"
+import { lazy } from "@/util/lazy"
 
-// Lazy-load @zvec/zvec to avoid breaking Bun compile mode.
-// The native .node addon can't be resolved from the virtual filesystem in compiled binaries.
-// In dev mode (bun dev) the package loads normally from node_modules.
+const log = Log.create({ service: "search.zvec" })
 
-type ZVecModule = typeof import("@zvec/zvec")
-
-let zvecMod: ZVecModule | null = null
-let zvecLoadFailed = false
-
-async function getZvec(): Promise<ZVecModule | null> {
-  if (zvecMod) return zvecMod
-  if (zvecLoadFailed) return null
-  try {
-    zvecMod = await import("@zvec/zvec")
-    zvecMod.ZVecInitialize({ logLevel: zvecMod.ZVecLogLevel.ERROR })
-    return zvecMod
-  } catch (e) {
-    zvecLoadFailed = true
-    return null
-  }
+// zvec document IDs reject characters like '/', ':' and '.'. Hash opaque IDs to
+// hex at the zvec boundary — the human-readable path is kept in the `path` field.
+function docId(input: string): string {
+  return createHash("sha1").update(input).digest("hex").slice(0, 16)
 }
+
+// Load the platform-specific native binding directly, mirroring the @parcel/watcher
+// pattern (src/file/watcher.ts). A template `require` of the per-platform binding
+// package is statically analyzable by Bun --compile, so the .node addon is embedded
+// into the standalone binary. The @zvec/zvec JS wrapper is intentionally bypassed:
+// its runtime `require.resolve` of the optional binding package cannot resolve inside
+// the compiled binary's virtual filesystem, which previously caused silent no-ops.
+
+interface ZVecModule {
+  readonly ZVecDataType: (typeof import("@zvec/zvec"))["ZVecDataType"]
+  readonly ZVecIndexType: (typeof import("@zvec/zvec"))["ZVecIndexType"]
+  readonly ZVecMetricType: (typeof import("@zvec/zvec"))["ZVecMetricType"]
+  readonly ZVecLogLevel: (typeof import("@zvec/zvec"))["ZVecLogLevel"]
+  readonly ZVecCollectionSchema: (typeof import("@zvec/zvec"))["ZVecCollectionSchema"]
+  readonly ZVecInitialize: (typeof import("@zvec/zvec"))["ZVecInitialize"]
+  readonly ZVecCreateAndOpen: (typeof import("@zvec/zvec"))["ZVecCreateAndOpen"]
+  readonly ZVecOpen: (typeof import("@zvec/zvec"))["ZVecOpen"]
+}
+
+const zvec = lazy((): ZVecModule | undefined => {
+  try {
+    const b = require(`@zvec/bindings-${process.platform}-${process.arch}`) as Record<string, any>
+    b.initialize({ logLevel: b.LogLevel.ERROR })
+    return {
+      ZVecDataType: b.DataType,
+      ZVecIndexType: b.IndexType,
+      ZVecMetricType: b.MetricType,
+      ZVecLogLevel: b.LogLevel,
+      ZVecCollectionSchema: b.CollectionSchema,
+      ZVecInitialize: b.initialize,
+      ZVecCreateAndOpen: b.createAndOpen,
+      ZVecOpen: b.open,
+    }
+  } catch (error) {
+    log.error("failed to load zvec binding", { error })
+    return undefined
+  }
+})
 
 const EMBEDDING_DIM = 384
 
@@ -35,31 +62,33 @@ class ZvecIndex {
     this.path = path
   }
 
-  private async open(zvec: ZVecModule) {
+  private open(): unknown {
     if (this.collection) return this.collection
-    const schema = new zvec.ZVecCollectionSchema({
+    const mod = zvec()
+    if (!mod) throw new Error("zvec binding unavailable")
+    const schema = new mod.ZVecCollectionSchema({
       name: "workspace_search",
       vectors: {
         name: "embedding",
-        dataType: zvec.ZVecDataType.VECTOR_FP32,
+        dataType: mod.ZVecDataType.VECTOR_FP32,
         dimension: EMBEDDING_DIM,
         indexParams: {
-          indexType: zvec.ZVecIndexType.HNSW,
-          metricType: zvec.ZVecMetricType.COSINE,
+          indexType: mod.ZVecIndexType.HNSW,
+          metricType: mod.ZVecMetricType.COSINE,
           m: 50,
           efConstruction: 200,
         },
       },
       fields: [
-        { name: "path", dataType: zvec.ZVecDataType.STRING },
-        { name: "content", dataType: zvec.ZVecDataType.STRING },
-        { name: "mtime", dataType: zvec.ZVecDataType.INT64 },
+        { name: "path", dataType: mod.ZVecDataType.STRING },
+        { name: "content", dataType: mod.ZVecDataType.STRING },
+        { name: "mtime", dataType: mod.ZVecDataType.INT64 },
       ],
     })
     try {
-      this.collection = zvec.ZVecCreateAndOpen(this.path, schema)
+      this.collection = mod.ZVecCreateAndOpen(this.path, schema)
     } catch {
-      this.collection = zvec.ZVecOpen(this.path)
+      this.collection = mod.ZVecOpen(this.path)
     }
     return this.collection
   }
@@ -67,14 +96,13 @@ class ZvecIndex {
   index(chunks: Array<{ id: string; path: string; content: string; embedding: number[] }>) {
     return Effect.tryPromise({
       try: async () => {
-        const zvec = await getZvec()
-        if (!zvec) return
-        const col = await this.open(zvec)
+        if (!zvec()) return
+        const col = this.open()
         ;(col as any).insertSync(
           chunks.map((c) => ({
-            id: c.id,
+            id: docId(c.id),
             vectors: { embedding: c.embedding },
-            fields: { path: c.path, content: c.content, mtime: BigInt(Date.now()) },
+            fields: { path: c.path, content: c.content, mtime: Date.now() },
           })),
         )
       },
@@ -85,16 +113,15 @@ class ZvecIndex {
   search(query: string, embedding: number[], topK = 10) {
     return Effect.tryPromise({
       try: async () => {
-        const zvec = await getZvec()
-        if (!zvec) return [] as SearchResult[]
-        const col = await this.open(zvec)
+        const mod = zvec()
+        if (!mod) return [] as SearchResult[]
+        const col = this.open()
         const results = (col as any).querySync({
           fieldName: "embedding",
           vector: new Float32Array(embedding),
-          fts: { queryString: query },
           topk: topK,
           outputFields: ["path", "content"],
-          params: { indexType: zvec.ZVecIndexType.HNSW, ef: 100 },
+          params: { indexType: mod.ZVecIndexType.HNSW, ef: 100 },
         })
         return (results as any[]).map((r) => ({
           id: r.id,
@@ -136,7 +163,10 @@ export const layer = Layer.effect(
       Effect.fn("SearchService.state")(function* () {
         const directory = yield* InstanceState.directory
         const indexPath = `${directory}/.opencode/zvec_index`
-        yield* fs.ensureDir(indexPath).pipe(Effect.catch(() => Effect.void))
+        // Ensure the parent (.opencode) exists, but NOT the index dir itself —
+        // ZVecCreateAndOpen must create it fresh (it rejects an already-existing path,
+        // and the open() fallback uses ZVecOpen only for re-opening an existing DB).
+        yield* fs.ensureDir(`${directory}/.opencode`).pipe(Effect.catch(() => Effect.void))
         return new ZvecIndex(indexPath)
       }),
     )
