@@ -10,6 +10,13 @@ const CHUNK_LINES = 100
 const CHUNK_MIN_CHARS = 200
 const EMBED_BATCH = 32
 
+// Strip ANSI/VT100 escape sequences (color codes, cursor moves, etc.) so raw
+// terminal output files don't pollute the embedding space.
+const ANSI_ESCAPE_RE = /\u001b\[[0-9;]*[a-zA-Z]/g
+function stripAnsi(text: string): string {
+  return text.replace(ANSI_ESCAPE_RE, "")
+}
+
 export const Parameters = Schema.Struct({
   force: Schema.Boolean.pipe(Schema.optional, Schema.withDecodingDefault(Effect.succeed(false))).annotate({
     description: "Force re-indexing all files even if already indexed (default false)",
@@ -46,7 +53,7 @@ export const IndexWorkspaceTool = Tool.define(
             ) {
               continue
             }
-            const content = yield* fs.readFileString(file).pipe(Effect.catch(() => Effect.succeed("")))
+            const content = stripAnsi(yield* fs.readFileString(file).pipe(Effect.catch(() => Effect.succeed(""))))
             if (!content) continue
             const lines = content.split("\n")
             if (lines.length <= CHUNK_LINES) {

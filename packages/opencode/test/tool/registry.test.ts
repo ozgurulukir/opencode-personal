@@ -35,40 +35,41 @@ const configLayer = TestConfig.layer({
   directories: () => InstanceState.directory.pipe(Effect.map((dir) => [path.join(dir, ".opencode")])),
 })
 
-const registryLayer = ToolRegistry.layer.pipe(
-  Layer.provide(configLayer),
-  Layer.provide(Plugin.defaultLayer),
-  Layer.provide(Question.defaultLayer),
-  Layer.provide(Todo.defaultLayer),
-  Layer.provide(Skill.defaultLayer),
-  Layer.provide(Agent.defaultLayer),
-  Layer.provide(Session.defaultLayer),
-  Layer.provide(Provider.defaultLayer),
-  Layer.provide(Git.defaultLayer),
-  Layer.provide(Reference.defaultLayer),
-  Layer.provide(LSP.defaultLayer),
-  Layer.provide(Instruction.defaultLayer),
-  Layer.provide(AppFileSystem.defaultLayer),
-  Layer.provide(Bus.layer),
-  Layer.provide(FetchHttpClient.layer),
-  Layer.provide(Format.defaultLayer),
-  Layer.provide(node),
-  Layer.provide(Ripgrep.defaultLayer),
-  Layer.provide(Truncate.defaultLayer),
-  Layer.provide(
-    Layer.succeed(SearchService, {
-      index: () => Effect.void,
-      search: () => Effect.succeed([]),
-      reset: Effect.void,
-    }),
-  ),
-  Layer.provide(
-    Layer.succeed(EmbeddingService, {
-      embed: () => Effect.succeed([]),
-      dimension: 384,
-    }),
-  ),
+const searchAndEmbeddingMock = Layer.mergeAll(
+  Layer.succeed(SearchService, {
+    index: () => Effect.void,
+    search: () => Effect.succeed([]),
+    reset: Effect.void,
+  }),
+  Layer.succeed(EmbeddingService, {
+    embed: () => Effect.succeed([]),
+    dimension: 384,
+  }),
 )
+
+const registryLayer = ToolRegistry.layer
+  .pipe(
+    Layer.provide(configLayer),
+    Layer.provide(Plugin.defaultLayer),
+    Layer.provide(Question.defaultLayer),
+    Layer.provide(Todo.defaultLayer),
+    Layer.provide(Skill.defaultLayer),
+    Layer.provide(Agent.defaultLayer),
+    Layer.provide(Session.defaultLayer),
+    Layer.provide(Provider.defaultLayer),
+    Layer.provide(Git.defaultLayer),
+    Layer.provide(Reference.defaultLayer),
+    Layer.provide(LSP.defaultLayer),
+    Layer.provide(Instruction.defaultLayer),
+    Layer.provide(AppFileSystem.defaultLayer),
+    Layer.provide(Bus.layer),
+    Layer.provide(FetchHttpClient.layer),
+    Layer.provide(Format.defaultLayer),
+    Layer.provide(node),
+    Layer.provide(Ripgrep.defaultLayer),
+    Layer.provide(Truncate.defaultLayer),
+  )
+  .pipe(Layer.provide(searchAndEmbeddingMock))
 
 const it = testEffect(Layer.mergeAll(registryLayer, node))
 
