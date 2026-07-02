@@ -51,7 +51,7 @@ const singleFlag = process.argv.includes("--single")
 const baselineFlag = process.argv.includes("--baseline")
 const skipInstall = process.argv.includes("--skip-install")
 const sourcemapsFlag = process.argv.includes("--sourcemaps")
-const plugin = createSolidTransformPlugin()
+const solidPlugin = createSolidTransformPlugin()
 const skipEmbedWebUi = process.argv.includes("--skip-embed-web-ui")
 
 const createEmbeddedWebUIBundle = async () => {
@@ -171,6 +171,30 @@ if (!skipInstall) {
   await $`bun install --os="*" --cpu="*" @opentui/core@${pkg.dependencies["@opentui/core"]}`
   await $`bun install --os="*" --cpu="*" @parcel/watcher@${pkg.dependencies["@parcel/watcher"]}`
 }
+// Resolve @opentui/core's parser.worker.js (may be in bun cache)
+const opentuiLocalPath = path.resolve(dir, "node_modules/@opentui/core/parser.worker.js")
+const opentuiRootPath = path.resolve(dir, "../../node_modules/@opentui/core/parser.worker.js")
+const parserWorker = fs.realpathSync(fs.existsSync(opentuiLocalPath) ? opentuiLocalPath : opentuiRootPath)
+
+// web-tree-sitter@0.26.10 renamed tree-sitter.wasm to web-tree-sitter.wasm, but
+// @opentui/core/parser.worker.js still imports "web-tree-sitter/tree-sitter.wasm".
+// The installed web-tree-sitter version varies across bun cache entries (0.25.10 uses
+// tree-sitter.wasm, 0.26.10 uses web-tree-sitter.wasm). Create a Bun plugin to remap
+// the import to the actual file regardless of version.
+const wtsDir = path.resolve(path.dirname(parserWorker), "../../web-tree-sitter")
+const availableWasm = ["web-tree-sitter.wasm", "tree-sitter.wasm"].find((f) =>
+  fs.existsSync(path.join(wtsDir, f)),
+)
+const wasmResolver = {
+  name: "web-tree-sitter-compat",
+  setup(build: any) {
+    build.onResolve({ filter: /^web-tree-sitter\/tree-sitter\.wasm$/ }, (args: any) => {
+      return { path: path.join(wtsDir, availableWasm ?? "web-tree-sitter.wasm") }
+    })
+  },
+}
+
+
 for (const item of targets) {
   const name = [
     pkg.name,
@@ -185,9 +209,6 @@ for (const item of targets) {
   console.log(`building ${name}`)
   await $`mkdir -p dist/${name}/bin`
 
-  const localPath = path.resolve(dir, "node_modules/@opentui/core/parser.worker.js")
-  const rootPath = path.resolve(dir, "../../node_modules/@opentui/core/parser.worker.js")
-  const parserWorker = fs.realpathSync(fs.existsSync(localPath) ? localPath : rootPath)
   const workerPath = "./src/cli/cmd/tui/worker.ts"
 
   // Use platform-specific bunfs root path based on target OS
@@ -197,7 +218,7 @@ for (const item of targets) {
   await Bun.build({
     conditions: ["browser"],
     tsconfig: "./tsconfig.json",
-    plugins: [plugin],
+    plugins: [solidPlugin, wasmResolver],
     external: ["node-gyp"],
     format: "esm",
     minify: true,
