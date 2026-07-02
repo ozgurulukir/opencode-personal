@@ -1,4 +1,3 @@
-import type { ToolPart } from "@opencode-ai/sdk/v2"
 import type * as Tool from "@/tool/tool"
 import type { ApplyPatchTool } from "@/tool/apply_patch"
 import type { ShellTool as BashTool } from "@/tool/shell"
@@ -18,28 +17,20 @@ import { webSearchProviderLabel, type WebSearchTool } from "@/tool/websearch"
 import type { WriteTool } from "@/tool/write"
 import type { ToolSnapshot } from "./types"
 import type {
-  ToolDict,
-  ToolFrame,
   ToolInline,
   ToolPermissionInfo,
   ToolPermissionProps,
   ToolProps,
   ToolRegistry,
   ToolRule,
-  ToolView,
 } from "./tool.types"
 import {
   count,
   dict,
   fail,
-  fallbackFinal,
-  fallbackInline,
-  fallbackStart,
   info,
   list,
   num,
-  permission,
-  props,
   span,
   text,
   toolError,

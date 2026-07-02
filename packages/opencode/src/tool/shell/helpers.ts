@@ -3,8 +3,7 @@ import { createReadStream } from "node:fs"
 import { createInterface } from "readline"
 import path from "path"
 import { fileURLToPath } from "url"
-import { Language, type Node } from "web-tree-sitter"
-import { AppFileSystem } from "@opencode-ai/core/filesystem"
+import { type Node } from "web-tree-sitter"
 import * as Log from "@opencode-ai/core/util/log"
 
 export const MAX_METADATA_LENGTH = 30_000
