@@ -41,8 +41,11 @@ const TolerantToolSchema = ToolSchema.extend({
   outputSchema: z.unknown().optional(),
 })
 
+// The MCP SDK resolves its own zod version, so its schema types are structurally
+// incompatible with our workspace zod types at compile time. Cast at the boundary
+// where SDK schemas cross with workspace zod helpers; runtime behavior is identical.
 const TolerantListToolsResultSchema = z.looseObject({
-  tools: z.array(TolerantToolSchema),
+  tools: z.array(TolerantToolSchema as unknown as z.ZodTypeAny),
   nextCursor: z.string().optional(),
 })
 
@@ -146,15 +149,20 @@ function listTools(key: string, client: MCPClient, timeout: number) {
 
       log.warn("failed to validate MCP tool output schemas, retrying without output schema validation", { key, error })
       return Effect.tryPromise({
-        try: () => client.request({ method: "tools/list" }, TolerantListToolsResultSchema, { timeout }),
+        try: () => client.request({ method: "tools/list" }, TolerantListToolsResultSchema as any, { timeout }),
         catch: (err) => (err instanceof Error ? err : new Error(String(err))),
       }).pipe(
-        Effect.map((result) =>
-          result.tools.map((tool) => ({
-            name: tool.name,
-            description: tool.description,
-            inputSchema: tool.inputSchema,
-          })),
+        Effect.map(
+          (result: {
+            tools: Array<{ name: string; description?: string; inputSchema: unknown }>
+          }) =>
+            result.tools.map(
+              (tool): MCPToolDef => ({
+                name: tool.name,
+                description: tool.description,
+                inputSchema: tool.inputSchema as MCPToolDef["inputSchema"],
+              }),
+            ),
         ),
       )
     }),

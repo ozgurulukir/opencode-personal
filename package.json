@@ -14,7 +14,7 @@
     "lint": "oxlint",
     "typecheck": "bun turbo typecheck",
     "upgrade-opentui": "bun run script/upgrade-opentui.ts",
-    "postinstall": "bun run --cwd packages/opencode fix-node-pty && bun run --cwd packages/opencode copy-wasm-glue",
+    "postinstall": "bun run script/dedupe-opentui.ts && bun run --cwd packages/opencode fix-node-pty && bun run --cwd packages/opencode copy-wasm-glue",
     "prepare": "husky",
     "random": "echo 'Random script'",
     "hello": "echo 'Hello World!'",
