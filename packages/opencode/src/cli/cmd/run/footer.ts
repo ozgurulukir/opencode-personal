@@ -526,7 +526,7 @@ export class RunFooter implements FooterApi {
     }
 
     this.closed = true
-    for (const fn of [...this.closes]) {
+    for (const fn of this.closes) {
       fn()
     }
   }
@@ -615,7 +615,7 @@ export class RunFooter implements FooterApi {
       return false
     }
 
-    for (const fn of [...this.prompts]) {
+    for (const fn of this.prompts) {
       fn(input)
     }
 

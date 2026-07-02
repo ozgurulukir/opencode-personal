@@ -1,6 +1,5 @@
 import os from "os"
 import path from "path"
-import type { ToolDict, ToolFrame } from "./tool.types"
 
 export function toolPath(input?: string, opts: { home?: boolean } = {}): string {
   if (!input) {

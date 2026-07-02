@@ -6,13 +6,10 @@ import type {
   ToolInline,
   ToolPermissionInfo,
   ToolPermissionProps,
-  ToolProps,
   ToolView,
 } from "./tool.types"
-import { dict, fallbackFinal, fallbackInline, fallbackStart, props, text, toolError } from "./tool.helpers"
-import { lspTitle, rule, snapPatch, taskResult } from "./tool.rules"
-import { webSearchProviderLabel } from "@/tool/websearch"
-import * as Locale from "@/util/locale"
+import { dict, fallbackFinal, fallbackInline, fallbackStart, props, text } from "./tool.helpers"
+import { rule, taskResult } from "./tool.rules"
 import path from "path"
 import { LANGUAGE_EXTENSIONS } from "@/lsp/language"
 

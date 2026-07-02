@@ -2,13 +2,11 @@ import { Effect, Stream } from "effect"
 import { createWriteStream } from "node:fs"
 import * as Tool from "../tool"
 import path from "path"
-import * as Log from "@opencode-ai/core/util/log"
 import { containsPath, type InstanceContext } from "../../project/instance-context"
 import { InstanceState } from "@/effect/instance-state"
 import { lazy } from "@/util/lazy"
 import { Language, type Node } from "web-tree-sitter"
 import { AppFileSystem } from "@opencode-ai/core/filesystem"
-import { fileURLToPath } from "url"
 import { Config } from "@/config/config"
 import { Flag } from "@opencode-ai/core/flag/flag"
 import { Shell } from "@/shell/shell"
@@ -20,20 +18,15 @@ import { ChildProcessSpawner } from "effect/unstable/process/ChildProcessSpawner
 import { ShellPrompt, type Parameters } from "./prompt"
 import { BashArity } from "@/permission/arity"
 import {
-  MAX_METADATA_LENGTH,
   CWD,
   FILES,
   CMD_FILES,
-  FLAGS,
-  SWITCHES,
   resolveWasm,
   parts,
   source,
   commands,
   unquote,
   home,
-  envValue,
-  auto,
   expand,
   provider,
   dynamic,
@@ -41,18 +34,10 @@ import {
   pathArgs,
   preview,
   tail,
-  lines,
-  getChangedRanges,
-  linesWithHunks,
-  log as helpersLog,
+  log,
 } from "./helpers"
 
 const DEFAULT_TIMEOUT = Flag.OPENCODE_EXPERIMENTAL_BASH_DEFAULT_TIMEOUT_MS || 2 * 60 * 1000
-
-type Part = {
-  type: string
-  text: string
-}
 
 type Scan = {
   dirs: Set<string>
@@ -64,8 +49,6 @@ type Chunk = {
   text: string
   size: number
 }
-
-const log = helpersLog
 
 const parser = lazy(async () => {
   const { Parser } = await import("web-tree-sitter")

@@ -1,4 +1,3 @@
-import type { ToolPart } from "@opencode-ai/sdk/v2"
 import type * as Tool from "@/tool/tool"
 import type { ApplyPatchTool } from "@/tool/apply_patch"
 import type { ShellTool as BashTool } from "@/tool/shell"
@@ -16,7 +15,7 @@ import type { TodoWriteTool } from "@/tool/todo"
 import type { WebFetchTool } from "@/tool/webfetch"
 import type { WebSearchTool } from "@/tool/websearch"
 import type { WriteTool } from "@/tool/write"
-import type { RunDiffStyle, RunEntryBody, StreamCommit, ToolSnapshot } from "./types"
+import type { ToolSnapshot } from "./types"
 
 export type ToolView = {
   output: boolean
@@ -63,12 +62,6 @@ export type ToolProps<T = Tool.Info> = {
 export type ToolPermissionProps<T = Tool.Info> = {
   input: Partial<Tool.InferParameters<T>>
   metadata: Partial<Tool.InferMetadata<T>>
-  patterns: string[]
-}
-
-type ToolPermissionCtx = {
-  input: ToolDict
-  meta: ToolDict
   patterns: string[]
 }
 

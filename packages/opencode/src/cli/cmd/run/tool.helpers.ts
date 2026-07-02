@@ -1,13 +1,11 @@
 import type { ToolDict, ToolFrame } from "./tool.types"
 import type { RunEntryBody, StreamCommit } from "./types"
-import * as Tool from "@/tool/tool"
 import * as Locale from "@/util/locale"
 import { toolPath } from "./tool.path"
-import stripAnsi from "strip-ansi"
 
 export { toolPath } from "./tool.path"
 
-export function props<T = Tool.Info>(frame: ToolFrame) {
+export function props(frame: ToolFrame) {
   return {
     input: Object.assign(Object.create(null), frame.input),
     metadata: Object.assign(Object.create(null), frame.meta),
@@ -15,7 +13,7 @@ export function props<T = Tool.Info>(frame: ToolFrame) {
   }
 }
 
-export function permission<T = Tool.Tool.Info>(ctx: { input: ToolDict; meta: ToolDict; patterns: string[] }) {
+export function permission(ctx: { input: ToolDict; meta: ToolDict; patterns: string[] }) {
   return {
     input: Object.assign(Object.create(null), ctx.input),
     metadata: Object.assign(Object.create(null), ctx.meta),
