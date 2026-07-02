@@ -52,7 +52,7 @@ type Chunk = {
 
 const parser = lazy(async () => {
   const { Parser } = await import("web-tree-sitter")
-  const { default: treeWasm } = await import("web-tree-sitter/tree-sitter.wasm" as string, {
+  const { default: treeWasm } = await import("web-tree-sitter/web-tree-sitter.wasm" as string, {
     with: { type: "wasm" },
   })
   const treePath = resolveWasm(treeWasm)
