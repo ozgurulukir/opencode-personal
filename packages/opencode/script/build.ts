@@ -260,6 +260,17 @@ for (const item of targets) {
   }
 
   await $`rm -rf ./dist/${name}/bin/tui`
+
+  // Ship the OpenTUI native library next to the compiled binary. In a Bun
+  // --compile binary the library is embedded under /$bunfs/root/..., which the
+  // OS dynamic linker cannot dlopen. The runtime falls back to this real copy.
+  const libExt = item.os === "win32" ? "dll" : item.os === "darwin" ? "dylib" : "so"
+  const coreDir = path.dirname(parserWorker)
+  const platformLib = path.join(coreDir, `../core-${item.os}-${item.arch}/libopentui.${libExt}`)
+  if (fs.existsSync(platformLib)) {
+    fs.copyFileSync(platformLib, `dist/${name}/bin/libopentui.${libExt}`)
+  }
+
   await Bun.file(`dist/${name}/package.json`).write(
     JSON.stringify(
       {

@@ -39,6 +39,7 @@ import { PluginCommand } from "./cli/cmd/plug"
 import { Heap } from "./cli/heap"
 import { drizzle } from "drizzle-orm/bun-sqlite"
 import { ensureProcessMetadata } from "@opencode-ai/core/util/opencode-process"
+import { setupOpenTUILib } from "@/util/opentui-lib"
 
 const processMetadata = ensureProcessMetadata("main")
 
@@ -192,6 +193,8 @@ const cli = yargs(args)
   .strict()
 
 try {
+  await setupOpenTUILib()
+
   if (args.includes("-h") || args.includes("--help")) {
     await cli.parse(args, (err: Error | undefined, _argv: unknown, out: string) => {
       if (err) throw err
