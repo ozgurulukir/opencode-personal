@@ -9,7 +9,7 @@ import * as Session from "./session"
 import { Agent } from "../agent/agent"
 import { Provider } from "@/provider/provider"
 import { ModelID, ProviderID } from "../provider/schema"
-import { type Tool as AITool, tool, jsonSchema, type ToolExecutionOptions, asSchema } from "ai"
+import { type Tool as AITool, tool, jsonSchema, type ToolExecutionOptions, asSchema, streamText, wrapLanguageModel } from "ai"
 import type { JSONSchema7 } from "@ai-sdk/provider"
 import { SessionCompaction } from "./compaction"
 import { Bus } from "../bus"
@@ -62,6 +62,7 @@ import * as DateTime from "effect/DateTime"
 import { eq } from "@/storage/db"
 import * as Database from "@/storage/db"
 import { SessionTable } from "./session.sql"
+import { InstallationVersion } from "@opencode-ai/core/installation/version"
 
 // @ts-ignore
 globalThis.AI_SDK_LOG_WARNINGS = false
@@ -76,6 +77,30 @@ IMPORTANT:
 
 const STRUCTURED_OUTPUT_SYSTEM_PROMPT = `IMPORTANT: The user has requested structured output. You MUST use the StructuredOutput tool to provide your final response. Do NOT respond with plain text - you MUST call the StructuredOutput tool with your answer formatted according to the schema.`
 
+// Ghost-text next-prompt prediction. The TUI surfaces this as gray text in the
+// empty input after each turn and accepts it with Tab. The system prompt asks
+// for one short, first-person next request — no preamble, no quotes, no
+// markdown — so the result can be inlined into the input without further parsing.
+const PREDICT_SYSTEM = `You predict the single most likely next message a user will send to a coding assistant, based on the conversation so far. Output only that next message as one short, natural first-person request (what the user would type). No preamble, no quotes, no explanation, no markdown. Keep it under 100 characters.`
+
+const PREDICT_NUDGE = `Based on the conversation above, write the user's most likely next message:`
+
+// Cleans the raw LLM output of a predict call. Drops any <think>…</think>
+// blocks the model may have emitted, picks the first non-empty line, trims
+// matching surrounding quotes, and caps the result at 120 chars (ellipsised).
+// Exported for unit tests; keep the regex list tight — every rule here is one
+// the user would otherwise see leaking into the input.
+export function cleanPrediction(raw: string): string {
+  const cleaned = raw
+    .replace(/<think>[\s\S]*?<\/think>\s*/g, "")
+    .split("\n")
+    .map((line) => line.trim())
+    .find((line) => line.length > 0)
+  if (!cleaned) return ""
+  const stripped = cleaned.replace(/^["'`]+|["'`]+$/g, "")
+  return stripped.length > 120 ? stripped.substring(0, 117) + "..." : stripped
+}
+
 const log = Log.create({ service: "session.prompt" })
 const elog = EffectLogger.create({ service: "session.prompt" })
 
@@ -86,6 +111,7 @@ export interface Interface {
   readonly shell: (input: ShellInput) => Effect.Effect<MessageV2.WithParts>
   readonly command: (input: CommandInput) => Effect.Effect<MessageV2.WithParts>
   readonly resolvePromptParts: (template: string) => Effect.Effect<PromptInput["parts"]>
+  readonly predict: (input: { sessionID: SessionID }) => Effect.Effect<string>
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/SessionPrompt") {}
@@ -1773,6 +1799,115 @@ NOTE: At any point in time through this workflow you should feel free to ask the
       return result
     })
 
+    // Ghost-text next-prompt prediction. Called from the TUI after each turn
+    // so the empty input can show a gray suggested follow-up the user accepts
+    // with Tab. The implementation deliberately bypasses `llm.stream` and the
+    // session-coupled plugin hooks — this is a side-channel call that must
+    // not appear in the session trajectory, must not publish memory
+    // instructions, and must not trigger chat.params/headers/transform. The
+    // small ("title") model is preferred; we fall back to the last assistant
+    // model and finally to getSmallModel for the last assistant's provider.
+    const predict = Effect.fn("SessionPrompt.predict")(function* (input: { sessionID: SessionID }) {
+      const cfg = yield* config.get()
+      if (cfg.experimental?.predict_next_prompt === false) return ""
+
+      const history = yield* sessions.messages({ sessionID: input.sessionID })
+      const real = (m: MessageV2.WithParts) =>
+        m.info.role === "user" && !m.parts.every((p) => "synthetic" in p && p.synthetic)
+      const userIdx = history.findLastIndex(real)
+      if (userIdx === -1) return ""
+      const lastUser = history[userIdx]
+      if (lastUser.info.role !== "user") return ""
+
+      // Only the assistant turn that actually answered this user message
+      // counts. Bail if any assistant after it is still running, so we never
+      // pair the newest prompt with a stale/older result.
+      const assistants = history
+        .slice(userIdx + 1)
+        .filter((m): m is MessageV2.WithParts & { info: MessageV2.Assistant } => m.info.role === "assistant")
+      if (assistants.length === 0) return ""
+      if (assistants.some((m) => m.info.time.completed === undefined)) return ""
+      const lastAssistant = assistants[assistants.length - 1]
+
+      // Context fed to the prediction: up to 3 most recent real user queries
+      // (chronological) plus the latest assistant turn (which carries tool
+      // outputs + final assistant text). Earlier assistant turns are dropped
+      // to keep the prompt small.
+      const recentUsers = history.filter(real).slice(-3)
+      const contextMsgs = [...recentUsers, lastAssistant]
+
+      // Prefer the small ("title") model for cost; fall back to the assistant's
+      // own model, and finally to getSmallModel for the assistant's provider.
+      // Each step is wrapped in Effect.catch -> succeed(undefined) so a
+      // missing provider/model just leaves us with the next fallback rather
+      // than failing the whole prediction.
+      const titleAg = yield* agents.get("title")
+      const mdl = yield* Effect.gen(function* () {
+        if (titleAg?.model) {
+          return yield* provider
+            .getModel(titleAg.model.providerID, titleAg.model.modelID)
+            .pipe(Effect.catch(() => Effect.succeed(undefined)))
+        }
+        return undefined
+      })
+      const fallback = yield* Effect.gen(function* () {
+        if (mdl) return mdl
+        return yield* provider
+          .getModel(lastAssistant.info.providerID, lastAssistant.info.modelID)
+          .pipe(
+            Effect.catch(() =>
+              provider.getSmallModel(lastAssistant.info.providerID).pipe(Effect.catch(() => Effect.succeed(undefined))),
+            ),
+          )
+      })
+      if (!fallback) return ""
+      const model = mdl ?? fallback
+
+      const msgs = yield* MessageV2.toModelMessagesEffect(contextMsgs, model, { stripMedia: true })
+      const language = yield* provider.getLanguage(model)
+
+      // Wrap the language model so we share the prompt-format transform used by
+      // the main run loop. The middleware touches only `args.params.prompt`,
+      // which is provider-agnostic shape, so wrapping here is safe.
+      const wrapped = wrapLanguageModel({
+        model: language,
+        middleware: [
+          {
+            specificationVersion: "v3" as const,
+            async transformParams(args) {
+              if (args.type === "generate" || args.type === "stream") {
+                // @ts-expect-error — ai's prompt type is not exported under a stable name
+                args.params.prompt = ProviderTransform.message(args.params.prompt, model, {})
+              }
+              return args.params
+            },
+          },
+        ],
+      })
+
+      const text = yield* Effect.tryPromise(() =>
+        streamText({
+          model: wrapped,
+          system: PREDICT_SYSTEM,
+          messages: [...msgs, { role: "user", content: PREDICT_NUDGE }],
+          maxOutputTokens: ProviderTransform.maxOutputTokens(model),
+          temperature: model.capabilities.temperature ? 0.7 : undefined,
+          providerOptions: ProviderTransform.providerOptions(model, ProviderTransform.smallOptions(model)),
+          headers: {
+            ...model.headers,
+            "User-Agent": `opencode/${InstallationVersion}`,
+          },
+          maxRetries: 1,
+        }).text,
+      ).pipe(
+        Effect.catchCause((cause) =>
+          elog.warn("predict failed", { error: Cause.pretty(cause) }).pipe(Effect.as(undefined)),
+        ),
+      )
+      if (!text) return ""
+      return cleanPrediction(text)
+    })
+
     return Service.of({
       cancel,
       prompt,
@@ -1780,6 +1915,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
       shell,
       command,
       resolvePromptParts,
+      predict,
     })
   }),
 )

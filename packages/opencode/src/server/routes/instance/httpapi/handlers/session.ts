@@ -275,6 +275,21 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       })
     })
 
+    const predict = Effect.fn("SessionHttpApi.predict")(function* (ctx: { params: { sessionID: SessionID } }) {
+      const instance = yield* InstanceState.context
+      const workspace = yield* InstanceState.workspaceID
+      // Best-effort: predict never throws upward — the TUI treats an empty
+      // string the same as a hidden suggestion.
+      const prediction = yield* promptSvc
+        .predict({ sessionID: ctx.params.sessionID })
+        .pipe(
+          Effect.provideService(InstanceRef, instance),
+          Effect.provideService(WorkspaceRef, workspace),
+          Effect.catch(() => Effect.succeed("")),
+        )
+      return { prediction }
+    })
+
     const promptAsync = Effect.fn("SessionHttpApi.promptAsync")(function* (ctx: {
       params: { sessionID: SessionID }
       payload: typeof PromptPayload.Type
@@ -381,6 +396,7 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       .handle("summarize", summarize)
       .handle("prompt", prompt)
       .handle("promptAsync", promptAsync)
+      .handle("predict", predict)
       .handle("command", command)
       .handle("shell", shell)
       .handle("revert", revert)

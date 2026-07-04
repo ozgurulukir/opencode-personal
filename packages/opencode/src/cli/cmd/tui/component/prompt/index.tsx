@@ -335,6 +335,130 @@ export function Prompt(props: PromptProps) {
     return messages.findLast((m): m is UserMessage => m.role === "user")
   })
 
+  // Ghost-text suggested next prompt. After the agent finishes a turn, ask
+  // the server to predict the user's most likely follow-up. The prediction
+  // appears as gray placeholder text in the empty input; Tab accepts it
+  // (fills the input), Esc dismisses it. Any keystroke, status change, or
+  // submit clears it. The token guards against stale responses arriving
+  // after a newer request or a context change.
+  const [ghost, setGhost] = createSignal("")
+  let ghostRequest = 0
+  async function fetchGhost(sessionID: string) {
+    if (props.showPlaceholder === false) return
+    const token = ++ghostRequest
+    const userMessageID = lastUserMessage()?.id
+    const res = await sdk.client.session.predict({ sessionID }).catch(() => undefined)
+    const text = res?.data?.prediction?.trim()
+    if (!text) return
+    // Drop the result if anything that defined its context changed while the
+    // request was in flight: superseded by a newer fetch, session switched,
+    // a new run started, or the user began typing.
+    if (token !== ghostRequest) return
+    if (props.sessionID !== sessionID) return
+    if (status().type !== "idle") return
+    if (lastUserMessage()?.id !== userMessageID) return
+    if (!input || input.isDestroyed || input.plainText !== "") return
+    setGhost(text)
+  }
+  function dismissGhost() {
+    ghostRequest++
+    if (ghost()) setGhost("")
+  }
+  function acceptGhost() {
+    if (!input || input.isDestroyed) return
+    const text = ghost()
+    if (!text) return
+    setGhost("")
+    // setText resets the buffer state (clears history, extmarks stay — we
+    // don't carry placeholder-state across accept since the user is now
+    // committing to a real input).
+    input.setText(text)
+    setStore("prompt", { input: text, parts: [] })
+    setStore("extmarkToPartIndex", new Map())
+    input.gotoBufferEnd()
+    setCursorVersion((v) => v + 1)
+    renderer.requestRender()
+  }
+  createEffect(
+    on(
+      () => status().type,
+      (type, prev) => {
+        if (type !== "idle") {
+          // New run started: invalidate any in-flight prediction and hide a
+          // stale suggestion.
+          dismissGhost()
+          return
+        }
+        if (prev === "idle") return
+        const sessionID = props.sessionID
+        if (!sessionID || !input || input.isDestroyed || input.plainText !== "") return
+        if (!lastUserMessage()) return
+        void fetchGhost(sessionID)
+      },
+    ),
+  )
+  // Clear the suggestion when the session switches (different agent, different
+  // message stream — the prior prediction is no longer relevant).
+  createEffect(
+    on(
+      () => props.sessionID,
+      () => {
+        dismissGhost()
+      },
+      { defer: true },
+    ),
+  )
+  // While a ghost suggestion is showing, intercept Tab/Esc globally. The
+  // global keymap runs before the textarea's onKeyDown, so to actually
+  // accept or dismiss we have to handle the key here — the textarea would
+  // never see it. The consume() swallows the event for the agent-cycle and
+  // autocomplete-complete keybinds. Esc is also swallowed so it doesn't
+  // dismiss a dialog or fire a leader exit. Any other key (typing, arrows,
+  // etc.) dismisses the ghost but passes through to the textarea / other
+  // handlers, so the user keeps full control the moment they start
+  // interacting. Cleanup releases the intercept on any dismissal.
+  //
+  // priority: 1 — runs before the default-priority (0) intercepts so we win
+  // over the agent-cycle and autocomplete-complete keybinds when ghost is
+  // visible.
+  createEffect(() => {
+    if (!ghost()) return
+    const off = keymap.intercept(
+      "key",
+      (ctx) => {
+        if (ctx.event.name === "tab") {
+          if (
+            store.mode === "normal" &&
+            !auto()?.visible &&
+            input &&
+            !input.isDestroyed &&
+            input.plainText === ""
+          ) {
+            ctx.consume()
+            acceptGhost()
+          } else {
+            // Tab pressed but ghost isn't accept-able right now (autocomplete
+            // open, non-empty input, shell mode) — dismiss ghost and let the
+            // original Tab keybind (agent_cycle / autocomplete) fire.
+            dismissGhost()
+            // Do NOT consume — pass through to the original Tab binding.
+          }
+          return
+        }
+        if (ctx.event.name === "escape") {
+          ctx.consume()
+          dismissGhost()
+          return
+        }
+        // Any other key dismisses the ghost but passes through to the
+        // textarea's normal handlers (typing, cursor movement, etc.).
+        dismissGhost()
+      },
+      { priority: 1 },
+    )
+    onCleanup(off)
+  })
+
   const usage = createMemo(() => {
     if (!props.sessionID) return
     const msg = sync.data.message[props.sessionID] ?? []
@@ -999,7 +1123,7 @@ export function Prompt(props: PromptProps) {
 
   async function submit() {
     setWarpNotice(undefined)
-
+    dismissGhost()
     // IME: double-defer may fire before onContentChange flushes the last
     // composed character (e.g. Korean hangul) to the store, so read
     // plainText directly and sync before any downstream reads.
@@ -1399,6 +1523,7 @@ export function Prompt(props: PromptProps) {
 
   const placeholderText = createMemo(() => {
     if (props.showPlaceholder === false) return undefined
+    if (store.mode === "normal" && ghost()) return `${ghost()}  (Tab to accept)`
     if (store.mode === "shell") {
       if (!shell().length) return undefined
       const example = shell()[store.placeholder % shell().length]
@@ -1501,6 +1626,11 @@ export function Prompt(props: PromptProps) {
                   e.preventDefault()
                   return
                 }
+                // Tab/Esc for the ghost suggestion are handled in the global
+                // keymap intercept above (which fires before the textarea's
+                // onKeyDown). The ghost is dismissed automatically by that
+                // intercept on any other keypress, so the textarea just
+                // behaves normally here.
               }}
               onSubmit={() => {
                 // IME: double-defer so the last composed character (e.g. Korean

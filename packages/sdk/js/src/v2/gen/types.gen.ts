@@ -1224,6 +1224,15 @@ export type Config = {
     primary_tools?: Array<string>
     continue_loop_on_deny?: boolean
     mcp_timeout?: number
+    predict_next_prompt?: boolean
+  }
+  search?: {
+    embedding?: {
+      provider?: "local" | "openai"
+      model?: string
+      dimension?: number
+      openaiApiKey?: string
+    }
   }
 }
 
@@ -5773,6 +5782,42 @@ export type SessionSummarizeResponses = {
 }
 
 export type SessionSummarizeResponse = SessionSummarizeResponses[keyof SessionSummarizeResponses]
+
+export type SessionPredictData = {
+  body?: never
+  path: {
+    sessionID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/session/{sessionID}/predict"
+}
+
+export type SessionPredictErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+  /**
+   * NotFoundError
+   */
+  404: NotFoundError
+}
+
+export type SessionPredictError = SessionPredictErrors[keyof SessionPredictErrors]
+
+export type SessionPredictResponses = {
+  /**
+   * Predicted next prompt
+   */
+  200: {
+    prediction: string
+  }
+}
+
+export type SessionPredictResponse = SessionPredictResponses[keyof SessionPredictResponses]
 
 export type SessionPromptAsyncData = {
   body?: {
