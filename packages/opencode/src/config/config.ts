@@ -300,6 +300,10 @@ export const Info = Schema.Struct({
       mcp_timeout: Schema.optional(PositiveInt).annotate({
         description: "Timeout in milliseconds for model context protocol (MCP) requests",
       }),
+      predict_next_prompt: Schema.optional(Schema.Boolean).annotate({
+        description:
+          "After the agent finishes a turn, predict the user's most likely next prompt and surface it as ghost text in the empty TUI input (accept with Tab). Set to false to disable.",
+      }),
     }),
   ),
   search: Schema.optional(SearchInfo).annotate({

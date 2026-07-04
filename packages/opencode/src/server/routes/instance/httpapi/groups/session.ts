@@ -88,6 +88,7 @@ export const SessionPaths = {
   share: `${root}/:sessionID/share`,
   init: `${root}/:sessionID/init`,
   summarize: `${root}/:sessionID/summarize`,
+  predict: `${root}/:sessionID/predict`,
   prompt: `${root}/:sessionID/message`,
   promptAsync: `${root}/:sessionID/prompt_async`,
   command: `${root}/:sessionID/command`,
@@ -307,6 +308,24 @@ export const SessionApi = HttpApi.make("session")
             identifier: "session.summarize",
             summary: "Summarize session",
             description: "Generate a concise summary of the session using AI compaction to preserve key information.",
+          }),
+        ),
+        HttpApiEndpoint.post("predict", SessionPaths.predict, {
+          params: { sessionID: SessionID },
+          query: WorkspaceRoutingQuery,
+          success: described(
+            Schema.Struct({
+              prediction: Schema.String,
+            }),
+            "Predicted next prompt",
+          ),
+          error: [HttpApiError.BadRequest, ApiNotFoundError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.predict",
+            summary: "Predict next prompt",
+            description:
+              "Predict the user's most likely next prompt based on the latest user message and the assistant's result. Returns an empty string when disabled or unavailable.",
           }),
         ),
         HttpApiEndpoint.post("prompt", SessionPaths.prompt, {
