@@ -176,6 +176,23 @@ See `specs/effect/migration.md` for the compact pattern reference and examples.
 
 - `Effect.fork` and `Effect.forkDaemon` do not exist. Use `Effect.forkIn(scope)` to fork a fiber into a specific scope.
 - For fiber error handling in `FiberMap`, use `Effect.tapError` (observe + propagate) instead of `Effect.catch` (swallow). The error propagates, the fiber fails, and FiberMap auto-removes it. See `control-plane/workspace.ts:512`.
+- `Effect.catchAll` is renamed to `Effect.catch` in v4. Signature is the same: `Effect.catch(f: (e: E) => Effect<A2, E2, R2>)`. Using the v3 name fails typecheck with "Property 'catchAll' does not exist".
+- In `Effect.gen` / `Effect.fn`, the `Effect.catch` callback must return an `Effect` — wrap `Effect.succeed(undefined)` / `Effect.void` directly, never the bare value (the type signature requires it).
+
+## LLM side-channels (predict, summaries, classification)
+
+For any non-trajectory LLM call (e.g. ghost-text predict, auto-title suggestions, intent classification) that should NOT appear in the session:
+
+- Bypass `llm.stream` and call `streamText` directly with a `wrapLanguageModel({ middleware: [ProviderTransform.message middleware] })`. The middleware is the only thing that adapts Anthropic/OpenAI/etc. message shapes to the LLM's wire format; reusing it keeps the prompt identical to what the main loop would have sent.
+- Prefer `agents.get("title")` as the small-model selector; fall back to `provider.getSmallModel(providerID)`, then to the assistant's own model. `Provider.getSmallModel` is a real method on the `Provider.Service` interface.
+- Inside `Effect.gen`, use `MessageV2.toModelMessagesEffect(msgs, model, { stripMedia: true })` — NOT `MessageV2.toModelMessages` (which calls `Effect.runPromise` and breaks the Effect context).
+- Always pass `{ stripMedia: true }` for side-channel calls so we don't ship image attachments to the predictor.
+- Return `""` on any failure (`Effect.catchCause` → `Effect.succeed("")`); TUI features that consume the result treat empty as "no suggestion available".
+
+## Config schema → SDK reflection
+
+- `Config.Info` schema fields appear in the JS SDK as a typed object in `packages/sdk/js/src/v2/gen/types.gen.ts`. Adding a new field to `experimental` in `config.ts` and regenerating the SDK gives `client.config.experimental.<field>` typing for free.
+- Regeneration command: `bun script/build.ts` from `packages/sdk/js/` — it runs `bun dev generate > openapi.json` from the opencode package, runs `@hey-api/openapi-ts`, then deletes the intermediate `openapi.json`. The script is idempotent; safe to run after every server-side change.
 
 ## Preferred Effect services
 
