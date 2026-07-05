@@ -62,6 +62,23 @@ describe("Npm.add", () => {
 
     expect(Option.isSome(entry.entrypoint)).toBe(true)
   })
+
+  test("handles malformed packages by falling back to raw spec name and failing with InstallFailedError gracefully", async () => {
+    await using tmp = await tmpdir()
+    const malformedSpec = "@@invalid/pkg"
+
+    const run = Effect.gen(function* () {
+      const npm = yield* Npm.Service
+      return yield* npm.add(malformedSpec)
+    }).pipe(
+      Effect.scoped,
+      Effect.provide(npmLayer(path.join(tmp.path, "cache"))),
+      Effect.flip,
+    )
+
+    const error = await Effect.runPromise(run)
+    expect(error._tag).toBe("NpmInstallFailedError")
+  })
 })
 
 describe("Npm.install", () => {
