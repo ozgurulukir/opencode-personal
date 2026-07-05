@@ -40,7 +40,7 @@ async function ensureDownloaded(file: string, dest: string): Promise<void> {
 }
 
 // BERT WordPiece tokenizer for all-MiniLM-L6-v2 (lowercase, accent-strip, punctuation split).
-class WordPieceTokenizer {
+export class WordPieceTokenizer {
   private readonly vocab: Map<string, number>
   private readonly unk: number
   private readonly cls: number

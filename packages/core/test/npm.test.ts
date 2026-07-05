@@ -106,3 +106,11 @@ describe("Npm.install", () => {
     await expect(fs.stat(path.join(tmp.path, "node_modules", "dev-pkg"))).rejects.toThrow()
   })
 })
+
+describe("Npm.resolveEntryPoint", () => {
+  test("gracefully returns Option.none() when import.meta.resolve throws", () => {
+    const result = Npm.resolveEntryPoint("non-existent-module-abc-123", "/invalid/directory/path")
+    expect(result.directory).toBe("/invalid/directory/path")
+    expect(Option.isNone(result.entrypoint)).toBe(true)
+  })
+})

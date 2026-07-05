@@ -24,11 +24,12 @@ export const IndexWorkspace = Effect.gen(function* () {
     const chunks: Array<{ id: string; path: string; content: string }> = []
 
     for (const file of files) {
+      const normalized = file.replace(/\\/g, "/")
       if (
-        file.includes("node_modules") ||
-        file.includes("/dist/") ||
-        file.includes("/.git/") ||
-        file.includes("/build/")
+        normalized.includes("node_modules") ||
+        normalized.includes("/dist/") ||
+        normalized.includes("/.git/") ||
+        normalized.includes("/build/")
       ) {
         continue
       }
