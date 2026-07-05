@@ -35,3 +35,31 @@ Use `Effect.provideService(...)` in middleware only for request-derived context,
 Public JSON errors should be explicit `Schema.ErrorClass` contracts declared on each endpoint. Use built-in `HttpApiError.*` classes only when their empty/tagged body is the intended wire shape; for SDK-visible errors with messages, define an API error schema such as `ApiNotFoundError` and fail with that exact declared error. Keep domain and storage services free of HttpApi types, and translate expected domain errors at the handler boundary.
 
 When adding middleware, compose it at the layer boundary and keep the route tree explicit in `server.ts`. Shared router middleware such as auth, workspace routing, and instance context should stay visible where routes are assembled.
+
+## Adding a new endpoint — three-file wiring
+
+Adding an endpoint touches three files that must stay in sync:
+
+1. **`groups/<resource>.ts`** — declare the endpoint with `HttpApiEndpoint.post("name", PathConst, { params, query, payload, success, error })`, mount it on the `HttpApi.make(...)` group, and add the `OpenApi.annotations({ identifier, summary, description })` block. The `identifier` becomes `client.<group>.<name>()` in the SDK.
+2. **`handlers/<resource>.ts`** — add the handler inside the `HttpApiBuilder.group(...)` closure and register it with `.handle("name", handlerFn)`. Mismatched names between group and handler fail at runtime, not typecheck.
+3. **`server.ts`** — usually no change needed; the group is already mounted. Only touch this file for cross-cutting middleware.
+
+The `success` schema must be a `Schema` (not a TypeScript type). For OpenAPI metadata, wrap it with `described(Schema.Struct({...}), "description")`. Use `Schema.Literal` / `Schema.Literals` for enum-ish query parameters. Errors must be `HttpApiError.*` classes (for built-in wire shapes) or a custom `Schema.ErrorClass` declared in `errors.ts` (for SDK-visible errors with messages).
+
+## Request-scoped services in handlers
+
+`InstanceRef` and `WorkspaceRef` are request-scoped; yield them in each handler that needs them:
+
+```ts
+const handler = Effect.fn("SessionHttpApi.foo")(function* (ctx) {
+  const instance = yield* InstanceState.context
+  const workspace = yield* InstanceState.workspaceID
+  // pass them into the service call:
+  return yield* someSvc.run(args).pipe(
+    Effect.provideService(InstanceRef, instance),
+    Effect.provideService(WorkspaceRef, workspace),
+  )
+})
+```
+
+Stable services (like `SessionPrompt.Service`) are yielded once at handler-group construction and closed over. Don't `Effect.provide` layers inside handlers — provide them at the app boundary instead.
