@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test"
+import { Effect, Layer } from "effect"
+import { SearchService, type SearchServiceInterface } from "../../src/search/search"
 import {
   ZVecCreateAndOpen,
   ZVecCollectionSchema,
@@ -53,9 +55,25 @@ describe("search.zvec", () => {
     col.destroySync()
   })
 
-  test("SearchService interface is defined", () => {
-    // The interface type check is done at compile time.
-    // This test just verifies the module loads without throwing.
-    expect(true).toBe(true)
+  test("SearchService interface is defined and can be resolved from context", async () => {
+    const mockSearchService: SearchServiceInterface = {
+      index: () => Effect.void,
+      search: () => Effect.succeed([]),
+      reset: Effect.void,
+    }
+    const layer = Layer.succeed(SearchService, mockSearchService)
+
+    const resolved = await Effect.gen(function* () {
+      const search = yield* SearchService
+      return search
+    }).pipe(
+      Effect.provide(layer),
+      Effect.runPromise,
+    )
+
+    expect(resolved).toBeDefined()
+    expect(resolved.index).toBeDefined()
+    expect(resolved.search).toBeDefined()
+    expect(resolved.reset).toBeDefined()
   })
 })
