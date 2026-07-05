@@ -291,7 +291,7 @@ describe("Format", () => {
         expect(cmd).not.toBe(false)
         const [bin] = cmd as string[]
         // Must resolve to the repo-local binary, not the opencode global cache.
-        expect(bin).toContain("node_modules/.bin/prettier")
+        expect(bin.replace(/\\/g, "/")).toContain("node_modules/.bin/prettier")
         expect(bin.startsWith(dir)).toBe(true)
       }),
     ),

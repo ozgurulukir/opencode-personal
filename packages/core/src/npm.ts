@@ -44,7 +44,7 @@ export function sanitize(pkg: string) {
   return Array.from(pkg, (char) => (illegal.has(char) || char.charCodeAt(0) < 32 ? "_" : char)).join("")
 }
 
-const resolveEntryPoint = (name: string, dir: string): EntryPoint => {
+export const resolveEntryPoint = (name: string, dir: string): EntryPoint => {
   let entrypoint: Option.Option<string>
   try {
     const resolved = typeof Bun !== "undefined" ? import.meta.resolve(name, dir) : import.meta.resolve(dir)
