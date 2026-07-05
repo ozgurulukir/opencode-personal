@@ -1,12 +1,11 @@
 #!/usr/bin/env bun
-import { mkdir, readdir, readlink, symlink, unlink } from "node:fs/promises"
+import { mkdir, readdir, readlink, symlink, unlink, stat } from "node:fs/promises"
 import path from "node:path"
 
 // Bun may resolve duplicate @opentui instances for packages/opencode because of
 // opentui-spinner's older peer dependency range. Redirect package-local @opentui
 // symlinks back through the root hoisted copies so TypeScript sees one instance.
 const root = path.resolve(import.meta.dirname, "..")
-const packageDir = path.join(root, "packages", "opencode", "node_modules", "@opentui")
 const rootDir = path.join(root, "node_modules", "@opentui")
 
 const packages = ["core", "keymap", "solid"]
@@ -29,12 +28,30 @@ async function relink(target: string, linkPath: string) {
   await symlink(relativeTarget, linkPath)
 }
 
-for (const pkg of packages) {
-  const rootLink = path.join(rootDir, pkg)
-  const packageLink = path.join(packageDir, pkg)
-  await relink(rootLink, packageLink).catch((error) => {
-    console.warn(`[dedupe-opentui] could not dedupe ${pkg}:`, error)
-  })
+// Find all package subdirectories under packages/ that contain node_modules/@opentui
+const packagesBase = path.join(root, "packages")
+const targetDirs: string[] = []
+try {
+  const dirs = await readdir(packagesBase)
+  for (const dir of dirs) {
+    const p = path.join(packagesBase, dir, "node_modules", "@opentui")
+    try {
+      const s = await stat(p)
+      if (s.isDirectory()) {
+        targetDirs.push(p)
+      }
+    } catch {}
+  }
+} catch {}
+
+for (const targetDir of targetDirs) {
+  for (const pkg of packages) {
+    const rootLink = path.join(rootDir, pkg)
+    const packageLink = path.join(targetDir, pkg)
+    await relink(rootLink, packageLink).catch((error) => {
+      console.warn(`[dedupe-opentui] could not dedupe ${pkg} in ${targetDir}:`, error)
+    })
+  }
 }
 
 // opentui-spinner itself resolves its peer dependencies to an older @opentui
