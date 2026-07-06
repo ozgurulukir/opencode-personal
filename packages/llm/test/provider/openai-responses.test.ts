@@ -292,7 +292,7 @@ describe("OpenAI Responses route", () => {
       expect(prepared.body.include).toEqual(["reasoning.encrypted_content"])
       expect(prepared.body.reasoning).toEqual({ effort: "high", summary: "auto" })
       expect(prepared.body.text).toEqual({ verbosity: "low" })
-    }),
+    }).pipe(configEnv({ OPENAI_API_KEY: "env-key" })),
   )
 
   it.effect("request OpenAI provider options override model defaults", () =>
@@ -309,7 +309,7 @@ describe("OpenAI Responses route", () => {
       )
 
       expect(prepared.body.prompt_cache_key).toBe("request_cache")
-    }),
+    }).pipe(configEnv({ OPENAI_API_KEY: "env-key" })),
   )
 
   it.effect("parses text and usage stream fixtures", () =>
