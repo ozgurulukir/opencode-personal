@@ -104,13 +104,15 @@ class ZvecIndex {
       try: () => {
         if (!zvec()) return
         const col = this.open()
-        col.insertSync(
-          chunks.map((c) => ({
-            id: docId(c.id),
-            vectors: { embedding: c.embedding },
-            fields: { path: c.path, content: c.content, mtime: Date.now() },
-          })),
-        )
+        const mapped = chunks.map((c) => ({
+          id: docId(c.id),
+          vectors: { embedding: c.embedding },
+          fields: { path: c.path, content: c.content, mtime: Date.now() },
+        }))
+        const BATCH_SIZE = 1000
+        for (let i = 0; i < mapped.length; i += BATCH_SIZE) {
+          col.insertSync(mapped.slice(i, i + BATCH_SIZE))
+        }
       },
       catch: (e) => new Error(`Zvec index failed: ${e instanceof Error ? e.message : String(e)}`),
     })
