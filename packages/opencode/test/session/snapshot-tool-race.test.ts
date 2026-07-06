@@ -147,6 +147,7 @@ function makeHttp() {
         index: () => Effect.void,
         search: () => Effect.succeed([]),
         reset: Effect.void,
+        delete: () => Effect.void,
       }),
     ),
     Layer.provide(

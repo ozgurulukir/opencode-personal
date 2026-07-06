@@ -292,6 +292,10 @@ exports[`tool parameters JSON Schema (wire shape) read 1`] = `
       "minimum": 0,
       "type": "integer",
     },
+    "onlyHunks": {
+      "description": "If true, only returns lines that contain code hunks modified in git or current changes, along with a few lines of context",
+      "type": "boolean",
+    },
   },
   "required": [
     "filePath",

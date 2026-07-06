@@ -1,17 +1,18 @@
-import { Effect, Layer, Context } from "effect"
+import { Effect, Layer } from "effect"
 import { createHash } from "node:crypto"
 import { AppFileSystem } from "@opencode-ai/core/filesystem"
 import * as Log from "@opencode-ai/core/util/log"
 import { SearchService, type SearchResult, type SearchServiceInterface } from "./search"
 import { InstanceState } from "@/effect/instance-state"
 import { lazy } from "@/util/lazy"
+import type { ZVecCollection } from "@zvec/zvec"
 
 const log = Log.create({ service: "search.zvec" })
 
 // zvec document IDs reject characters like '/', ':' and '.'. Hash opaque IDs to
 // hex at the zvec boundary — the human-readable path is kept in the `path` field.
 function docId(input: string): string {
-  return createHash("sha1").update(input).digest("hex").slice(0, 16)
+  return createHash("sha1").update(input).digest("hex").slice(0, 24)
 }
 
 // Load the platform-specific native binding directly, mirroring the @parcel/watcher
@@ -55,14 +56,14 @@ const zvec = lazy((): ZVecModule | undefined => {
 const EMBEDDING_DIM = 384
 
 class ZvecIndex {
-  private collection: unknown = null
+  private collection: ZVecCollection | null = null
   private readonly path: string
 
   constructor(path: string) {
     this.path = path
   }
 
-  private open(): unknown {
+  private open(): ZVecCollection {
     if (this.collection) return this.collection
     const mod = zvec()
     if (!mod) throw new Error("zvec binding unavailable")
@@ -75,8 +76,8 @@ class ZvecIndex {
         indexParams: {
           indexType: mod.ZVecIndexType.HNSW,
           metricType: mod.ZVecMetricType.COSINE,
-          m: 50,
-          efConstruction: 200,
+          m: 24,
+          efConstruction: 100,
         },
       },
       fields: [
@@ -86,19 +87,24 @@ class ZvecIndex {
       ],
     })
     try {
-      this.collection = mod.ZVecCreateAndOpen(this.path, schema)
-    } catch {
-      this.collection = mod.ZVecOpen(this.path)
+      this.collection = mod.ZVecCreateAndOpen(this.path, schema) as ZVecCollection
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      if (msg.toLowerCase().includes("already exist") || msg.toLowerCase().includes("alreadyexist")) {
+        this.collection = mod.ZVecOpen(this.path) as ZVecCollection
+      } else {
+        throw e
+      }
     }
     return this.collection
   }
 
   index(chunks: Array<{ id: string; path: string; content: string; embedding: number[] }>) {
-    return Effect.tryPromise({
-      try: async () => {
+    return Effect.try({
+      try: () => {
         if (!zvec()) return
         const col = this.open()
-        ;(col as any).insertSync(
+        col.insertSync(
           chunks.map((c) => ({
             id: docId(c.id),
             vectors: { embedding: c.embedding },
@@ -111,19 +117,19 @@ class ZvecIndex {
   }
 
   search(query: string, embedding: number[], topK = 10) {
-    return Effect.tryPromise({
-      try: async () => {
+    return Effect.try({
+      try: () => {
         const mod = zvec()
         if (!mod) return [] as SearchResult[]
         const col = this.open()
-        const results = (col as any).querySync({
+        const results = col.querySync({
           fieldName: "embedding",
           vector: new Float32Array(embedding),
           topk: topK,
           outputFields: ["path", "content"],
           params: { indexType: mod.ZVecIndexType.HNSW, ef: 100 },
         })
-        return (results as any[]).map((r) => ({
+        return results.map((r) => ({
           id: r.id,
           score: r.score,
           path: (r.fields?.path as string) ?? "",
@@ -134,16 +140,36 @@ class ZvecIndex {
     })
   }
 
+  delete(ids: string[]) {
+    return Effect.try({
+      try: () => {
+        if (!zvec() || ids.length === 0) return
+        const col = this.open()
+        col.deleteSync(ids.map(docId))
+      },
+      catch: (e) => new Error(`Zvec delete failed: ${e instanceof Error ? e.message : String(e)}`),
+    })
+  }
+
   reset() {
-    return Effect.sync(() => {
-      if (this.collection) {
+    return Effect.try({
+      try: () => {
+        if (this.collection) {
+          try {
+            this.collection.destroySync()
+          } catch {
+            // ignore
+          }
+          this.collection = null
+        }
+        const fs = require("node:fs")
         try {
-          ;(this.collection as any).destroySync?.()
+          fs.rmSync(this.path, { recursive: true, force: true })
         } catch {
           // ignore
         }
-        this.collection = null
-      }
+      },
+      catch: (e) => new Error(`Zvec reset failed: ${e instanceof Error ? e.message : String(e)}`),
     })
   }
 }
@@ -152,6 +178,7 @@ const noOpSearchService: SearchServiceInterface = {
   index: () => Effect.void,
   search: () => Effect.succeed([] as SearchResult[]),
   reset: Effect.void,
+  delete: () => Effect.void,
 }
 
 export const layer = Layer.effect(
@@ -186,9 +213,18 @@ export const layer = Layer.effect(
           const index = yield* getIndex()
           return yield* index.search(q, emb, k)
         }),
-      reset: Effect.void,
+      reset: Effect.gen(function* () {
+        const index = yield* getIndex()
+        return yield* index.reset()
+      }),
+      delete: (ids: string[]) =>
+        Effect.gen(function* () {
+          const index = yield* getIndex()
+          return yield* index.delete(ids)
+        }),
     }
   }).pipe(Effect.catchDefect(() => Effect.succeed(noOpSearchService))),
 )
 
 export const defaultLayer = layer.pipe(Layer.provide(AppFileSystem.defaultLayer))
+

@@ -4,18 +4,8 @@ import { SearchService } from "@/search/search"
 import { EmbeddingService } from "@/search/embedding"
 import { AppFileSystem } from "@opencode-ai/core/filesystem"
 import { InstanceState } from "@/effect/instance-state"
+import { IndexWorkspace } from "@/search/indexer"
 import DESCRIPTION from "./index-workspace.txt"
-
-const CHUNK_LINES = 100
-const CHUNK_MIN_CHARS = 200
-const EMBED_BATCH = 32
-
-// Strip ANSI/VT100 escape sequences (color codes, cursor moves, etc.) so raw
-// terminal output files don't pollute the embedding space.
-const ANSI_ESCAPE_RE = /\u001b\[[0-9;]*[a-zA-Z]/g
-function stripAnsi(text: string): string {
-  return text.replace(ANSI_ESCAPE_RE, "")
-}
 
 export const Parameters = Schema.Struct({
   force: Schema.Boolean.pipe(Schema.optional, Schema.withDecodingDefault(Effect.succeed(false))).annotate({
@@ -29,6 +19,7 @@ export const IndexWorkspaceTool = Tool.define(
     const search = yield* SearchService
     const embedder = yield* EmbeddingService
     const fs = yield* AppFileSystem.Service
+    const runIndexer = yield* IndexWorkspace
 
     return {
       description: DESCRIPTION,
@@ -36,44 +27,31 @@ export const IndexWorkspaceTool = Tool.define(
       execute: (params: { force: boolean }) =>
         Effect.gen(function* () {
           const directory = yield* InstanceState.directory
-          const files = yield* fs.glob("**/*.{ts,js,tsx,jsx,py,rs,go,md,txt,json,yaml,yml,sh,bash}", {
-            cwd: directory,
-            absolute: true,
-            dot: false,
-          })
+          const manifestPath = `${directory}/.opencode/zvec_index_manifest.json`
 
-          const chunks: Array<{ id: string; path: string; content: string }> = []
-
-          for (const file of files) {
-            const normalized = file.replace(/\\/g, "/")
-            if (
-              normalized.includes("node_modules") ||
-              normalized.includes("/dist/") ||
-              normalized.includes("/.git/") ||
-              normalized.includes("/build/")
-            ) {
-              continue
-            }
-            const content = stripAnsi(yield* fs.readFileString(file).pipe(Effect.catch(() => Effect.succeed(""))))
-            if (!content) continue
-            const lines = content.split("\n")
-            if (lines.length <= CHUNK_LINES) {
-              const trimmed = content.trim()
-              if (trimmed.length >= CHUNK_MIN_CHARS) {
-                chunks.push({ id: `${file}:0`, path: file, content: trimmed })
-              }
-              continue
-            }
-            for (let i = 0; i < lines.length; i += CHUNK_LINES) {
-              const slice = lines.slice(i, i + CHUNK_LINES).join("\n")
-              const trimmed = slice.trim()
-              if (trimmed.length >= CHUNK_MIN_CHARS) {
-                chunks.push({ id: `${file}:${i}`, path: file, content: trimmed })
-              }
-            }
+          if (params.force) {
+            yield* search.reset
+            yield* fs.remove(manifestPath, { force: true }).pipe(Effect.catch(() => Effect.void))
           }
 
-          if (chunks.length === 0) {
+          yield* runIndexer
+
+          let filesCount = 0
+          let chunksCount = 0
+          try {
+            const manifest = (yield* fs.readJson(manifestPath)) as any
+            if (manifest && manifest.files) {
+              const filePaths = Object.keys(manifest.files)
+              filesCount = filePaths.length
+              for (const f of filePaths) {
+                chunksCount += manifest.files[f].chunkIds.length
+              }
+            }
+          } catch {
+            // ignore
+          }
+
+          if (filesCount === 0) {
             return {
               title: "Workspace indexed",
               output: "No indexable files found in workspace.",
@@ -81,27 +59,13 @@ export const IndexWorkspaceTool = Tool.define(
             }
           }
 
-          if (params.force) {
-            yield* search.reset
-          }
-
-          const allEmbeddings: number[][] = []
-          for (let i = 0; i < chunks.length; i += EMBED_BATCH) {
-            const batch = chunks.slice(i, i + EMBED_BATCH).map((c) => c.content)
-            const embeddings = yield* embedder.embed(batch)
-            allEmbeddings.push(...embeddings)
-          }
-
-          const enriched = chunks.map((c, i) => ({ ...c, embedding: allEmbeddings[i] }))
-          yield* search.index(enriched)
-
-          const uniqueFiles = new Set(chunks.map((c) => c.path))
           return {
             title: "Workspace indexed",
-            output: `Indexed ${uniqueFiles.size} files (${chunks.length} chunks) using ${embedder.dimension}-dim embeddings.`,
-            metadata: { files: uniqueFiles.size, chunks: chunks.length },
+            output: `Indexed ${filesCount} files (${chunksCount} chunks) using ${embedder.dimension}-dim embeddings.`,
+            metadata: { files: filesCount, chunks: chunksCount },
           }
         }).pipe(Effect.orDie),
     }
   }),
 )
+

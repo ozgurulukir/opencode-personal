@@ -60,6 +60,7 @@ describe("search.zvec", () => {
       index: () => Effect.void,
       search: () => Effect.succeed([]),
       reset: Effect.void,
+      delete: () => Effect.void,
     }
     const layer = Layer.succeed(SearchService, mockSearchService)
 
@@ -75,5 +76,52 @@ describe("search.zvec", () => {
     expect(resolved.index).toBeDefined()
     expect(resolved.search).toBeDefined()
     expect(resolved.reset).toBeDefined()
+  })
+
+  test("ZvecIndex delete and reset methods function correctly via defaultLayer", async () => {
+    const { defaultLayer } = await import("../../src/search/zvec")
+    const { provideInstance } = await import("../fixture/fixture")
+    const { AppFileSystem } = await import("@opencode-ai/core/filesystem")
+    const fsNode = await import("node:fs/promises")
+    const os = await import("node:os")
+    const path = await import("path")
+
+    const dir = await fsNode.mkdtemp(path.join(os.tmpdir(), "opencode-zvec-test-"))
+
+    try {
+      await Effect.gen(function* () {
+        const search = yield* SearchService
+        const fs = yield* AppFileSystem.Service
+
+        const chunks = [
+          { id: "doc1", path: "a.ts", content: "some code content here", embedding: Array(384).fill(0.1) },
+          { id: "doc2", path: "b.ts", content: "other code content here", embedding: Array(384).fill(0.9) },
+        ]
+
+        yield* search.index(chunks)
+
+        let results = yield* search.search("query", Array(384).fill(0.1), 2)
+        expect(results.some((r) => r.path === "a.ts")).toBe(true)
+
+        yield* search.delete(["doc1"])
+
+        results = yield* search.search("query", Array(384).fill(0.1), 2)
+        expect(results.some((r) => r.path === "a.ts")).toBe(false)
+        expect(results.some((r) => r.path === "b.ts")).toBe(true)
+
+        yield* search.reset
+
+        const indexPath = path.join(dir, ".opencode", "zvec_index")
+        const exists = yield* fs.existsSafe(indexPath)
+        expect(exists).toBe(false)
+      }).pipe(
+        Effect.provide(defaultLayer),
+        Effect.provide(AppFileSystem.defaultLayer),
+        provideInstance(dir),
+        Effect.runPromise,
+      )
+    } finally {
+      await fsNode.rm(dir, { recursive: true, force: true }).catch(() => {});
+    }
   })
 })
