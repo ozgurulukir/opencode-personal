@@ -1,5 +1,5 @@
 import { describe, expect } from "bun:test"
-import { Effect, Schema, Stream } from "effect"
+import { Effect, Schema, Stream, ConfigProvider } from "effect"
 import { HttpClientRequest } from "effect/unstable/http"
 import { LLM, LLMError } from "../../src"
 import * as Azure from "../../src/providers/azure"
@@ -14,6 +14,9 @@ import { sseEvents } from "../lib/sse"
 const TargetJson = Schema.fromJsonString(Schema.Unknown)
 const encodeJson = Schema.encodeSync(TargetJson)
 const decodeJson = Schema.decodeUnknownSync(TargetJson)
+
+const configEnv = (env: Record<string, string>) =>
+  Effect.provide(ConfigProvider.layer(ConfigProvider.fromEnv({ env })))
 
 const model = OpenAIChat.model({
   id: "gpt-4o-mini",
@@ -64,7 +67,7 @@ describe("OpenAI Chat route", () => {
 
       expect(prepared.body.store).toBe(false)
       expect(prepared.body.reasoning_effort).toBe("low")
-    }),
+    }).pipe(configEnv({ OPENAI_API_KEY: "env-key" })),
   )
 
   it.effect("adds native query params to the Chat Completions URL", () =>

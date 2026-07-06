@@ -58,12 +58,20 @@ describe("ensureProcessMetadata", () => {
 
 describe("sanitizedProcessEnv", () => {
   test("excludes undefined values", () => {
-    process.env.SOME_VAR = "value"
-    process.env.UNDEFINED_VAR = undefined as unknown as string
-    const env = sanitizedProcessEnv()
-    expect(env.SOME_VAR).toBe("value")
-    expect("UNDEFINED_VAR" in env).toBe(false)
-    delete process.env.SOME_VAR
+    const originalEntries = Object.entries
+    Object.entries = (obj: any): [string, any][] => {
+      if (obj === process.env) {
+        return [["SOME_VAR", "value"], ["UNDEFINED_VAR", undefined as any]]
+      }
+      return originalEntries(obj)
+    }
+    try {
+      const env = sanitizedProcessEnv()
+      expect(env.SOME_VAR).toBe("value")
+      expect("UNDEFINED_VAR" in env).toBe(false)
+    } finally {
+      Object.entries = originalEntries
+    }
   })
 
   test("applies overrides", () => {
