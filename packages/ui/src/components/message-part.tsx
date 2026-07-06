@@ -571,7 +571,11 @@ function groupParts(parts: { messageID: string; part: PartType }[]) {
 }
 
 function index<T extends { id: string }>(items: readonly T[]) {
-  return new Map(items.map((item) => [item.id, item] as const))
+  const map = new Map<string, T>()
+  for (const item of items) {
+    map.set(item.id, item)
+  }
+  return map
 }
 
 function renderable(part: PartType, showReasoningSummaries = true) {
@@ -609,24 +613,32 @@ export function AssistantParts(props: {
   const emptyTools: ToolPart[] = []
   const msgs = createMemo(() => index(props.messages))
   const part = createMemo(
-    () =>
-      new Map(
-        props.messages.map((message) => [message.id, index(list(data.store.part?.[message.id], emptyParts))] as const),
-      ),
+    () => {
+      const map = new Map<string, Map<string, PartType>>()
+      for (const message of props.messages) {
+        map.set(message.id, index(list(data.store.part?.[message.id], emptyParts)))
+      }
+      return map
+    }
   )
 
   const grouped = createMemo(
-    () =>
-      groupParts(
-        props.messages.flatMap((message) =>
-          list(data.store.part?.[message.id], emptyParts)
-            .filter((part) => renderable(part, props.showReasoningSummaries ?? true))
-            .map((part) => ({
+    () => {
+      const partsToGroup: { messageID: string; part: PartType }[] = []
+      const showReasoning = props.showReasoningSummaries ?? true
+      for (const message of props.messages) {
+        const partsList = list(data.store.part?.[message.id], emptyParts)
+        for (const p of partsList) {
+          if (renderable(p, showReasoning)) {
+            partsToGroup.push({
               messageID: message.id,
-              part,
-            })),
-        ),
-      ),
+              part: p,
+            })
+          }
+        }
+      }
+      return groupParts(partsToGroup)
+    },
     [] as PartGroup[],
     { equals: sameGroups },
   )
@@ -836,15 +848,19 @@ export function AssistantMessageDisplay(props: {
   const emptyTools: ToolPart[] = []
   const part = createMemo(() => index(props.parts))
   const grouped = createMemo(
-    () =>
-      groupParts(
-        props.parts
-          .filter((part) => renderable(part, props.showReasoningSummaries ?? true))
-          .map((part) => ({
+    () => {
+      const partsToGroup: { messageID: string; part: PartType }[] = []
+      const showReasoning = props.showReasoningSummaries ?? true
+      for (const p of props.parts) {
+        if (renderable(p, showReasoning)) {
+          partsToGroup.push({
             messageID: props.message.id,
-            part,
-          })),
-      ),
+            part: p,
+          })
+        }
+      }
+      return groupParts(partsToGroup)
+    },
     [] as PartGroup[],
     { equals: sameGroups },
   )
