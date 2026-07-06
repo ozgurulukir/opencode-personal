@@ -40,6 +40,7 @@ describe("IndexWorkspace", () => {
           }),
         search: () => Effect.succeed([]),
         reset: Effect.void,
+        delete: () => Effect.void,
       })
 
       const mockEmbedder = Layer.succeed(EmbeddingService, {
@@ -64,6 +65,98 @@ describe("IndexWorkspace", () => {
       expect(paths.every((p) => !p.includes("node_modules") && !p.includes("dist"))).toBe(true)
       // Verified chunks contain the source file
       expect(paths.some((p) => p.includes("src.ts"))).toBe(true)
+    }),
+  )
+
+  it.live("performs incremental indexing", () =>
+    Effect.gen(function* () {
+      const dir = yield* tmpdirScoped()
+      const fs = yield* AppFileSystem.Service
+
+      const fileA = path.join(dir, "a.ts")
+      const fileB = path.join(dir, "b.ts")
+
+      yield* fs.writeFileString(fileA, "x".repeat(300))
+      yield* fs.writeFileString(fileB, "y".repeat(300))
+
+      let indexedChunks: any[] = []
+      let deletedIds: string[] = []
+      let embeddedTexts: string[] = []
+
+      const mockSearch = Layer.succeed(SearchService, {
+        index: (chunks) =>
+          Effect.sync(() => {
+            indexedChunks.push(...chunks)
+          }),
+        search: () => Effect.succeed([]),
+        reset: Effect.void,
+        delete: (ids) =>
+          Effect.sync(() => {
+            deletedIds.push(...ids)
+          }),
+      })
+
+      const mockEmbedder = Layer.succeed(EmbeddingService, {
+        embed: (texts) =>
+          Effect.sync(() => {
+            embeddedTexts.push(...texts)
+            return texts.map(() => [0.1, 0.2, 0.3])
+          }),
+        dimension: 3,
+      })
+
+      const run = () =>
+        Effect.gen(function* () {
+          const runIndexer = yield* IndexWorkspace
+          yield* runIndexer
+        }).pipe(
+          Effect.provide(mockSearch),
+          Effect.provide(mockEmbedder),
+          provideInstance(dir),
+        )
+
+      // First run: index both files
+      yield* run()
+      expect(embeddedTexts.length).toBe(2)
+      expect(indexedChunks.length).toBe(2)
+      expect(deletedIds.length).toBe(0)
+
+      // Reset trackers
+      embeddedTexts = []
+      indexedChunks = []
+      deletedIds = []
+
+      // Second run: no changes on disk
+      yield* run()
+      expect(embeddedTexts.length).toBe(0)
+      expect(indexedChunks.length).toBe(0)
+      expect(deletedIds.length).toBe(0)
+
+      // Third run: modify fileA
+      const now = Date.now() + 5000
+      const fsNode = require("node:fs/promises")
+      yield* fs.writeFileString(fileA, "z".repeat(300))
+      yield* Effect.tryPromise(() => fsNode.utimes(fileA, now / 1000, now / 1000))
+
+      yield* run()
+      // Only fileA should be embedded/indexed
+      expect(embeddedTexts).toEqual(["z".repeat(300)])
+      expect(indexedChunks.length).toBe(1)
+      // FileA's old chunk should be deleted
+      expect(deletedIds).toEqual([`${fileA}:0`])
+
+      // Reset trackers
+      embeddedTexts = []
+      indexedChunks = []
+      deletedIds = []
+
+      // Fourth run: delete fileB
+      yield* fs.remove(fileB)
+      yield* run()
+      expect(embeddedTexts.length).toBe(0)
+      expect(indexedChunks.length).toBe(0)
+      // FileB's old chunk should be deleted
+      expect(deletedIds).toEqual([`${fileB}:0`])
     }),
   )
 })

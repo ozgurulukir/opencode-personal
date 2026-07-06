@@ -38,6 +38,7 @@ const it = testEffect(
       index: () => Effect.void,
       search: () => Effect.succeed([]),
       reset: Effect.void,
+      delete: () => Effect.void,
     }),
     Layer.succeed(EmbeddingService, {
       embed: () => Effect.succeed([]),
