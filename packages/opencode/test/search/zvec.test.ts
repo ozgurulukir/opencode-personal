@@ -124,4 +124,44 @@ describe("search.zvec", () => {
       await fsNode.rm(dir, { recursive: true, force: true }).catch(() => {});
     }
   })
+
+  test("ZvecIndex index handles more than 1024 documents by batching", async () => {
+    const { defaultLayer } = await import("../../src/search/zvec")
+    const { provideInstance } = await import("../fixture/fixture")
+    const { AppFileSystem } = await import("@opencode-ai/core/filesystem")
+    const fsNode = await import("node:fs/promises")
+    const os = await import("node:os")
+    const path = await import("path")
+
+    const dir = await fsNode.mkdtemp(path.join(os.tmpdir(), "opencode-zvec-batch-test-"))
+
+    try {
+      await Effect.gen(function* () {
+        const search = yield* SearchService
+
+        // Create 1200 chunks (exceeding 1024 limit)
+        const chunks = Array.from({ length: 1200 }, (_, i) => ({
+          id: `doc_${i}`,
+          path: `file_${i}.ts`,
+          content: `content_${i}`,
+          embedding: Array(384).fill(0.1),
+        }))
+
+        // This should not throw any "Too many docs" error
+        yield* search.index(chunks)
+
+        // Verify that we can search and retrieve
+        const results = yield* search.search("query", Array(384).fill(0.1), 1)
+        expect(results.length).toBe(1)
+        expect(results[0].id).toBeDefined()
+      }).pipe(
+        Effect.provide(defaultLayer),
+        Effect.provide(AppFileSystem.defaultLayer),
+        provideInstance(dir),
+        Effect.runPromise,
+      )
+    } finally {
+      await fsNode.rm(dir, { recursive: true, force: true }).catch(() => {});
+    }
+  })
 })
