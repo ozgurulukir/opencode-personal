@@ -8,10 +8,10 @@ import { IconButton } from "./icon-button"
 import { TextField } from "./text-field"
 
 function findByKey(container: HTMLElement, key: string) {
-  const nodes = container.querySelectorAll<HTMLElement>('[data-slot="list-item"][data-key]')
-  for (const node of nodes) {
-    if (node.getAttribute("data-key") === key) return node
-  }
+  // ⚡ Bolt: Optimize by directly querying the exact element using an escaped key.
+  // This changes an O(N) linear search over all items to an O(1) querySelector call.
+  const escaped = key.replace(/(["\\])/g, '\\$1')
+  return container.querySelector<HTMLElement>(`[data-slot="list-item"][data-key="${escaped}"]`) ?? undefined
 }
 
 export interface ListSearchProps {
