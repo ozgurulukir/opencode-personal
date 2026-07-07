@@ -164,7 +164,22 @@ const targets = singleFlag
     })
   : allTargets
 
-await $`rm -rf dist`
+try {
+  if (fs.existsSync("dist")) {
+    await $`rm -rf dist`
+  }
+} catch (err) {
+  console.warn("Failed to delete 'dist' directory directly. Renaming to bypass locked files...")
+  const oldDistName = `dist.old.${Date.now()}`
+  try {
+    fs.renameSync("dist", oldDistName)
+    // Attempt to clean up what we can in the background/silently
+    $`rm -rf ${oldDistName}`.catch(() => {})
+  } catch (renameErr) {
+    console.error("Fatal: failed to rename 'dist' directory:", renameErr)
+    throw renameErr
+  }
+}
 
 const binaries: Record<string, string> = {}
 if (!skipInstall) {
