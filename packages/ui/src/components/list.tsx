@@ -11,7 +11,7 @@ function findByKey(container: HTMLElement, key: string) {
   // ⚡ Bolt: Optimize by directly querying the exact element using an escaped key.
   // This changes an O(N) linear search over all items to an O(1) querySelector call.
   try {
-    const escaped = key.replace(/(["\\])/g, '\\$1')
+    const escaped = key.replace(/(["\\])/g, '\\$1').replace(/\n/g, '\\a ')
     return container.querySelector<HTMLElement>(`[data-slot="list-item"][data-key="${escaped}"]`) ?? undefined
   } catch {
     const nodes = container.querySelectorAll<HTMLElement>('[data-slot="list-item"][data-key]')
