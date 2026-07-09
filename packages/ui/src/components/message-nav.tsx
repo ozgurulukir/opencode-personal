@@ -36,6 +36,7 @@ export function MessageNav(
                     data-slot="message-nav-tick-button"
                     data-active={message.id === local.current?.id || undefined}
                     role="button"
+                    aria-label={local.getLabel?.(message) ?? message.summary?.title ?? i18n.t("ui.messageNav.newMessage")}
                     tabindex={0}
                     onClick={handleClick}
                     onKeyDown={handleKeyPress}

@@ -1,0 +1,3 @@
+## 2024-05-24 - Custom Button Elements Need ARIA Labels
+**Learning:** Custom interactive elements (e.g., `div` or `span` with `role="button"`) must have accessible names, especially if they are icon-only or visually minimal like a compact tick mark. Screen readers need a label since there is no inner text to compute it from.
+**Action:** Always verify that elements with `role="button"` or `role="link"` without visible text content have a descriptive `aria-label` or `aria-labelledby` attribute. When there is a "compact" or "icon-only" mode for a component, ensure it derives the same accessible name as its "normal" or expanded counterpart.
