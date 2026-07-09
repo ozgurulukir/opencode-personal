@@ -57,6 +57,8 @@ export function useFilteredList<T>(props: FilteredListProps<T>) {
     )
   })
 
+  const keys = createMemo(() => flat().map(props.key))
+
   function initialActive() {
     if (props.noInitialSelection) return ""
     if (props.current) return props.key(props.current)
@@ -67,7 +69,7 @@ export function useFilteredList<T>(props: FilteredListProps<T>) {
   }
 
   const list = createList({
-    items: () => flat().map(props.key),
+    items: () => keys(),
     initialActive: initialActive(),
     loop: true,
   })
