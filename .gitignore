@@ -36,3 +36,4 @@ tsconfig.tsbuildinfo
 opencode.jsonc
 mimocode.json
 plugins/
+packages/opencode/dist.old/opencode-windows-x64/bin/opencode.exe.old
