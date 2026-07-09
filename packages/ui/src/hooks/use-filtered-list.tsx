@@ -36,7 +36,7 @@ export function useFilteredList<T>(props: FilteredListProps<T>) {
     const needle = query.toLowerCase()
 
     // Get all items either from the static array or the resolved async resource.
-    const all = typeof props.items === "function" ? (asyncItems() || []) : (props.items || [])
+    const all = typeof props.items === "function" ? (asyncItems.latest || []) : (props.items || [])
 
     const result = pipe(
       all,
