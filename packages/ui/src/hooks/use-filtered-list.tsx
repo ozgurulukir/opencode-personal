@@ -121,7 +121,7 @@ export function useFilteredList<T>(props: FilteredListProps<T>) {
   }
 
   return {
-    grouped: Object.assign(() => grouped(), { get latest() { return grouped() }, get loading() { return asyncItems.loading } }),
+    grouped: Object.assign(() => grouped(), { get latest() { return grouped() }, get loading() { return asyncItems.loading }, get error() { return asyncItems.error }, get state() { return asyncItems.state } }),
     filter: () => store.filter,
     flat,
     reset,
