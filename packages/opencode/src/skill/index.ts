@@ -103,8 +103,21 @@ const add = Effect.fnUntraced(function* (state: State, match: string, bus: Bus.I
 
   if (!md) return
 
-  const parsed = z.object({ name: z.string(), description: z.string().optional() }).safeParse(md.data)
-  if (!parsed.success) return
+  const parsed = z.object({ name: z.string().min(1).max(64), description: z.string().optional() }).safeParse(md.data)
+  if (!parsed.success) {
+    const message = parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")
+    const { Session } = yield* Effect.promise(() => import("@/session/session"))
+    yield* bus.publish(Session.Event.Error, {
+      error: new NamedError.Unknown({ message: `Skill ${match}: ${message}` }).toObject(),
+    })
+    log.error("skill schema invalid", { skill: match, issues: parsed.error.issues })
+    return
+  }
+
+  const folderName = path.basename(path.dirname(match))
+  if (parsed.data.name !== folderName) {
+    log.warn("skill name does not match folder", { skill: match, expected: folderName, actual: parsed.data.name })
+  }
 
   if (state.skills[parsed.data.name]) {
     log.warn("duplicate skill name", {
