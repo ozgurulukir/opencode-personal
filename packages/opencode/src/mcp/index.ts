@@ -112,6 +112,14 @@ export const Status = Schema.Union([
   .pipe(withStatics((s) => ({ zod: effectZod(s) })))
 export type Status = Schema.Schema.Type<typeof Status>
 
+export const StatusChanged = BusEvent.define(
+  "mcp.status.changed",
+  Schema.Struct({
+    server: Schema.String,
+    status: Status,
+  }),
+)
+
 // Store transports for OAuth servers to allow finishing auth
 type TransportWithAuth = StreamableHTTPClientTransport | SSEClientTransport
 const pendingOAuthTransports = new Map<string, TransportWithAuth>()
@@ -126,6 +134,15 @@ function isMcpConfigured(entry: McpEntry): entry is ConfigMCP.Info {
 }
 
 const sanitize = (s: string) => s.replace(/[^a-zA-Z0-9_-]/g, "_")
+
+// Filter out headers that the SDK manages automatically (e.g., MCP-Protocol-Version)
+function filterTransportHeaders(headers?: Record<string, string>): { headers: Record<string, string> } | undefined {
+  if (!headers) return undefined
+  const filtered = Object.fromEntries(
+    Object.entries(headers).filter(([k]) => k.toLowerCase() !== "mcp-protocol-version"),
+  )
+  return Object.keys(filtered).length > 0 ? { headers: filtered } : undefined
+}
 
 function remoteURL(key: string, value: string) {
   if (URL.canParse(value)) return new URL(value)
@@ -170,7 +187,7 @@ function listTools(key: string, client: MCPClient, timeout: number) {
 }
 
 // Convert MCP tool definition to AI SDK Tool type
-function convertMcpTool(mcpTool: MCPToolDef, client: MCPClient, timeout?: number): Tool {
+function convertMcpTool(mcpTool: MCPToolDef, client: MCPClient, serverKey: string, timeout?: number): Tool {
   const inputSchema = mcpTool.inputSchema
 
   // Spread first, then override type to ensure it's always "object"
@@ -181,21 +198,35 @@ function convertMcpTool(mcpTool: MCPToolDef, client: MCPClient, timeout?: number
     additionalProperties: false,
   }
 
+  // Include title in description for display purposes if present
+  const description = mcpTool.title
+    ? `${mcpTool.title}${mcpTool.description ? `: ${mcpTool.description}` : ""}`
+    : (mcpTool.description ?? "")
+
   return dynamicTool({
-    description: mcpTool.description ?? "",
+    description,
     inputSchema: jsonSchema(schema),
     execute: async (args: unknown) => {
-      return client.callTool(
-        {
-          name: mcpTool.name,
-          arguments: (args || {}) as Record<string, unknown>,
-        },
-        CallToolResultSchema,
-        {
-          resetTimeoutOnProgress: true,
-          timeout,
-        },
-      )
+      try {
+        return await client.callTool(
+          {
+            name: mcpTool.name,
+            arguments: (args || {}) as Record<string, unknown>,
+          },
+          CallToolResultSchema,
+          {
+            resetTimeoutOnProgress: true,
+            timeout: timeout ?? DEFAULT_TIMEOUT,
+          },
+        )
+      } catch (error) {
+        log.error("mcp tool call failed", {
+          tool: mcpTool.name,
+          server: serverKey,
+          error: error instanceof Error ? error.message : String(error),
+        })
+        throw error
+      }
     },
   })
 }
@@ -302,7 +333,15 @@ export const layer = Layer.effect(
         (t) =>
           Effect.tryPromise({
             try: () => {
-              const client = new Client({ name: "opencode", version: InstallationVersion })
+              const client = new Client(
+                { name: "opencode", version: InstallationVersion },
+                {
+                  capabilities: {
+                    roots: { listChanged: true },
+                    elicitation: {},
+                  },
+                },
+              )
               return withTimeout(client.connect(t), timeout).then(() => client)
             },
             catch: (e) => (e instanceof Error ? e : new Error(String(e))),
@@ -351,14 +390,14 @@ export const layer = Layer.effect(
           name: "StreamableHTTP",
           transport: new StreamableHTTPClientTransport(url, {
             authProvider,
-            requestInit: mcp.headers ? { headers: mcp.headers } : undefined,
+            requestInit: filterTransportHeaders(mcp.headers),
           }),
         },
         {
           name: "SSE",
           transport: new SSEClientTransport(url, {
             authProvider,
-            requestInit: mcp.headers ? { headers: mcp.headers } : undefined,
+            requestInit: filterTransportHeaders(mcp.headers),
           }),
         },
       ]
@@ -446,7 +485,13 @@ export const layer = Layer.effect(
         },
       })
       transport.stderr?.on("data", (chunk: Buffer) => {
-        log.info(`mcp stderr: ${chunk.toString()}`, { key })
+        const text = chunk.toString().trim()
+        try {
+          const json = JSON.parse(text)
+          log.info("mcp stderr (json)", { key, ...json })
+        } catch {
+          log.info("mcp stderr", { key, message: text })
+        }
       })
 
       const connectTimeout = mcp.timeout ?? DEFAULT_TIMEOUT
@@ -525,8 +570,47 @@ export const layer = Layer.effect(
         if (s.clients[name] !== client || s.status[name]?.status !== "connected") return
 
         s.defs[name] = listed
-        await bridge.promise(bus.publish(ToolsChanged, { server: name }).pipe(Effect.ignore))
+        await bridge.promise(Effect.promise(() => Bus.publish(ToolsChanged, { server: name })))
       })
+
+      // Auto-reconnect on transport close
+      if (client.transport) {
+        client.transport.onclose = () => {
+          log.info("mcp transport closed, scheduling reconnect", { server: name })
+          if (s.clients[name] !== client) return
+          s.status[name] = { status: "failed", error: "Transport closed" }
+          delete s.clients[name]
+          delete s.defs[name]
+
+          // Schedule reconnect with exponential backoff
+          const reconnect = (attempt: number) => {
+            const delay = Math.min(1000 * Math.pow(2, attempt), 30_000)
+            setTimeout(async () => {
+              log.info("attempting mcp reconnect", { server: name, attempt })
+              const mcpConfig = await bridge.promise(getMcpConfig(name))
+              if (!mcpConfig) {
+                log.warn("mcp config not found for reconnect", { server: name })
+                return
+              }
+              const result = await bridge.promise(create(name, mcpConfig).pipe(Effect.catch(() => Effect.void)))
+              if (!result?.mcpClient) {
+                log.warn("mcp reconnect failed, retrying", { server: name, attempt })
+                reconnect(attempt + 1)
+                return
+              }
+              s.status[name] = result.status
+              s.clients[name] = result.mcpClient
+              s.defs[name] = result.defs!
+              watch(s, name, result.mcpClient, bridge, mcpConfig.timeout)
+              await bridge.promise(
+                Effect.promise(() => Bus.publish(StatusChanged, { server: name, status: result.status })),
+              )
+              log.info("mcp reconnected", { server: name })
+            }, delay)
+          }
+          reconnect(0)
+        }
+      }
     }
 
     const state = yield* InstanceState.make<State>(
@@ -601,6 +685,9 @@ export const layer = Layer.effect(
       return Effect.tryPromise(() => client.close()).pipe(Effect.ignore)
     }
 
+    const publishStatus = (name: string, status: Status) =>
+      Effect.promise(() => Bus.publish(StatusChanged, { server: name, status })).pipe(Effect.ignore)
+
     const storeClient = Effect.fnUntraced(function* (
       s: State,
       name: string,
@@ -614,6 +701,7 @@ export const layer = Layer.effect(
       s.clients[name] = client
       s.defs[name] = listed
       watch(s, name, client, bridge, timeout)
+      yield* publishStatus(name, s.status[name])
       return s.status[name]
     })
 
@@ -645,6 +733,7 @@ export const layer = Layer.effect(
       if (!result.mcpClient) {
         yield* closeClient(s, name)
         delete s.clients[name]
+        yield* publishStatus(name, result.status)
         return result.status
       }
 
@@ -671,6 +760,7 @@ export const layer = Layer.effect(
       yield* closeClient(s, name)
       delete s.clients[name]
       s.status[name] = { status: "disabled" }
+      yield* publishStatus(name, s.status[name])
     })
 
     const tools = Effect.fn("MCP.tools")(function* () {
@@ -700,7 +790,7 @@ export const layer = Layer.effect(
 
             const timeout = entry?.timeout ?? defaultTimeout
             for (const mcpTool of listed) {
-              result[sanitize(clientName) + "_" + sanitize(mcpTool.name)] = convertMcpTool(mcpTool, client, timeout)
+              result[sanitize(clientName) + "_" + sanitize(mcpTool.name)] = convertMcpTool(mcpTool, client, clientName, timeout)
             }
           }),
         { concurrency: "unbounded" },
@@ -815,7 +905,15 @@ export const layer = Layer.effect(
 
       return yield* Effect.tryPromise({
         try: () => {
-          const client = new Client({ name: "opencode", version: InstallationVersion })
+          const client = new Client(
+            { name: "opencode", version: InstallationVersion },
+            {
+              capabilities: {
+                roots: { listChanged: true },
+                elicitation: {},
+              },
+            },
+          )
           return client
             .connect(transport)
             .then(() => ({ authorizationUrl: "", oauthState, client }) satisfies AuthResult)
@@ -875,7 +973,7 @@ export const layer = Layer.effect(
         ),
         Effect.catch(() => {
           log.warn("failed to open browser, user must open URL manually", { mcpName })
-          return bus.publish(BrowserOpenFailed, { mcpName, url: result.authorizationUrl }).pipe(Effect.ignore)
+          return Effect.promise(() => Bus.publish(BrowserOpenFailed, { mcpName, url: result.authorizationUrl })).pipe(Effect.ignore)
         }),
       )
 

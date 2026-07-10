@@ -150,23 +150,28 @@ export async function ensureRunning(redirectUri?: string): Promise<void> {
 
   if (server) return
 
-  const running = await isPortInUse(port)
-  if (running) {
-    log.info("oauth callback server already running on another instance", { port })
-    return
-  }
-
   currentPort = port
   currentPath = path
 
+  // Try to listen directly instead of checking port first (avoids TOCTOU race).
+  // If the port is already in use, another opencode instance is handling callbacks.
   server = createServer(handleRequest)
-  await new Promise<void>((resolve, reject) => {
-    server!.listen(currentPort, () => {
-      log.info("oauth callback server started", { port: currentPort, path: currentPath })
-      resolve()
+  try {
+    await new Promise<void>((resolve, reject) => {
+      server!.listen(currentPort, () => {
+        log.info("oauth callback server started", { port: currentPort, path: currentPath })
+        resolve()
+      })
+      server!.once("error", reject)
     })
-    server!.on("error", reject)
-  })
+  } catch (error: any) {
+    server = undefined
+    if (error?.code === "EADDRINUSE") {
+      log.info("oauth callback port already in use by another instance", { port: currentPort })
+      return
+    }
+    throw error
+  }
 }
 
 export function waitForCallback(oauthState: string, mcpName?: string): Promise<string> {

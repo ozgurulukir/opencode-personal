@@ -570,7 +570,20 @@ NOTE: At any point in time through this workflow you should feel free to ask the
                         filename: resource.uri,
                       })
                     }
+                  } else if (contentItem.type === "resource_link") {
+                    textParts.push(`[Resource: ${contentItem.uri}]`)
+                  } else if (contentItem.type === "audio") {
+                    attachments.push({
+                      type: "file",
+                      mime: contentItem.mimeType,
+                      url: `data:${contentItem.mimeType};base64,${contentItem.data}`,
+                    })
                   }
+                }
+
+                // Include structuredContent if present (2025-06-18 spec)
+                if (result.structuredContent) {
+                  textParts.push(JSON.stringify(result.structuredContent, null, 2))
                 }
 
                 const truncated = yield* truncate.output(textParts.join("\n\n"), {}, input.agent)

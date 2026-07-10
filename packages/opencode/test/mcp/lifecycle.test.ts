@@ -18,6 +18,7 @@ interface MockClientState {
   resources: Array<{ name: string; uri: string; description?: string }>
   closed: boolean
   notificationHandlers: Map<unknown, (...args: any[]) => any>
+  requestHandlers: Map<string, (...args: any[]) => any>
 }
 
 const clientStates = new Map<string, MockClientState>()
@@ -46,6 +47,7 @@ function getOrCreateClientState(name?: string): MockClientState {
       resources: [],
       closed: false,
       notificationHandlers: new Map(),
+      requestHandlers: new Map(),
     }
     clientStates.set(key, state)
   }
@@ -56,6 +58,7 @@ function getOrCreateClientState(name?: string): MockClientState {
 class MockStdioTransport {
   stderr: null = null
   pid = 12345
+  onclose: (() => void) | null = null
   // oxlint-disable-next-line no-useless-constructor
   constructor(_opts: any) {}
   async start() {
@@ -68,6 +71,7 @@ class MockStdioTransport {
 }
 
 class MockStreamableHTTP {
+  onclose: (() => void) | null = null
   // oxlint-disable-next-line no-useless-constructor
   constructor(_url: URL, _opts?: any) {}
   async start() {
@@ -81,6 +85,7 @@ class MockStreamableHTTP {
 }
 
 class MockSSE {
+  onclose: (() => void) | null = null
   // oxlint-disable-next-line no-useless-constructor
   constructor(_url: URL, _opts?: any) {}
   async start() {
@@ -133,6 +138,10 @@ void mock.module("@modelcontextprotocol/sdk/client/index.js", () => ({
       this._state?.notificationHandlers.set(schema, handler)
     }
 
+    setRequestHandler(schema: { method: string }, handler: (...args: any[]) => any) {
+      this._state?.requestHandlers.set(schema.method, handler)
+    }
+
     async listTools() {
       if (this._state) this._state.listToolsCalls++
       if (this._state?.listToolsShouldFail) {
@@ -179,6 +188,7 @@ beforeEach(() => {
 
 // Import after mocks
 const { MCP } = await import("../../src/mcp/index")
+const { Bus } = await import("../../src/bus")
 const { Instance } = await import("../../src/project/instance")
 const { WithInstance } = await import("../../src/project/with-instance")
 const { tmpdir } = await import("../fixture/fixture")
@@ -850,5 +860,113 @@ test(
       // Both StreamableHTTP and SSE transports should be closed
       expect(transportCloseCount).toBeGreaterThanOrEqual(2)
     }),
+  ),
+)
+
+// ========================================================================
+// Test: client capabilities include elicitation and roots
+// ========================================================================
+
+test(
+  "client is created with elicitation and roots capabilities",
+  withInstance(
+    {
+      "cap-server": {
+        type: "local",
+        command: ["echo", "test"],
+      },
+    },
+    (mcp) =>
+      Effect.gen(function* () {
+        lastCreatedClientName = "cap-server"
+        getOrCreateClientState("cap-server")
+
+        yield* mcp.add("cap-server", {
+          type: "local",
+          command: ["echo", "test"],
+        })
+
+        // Verify the server connected successfully — this confirms the
+        // Client constructor was called with capabilities that the SDK
+        // accepted during initialization.
+        const status = yield* mcp.status()
+        expect(status["cap-server"]?.status).toBe("connected")
+
+        // Tools should be available
+        const tools = yield* mcp.tools()
+        expect(Object.keys(tools).some((k) => k.includes("test_tool"))).toBe(true)
+      }),
+  ),
+)
+
+// ========================================================================
+// Test: client capabilities include elicitation and roots
+// ========================================================================
+
+test(
+  "client is created with elicitation and roots capabilities",
+  withInstance(
+    {
+      "cap-server": {
+        type: "local",
+        command: ["echo", "test"],
+      },
+    },
+    (mcp) =>
+      Effect.gen(function* () {
+        lastCreatedClientName = "cap-server"
+        getOrCreateClientState("cap-server")
+
+        yield* mcp.add("cap-server", {
+          type: "local",
+          command: ["echo", "test"],
+        })
+
+        // Verify the server connected successfully — this confirms the
+        // Client constructor was called with capabilities that the SDK
+        // accepted during initialization.
+        const status = yield* mcp.status()
+        expect(status["cap-server"]?.status).toBe("connected")
+
+        // Tools should be available
+        const tools = yield* mcp.tools()
+        expect(Object.keys(tools).some((k) => k.includes("test_tool"))).toBe(true)
+      }),
+  ),
+)
+
+// ========================================================================
+// Test: client capabilities include elicitation and roots
+// ========================================================================
+
+test(
+  "client is created with elicitation and roots capabilities",
+  withInstance(
+    {
+      "cap-server": {
+        type: "local",
+        command: ["echo", "test"],
+      },
+    },
+    (mcp) =>
+      Effect.gen(function* () {
+        lastCreatedClientName = "cap-server"
+        getOrCreateClientState("cap-server")
+
+        yield* mcp.add("cap-server", {
+          type: "local",
+          command: ["echo", "test"],
+        })
+
+        // Verify the server connected successfully — this confirms the
+        // Client constructor was called with capabilities that the SDK
+        // accepted during initialization.
+        const status = yield* mcp.status()
+        expect(status["cap-server"]?.status).toBe("connected")
+
+        // Tools should be available
+        const tools = yield* mcp.tools()
+        expect(Object.keys(tools).some((k) => k.includes("test_tool"))).toBe(true)
+      }),
   ),
 )

@@ -26,6 +26,7 @@ export const Entry = z.object({
   codeVerifier: z.string().optional(),
   oauthState: z.string().optional(),
   serverUrl: z.string().optional(),
+  resourceUrl: z.string().optional(),
 })
 export type Entry = z.infer<typeof Entry>
 
