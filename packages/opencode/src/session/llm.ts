@@ -17,6 +17,7 @@ import { Permission } from "@/permission"
 import { PermissionID } from "@/permission/schema"
 import { Bus } from "@/bus"
 import { Wildcard } from "@/util/wildcard"
+import { Token } from "@/util/token"
 import { SessionID } from "@/session/schema"
 import { Auth } from "@/auth"
 import { Installation } from "@/installation"
@@ -33,6 +34,13 @@ type Result = Awaited<ReturnType<typeof streamText>>
 const mergeOptions = (target: Record<string, any>, source: Record<string, any> | undefined): Record<string, any> =>
   mergeDeep(target, source ?? {}) as Record<string, any>
 
+export type SystemPrompt = {
+  /** Cacheable core identity prompt (core + provider delta). */
+  prefix: string
+  /** Dynamic context: environment, skills, structured output hints, user system prompt. */
+  suffix: string
+}
+
 export type StreamInput = {
   user: MessageV2.User
   sessionID: string
@@ -40,7 +48,7 @@ export type StreamInput = {
   model: Provider.Model
   agent: Agent.Info
   permission?: Permission.Ruleset
-  system: string[]
+  system: SystemPrompt
   messages: ModelMessage[]
   small?: boolean
   tools: Record<string, Tool>
@@ -97,28 +105,27 @@ const live: Layer.Layer<
         { concurrency: "unbounded" },
       )
 
-      const isOpenaiOauth = ProviderTransform.shouldUseInstructions(item.id, info)
+      const delivery = ProviderTransform.systemPromptDelivery(item.id, info)
 
-      const system: string[] = []
       // Cacheable prefix: core identity prompt (stable across turns for same model/agent)
-      const corePrompt = input.agent.prompt ?? SystemPrompt.provider(input.model).join("\n")
-      system.push(corePrompt)
+      const prefix = input.agent.prompt ?? SystemPrompt.provider(input.model).prefix
       // Dynamic suffix: environment, skills, structured output, user system
-      const dynamicParts = [...input.system, ...(input.user.system ? [input.user.system] : [])].filter((x) => x)
-      if (dynamicParts.length > 0) system.push(dynamicParts.join("\n"))
+      const suffix = input.system.suffix
 
-      const header = system[0]
+      let system: SystemPrompt = { prefix, suffix }
       yield* plugin.trigger(
         "experimental.chat.system.transform",
         { sessionID: input.sessionID, model: input.model },
         { system },
       )
-      // rejoin to maintain 2-part structure for caching if header unchanged
-      if (system.length > 2 && system[0] === header) {
-        const rest = system.slice(1)
-        system.length = 0
-        system.push(header, rest.join("\n"))
+      // Ensure the plugin cannot silently drop the prefix; restore it if missing.
+      if (!system.prefix || system.prefix.trim().length === 0) {
+        system = { prefix, suffix: system.suffix }
       }
+
+      const systemMessages: string[] = []
+      systemMessages.push(system.prefix)
+      if (system.suffix) systemMessages.push(system.suffix)
 
       const variant =
         !input.small && input.model.variants && input.user.model.variant
@@ -132,8 +139,8 @@ const live: Layer.Layer<
             providerOptions: item.options,
           })
       const options = mergeOptions(mergeOptions(mergeOptions(base, input.model.options), input.agent.options), variant)
-      if (isOpenaiOauth) {
-        options.instructions = system.join("\n")
+      if (delivery.type === "instructions") {
+        options.instructions = [system.prefix, system.suffix].filter((x) => x).join("\n")
       }
 
       const isWorkflow = language instanceof GitLabWorkflowLanguageModel
@@ -218,7 +225,7 @@ const live: Layer.Layer<
           approvalHandler?: (approvalTools: { name: string; args: string }[]) => Promise<{ approved: boolean }>
         }
         workflowModel.sessionID = input.sessionID
-        workflowModel.systemPrompt = system.join("\n")
+        workflowModel.systemPrompt = [system.prefix, system.suffix].filter((x) => x).join("\n")
         workflowModel.toolExecutor = async (toolName, argsJson, _requestID) => {
           const t = sortedTools[toolName]
           if (!t || !t.execute) {
@@ -315,6 +322,13 @@ const live: Layer.Layer<
         ? (yield* InstanceState.context).project.id
         : undefined
 
+      l.debug("assembled context", {
+        prefixTokens: Token.estimate(system.prefix),
+        suffixTokens: Token.estimate(system.suffix),
+        messageCount: messages.length,
+        toolCount: Object.keys(sortedTools).length,
+      })
+
       return streamText({
         onError(error) {
           l.error("stream error", {
@@ -369,7 +383,7 @@ const live: Layer.Layer<
           ...headers,
         },
         maxRetries: input.retries ?? 0,
-        system: isOpenaiOauth || isWorkflow ? undefined : system.map((x) => ({ role: "system" as const, content: x })),
+        system: delivery.type !== "messages" || isWorkflow ? undefined : systemMessages.map((x) => ({ role: "system" as const, content: x })),
         messages,
         model: wrapLanguageModel({
           model: language,

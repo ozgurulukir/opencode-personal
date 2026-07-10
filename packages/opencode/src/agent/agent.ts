@@ -6,6 +6,7 @@ import { generateObject, streamObject, type ModelMessage } from "ai"
 import { Truncate } from "@/tool/truncate"
 import { Auth } from "../auth"
 import { ProviderTransform } from "@/provider/transform"
+import type { SystemPrompt } from "../session/llm"
 
 import PROMPT_GENERATE from "./generate.txt"
 import PROMPT_COMPACTION from "./prompt/compaction.txt"
@@ -447,12 +448,12 @@ export const layer = Layer.effect(
           ? Option.getOrUndefined(yield* Effect.serviceOption(OtelTracer.OtelTracer))
           : undefined
 
-        const system = [PROMPT_GENERATE]
+        let system: SystemPrompt = { prefix: PROMPT_GENERATE, suffix: "" }
         yield* plugin.trigger("experimental.chat.system.transform", { model: resolved }, { system })
         const existing = yield* InstanceState.useEffect(state, (s) => s.list())
 
         const authInfo = yield* auth.get(model.providerID).pipe(Effect.orDie)
-        const isOpenaiOauth = ProviderTransform.shouldUseInstructions(model.providerID, authInfo)
+        const delivery = ProviderTransform.systemPromptDelivery(model.providerID, authInfo)
 
         const params = {
           experimental_telemetry: {
@@ -469,7 +470,7 @@ export const layer = Layer.effect(
               content: `Create an agent configuration based on this request: "${input.description}".\n\nIMPORTANT: The following identifiers already exist and must NOT be used: ${existing.map((i) => i.name).join(", ")}\n  Return ONLY the JSON object, no other text, do not wrap in backticks`,
             },
           ],
-          system: isOpenaiOauth ? undefined : system.map((item) => ({ role: "system" as const, content: item })),
+          system: delivery.type !== "messages" ? undefined : [system.prefix, system.suffix].filter((x) => x).map((item) => ({ role: "system" as const, content: item })),
           model: language,
           schema: z.object({
             identifier: z.string(),
@@ -478,12 +479,12 @@ export const layer = Layer.effect(
           }),
         } satisfies Parameters<typeof generateObject>[0]
 
-        if (isOpenaiOauth) {
+        if (delivery.type !== "messages") {
           return yield* Effect.promise(async () => {
             const result = streamObject({
               ...params,
               providerOptions: ProviderTransform.providerOptions(resolved, {
-                instructions: system.join("\n"),
+                instructions: [system.prefix, system.suffix].filter((x) => x).join("\n"),
                 store: false,
               }),
               onError: () => {},

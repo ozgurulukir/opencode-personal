@@ -282,6 +282,21 @@ export const Info = Schema.Struct({
       reserved: Schema.optional(NonNegativeInt).annotate({
         description: "Token buffer for compaction. Leaves enough window to avoid overflow during compaction.",
       }),
+      prune_minimum_tokens: Schema.optional(NonNegativeInt).annotate({
+        description: "Minimum token savings required before pruning old tool outputs (default: 20000)",
+      }),
+      prune_protect_tokens: Schema.optional(NonNegativeInt).annotate({
+        description: "Number of recent tool-output tokens to protect from pruning (default: 40000)",
+      }),
+      tool_output_max_chars: Schema.optional(NonNegativeInt).annotate({
+        description: "Maximum characters of tool output to include when estimating compaction size (default: 2000)",
+      }),
+      min_preserve_recent_tokens: Schema.optional(NonNegativeInt).annotate({
+        description: "Minimum tokens to preserve from recent turns when auto-calculating the budget (default: 2000)",
+      }),
+      max_preserve_recent_tokens: Schema.optional(NonNegativeInt).annotate({
+        description: "Maximum tokens to preserve from recent turns when auto-calculating the budget (default: 8000)",
+      }),
     }),
   ),
   experimental: Schema.optional(
