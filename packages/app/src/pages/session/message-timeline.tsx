@@ -246,7 +246,7 @@ export function MessageTimeline(props: {
     const list = props.renderedUserMessages
     const result = new Array(list.length)
     let i = 0
-    for (const message of list) result[i++] = message.id
+    for (let j = 0; j < list.length; j++) result[i++] = list[j].id
     return result
   })
   const sessionID = createMemo(() => params.id)

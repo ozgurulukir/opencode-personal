@@ -148,7 +148,7 @@ export function TerminalPanel() {
     const list = all()
     const result = new Array(list.length)
     let i = 0
-    for (const pty of list) result[i++] = pty.id
+    for (let j = 0; j < list.length; j++) result[i++] = list[j].id
     return result
   })
 

@@ -25,14 +25,15 @@ export const useSessionHashScroll = (input: {
 }) => {
   const visibleUserMessages = createMemo(() => input.visibleUserMessages())
   const messageById = createMemo(() => {
+    const list = visibleUserMessages()
     const map = new Map<string, UserMessage>()
-    for (const m of visibleUserMessages()) map.set(m.id, m)
+    for (let j = 0; j < list.length; j++) map.set(list[j].id, list[j])
     return map
   })
   const messageIndex = createMemo(() => {
+    const list = visibleUserMessages()
     const map = new Map<string, number>()
-    let i = 0
-    for (const m of visibleUserMessages()) map.set(m.id, i++)
+    for (let j = 0; j < list.length; j++) map.set(list[j].id, j)
     return map
   })
   let pendingKey = ""

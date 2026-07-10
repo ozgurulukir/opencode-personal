@@ -81,7 +81,7 @@ export function SessionSidePanel(props: {
     const list = diffs()
     const result = new Array(list.length)
     let i = 0
-    for (const d of list) result[i++] = d.file
+    for (let j = 0; j < list.length; j++) result[i++] = list[j].file
     return result
   })
   const kinds = createMemo(() => {
