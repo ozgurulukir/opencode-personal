@@ -155,6 +155,7 @@ const table = sqliteTable("session", {
 ## Notes
 
 - bun.lock stores catalog versions with `catalog:` prefix
+- `bun install` can silently modify `bun.lock` (configVersion removal, integrity hash stripping, formatting churn) even without dependency changes. Revert lockfile to match the base branch unless intentionally updating dependencies.
 - Prettier config: no semicolons, 120 char printWidth (in root `package.json`)
 - `do-not-run-tests-from-root` guard prevents running tests from repo root
 - ast-grep is installed at `/home/aristo/.npm-global/bin/ast-grep` and is effective for bulk AST-level refactoring (e.g., removing redundant `(x as any)` casts when the variable is already typed `any`)
