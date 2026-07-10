@@ -1,5 +1,5 @@
 import path from "path"
-import { Effect, Layer, Context } from "effect"
+import { Effect, Layer, Context, Option } from "effect"
 import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/unstable/http"
 import { Config } from "@/config/config"
 import { InstanceState } from "@/effect/instance-state"
@@ -88,6 +88,28 @@ export const layer: Layer.Layer<
       return yield* fs.readFileString(filepath).pipe(Effect.catch(() => Effect.succeed("")))
     })
 
+    type CacheEntry = { mtime: number; content: string }
+    const fileCache = new Map<string, CacheEntry>()
+
+    const statMtime = Effect.fnUntraced(function* (filepath: string) {
+      const info = yield* fs.stat(filepath).pipe(Effect.catch(() => Effect.succeed(undefined)))
+      return info && "mtime" in info ? (info.mtime as Option.Option<Date>).pipe(Option.getOrUndefined)?.getTime() : undefined
+    })
+
+    const readCached = Effect.fnUntraced(function* (filepath: string) {
+      const mtime = yield* statMtime(filepath)
+      if (mtime === undefined) {
+        fileCache.delete(filepath)
+        return yield* read(filepath)
+      }
+      const cached = fileCache.get(filepath)
+      if (cached && cached.mtime >= mtime) return cached.content
+      const content = yield* read(filepath)
+      if (content) fileCache.set(filepath, { mtime, content })
+      else fileCache.delete(filepath)
+      return content
+    })
+
     const fetch = Effect.fnUntraced(function* (url: string) {
       const res = yield* http.execute(HttpClientRequest.get(url)).pipe(
         Effect.timeout(5000),
@@ -153,7 +175,7 @@ export const layer: Layer.Layer<
         (item) => item.startsWith("https://") || item.startsWith("http://"),
       )
 
-      const files = yield* Effect.forEach(Array.from(paths), read, { concurrency: 8 })
+      const files = yield* Effect.forEach(Array.from(paths), readCached, { concurrency: 8 })
       const remote = yield* Effect.forEach(urls, fetch, { concurrency: 4 })
 
       return [
@@ -207,7 +229,7 @@ export const layer: Layer.Layer<
         }
 
         set.add(found)
-        const content = yield* read(found)
+        const content = yield* readCached(found)
         if (content) {
           results.push({ filepath: found, content: `<instructions source="${found}">\n${content}\n</instructions>` })
         }

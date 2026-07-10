@@ -24,10 +24,38 @@ export function sanitizeSurrogates(content: string) {
   return content.replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, "\uFFFD")
 }
 
+export type SystemPromptDelivery =
+  | { type: "messages" }
+  | { type: "instructions" }
+
 // OpenAI OAuth doesn't support `system` role messages — system prompt
 // must be passed via `instructions` in providerOptions instead.
+export function systemPromptDelivery(providerID: string, authInfo: Auth.Info | undefined): SystemPromptDelivery {
+  if (providerID === "openai" && authInfo?.type === "oauth") return { type: "instructions" }
+  return { type: "messages" }
+}
+
+/** @deprecated Use {@link systemPromptDelivery} instead. */
 export function shouldUseInstructions(providerID: string, authInfo: Auth.Info | undefined): boolean {
-  return providerID === "openai" && authInfo?.type === "oauth"
+  return systemPromptDelivery(providerID, authInfo).type === "instructions"
+}
+
+// Whether a provider supports media attachments (images, PDFs) inside tool
+// results, or whether they must be extracted into a separate user message.
+export function supportsMediaInToolResult(model: Model, mime: string): boolean {
+  switch (model.api.npm) {
+    case "@ai-sdk/anthropic":
+    case "@ai-sdk/openai":
+    case "@ai-sdk/google-vertex/anthropic":
+      return true
+    case "@ai-sdk/amazon-bedrock":
+      return mime.startsWith("image/")
+    case "@ai-sdk/google": {
+      const id = model.api.id.toLowerCase()
+      return id.includes("gemini-3") && !id.includes("gemini-2")
+    }
+  }
+  return false
 }
 
 // Maps npm package to the key the AI SDK expects for providerOptions

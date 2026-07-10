@@ -16,6 +16,7 @@ import { Effect, Layer, Context, Schema } from "effect"
 import * as DateTime from "effect/DateTime"
 import { InstanceState } from "@/effect/instance-state"
 import { isOverflow as overflow, usable } from "./overflow"
+import * as ContextBudget from "./context-budget"
 import { makeRuntime } from "@/effect/run-service"
 import { serviceUse } from "@/effect/service-use"
 import { SyncEvent } from "@/sync"
@@ -33,13 +34,13 @@ export const Event = {
   ),
 }
 
-export const PRUNE_MINIMUM = 20_000
-export const PRUNE_PROTECT = 40_000
-const TOOL_OUTPUT_MAX_CHARS = 2_000
+export const PRUNE_MINIMUM = ContextBudget.DEFAULTS.pruneMinimumTokens
+export const PRUNE_PROTECT = ContextBudget.DEFAULTS.pruneProtectTokens
+const TOOL_OUTPUT_MAX_CHARS = ContextBudget.DEFAULTS.toolOutputMaxChars
 const PRUNE_PROTECTED_TOOLS = ["skill"]
-const DEFAULT_TAIL_TURNS = 2
-const MIN_PRESERVE_RECENT_TOKENS = 2_000
-const MAX_PRESERVE_RECENT_TOKENS = 8_000
+const DEFAULT_TAIL_TURNS = ContextBudget.DEFAULTS.defaultTailTurns
+const MIN_PRESERVE_RECENT_TOKENS = ContextBudget.DEFAULTS.minPreserveRecentTokens
+const MAX_PRESERVE_RECENT_TOKENS = ContextBudget.DEFAULTS.maxPreserveRecentTokens
 const SUMMARY_TEMPLATE = `Output exactly the Markdown structure shown inside <template> and keep the section order unchanged. Do not include the <template> tags in your response.
 <template>
 ## Goal
@@ -135,9 +136,10 @@ function buildPrompt(input: { previousSummary?: string; context: string[] }) {
 }
 
 function preserveRecentBudget(input: { cfg: Config.Info; model: Provider.Model }) {
+  const cc = ContextBudget.compactionConfig(input.cfg)
   return (
-    input.cfg.compaction?.preserve_recent_tokens ??
-    Math.min(MAX_PRESERVE_RECENT_TOKENS, Math.max(MIN_PRESERVE_RECENT_TOKENS, Math.floor(usable(input) * 0.25)))
+    cc.preserveRecentTokens ??
+    Math.min(cc.maxPreserveRecentTokens, Math.max(cc.minPreserveRecentTokens, Math.floor(usable(input) * 0.25)))
   )
 }
 
@@ -253,7 +255,7 @@ export const layer: Layer.Layer<
       cfg: Config.Info
       model: Provider.Model
     }) {
-      const limit = input.cfg.compaction?.tail_turns ?? DEFAULT_TAIL_TURNS
+      const limit = ContextBudget.compactionConfig(input.cfg).tailTurns
       if (limit <= 0) return { head: input.messages, tail_start_id: undefined }
       const budget = preserveRecentBudget({ cfg: input.cfg, model: input.model })
       const all = turns(input.messages)
@@ -303,7 +305,8 @@ export const layer: Layer.Layer<
     // calls, then erases output of older tool calls to free context space
     const prune = Effect.fn("SessionCompaction.prune")(function* (input: { sessionID: SessionID }) {
       const cfg = yield* config.get()
-      if (!cfg.compaction?.prune) return
+      const cc = ContextBudget.compactionConfig(cfg)
+      if (!cc.prune) return
       log.info("pruning")
 
       const msgs = yield* session
@@ -329,14 +332,14 @@ export const layer: Layer.Layer<
           if (part.state.time.compacted) break loop
           const estimate = Token.estimate(part.state.output)
           total += estimate
-          if (total <= PRUNE_PROTECT) continue
+          if (total <= cc.pruneProtectTokens) continue
           pruned += estimate
           toPrune.push(part)
         }
       }
 
       log.info("found", { pruned, total })
-      if (pruned > PRUNE_MINIMUM) {
+      if (pruned > cc.pruneMinimumTokens) {
         for (const part of toPrune) {
           if (part.state.status === "completed") {
             part.state.time.compacted = Date.now()
@@ -400,6 +403,11 @@ export const layer: Layer.Layer<
         cfg,
         model,
       })
+      log.info("compaction selected", {
+        tail_start_id: selected.tail_start_id,
+        budget: preserveRecentBudget({ cfg, model }),
+        overflow: input.overflow === true,
+      })
       // Allow plugins to inject context or replace compaction prompt.
       const compacting = yield* plugin.trigger(
         "experimental.session.compacting",
@@ -411,7 +419,7 @@ export const layer: Layer.Layer<
       yield* plugin.trigger("experimental.chat.messages.transform", {}, { messages: msgs })
       const modelMessages = yield* MessageV2.toModelMessagesEffect(msgs, model, {
         stripMedia: true,
-        toolOutputMaxChars: TOOL_OUTPUT_MAX_CHARS,
+        toolOutputMaxChars: ContextBudget.compactionConfig(cfg).toolOutputMaxChars,
       })
       const ctx = yield* InstanceState.context
       const msg: MessageV2.Assistant = {
@@ -451,7 +459,7 @@ export const layer: Layer.Layer<
         agent,
         sessionID: input.sessionID,
         tools: {},
-        system: [],
+        system: { prefix: "", suffix: "" },
         messages: [
           ...modelMessages,
           {
@@ -580,6 +588,7 @@ export const layer: Layer.Layer<
         }
         yield* bus.publish(Event.Compacted, { sessionID: input.sessionID })
       }
+      log.info("compaction finished", { result, overflow: input.overflow === true })
       return result
     })
 

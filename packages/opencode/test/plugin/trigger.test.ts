@@ -52,7 +52,7 @@ function withProject<A, E, R>(source: string, self: Effect.Effect<A, E, R>) {
 
 const triggerSystemTransform = Effect.fn("PluginTriggerTest.triggerSystemTransform")(function* () {
   const plugin = yield* Plugin.Service
-  const out = { system: [] as string[] }
+  const out = { system: { prefix: "", suffix: "" } }
   yield* plugin.trigger(
     systemHook,
     {
@@ -72,13 +72,13 @@ describe("plugin.trigger", () => {
       [
         "export default async () => ({",
         `  ${JSON.stringify(systemHook)}: (_input, output) => {`,
-        '    output.system.unshift("sync")',
+        '    output.system.prefix = "sync\\n" + output.system.prefix',
         "  },",
         "})",
         "",
       ].join("\n"),
       Effect.gen(function* () {
-        expect(yield* triggerSystemTransform()).toEqual(["sync"])
+        expect(yield* triggerSystemTransform()).toEqual({ prefix: "sync\n", suffix: "" })
       }),
     ),
   )
@@ -89,13 +89,13 @@ describe("plugin.trigger", () => {
         "export default async () => ({",
         `  ${JSON.stringify(systemHook)}: async (_input, output) => {`,
         "    await Bun.sleep(1)",
-        '    output.system.unshift("async")',
+        '    output.system.prefix = "async\\n" + output.system.prefix',
         "  },",
         "})",
         "",
       ].join("\n"),
       Effect.gen(function* () {
-        expect(yield* triggerSystemTransform()).toEqual(["async"])
+        expect(yield* triggerSystemTransform()).toEqual({ prefix: "async\n", suffix: "" })
       }),
     ),
   )

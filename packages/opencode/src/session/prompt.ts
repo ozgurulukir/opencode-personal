@@ -15,6 +15,7 @@ import { SessionCompaction } from "./compaction"
 import { Bus } from "../bus"
 import { ProviderTransform } from "@/provider/transform"
 import { SystemPrompt } from "./system"
+
 import { Instruction } from "./instruction"
 import { Plugin } from "../plugin"
 import PROMPT_PLAN from "../session/prompt/plan.txt"
@@ -39,7 +40,7 @@ import { SessionProcessor } from "./processor"
 import { Tool } from "@/tool/tool"
 import { Permission } from "@/permission"
 import { SessionStatus } from "./status"
-import { LLM } from "./llm"
+import { LLM, type SystemPrompt as LLMSystemPrompt } from "./llm"
 import { Shell } from "@/shell/shell"
 import { ShellID } from "@/tool/shell/id"
 import { AppFileSystem } from "@opencode-ai/core/filesystem"
@@ -155,6 +156,24 @@ export const layer = Layer.effect(
       } satisfies TaskPromptOps
     })
 
+    type ToolSchemaCacheEntry = { schema: Record<string, any> }
+    const toolSchemaCache = new Map<string, ToolSchemaCacheEntry>()
+
+    const cachedToolSchema = Effect.fnUntraced(function* (
+      source: "registry" | "mcp",
+      model: Provider.Model,
+      toolID: string,
+      getSchema: () => Record<string, any>,
+    ) {
+      const sourceSchema = getSchema()
+      const key = `${source}:${model.providerID}:${model.api.id}:${toolID}:${JSON.stringify(sourceSchema)}`
+      const cached = toolSchemaCache.get(key)
+      if (cached) return cached.schema
+      const transformed = ProviderTransform.schema(model, sourceSchema)
+      toolSchemaCache.set(key, { schema: transformed })
+      return transformed
+    })
+
     const cancel = Effect.fn("SessionPrompt.cancel")(function* (sessionID: SessionID) {
       yield* elog.info("cancel", { sessionID })
       yield* state.cancel(sessionID)
@@ -230,7 +249,7 @@ export const layer = Layer.effect(
         .stream({
           agent: ag,
           user: firstInfo,
-          system: [],
+          system: { prefix: "", suffix: "" },
           small: true,
           tools: {},
           model: mdl,
@@ -261,12 +280,20 @@ export const layer = Layer.effect(
       agent: Agent.Info
       session: Session.Info
     }) {
-      const userMessage = input.messages.findLast((msg) => msg.info.role === "user")
-      if (!userMessage) return input.messages
+      const userIndex = input.messages.findLastIndex((msg) => msg.info.role === "user")
+      if (userIndex === -1) return input.messages
+      const userMessage = input.messages[userIndex]
+
+      const appendParts = (parts: MessageV2.Part[]): MessageV2.WithParts[] => [
+        ...input.messages.slice(0, userIndex),
+        { ...userMessage, parts: [...userMessage.parts, ...parts] },
+        ...input.messages.slice(userIndex + 1),
+      ]
 
       if (!Flag.OPENCODE_EXPERIMENTAL_PLAN_MODE) {
+        const extra: MessageV2.TextPart[] = []
         if (input.agent.name === "plan") {
-          userMessage.parts.push({
+          extra.push({
             id: PartID.ascending(),
             messageID: userMessage.info.id,
             sessionID: userMessage.info.sessionID,
@@ -277,7 +304,7 @@ export const layer = Layer.effect(
         }
         const wasPlan = input.messages.some((msg) => msg.info.role === "assistant" && msg.info.agent === "plan")
         if (wasPlan && input.agent.name === "build") {
-          userMessage.parts.push({
+          extra.push({
             id: PartID.ascending(),
             messageID: userMessage.info.id,
             sessionID: userMessage.info.sessionID,
@@ -286,7 +313,7 @@ export const layer = Layer.effect(
             synthetic: true,
           })
         }
-        return input.messages
+        return extra.length > 0 ? appendParts(extra) : input.messages
       }
 
       const assistantMessage = input.messages.findLast((msg) => msg.info.role === "assistant")
@@ -302,8 +329,7 @@ export const layer = Layer.effect(
           text: `${BUILD_SWITCH}\n<system-reminder>\nA plan file exists at ${plan}. You should execute on the plan defined within it\n</system-reminder>`,
           synthetic: true,
         })
-        userMessage.parts.push(part)
-        return input.messages
+        return appendParts([part])
       }
 
       if (input.agent.name !== "plan" || assistantMessage?.info.agent === "plan") return input.messages
@@ -389,8 +415,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
 </system-reminder>`,
         synthetic: true,
       })
-      userMessage.parts.push(part)
-      return input.messages
+      return appendParts([part])
     })
 
     const resolveTools = Effect.fn("SessionPrompt.resolveTools")(function* (input: {
@@ -445,7 +470,9 @@ NOTE: At any point in time through this workflow you should feel free to ask the
         providerID: input.model.providerID,
         agent: input.agent,
       })) {
-        const schema = ProviderTransform.schema(input.model, EffectZod.toJsonSchema(item.parameters))
+        const schema = yield* cachedToolSchema("registry", input.model, item.id, () =>
+          EffectZod.toJsonSchema(item.parameters),
+        )
         tools[item.id] = tool({
           description: item.description,
           inputSchema: jsonSchema(schema),
@@ -488,86 +515,91 @@ NOTE: At any point in time through this workflow you should feel free to ask the
         if (!execute) continue
 
         const schema = yield* Effect.promise(() => Promise.resolve(asSchema(item.inputSchema).jsonSchema))
-        const transformed = ProviderTransform.schema(input.model, schema)
-        item.inputSchema = jsonSchema(transformed)
-        item.execute = (args, opts) =>
-          run.promise(
-            Effect.gen(function* () {
-              const ctx = context(args, opts)
-              yield* plugin.trigger(
-                "tool.execute.before",
-                { tool: key, sessionID: ctx.sessionID, callID: opts.toolCallId },
-                { args },
-              )
-              const result: Awaited<ReturnType<NonNullable<typeof execute>>> = yield* Effect.gen(function* () {
-                yield* ctx.ask({ permission: key, metadata: {}, patterns: ["*"], always: ["*"] })
-                return yield* Effect.promise(() => execute(args, opts))
-              }).pipe(
-                Effect.withSpan("Tool.execute", {
-                  attributes: {
-                    "tool.name": key,
-                    "tool.call_id": opts.toolCallId,
-                    "session.id": ctx.sessionID,
-                    "message.id": input.processor.message.id,
-                  },
-                }),
-              )
-              yield* plugin.trigger(
-                "tool.execute.after",
-                { tool: key, sessionID: ctx.sessionID, callID: opts.toolCallId, args },
-                result,
-              )
+        const transformed = yield* cachedToolSchema("mcp", input.model, key, () => schema)
+        const inputSchema = jsonSchema(transformed)
 
-              const textParts: string[] = []
-              const attachments: Omit<MessageV2.FilePart, "id" | "sessionID" | "messageID">[] = []
-              for (const contentItem of result.content) {
-                if (contentItem.type === "text") textParts.push(contentItem.text)
-                else if (contentItem.type === "image") {
-                  attachments.push({
-                    type: "file",
-                    mime: contentItem.mimeType,
-                    url: `data:${contentItem.mimeType};base64,${contentItem.data}`,
-                  })
-                } else if (contentItem.type === "resource") {
-                  const { resource } = contentItem
-                  if (resource.text) textParts.push(resource.text)
-                  if (resource.blob) {
+        tools[key] = tool({
+          description: item.description ?? "",
+          inputSchema,
+          execute(args, opts) {
+            return run.promise(
+              Effect.gen(function* () {
+                const ctx = context(args, opts)
+                yield* plugin.trigger(
+                  "tool.execute.before",
+                  { tool: key, sessionID: ctx.sessionID, callID: opts.toolCallId },
+                  { args },
+                )
+                const result: Awaited<ReturnType<NonNullable<typeof execute>>> = yield* Effect.gen(function* () {
+                  yield* ctx.ask({ permission: key, metadata: {}, patterns: ["*"], always: ["*"] })
+                  return yield* Effect.promise(() => execute(args, opts))
+                }).pipe(
+                  Effect.withSpan("Tool.execute", {
+                    attributes: {
+                      "tool.name": key,
+                      "tool.call_id": opts.toolCallId,
+                      "session.id": ctx.sessionID,
+                      "message.id": input.processor.message.id,
+                    },
+                  }),
+                )
+                yield* plugin.trigger(
+                  "tool.execute.after",
+                  { tool: key, sessionID: ctx.sessionID, callID: opts.toolCallId, args },
+                  result,
+                )
+
+                const textParts: string[] = []
+                const attachments: Omit<MessageV2.FilePart, "id" | "sessionID" | "messageID">[] = []
+                for (const contentItem of result.content) {
+                  if (contentItem.type === "text") textParts.push(contentItem.text)
+                  else if (contentItem.type === "image") {
                     attachments.push({
                       type: "file",
-                      mime: resource.mimeType ?? "application/octet-stream",
-                      url: `data:${resource.mimeType ?? "application/octet-stream"};base64,${resource.blob}`,
-                      filename: resource.uri,
+                      mime: contentItem.mimeType,
+                      url: `data:${contentItem.mimeType};base64,${contentItem.data}`,
                     })
+                  } else if (contentItem.type === "resource") {
+                    const { resource } = contentItem
+                    if (resource.text) textParts.push(resource.text)
+                    if (resource.blob) {
+                      attachments.push({
+                        type: "file",
+                        mime: resource.mimeType ?? "application/octet-stream",
+                        url: `data:${resource.mimeType ?? "application/octet-stream"};base64,${resource.blob}`,
+                        filename: resource.uri,
+                      })
+                    }
                   }
                 }
-              }
 
-              const truncated = yield* truncate.output(textParts.join("\n\n"), {}, input.agent)
-              const metadata = {
-                ...result.metadata,
-                truncated: truncated.truncated,
-                ...(truncated.truncated && { outputPath: truncated.outputPath }),
-              }
+                const truncated = yield* truncate.output(textParts.join("\n\n"), {}, input.agent)
+                const metadata = {
+                  ...result.metadata,
+                  truncated: truncated.truncated,
+                  ...(truncated.truncated && { outputPath: truncated.outputPath }),
+                }
 
-              const output = {
-                title: "",
-                metadata,
-                output: truncated.content,
-                attachments: attachments.map((attachment) => ({
-                  ...attachment,
-                  id: PartID.ascending(),
-                  sessionID: ctx.sessionID,
-                  messageID: input.processor.message.id,
-                })),
-                content: result.content,
-              }
-              if (opts.abortSignal?.aborted) {
-                yield* input.processor.completeToolCall(opts.toolCallId, output)
-              }
-              return output
-            }),
-          )
-        tools[key] = item
+                const output = {
+                  title: "",
+                  metadata,
+                  output: truncated.content,
+                  attachments: attachments.map((attachment) => ({
+                    ...attachment,
+                    id: PartID.ascending(),
+                    sessionID: ctx.sessionID,
+                    messageID: input.processor.message.id,
+                  })),
+                  content: result.content,
+                }
+                if (opts.abortSignal?.aborted) {
+                  yield* input.processor.completeToolCall(opts.toolCallId, output)
+                }
+                return output
+              }),
+            )
+          },
+        })
       }
 
       return tools
@@ -1598,7 +1630,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
               yield* summary.summarize({ sessionID, messageID: lastUser.id }).pipe(Effect.ignore, Effect.forkIn(scope))
 
             if (step > 1 && lastFinished) {
-              wrapMessageContinuation(msgs, lastFinished.id)
+              msgs = wrapMessageContinuation(msgs, lastFinished.id)
             }
 
             yield* plugin.trigger("experimental.chat.messages.transform", {}, { messages: msgs })
@@ -1609,9 +1641,17 @@ NOTE: At any point in time through this workflow you should feel free to ask the
               instruction.system().pipe(Effect.orDie),
               MessageV2.toModelMessagesEffect(msgs, model),
             ])
-            const system = [...env, ...(skills ? [skills] : [])]
             const format = lastUser.format ?? { type: "text" as const }
-            if (format.type === "json_schema") system.push(STRUCTURED_OUTPUT_SYSTEM_PROMPT)
+            const suffixParts = [
+              ...env,
+              ...(skills ? [skills] : []),
+              ...(format.type === "json_schema" ? [STRUCTURED_OUTPUT_SYSTEM_PROMPT] : []),
+              ...(lastUser.system ? [lastUser.system] : []),
+            ]
+            const system: LLMSystemPrompt = {
+              prefix: "", // LLM.stream fills this from agent.prompt or SystemPrompt.provider
+              suffix: suffixParts.filter((x) => x).join("\n"),
+            }
             const result = yield* handle.process({
               user: lastUser,
               agent,

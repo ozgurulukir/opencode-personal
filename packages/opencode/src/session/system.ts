@@ -16,9 +16,14 @@ import type { Agent } from "@/agent/agent"
 import { Permission } from "@/permission"
 import { Skill } from "@/skill"
 
-export function provider(model: Provider.Model): string[] {
+export type Prompt = {
+  /** Cacheable core identity prompt (core + provider delta). */
+  prefix: string
+}
+
+export function provider(model: Provider.Model): Prompt {
   const delta = matchDelta(model)
-  return [PROMPT_CORE, delta]
+  return { prefix: [PROMPT_CORE, delta].join("\n") }
 }
 
 function matchDelta(model: Provider.Model): string {

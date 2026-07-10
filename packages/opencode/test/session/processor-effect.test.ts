@@ -217,7 +217,7 @@ it.live("session.processor effect tests capture llm input cleanly", () =>
           sessionID: chat.id,
           model: mdl,
           agent: agent(),
-          system: [],
+          system: { prefix: "", suffix: "" },
           messages: [{ role: "user", content: "hi" }],
           tools: {},
         } satisfies LLM.StreamInput
@@ -289,7 +289,7 @@ it.live("session.processor effect tests preserve text start time", () =>
             sessionID: chat.id,
             model: mdl,
             agent: agent(),
-            system: [],
+            system: { prefix: "", suffix: "" },
             messages: [{ role: "user", content: "hi" }],
             tools: {},
           })
@@ -352,7 +352,7 @@ it.live("session.processor effect tests stop after token overflow requests compa
           sessionID: chat.id,
           model: mdl,
           agent: agent(),
-          system: [],
+          system: { prefix: "", suffix: "" },
           messages: [{ role: "user", content: "compact" }],
           tools: {},
         })
@@ -397,7 +397,7 @@ it.live("session.processor effect tests capture reasoning from http mock", () =>
           sessionID: chat.id,
           model: mdl,
           agent: agent(),
-          system: [],
+          system: { prefix: "", suffix: "" },
           messages: [{ role: "user", content: "reason" }],
           tools: {},
         })
@@ -445,7 +445,7 @@ it.live("session.processor effect tests reset reasoning state across retries", (
           sessionID: chat.id,
           model: mdl,
           agent: agent(),
-          system: [],
+          system: { prefix: "", suffix: "" },
           messages: [{ role: "user", content: "reason" }],
           tools: {},
         })
@@ -492,7 +492,7 @@ it.live("session.processor effect tests do not retry unknown json errors", () =>
           sessionID: chat.id,
           model: mdl,
           agent: agent(),
-          system: [],
+          system: { prefix: "", suffix: "" },
           messages: [{ role: "user", content: "json" }],
           tools: {},
         })
@@ -536,7 +536,7 @@ it.live("session.processor effect tests retry recognized structured json errors"
           sessionID: chat.id,
           model: mdl,
           agent: agent(),
-          system: [],
+          system: { prefix: "", suffix: "" },
           messages: [{ role: "user", content: "retry json" }],
           tools: {},
         })
@@ -589,7 +589,7 @@ it.live("session.processor effect tests publish retry status updates", () =>
           sessionID: chat.id,
           model: mdl,
           agent: agent(),
-          system: [],
+          system: { prefix: "", suffix: "" },
           messages: [{ role: "user", content: "retry" }],
           tools: {},
         })
@@ -634,7 +634,7 @@ it.live("session.processor effect tests compact on structured context overflow",
           sessionID: chat.id,
           model: mdl,
           agent: agent(),
-          system: [],
+          system: { prefix: "", suffix: "" },
           messages: [{ role: "user", content: "compact json" }],
           tools: {},
         })
@@ -678,7 +678,7 @@ it.live("session.processor effect tests mark pending tools as aborted on cleanup
             sessionID: chat.id,
             model: mdl,
             agent: agent(),
-            system: [],
+            system: { prefix: "", suffix: "" },
             messages: [{ role: "user", content: "tool abort" }],
             tools: {},
           })
@@ -756,7 +756,7 @@ it.live("session.processor effect tests record aborted errors and idle state", (
             sessionID: chat.id,
             model: mdl,
             agent: agent(),
-            system: [],
+            system: { prefix: "", suffix: "" },
             messages: [{ role: "user", content: "abort" }],
             tools: {},
           })
@@ -819,7 +819,7 @@ it.live("session.processor effect tests mark interruptions aborted without manua
             sessionID: chat.id,
             model: mdl,
             agent: agent(),
-            system: [],
+            system: { prefix: "", suffix: "" },
             messages: [{ role: "user", content: "interrupt" }],
             tools: {},
           })
