@@ -77,7 +77,13 @@ export function SessionSidePanel(props: {
   const treeWidth = createMemo(() => (fileOpen() ? `${layout.fileTree.width()}px` : "0px"))
 
   const diffs = createMemo(() => props.diffs().filter(renderDiff))
-  const diffFiles = createMemo(() => diffs().map((d) => d.file))
+  const diffFiles = createMemo(() => {
+    const list = diffs()
+    const result = new Array(list.length)
+    let i = 0
+    for (let j = 0; j < list.length; j++) result[i++] = list[j].file
+    return result
+  })
   const kinds = createMemo(() => {
     const merge = (a: "add" | "del" | "mix" | undefined, b: "add" | "del" | "mix") => {
       if (!a) return b
