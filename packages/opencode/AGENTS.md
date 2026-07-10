@@ -18,7 +18,7 @@ System prompt uses a **shared core + provider delta** structure:
 2. `system[1]` = environment + skills (dynamic suffix, session-specific)
 3. Plugin transform hook may add entries; rejoin logic collapses back to 2-part structure if needed
 
-**AGENTS.md injection** (`session/prompt.ts:1580-1604`):
+**AGENTS.md injection** (`session/prompt.ts:1638-1644`):
 
 - `instruction.system()` reads AGENTS.md/CLAUDE.md/CONTEXT.md from disk on every `runLoop` iteration (no caching)
 - Content is wrapped in `<instructions source="path">` tags and prepended as a **user message** (not system prompt)

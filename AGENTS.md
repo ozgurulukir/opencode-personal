@@ -139,7 +139,7 @@ const table = sqliteTable("session", {
 - Drizzle ORM type mismatches (e.g., `UserTable.userID`, `WorkspaceTable.workspaceID`) often require runtime `any` casts during extraction. Accept them as necessary boundary violations, not technical debt to immediately resolve.
 - Avoid sed for code extraction; prefer manual refactor or structural search tools (ast-grep) to prevent stray syntax artifacts.
 - System prompts use a shared core (`session/prompt/core.txt`) plus provider-specific deltas (`session/prompt/delta-*.txt`). Do not duplicate universal rules across deltas — put them in core.txt. Provider deltas contain only provider-specific guidance (TodoWrite emphasis for Claude, apply_patch for GPT, autonomous mode for GPT-4/o1/o3, etc.). Provider matching is in `system.ts:matchDelta()`.
-- AGENTS.md is injected as a **user message** (not system prompt) per the Instruction Hierarchy pattern (Claude Code / Codex CLI). It is re-read from disk on every LLM API call inside `runLoop` — no caching, so edits take effect immediately. See `session/prompt.ts:1580-1604` for the injection point.
+- AGENTS.md is injected as a **user message** (not system prompt) per the Instruction Hierarchy pattern (Claude Code / Codex CLI). It is re-read from disk on every LLM API call inside `runLoop` — no caching, so edits take effect immediately. See `session/prompt.ts:1638-1644` for the injection point.
 - System prompt assembly: `llm.ts:102-114` splits into cacheable prefix (`system[0]` = core + delta) and dynamic suffix (`system[1]` = environment + skills). The plugin transform hook and rejoin logic at `llm.ts:116-121` maintain the 2-part structure for prompt caching.
 - XML section markers are used consistently: `<environment>`, `<skills>` in system prompt; `<instructions source="...">` for AGENTS.md/CLAUDE.md; `<system-reminder>` for transient status (plan mode, build switch, max steps). Do not mix these tag semantics.
 
@@ -149,7 +149,7 @@ const table = sqliteTable("session", {
 - `packages/console/app/src/routes/zen/util/billing.ts`, `reload.ts`, `usage.ts` require SST cloud resources (`ZEN_LITE_PRICE`, `ZEN_BLACK_PRICE`) — tests blocked in local environment without `sst dev`
 - Typecheck in `packages/web` requires `--skipLibCheck` due to astro/starlight type errors
 - Root `test` script always fails: `echo 'do not run tests from root' && exit 1`
-- `packages/opencode/src/session/prompt.ts:1422` — `runLoop` is a 510-line Effect-based infinite loop; future extraction target
+- `packages/opencode/src/session/prompt.ts:1480` — `runLoop` is a ~230-line Effect-based infinite loop; future extraction target
 - Remaining `as any` casts (6 total) are in library internals: `packages/core/src/effect-zod.ts` (3, accessing Effect Schema annotations), `packages/slack/src/index.ts` (1, Slack message shape), `packages/opencode/src/plugin/index.ts` (1, plugin hook typing), `packages/desktop/src/main/index.ts` (1, Electron HTTP proxy), plus test files accessing Effect internals
 
 ## Notes
@@ -162,8 +162,8 @@ const table = sqliteTable("session", {
 - Error handling: use `safeCatch` from `packages/opencode/src/util/error.ts` for promise error wrapping instead of manual try/catch; it logs context automatically
 - Message continuation: extracted 16-line `wrapMessageContinuation` to `packages/opencode/src/session/message-continuation.ts` — pure function mutating message parts in-place; operate on message array copy before calling
 - Provider usage feature: `packages/opencode/src/provider/usage/` contains types.ts (interfaces), claude.ts (Anthropic OAuth fetcher), zai.ts (ZAI API key fetcher), registry.ts (auth.json reader + dispatcher). `/usage` TUI dialog at `cli/cmd/tui/component/dialog-usage.tsx`.
-- Double compaction fix: overflow guard now checks `compaction_continue` metadata to prevent `Event.Compacted` double-fire (`session/prompt.ts:1501`)
+- Double compaction fix: overflow guard now checks `compaction_continue` metadata to prevent `Event.Compacted` double-fire (`session/prompt.ts:1564`)
 - Security: use `constantTimeEqual()` (wrapper around `node:crypto`'s `timingSafeEqual`) for secret comparisons, not `!==`. Pattern in `packages/function/src/api.ts` and `packages/enterprise/src/core/share.ts`. Both define a local `constantTimeEqual(a, b)` that handles length mismatch before calling `timingSafeEqual`.
-- Provider system prompt: `ProviderTransform.shouldUseInstructions(providerID, authInfo)` in `packages/opencode/src/provider/transform.ts` — returns true for OpenAI OAuth, which doesn't support `system` role messages (system prompt passed via `instructions` field instead). Used in `session/llm.ts:100` and `agent/agent.ts:455`.
+- Provider system prompt: `ProviderTransform.systemPromptDelivery(providerID, authInfo)` in `packages/opencode/src/provider/transform.ts` — returns `{ type: "instructions" }` for OpenAI OAuth, which doesn't support `system` role messages (system prompt passed via `instructions` field instead). Used in `session/llm.ts:108` and `agent/agent.ts:456`.
 - WSL path resolution: `wslPath()` in `packages/desktop/src/main/apps.ts` resolves `$HOME` separately (no user input) then passes the path as an `execFileSync` array argument to prevent shell injection. Never interpolate user-controlled paths into `sh -lc` strings.
 - Fiber error handling in FiberMap: use `Effect.tapError` (observe + propagate) instead of `Effect.catch` (swallow) for sync loop errors. The error propagates, the fiber fails, and FiberMap auto-removes it. See `packages/opencode/src/control-plane/workspace.ts:512`.
