@@ -449,7 +449,16 @@ export const layer = Layer.effect(
               url: mcp.url,
               error: lastError.message,
             })
-            lastStatus = { status: "failed" as const, error: lastError.message }
+
+            // Improve error message for common SSE content-type mismatch
+            if (lastError.message.includes("Invalid content type") && lastError.message.includes("text/event-stream")) {
+              lastStatus = {
+                status: "failed" as const,
+                error: `SSE transport failed: server returned wrong Content-Type. The server at "${mcp.url}" may not support SSE, or the URL is incorrect. If the server supports Streamable HTTP, it will be tried next.`,
+              }
+            } else {
+              lastStatus = { status: "failed" as const, error: lastError.message }
+            }
             return Effect.succeed(undefined)
           }),
         )
