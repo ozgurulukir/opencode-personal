@@ -187,8 +187,10 @@ Instructions here.
           const item = list.find((x) => x.name === "manual-skill")
           expect(item).toBeDefined()
           expect(item!.description).toBeUndefined()
-          expect(Skill.fmt(list, { verbose: false })).toBe("No skills are currently available.")
-          expect(Skill.fmt(list, { verbose: true })).toBe("No skills are currently available.")
+          expect(Skill.fmt(list, { verbose: false })).not.toBe("No skills are currently available.")
+          expect(Skill.fmt(list, { verbose: false })).toContain("manual-skill")
+          expect(Skill.fmt(list, { verbose: true })).not.toBe("No skills are currently available.")
+          expect(Skill.fmt(list, { verbose: true })).toContain("manual-skill")
         }),
       { git: true },
     ),

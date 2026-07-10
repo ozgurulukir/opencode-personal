@@ -303,28 +303,43 @@ export const defaultLayer = layer.pipe(
 
 export function fmt(list: Info[], opts: { verbose: boolean }) {
   const described = list.filter((skill) => skill.description !== undefined)
-  if (described.length === 0) return "No skills are currently available."
-  if (opts.verbose) {
-    return [
-      "<available_skills>",
-      ...described
-        .toSorted((a, b) => a.name.localeCompare(b.name))
-        .flatMap((skill) => [
+  if (described.length === 0) {
+    if (list.length === 0) return "No skills are currently available."
+    if (opts.verbose) {
+      return [
+        "<available_skills>",
+        ...list.flatMap((skill) => [
           "  <skill>",
           `    <name>${skill.name}</name>`,
-          `    <description>${skill.description}</description>`,
+          "    <description>(no description provided)</description>",
           `    <location>${pathToFileURL(skill.location).href}</location>`,
           "  </skill>",
         ]),
+        "</available_skills>",
+      ].join("\n")
+    }
+    return [
+      "## Available Skills",
+      ...list.map((skill) => `- **${skill.name}** (add a description to improve discoverability)`),
+    ].join("\n")
+  }
+  if (opts.verbose) {
+    return [
+      "<available_skills>",
+      ...described.flatMap((skill) => [
+        "  <skill>",
+        `    <name>${skill.name}</name>`,
+        `    <description>${skill.description}</description>`,
+        `    <location>${pathToFileURL(skill.location).href}</location>`,
+        "  </skill>",
+      ]),
       "</available_skills>",
     ].join("\n")
   }
 
   return [
     "## Available Skills",
-    ...described
-      .toSorted((a, b) => a.name.localeCompare(b.name))
-      .map((skill) => `- **${skill.name}**: ${skill.description}`),
+    ...described.map((skill) => `- **${skill.name}**: ${skill.description}`),
   ].join("\n")
 }
 
