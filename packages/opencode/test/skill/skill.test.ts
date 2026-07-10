@@ -1,4 +1,4 @@
-import { describe, expect } from "bun:test"
+import { describe, expect, test } from "bun:test"
 import { Effect, Layer } from "effect"
 import { Skill } from "../../src/skill"
 import { CrossSpawnSpawner } from "@opencode-ai/core/cross-spawn-spawner"
@@ -521,4 +521,44 @@ description: Name mismatch with folder.
       { git: true },
     ),
   )
+})
+
+describe("skill.fmt", () => {
+  const mkSkill = (name: string, description?: string): Skill.Info => ({
+    name,
+    description,
+    location: `/skills/${name}/SKILL.md`,
+    content: "body",
+  })
+
+  test("returns placeholder for empty list", () => {
+    expect(Skill.fmt([], { verbose: false })).toBe("No skills are currently available.")
+    expect(Skill.fmt([], { verbose: true })).toBe("No skills are currently available.")
+  })
+
+  test("lists described skills in non-verbose mode", () => {
+    const result = Skill.fmt([mkSkill("alpha", "Alpha skill")], { verbose: false })
+    expect(result).toContain("## Available Skills")
+    expect(result).toContain("**alpha**")
+    expect(result).toContain("Alpha skill")
+  })
+
+  test("lists described skills in verbose mode", () => {
+    const result = Skill.fmt([mkSkill("alpha", "Alpha skill")], { verbose: true })
+    expect(result).toContain("<available_skills>")
+    expect(result).toContain("<name>alpha</name>")
+    expect(result).toContain("<description>Alpha skill</description>")
+  })
+
+  test("shows skills without descriptions instead of hiding them", () => {
+    const result = Skill.fmt([mkSkill("nameless")], { verbose: false })
+    expect(result).not.toBe("No skills are currently available.")
+    expect(result).toContain("nameless")
+  })
+
+  test("preserves input order without re-sorting", () => {
+    const input = [mkSkill("zebra", "z"), mkSkill("alpha", "a")]
+    const result = Skill.fmt(input, { verbose: false })
+    expect(result.indexOf("zebra")).toBeLessThan(result.indexOf("alpha"))
+  })
 })
