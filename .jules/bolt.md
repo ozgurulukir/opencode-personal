@@ -10,3 +10,7 @@
 
 **Learning:** `createResource` inherently resolves its promise in a microtask, meaning any UI using it will experience a brief asynchronous delay/flicker—even if the initial resource resolution resolves immediately or wraps synchronous lists.
 **Action:** When filtering static arrays or handling synchronous logic, extract that logic into a `createMemo` (which evaluates synchronously upon access) rather than wrapping it in a `createResource` fetcher, preserving instantaneous updates in the UI. If you are modifying a hook that returned a `Resource` type, use `Object.assign` to mock out the original `Resource` shape (`() => T` accessor with `get latest()` / `get loading()`) to avoid API breaking changes while injecting custom Memo implementations.
++
++## 2024-03-24 - Array Map vs Loop in createMemo
++**Learning:** In SolidJS `createMemo`, using `new Array(length)` with an index-based `for` loop avoids intermediate array allocations that come from chaining `.map()` on observable lists or doing `new Map(list.map(...))`. This drastically reduces garbage collection pressure on frequently re-rendered or large lists (like `visibleUserMessages`, `diffs`, `renderedUserMessages`, `terminal.all()`).
++**Action:** Replace `.map()` chains inside high-frequency `createMemo`s with pre-allocated arrays and index-based `for` loops, or single-pass iteration to build Maps.
