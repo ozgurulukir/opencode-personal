@@ -419,4 +419,106 @@ description: A skill in the .opencode/skills directory.
       { git: true },
     ),
   )
+
+  it.live("drops skills with empty name", () =>
+    provideTmpdirInstance(
+      (dir) =>
+        Effect.gen(function* () {
+          yield* Effect.promise(() =>
+            Bun.write(
+              path.join(dir, ".opencode", "skill", "empty-name", "SKILL.md"),
+              `---
+name: ""
+description: Skill with empty name.
+---
+
+# Empty Name
+`,
+            ),
+          )
+
+          const skill = yield* Skill.Service
+          expect(yield* skill.all()).toEqual([])
+        }),
+      { git: true },
+    ),
+  )
+
+  it.live("drops skills with name exceeding 64 characters", () =>
+    provideTmpdirInstance(
+      (dir) =>
+        Effect.gen(function* () {
+          const longName = "a".repeat(65)
+          yield* Effect.promise(() =>
+            Bun.write(
+              path.join(dir, ".opencode", "skill", longName, "SKILL.md"),
+              `---
+name: ${longName}
+description: Skill with too-long name.
+---
+
+# Long Name
+`,
+            ),
+          )
+
+          const skill = yield* Skill.Service
+          expect(yield* skill.all()).toEqual([])
+        }),
+      { git: true },
+    ),
+  )
+
+  it.live("accepts skill name at exactly 64 character limit", () =>
+    provideTmpdirInstance(
+      (dir) =>
+        Effect.gen(function* () {
+          const name64 = "a".repeat(64)
+          yield* Effect.promise(() =>
+            Bun.write(
+              path.join(dir, ".opencode", "skill", name64, "SKILL.md"),
+              `---
+name: ${name64}
+description: Boundary name length.
+---
+
+# Name 64
+`,
+            ),
+          )
+
+          const skill = yield* Skill.Service
+          const list = yield* skill.all()
+          expect(list.length).toBe(1)
+          expect(list[0].name).toBe(name64)
+        }),
+      { git: true },
+    ),
+  )
+
+  it.live("loads skill when name does not match folder name", () =>
+    provideTmpdirInstance(
+      (dir) =>
+        Effect.gen(function* () {
+          yield* Effect.promise(() =>
+            Bun.write(
+              path.join(dir, ".opencode", "skill", "my-folder", "SKILL.md"),
+              `---
+name: different-name
+description: Name mismatch with folder.
+---
+
+# Different Name
+`,
+            ),
+          )
+
+          const skill = yield* Skill.Service
+          const list = yield* skill.all()
+          expect(list.length).toBe(1)
+          expect(list[0].name).toBe("different-name")
+        }),
+      { git: true },
+    ),
+  )
 })
