@@ -110,4 +110,59 @@ Use this skill.
       { git: true },
     ),
   )
+
+  it.live("limits file listing to 10 entries", () =>
+    provideTmpdirInstance(
+      (dir) =>
+        Effect.gen(function* () {
+          const skill = path.join(dir, ".opencode", "skill", "many-files")
+          yield* Effect.promise(() =>
+            Bun.write(
+              path.join(skill, "SKILL.md"),
+              `---
+name: many-files
+description: Skill with many files.
+---
+
+# Many Files
+`,
+            ),
+          )
+          yield* Effect.promise(() =>
+            Promise.all(
+              Array.from({ length: 15 }, (_, i) =>
+                Bun.write(path.join(skill, `file-${i}.txt`), `content ${i}`),
+              ),
+            ),
+          )
+
+          const home = process.env.OPENCODE_TEST_HOME
+          process.env.OPENCODE_TEST_HOME = dir
+          yield* Effect.addFinalizer(() =>
+            Effect.sync(() => {
+              process.env.OPENCODE_TEST_HOME = home
+            }),
+          )
+
+          const registry = yield* ToolRegistry.Service
+          const agent = { name: "build", mode: "primary" as const, permission: [], options: {} }
+          const tool = (yield* registry.tools({
+            providerID: "opencode" as any,
+            modelID: "gpt-5" as any,
+            agent,
+          })).find((t) => t.id === SkillTool.id)
+          if (!tool) throw new Error("Skill tool not found")
+
+          const ctx: Tool.Context = {
+            ...baseCtx,
+            ask: () => Effect.void,
+          }
+
+          const result = yield* tool.execute({ name: "many-files" }, ctx)
+          const fileCount = (result.output.match(/<file>/g) || []).length
+          expect(fileCount).toBeLessThanOrEqual(10)
+        }),
+      { git: true },
+    ),
+  )
 })

@@ -564,3 +564,123 @@ describe("skill.fmt", () => {
     expect(result.indexOf("zebra")).toBeLessThan(result.indexOf("alpha"))
   })
 })
+
+describe("skill duplicates", () => {
+  it.live("keeps single entry when duplicate names exist", () =>
+    provideTmpdirInstance(
+      (dir) =>
+        Effect.gen(function* () {
+          yield* Effect.promise(() =>
+            Promise.all([
+              Bun.write(
+                path.join(dir, ".opencode", "skill", "dupename", "SKILL.md"),
+                `---
+name: dupename
+description: First definition.
+---
+
+# First
+`,
+              ),
+              Bun.write(
+                path.join(dir, ".opencode", "skills", "dupename", "SKILL.md"),
+                `---
+name: dupename
+description: Second definition.
+---
+
+# Second
+`,
+              ),
+            ]),
+          )
+
+          const skill = yield* Skill.Service
+          const list = yield* skill.all()
+          expect(list.length).toBe(1)
+          expect(list[0].name).toBe("dupename")
+        }),
+      { git: true },
+    ),
+  )
+})
+
+describe("skill permission filtering", () => {
+  it.live("filters denied skills by agent permission", () =>
+    provideTmpdirInstance(
+      (dir) =>
+        Effect.gen(function* () {
+          yield* Effect.promise(() =>
+            Promise.all([
+              Bun.write(
+                path.join(dir, ".opencode", "skill", "good-skill", "SKILL.md"),
+                `---
+name: good-skill
+description: A good skill.
+---
+
+# Good
+`,
+              ),
+              Bun.write(
+                path.join(dir, ".opencode", "skill", "evil-skill", "SKILL.md"),
+                `---
+name: evil-skill
+description: An evil skill.
+---
+
+# Evil
+`,
+              ),
+            ]),
+          )
+
+          const skill = yield* Skill.Service
+          const agent = {
+            name: "restricted",
+            description: "Agent with skill deny rules",
+            mode: "primary" as const,
+            permission: [{ permission: "skill", pattern: "evil-*", action: "deny" as const }],
+            options: {},
+          }
+          const available = yield* skill.available(agent)
+          expect(available.length).toBe(1)
+          expect(available[0].name).toBe("good-skill")
+        }),
+      { git: true },
+    ),
+  )
+
+  it.live("returns all skills for agent without deny rules", () =>
+    provideTmpdirInstance(
+      (dir) =>
+        Effect.gen(function* () {
+          yield* Effect.promise(() =>
+            Bun.write(
+              path.join(dir, ".opencode", "skill", "any-skill", "SKILL.md"),
+              `---
+name: any-skill
+description: Any skill.
+---
+
+# Any
+`,
+            ),
+          )
+
+          const skill = yield* Skill.Service
+          const agent = {
+            name: "build",
+            description: "Default agent",
+            mode: "primary" as const,
+            permission: [],
+            options: {},
+          }
+          const available = yield* skill.available(agent)
+          expect(available.length).toBe(1)
+          expect(available[0].name).toBe("any-skill")
+        }),
+      { git: true },
+    ),
+  )
+})
