@@ -34,6 +34,13 @@ export const layer: Layer.Layer<Service, never, AppFileSystem.Service | Path.Pat
       const http = HttpClient.filterStatusOk(withTransientReadRetry(yield* HttpClient.HttpClient))
       const cache = path.join(Global.Path.cache, "skills")
 
+      const safePath = (base: string, target: string): string | null => {
+        const dest = path.resolve(base, target)
+        const rel = path.relative(base, dest)
+        if (rel === ".." || rel.startsWith(`..${path.sep}`) || path.isAbsolute(rel)) return null
+        return dest
+      }
+
       const download = Effect.fn("Discovery.download")(function* (url: string, dest: string) {
         if (yield* fs.exists(dest).pipe(Effect.orDie)) return true
 
@@ -84,11 +91,20 @@ export const layer: Layer.Layer<Service, never, AppFileSystem.Service | Path.Pat
           list,
           (skill) =>
             Effect.gen(function* () {
-              const root = path.join(cache, skill.name)
+              const root = safePath(cache, skill.name)
+              if (!root) {
+                log.warn("path traversal blocked in skill name", { skill: skill.name })
+                return null
+              }
+
+              if (skill.files.some((file) => !safePath(root, file))) {
+                log.warn("path traversal blocked in file path", { skill: skill.name })
+                return null
+              }
 
               yield* Effect.forEach(
                 skill.files,
-                (file) => download(new URL(file, `${host}/${skill.name}/`).href, path.join(root, file)),
+                (file) => download(new URL(file, `${host}/${skill.name}/`).href, safePath(root, file)!),
                 {
                   concurrency: fileConcurrency,
                 },
