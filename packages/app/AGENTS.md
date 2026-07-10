@@ -13,6 +13,7 @@
 ## SolidJS
 
 - Always prefer `createStore` over multiple `createSignal` calls
+- In hot `createMemo` paths, `for...of` still allocates iterator objects. Use index-based `for` loops with pre-allocated arrays to eliminate GC pressure from iteration.
 
 ## Tool Calling
 
