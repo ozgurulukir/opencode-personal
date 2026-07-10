@@ -242,7 +242,13 @@ export function MessageTimeline(props: {
   const { params, sessionKey } = useSessionKey()
   const platform = usePlatform()
 
-  const rendered = createMemo(() => props.renderedUserMessages.map((message) => message.id))
+  const rendered = createMemo(() => {
+    const list = props.renderedUserMessages
+    const result = new Array(list.length)
+    let i = 0
+    for (const message of list) result[i++] = message.id
+    return result
+  })
   const sessionID = createMemo(() => params.id)
   const sessionMessages = createMemo(() => {
     const id = sessionID()
