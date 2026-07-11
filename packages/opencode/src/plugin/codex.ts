@@ -257,7 +257,7 @@ async function startOAuthServer(): Promise<{ port: number; redirectUri: string }
     return { port: OAUTH_PORT, redirectUri: `http://localhost:${OAUTH_PORT}/auth/callback` }
   }
 
-  oauthServer = createServer((req, res) => {
+  const server = createServer((req, res) => {
     const url = new URL(req.url || "/", `http://localhost:${OAUTH_PORT}`)
 
     if (url.pathname === "/auth/callback") {
@@ -318,12 +318,19 @@ async function startOAuthServer(): Promise<{ port: number; redirectUri: string }
   })
 
   await new Promise<void>((resolve, reject) => {
-    oauthServer!.listen(OAUTH_PORT, () => {
+    server.listen(OAUTH_PORT, () => {
       log.info("codex oauth server started", { port: OAUTH_PORT })
       resolve()
     })
-    oauthServer!.on("error", reject)
+    server.on("error", reject)
+  }).catch((error) => {
+    // If listen() fails, don't leave a stale reference — a retry would
+    // otherwise skip re-creating the server.
+    oauthServer = undefined
+    throw error
   })
+
+  oauthServer = server
 
   return { port: OAUTH_PORT, redirectUri: `http://localhost:${OAUTH_PORT}/auth/callback` }
 }
@@ -343,6 +350,9 @@ function waitForOAuthCallback(pkce: PkceCodes, state: string): Promise<TokenResp
       () => {
         if (pendingOAuth) {
           pendingOAuth = undefined
+          // Stop the server so we don't leak a listening socket when the
+          // user never completes the OAuth flow.
+          stopOAuthServer()
           reject(new Error("OAuth callback timeout - authorization took too long"))
         }
       },

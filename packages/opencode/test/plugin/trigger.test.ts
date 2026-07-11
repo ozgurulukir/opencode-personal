@@ -50,6 +50,38 @@ function withProject<A, E, R>(source: string, self: Effect.Effect<A, E, R>) {
   )
 }
 
+function withProjects<A, E, R>(sources: string[], self: Effect.Effect<A, E, R>) {
+  return provideTmpdirInstance((dir) =>
+    Effect.gen(function* () {
+      const specs: string[] = []
+      yield* Effect.all(
+        sources.map((source, i) =>
+          Effect.gen(function* () {
+            const file = path.join(dir, `plugin-${i}.ts`)
+            yield* Effect.promise(() => Bun.write(file, source))
+            specs.push(pathToFileURL(file).href)
+          }),
+        ),
+        { discard: true, concurrency: sources.length },
+      )
+      yield* Effect.promise(() =>
+        Bun.write(
+          path.join(dir, "opencode.json"),
+          JSON.stringify(
+            {
+              $schema: "https://opencode.ai/config.json",
+              plugin: specs,
+            },
+            null,
+            2,
+          ),
+        ),
+      )
+      return yield* self
+    }),
+  )
+}
+
 const triggerSystemTransform = Effect.fn("PluginTriggerTest.triggerSystemTransform")(function* () {
   const plugin = yield* Plugin.Service
   const out = { system: { prefix: "", suffix: "" } }
@@ -96,6 +128,59 @@ describe("plugin.trigger", () => {
       ].join("\n"),
       Effect.gen(function* () {
         expect(yield* triggerSystemTransform()).toEqual({ prefix: "async\n", suffix: "" })
+      }),
+    ),
+  )
+
+  it.live("continues running subsequent hooks after one throws", () =>
+    withProjects(
+      [
+        [
+          "export default async () => ({",
+          `  ${JSON.stringify(systemHook)}: async () => {`,
+          '    throw new Error("boom")',
+          "  },",
+          "})",
+          "",
+        ].join("\n"),
+        [
+          "export default async () => ({",
+          `  ${JSON.stringify(systemHook)}: async (_input, output) => {`,
+          '    output.system.prefix = "survived\\n" + output.system.prefix',
+          "  },",
+          "})",
+          "",
+        ].join("\n"),
+      ],
+      Effect.gen(function* () {
+        expect(yield* triggerSystemTransform()).toEqual({ prefix: "survived\n", suffix: "" })
+      }),
+    ),
+  )
+
+  it.live("continues running subsequent hooks after one rejects", () =>
+    withProjects(
+      [
+        [
+          "export default async () => ({",
+          `  ${JSON.stringify(systemHook)}: async () => {`,
+          "    await Bun.sleep(1)",
+          '    throw new Error("async boom")',
+          "  },",
+          "})",
+          "",
+        ].join("\n"),
+        [
+          "export default async () => ({",
+          `  ${JSON.stringify(systemHook)}: async (_input, output) => {`,
+          '    output.system.suffix = output.system.suffix + "ok"',
+          "  },",
+          "})",
+          "",
+        ].join("\n"),
+      ],
+      Effect.gen(function* () {
+        expect(yield* triggerSystemTransform()).toEqual({ prefix: "", suffix: "ok" })
       }),
     ),
   )
