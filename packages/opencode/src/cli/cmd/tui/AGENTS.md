@@ -23,3 +23,12 @@ This file covers TUI-specific patterns for `packages/opencode/src/cli/cmd/tui/`.
 ## Sync with the store
 
 - `store.prompt.input` and the textarea's `plainText` can drift briefly during IME composition. Read `input.plainText` and call `setStore("prompt", "input", value)` to reconcile, or trust the textarea and sync the store at submission time. See `submit()` in `component/prompt/index.tsx` for the canonical double-defer pattern.
+
+## TUI plugin runtime
+
+- TUI plugins have a scoped lifecycle backed by `AbortController`. Each plugin's dispose functions are tracked and cleaned up in reverse order with a 5-second timeout per plugin (`DISPOSE_TIMEOUT_MS = 5000` in `plugin/runtime.ts:118`).
+- The keymap API exposed to TUI plugins is a `Proxy`-based scoped wrapper (`createScopedKeymap` in `plugin/runtime.ts:142`). All registration methods (`registerLayer`, `intercept`, `on`, etc.) are intercepted to auto-track their dispose functions via `scope.track()`. Non-registration methods pass through transparently.
+- TUI plugins are activated sequentially (not in parallel) to guarantee deterministic side-effect order — command registration order affects keybind/command precedence, route registration is last-wins, and hook chains rely on stable ordering. See `plugin/runtime.ts:1064-1071`.
+- The `api.command` shim (`plugin/command-shim.ts`) bridges v1 plugins to the v2 keymap API. It warns once per deprecated API call via `console.warn`. Remove the shim entirely in v2.
+- `api.slots.register` and `api.theme.install` throw errors when called outside a plugin context (from `api.tsx`). They are only available inside the scoped plugin API created in `runtime.ts:pluginApi()`.
+- Plugin enabled/disabled state is persisted in KV store under key `"plugin_enabled"` and merged with `tuiConfig.plugin_enabled` at startup. See `plugin/runtime.ts:447-466`.
