@@ -245,7 +245,13 @@ export const layer = Layer.effect(
           Stream.runForEach((input) =>
             Effect.sync(() => {
               for (const hook of hooks) {
-                void hook["event"]?.({ event: input as any })
+                const eventFn = hook["event"]
+                if (!eventFn) continue
+                // Attach a catch handler so a throwing event hook doesn't
+                // produce an unhandled promise rejection.
+                Promise.resolve(eventFn({ event: input as any })).catch((error) => {
+                  log.error("plugin event hook failed", { error })
+                })
               }
             }),
           ),
@@ -266,7 +272,17 @@ export const layer = Layer.effect(
       for (const hook of s.hooks) {
         const fn = hook[name] as any
         if (!fn) continue
-        yield* Effect.promise(async () => fn(input, output))
+        // Isolate each hook so a single failing plugin doesn't break the
+        // rest of the hook chain for all other plugins.
+        yield* Effect.tryPromise({
+          try: () => Promise.resolve(fn(input, output)),
+          catch: (error: unknown) => {
+            log.error("plugin hook failed", { hook: name, error })
+            return new NamedError.Unknown({ message: errorMessage(error) })
+          },
+        }).pipe(
+          Effect.catch(() => Effect.void),
+        )
       }
       return output
     })
