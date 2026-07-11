@@ -178,6 +178,7 @@ See `specs/effect/migration.md` for the compact pattern reference and examples.
 - For fiber error handling in `FiberMap`, use `Effect.tapError` (observe + propagate) instead of `Effect.catch` (swallow). The error propagates, the fiber fails, and FiberMap auto-removes it. See `control-plane/workspace.ts:512`.
 - `Effect.catchAll` is renamed to `Effect.catch` in v4. Signature is the same: `Effect.catch(f: (e: E) => Effect<A2, E2, R2>)`. Using the v3 name fails typecheck with "Property 'catchAll' does not exist".
 - In `Effect.gen` / `Effect.fn`, the `Effect.catch` callback must return an `Effect` — wrap `Effect.succeed(undefined)` / `Effect.void` directly, never the bare value (the type signature requires it).
+- `Effect.tryPromise` with a `catch` callback transforms the caught error into the error channel type. The catch callback returns a value (not an Effect) — that value becomes the error. To recover from the error, chain `.pipe(Effect.catch(() => Effect.void))` after `Effect.tryPromise`. This is the canonical pattern for "try an async fn, log on failure, continue" in Effect v4. See `plugin/index.ts:275-284`.
 
 ## LLM side-channels (predict, summaries, classification)
 

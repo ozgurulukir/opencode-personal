@@ -150,7 +150,7 @@ const table = sqliteTable("session", {
 - Typecheck in `packages/web` requires `--skipLibCheck` due to astro/starlight type errors
 - Root `test` script always fails: `echo 'do not run tests from root' && exit 1`
 - `packages/opencode/src/session/prompt.ts:1480` — `runLoop` is a ~230-line Effect-based infinite loop; future extraction target
-- Remaining `as any` casts (6 total) are in library internals: `packages/core/src/effect-zod.ts` (3, accessing Effect Schema annotations), `packages/slack/src/index.ts` (1, Slack message shape), `packages/opencode/src/plugin/index.ts` (1, plugin hook typing), `packages/desktop/src/main/index.ts` (1, Electron HTTP proxy), plus test files accessing Effect internals
+- Remaining `as any` casts (6 total) are in library internals: `packages/core/src/effect-zod.ts` (3, accessing Effect Schema annotations), `packages/slack/src/index.ts` (1, Slack message shape), `packages/opencode/src/plugin/index.ts` (1, plugin hook typing via `(hook as any).config?.(cfg)`), `packages/desktop/src/main/index.ts` (1, Electron HTTP proxy), plus test files accessing Effect internals
 
 ## Notes
 
