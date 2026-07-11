@@ -1,14 +1,46 @@
 import { Flag } from "@opencode-ai/core/flag/flag"
 import { AppFileSystem } from "@opencode-ai/core/filesystem"
+import * as Log from "@opencode-ai/core/util/log"
 import { Effect, Stream } from "effect"
 import { HttpBody, HttpClient, HttpClientRequest, HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
 import { createHash } from "node:crypto"
 import { ProxyUtil } from "../proxy-util"
 
-const embeddedUIPromise = Flag.OPENCODE_DISABLE_EMBEDDED_WEB_UI
-  ? Promise.resolve(null)
-  : // @ts-expect-error - generated file at build time
-    import("opencode-web-ui.gen.ts").then((module) => module.default as Record<string, string>).catch(() => null)
+const log = Log.create({ service: "ui" })
+
+// Cache for embedded UI bundle with error recovery
+let embeddedUICache: { promise: Promise<Record<string, string> | null>; disabled: boolean } | undefined
+
+export function embeddedUI() {
+  if (Flag.OPENCODE_DISABLE_EMBEDDED_WEB_UI) return Promise.resolve(null)
+
+  if (!embeddedUICache) {
+    const promise =
+      // @ts-expect-error - generated file at build time
+      import("opencode-web-ui.gen.ts")
+        .then((module) => module.default as Record<string, string>)
+        .catch((error) => {
+          log.warn("embedded UI import failed, falling back to upstream", {
+            error: error instanceof Error ? error.message : String(error),
+          })
+          return null
+        })
+    embeddedUICache = { promise, disabled: false }
+  }
+
+  return embeddedUICache.promise
+}
+
+/**
+ * Invalidate the embedded UI cache.
+ * Useful for development hot-reload scenarios.
+ */
+export function invalidateEmbeddedUICache() {
+  embeddedUICache = undefined
+}
+
+// CSP cache to avoid recomputing hashes for static embedded UI
+const cspCache = new Map<string, string>()
 
 export const UI_UPSTREAM = new URL("https://app.opencode.ai")
 
@@ -21,8 +53,21 @@ export function themePreloadHash(body: string) {
 }
 
 export function cspForHtml(body: string) {
+  // Fast path: cache by content hash for static embedded UI
+  const contentHash = createHash("sha256").update(body).digest("hex")
+  const cached = cspCache.get(contentHash)
+  if (cached) return cached
+
   const match = themePreloadHash(body)
-  return csp(match ? createHash("sha256").update(match[2]).digest("base64") : "")
+  const result = csp(match ? createHash("sha256").update(match[2]).digest("base64") : "")
+
+  // Bound cache size to prevent unbounded memory growth
+  if (cspCache.size > 256) {
+    const firstKey = cspCache.keys().next().value
+    if (firstKey) cspCache.delete(firstKey)
+  }
+  cspCache.set(contentHash, result)
+  return result
 }
 
 function requestBody(request: HttpServerRequest.HttpServerRequest) {
@@ -43,11 +88,6 @@ function proxyResponseHeaders(headers: Record<string, string>) {
 
 export function upstreamURL(path: string) {
   return new URL(path, UI_UPSTREAM).toString()
-}
-
-export function embeddedUI() {
-  if (Flag.OPENCODE_DISABLE_EMBEDDED_WEB_UI) return Promise.resolve(null)
-  return embeddedUIPromise
 }
 
 function notFound() {
@@ -74,6 +114,15 @@ export function serveEmbeddedUIEffect(
   return fs.readFile(file).pipe(
     Effect.map((body) => embeddedUIResponse(file, body)),
     Effect.catchReason("PlatformError", "NotFound", () => Effect.succeed(notFound())),
+    Effect.catch((error) =>
+      Effect.sync(() => {
+        log.warn("serveEmbeddedUIEffect: failed to read embedded UI file", {
+          file,
+          path: requestPath,
+          error: error instanceof Error ? error.message : String(error),
+        })
+      }).pipe(Effect.andThen(() => Effect.succeed(notFound()))),
+    ),
   )
 }
 

@@ -122,7 +122,6 @@ export async function listen(opts: ListenOptions): Promise<Listener> {
     log.warn("mDNS enabled but hostname is loopback; skipping mDNS publish")
   }
 
-  let forceStopPromise: Promise<void> | undefined
   let stopPromise: Promise<void> | undefined
   let mdnsUnpublished = false
   const unpublish = () => {
@@ -130,14 +129,13 @@ export async function listen(opts: ListenOptions): Promise<Listener> {
     mdnsUnpublished = true
     MDNS.unpublish()
   }
-  const forceStop = () => {
-    forceStopPromise ??= Effect.runPromiseExit(
+  const forceStop = async () => {
+    await Effect.runPromiseExit(
       Effect.gen(function* () {
         yield* Context.get(resolved!.ctx, HttpApiServer.Service).closeAll
         yield* Context.get(resolved!.ctx, WebSocketTracker.Service).closeAll
       }),
-    ).then(() => undefined)
-    return forceStopPromise
+    ).catch(() => undefined)
   }
 
   return {
@@ -146,11 +144,18 @@ export async function listen(opts: ListenOptions): Promise<Listener> {
     url: innerUrl,
     stop: (close?: boolean) => {
       unpublish()
-      const requested = close ? forceStop() : Promise.resolve()
-      stopPromise ??= requested
-        .then(() => Effect.runPromiseExit(Scope.close(resolved!.scope, Exit.void)))
-        .then(() => undefined)
-      return requested.then(() => stopPromise!)
+      if (stopPromise) return stopPromise
+
+      stopPromise = (async () => {
+        if (close) await forceStop()
+        await Effect.runPromiseExit(
+          Effect.gen(function* () {
+            yield* Scope.close(resolved!.scope, Exit.void)
+          }),
+        ).catch(() => undefined)
+      })()
+
+      return stopPromise
     },
   }
 }
