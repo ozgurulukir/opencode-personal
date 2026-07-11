@@ -222,3 +222,7 @@ const cb = Instance.bind((err, evts) => {
 })
 nativeAddon.subscribe(dir, cb)
 ```
+
+## Known Issues
+
+- `Plugin.defaultLayer` includes `Config.defaultLayer` (real filesystem config) and triggers `import("../server/server")` inside the layer init closure (`plugin/index.ts:123`). Tests using `Plugin.defaultLayer` directly (`trigger.test.ts`, `workspace-adapter.test.ts`) time out because the server import block is too heavy for test context. Fix: use `TestConfig.layer()` mock + `Plugin.layer` (not `defaultLayer`) in tests that need Plugin service — see `auth-override.test.ts` and `loader-shared.test.ts` for the working pattern.
