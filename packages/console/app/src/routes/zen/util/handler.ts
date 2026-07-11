@@ -15,6 +15,7 @@ import { fetchWith429Retry } from "./http"
 import { reload } from "./reload"
 import { trackUsage } from "./usage"
 import { validateModelSettings, updateProviderKey } from "./validation"
+import { parseRequest } from "./request"
 import { Actor } from "@opencode-ai/console-core/actor.js"
 import { WorkspaceTable } from "@opencode-ai/console-core/schema/workspace.sql.js"
 import { ZenData } from "@opencode-ai/console-core/model.js"
@@ -98,28 +99,15 @@ export async function handler(
   ]
 
   try {
-    const url = input.request.url
-    const body = await input.request.json()
-    const model = opts.parseModel(url, body)
-    const variant = opts.parseVariant(url, body)
-    const isStream = opts.parseIsStream(url, body)
-    const rawIp = input.request.headers.get("x-real-ip") ?? ""
-    const ip = rawIp.includes(":") ? rawIp.split(":").slice(0, 4).join(":") : rawIp
-    const rawZenApiKey = opts.parseApiKey(input.request.headers)
-    const zenApiKey = rawZenApiKey === "public" ? undefined : rawZenApiKey
-    const sessionId = input.request.headers.get("x-opencode-session") ?? ""
-    const requestId = input.request.headers.get("x-opencode-request") ?? ""
-    const projectId = input.request.headers.get("x-opencode-project") ?? ""
-    const ocClient = input.request.headers.get("x-opencode-client") ?? ""
-    const userAgent = input.request.headers.get("user-agent") ?? ""
-    logger.metric({
-      is_stream: isStream,
-      session: sessionId,
-      request: requestId,
-      client: ocClient,
-      user_agent: userAgent,
-      "model.variant": variant,
-    })
+    const req = await parseRequest(input, opts)
+    const body = req.body
+    const model = req.model
+    const isStream = req.isStream
+    const ip = req.ip
+    const zenApiKey = req.zenApiKey
+    const sessionId = req.sessionId
+    const requestId = req.requestId
+    const projectId = req.projectId
     const zenData = ZenData.list(opts.modelList)
     const modelInfo = validateModel(zenData, model, { format: opts.format, t })
     const dataDumper = createDataDumper(sessionId, requestId, projectId)
