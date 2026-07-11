@@ -22,43 +22,37 @@ export function useFilteredList<T>(props: FilteredListProps<T>) {
   type Group = { category: string; items: [T, ...T[]] }
   const empty: Group[] = []
 
-  // If items is a function (e.g., an async fetcher or a filter-dependent loader),
-  // use createResource to fetch the data.
-  const [asyncItems, { refetch }] = createResource(
-    () => typeof props.items === "function" ? props.items(store.filter) : undefined,
-    async (itemsPromise) => itemsPromise ? await itemsPromise : []
+  const [grouped, { refetch }] = createResource(
+    () => ({
+      filter: store.filter,
+      items: typeof props.items === "function" ? props.items(store.filter) : props.items,
+    }),
+    async ({ filter, items }) => {
+      const query = filter ?? ""
+      const needle = query.toLowerCase()
+      const all = (await Promise.resolve(items)) || []
+      const result = pipe(
+        all,
+        (x) => {
+          if (!needle) return x
+          if (!props.filterKeys && Array.isArray(x) && x.every((e) => typeof e === "string")) {
+            return fuzzysort.go(needle, x).map((x) => x.target) as T[]
+          }
+          return fuzzysort.go(needle, x, { keys: props.filterKeys! }).map((x) => x.obj)
+        },
+        groupBy((x) => (props.groupBy ? props.groupBy(x) : "")),
+        entries(),
+        map(([k, v]) => ({ category: k, items: props.sortBy ? v.sort(props.sortBy) : v })),
+        (groups) => (props.sortGroupsBy ? groups.sort(props.sortGroupsBy) : groups),
+      )
+      return result
+    },
+    { initialValue: empty },
   )
-
-  // Compute the filtering synchronously.
-  const grouped = createMemo<Group[]>(() => {
-    const filter = store.filter
-    const query = filter ?? ""
-    const needle = query.toLowerCase()
-
-    // Get all items either from the static array or the resolved async resource.
-    const all = typeof props.items === "function" ? (asyncItems.latest || []) : (props.items || [])
-
-    const result = pipe(
-      all,
-      (x) => {
-        if (!needle) return x
-        if (!props.filterKeys && Array.isArray(x) && x.every((e) => typeof e === "string")) {
-          return fuzzysort.go(needle, x).map((x) => x.target) as T[]
-        }
-        return fuzzysort.go(needle, x, { keys: props.filterKeys! }).map((x) => x.obj)
-      },
-      groupBy((x) => (props.groupBy ? props.groupBy(x) : "")),
-      entries(),
-      map(([k, v]) => ({ category: k, items: props.sortBy ? v.sort(props.sortBy) : v }) as Group),
-      (groups) => (props.sortGroupsBy ? groups.sort(props.sortGroupsBy) : groups),
-    )
-
-    return result || empty
-  })
 
   const flat = createMemo(() => {
     return pipe(
-      grouped() || [],
+      grouped.latest || [],
       flatMap((x) => x.items),
     )
   })
@@ -123,7 +117,7 @@ export function useFilteredList<T>(props: FilteredListProps<T>) {
   }
 
   return {
-    grouped: Object.assign(() => grouped(), { get latest() { return grouped() }, get loading() { return asyncItems.loading }, get error() { return asyncItems.error }, get state() { return asyncItems.state } }),
+    grouped,
     filter: () => store.filter,
     flat,
     reset,

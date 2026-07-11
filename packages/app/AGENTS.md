@@ -14,6 +14,8 @@
 
 - Always prefer `createStore` over multiple `createSignal` calls
 - In hot `createMemo` paths, `for...of` still allocates iterator objects. Use index-based `for` loops with pre-allocated arrays to eliminate GC pressure from iteration.
+- Never replace `createResource` with `createMemo` + `Object.assign` to mock the `Resource` shape. SolidJS tracks resource state internally — `List`'s `<For each={grouped.latest}>` and `grouped.loading` rely on native `Resource` reactivity. Commit `016a457` did this in `use-filtered-list.tsx` and broke async `List` dialogs (Open project, Model selection): API calls returned 200 OK but items never rendered. Reverted; the `keys` memo optimization is safe.
+- `useFilteredList` in `packages/ui/src/hooks/use-filtered-list.tsx` uses a single `createResource` for grouped/filtered data. The `items` prop can be `T[]` (static) or `(filter: string) => T[] | Promise<T[]>` (sync or async). The `createResource` fetcher handles both cases via `(await Promise.resolve(items))`.
 
 ## Tool Calling
 
