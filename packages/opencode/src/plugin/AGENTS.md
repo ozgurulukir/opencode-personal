@@ -17,3 +17,8 @@
 ## Compatibility
 
 - npm plugins are checked for opencode version compatibility via `engines.opencode` in `package.json`. File plugins (local development code) skip this check entirely.
+
+## Testing
+
+- `Plugin.defaultLayer` includes `Config.defaultLayer` and triggers `import("../server/server")` in the init closure. Tests using `defaultLayer` time out in test context. Use `TestConfig.layer()` mock + `Plugin.layer` instead. See `auth-override.test.ts` and `loader-shared.test.ts` for the working pattern.
+- `trigger.test.ts` and `workspace-adapter.test.ts` have a pre-existing timeout issue on Windows for this reason. They are not runnable without a running server or a mocked config layer.
