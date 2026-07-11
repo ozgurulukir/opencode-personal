@@ -10,12 +10,12 @@ import { validateBilling, type BillingSource } from "./billing"
 import { authenticate } from "./auth"
 import { selectProvider } from "./provider-selector"
 import { validateModel } from "./model"
-import { calculateCost, calculateOccurredCost, type CostInfo } from "./cost"
 import { fetchWith429Retry } from "./http"
 import { reload } from "./reload"
 import { trackUsage } from "./usage"
 import { validateModelSettings, updateProviderKey } from "./validation"
 import { parseRequest } from "./request"
+import { handleNonStreamingResponse, createStreamingResponse } from "./response"
 import { Actor } from "@opencode-ai/console-core/actor.js"
 import { WorkspaceTable } from "@opencode-ai/console-core/schema/workspace.sql.js"
 import { ZenData } from "@opencode-ai/console-core/model.js"
@@ -36,13 +36,7 @@ import {
   GoUsageLimitError,
   BlackUsageLimitError,
 } from "./error"
-import {
-  buildCostChunk,
-  createBodyConverter,
-  createStreamPartConverter,
-  createResponseConverter,
-  UsageInfo,
-} from "./provider/provider"
+import { createBodyConverter, createStreamPartConverter } from "./provider/provider"
 import { anthropicHelper } from "./provider/anthropic"
 import { googleHelper } from "./provider/google"
 import { openaiHelper } from "./provider/openai"
@@ -233,157 +227,29 @@ export async function handler(
     // Store sticky provider
     await stickyTracker?.set(providerInfo.id)
 
-    // Temporarily change 404 to 400 status code b/c solid start automatically override 404 response
-    const resStatus = res.status === 404 ? 400 : res.status
-
-    // Scrub response headers
-    const resHeaders = new Headers()
-    const keepHeaders = ["content-type", "cache-control"]
-    for (const [k, v] of res.headers.entries()) {
-      if (keepHeaders.includes(k.toLowerCase())) {
-        resHeaders.set(k, v)
-      }
+    const responseDeps = {
+      providerInfo,
+      modelInfo,
+      billingSource,
+      authInfo,
+      sessionId,
+      format: opts.format,
+      rateLimiter,
+      trialLimiter,
+      modelTpmLimiter,
+      dataDumper,
+      Database,
+      logger,
+      trackUsage,
+      reload,
     }
-    logger.debug("STATUS: " + res.status + " " + res.statusText)
 
-    // Handle non-streaming response
     if (!isStream || [400, 404, 429].includes(res.status)) {
-      const json = await res.json()
-      await rateLimiter?.track()
-      if (json.usage) {
-        const usageInfo = providerInfo.normalizeUsage(json.usage)
-        const costInfo = calculateCost(modelInfo, usageInfo)
-        await trialLimiter?.track(usageInfo)
-        await modelTpmLimiter?.track(providerInfo.id, providerInfo.model, usageInfo)
-        await trackUsage(
-          sessionId,
-          billingSource,
-          authInfo,
-          modelInfo,
-          providerInfo,
-          usageInfo,
-          costInfo,
-          Database,
-          logger,
-        )
-        await reload(billingSource, authInfo, costInfo, Database)
-        json.cost = calculateOccurredCost(billingSource, costInfo)
-      }
-      if (res.status === 400) {
-        logger.metric({ "error.response": JSON.stringify(json) })
-      }
-      if (json.error?.message) {
-        json.error.message = `Error from provider${providerInfo.displayName ? ` (${providerInfo.displayName})` : ""}: ${json.error.message}`
-      }
-
-      const responseConverter = createResponseConverter(providerInfo.format, opts.format)
-      const body = JSON.stringify(responseConverter(json))
-      logger.metric({ response_length: body.length })
-      logger.debug("RESPONSE: " + body)
-      dataDumper?.provideResponse(body)
-      dataDumper?.flush()
-      return new Response(body, {
-        status: resStatus,
-        statusText: res.statusText,
-        headers: resHeaders,
-      })
+      return handleNonStreamingResponse(res, responseDeps)
     }
 
-    // Handle streaming response
     const streamConverter = createStreamPartConverter(providerInfo.format, opts.format)
-    const usageParser = providerInfo.createUsageParser()
-    const binaryDecoder = providerInfo.createBinaryStreamDecoder()
-    const stream = new ReadableStream({
-      start(c) {
-        const reader = res.body?.getReader()
-        const decoder = new TextDecoder()
-        const encoder = new TextEncoder()
-
-        let buffer = ""
-        let responseLength = 0
-
-        function pump(): Promise<void> {
-          return (
-            reader?.read().then(async ({ done, value: rawValue }) => {
-              if (done) {
-                logger.metric({
-                  response_length: responseLength,
-                  "timestamp.last_byte": Date.now(),
-                })
-                dataDumper?.flush()
-                await rateLimiter?.track()
-                const usage = usageParser.retrieve()
-                if (usage) {
-                  const usageInfo = providerInfo.normalizeUsage(usage)
-                  const costInfo = calculateCost(modelInfo, usageInfo)
-                  await trialLimiter?.track(usageInfo)
-                  await modelTpmLimiter?.track(providerInfo.id, providerInfo.model, usageInfo)
-                  await trackUsage(
-                    sessionId,
-                    billingSource,
-                    authInfo,
-                    modelInfo,
-                    providerInfo,
-                    usageInfo,
-                    costInfo,
-                    Database,
-                    logger,
-                  )
-                  await reload(billingSource, authInfo, costInfo, Database)
-                  const cost = calculateOccurredCost(billingSource, costInfo)
-                  c.enqueue(encoder.encode(buildCostChunk(opts.format, cost)))
-                }
-                c.close()
-                return
-              }
-
-              if (responseLength === 0) {
-                const now = Date.now()
-                logger.metric({
-                  time_to_first_byte: now - startTimestamp,
-                  "timestamp.first_byte": now,
-                })
-              }
-
-              const value = binaryDecoder ? binaryDecoder(rawValue) : rawValue
-              if (!value) return
-
-              responseLength += value.length
-              buffer += decoder.decode(value, { stream: true })
-              dataDumper?.provideStream(buffer)
-
-              const parts = buffer.split(providerInfo.streamSeparator)
-              buffer = parts.pop() ?? ""
-
-              for (let part of parts) {
-                logger.debug("PART: " + part)
-
-                part = part.trim()
-                usageParser.parse(part)
-
-                if (providerInfo.format !== opts.format) {
-                  part = streamConverter(part)
-                  c.enqueue(encoder.encode(part + "\n\n"))
-                }
-              }
-
-              if (providerInfo.format === opts.format) {
-                c.enqueue(value)
-              }
-
-              return pump()
-            }) || Promise.resolve()
-          )
-        }
-
-        return pump()
-      },
-    })
-    return new Response(stream, {
-      status: resStatus,
-      statusText: res.statusText,
-      headers: resHeaders,
-    })
+    return createStreamingResponse(res, startTimestamp, streamConverter, responseDeps)
   } catch (error: any) {
     logger.metric({
       "error.type": error.constructor.name,
