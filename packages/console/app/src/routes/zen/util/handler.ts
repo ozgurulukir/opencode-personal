@@ -16,6 +16,7 @@ import { trackUsage } from "./usage"
 import { validateModelSettings, updateProviderKey } from "./validation"
 import { parseRequest } from "./request"
 import { handleNonStreamingResponse, createStreamingResponse } from "./response"
+import { mapErrorToResponse } from "./error-mapping"
 import { Actor } from "@opencode-ai/console-core/actor.js"
 import { WorkspaceTable } from "@opencode-ai/console-core/schema/workspace.sql.js"
 import { ZenData } from "@opencode-ai/console-core/model.js"
@@ -25,17 +26,6 @@ import { UserTable } from "@opencode-ai/console-core/schema/user.sql.js"
 import { ModelTable } from "@opencode-ai/console-core/schema/model.sql.js"
 import { ProviderTable } from "@opencode-ai/console-core/schema/provider.sql.js"
 import { logger } from "./logger"
-import {
-  AuthError,
-  CreditsError,
-  MonthlyLimitError,
-  UserLimitError,
-  ModelError,
-  RateLimitError,
-  FreeUsageLimitError,
-  GoUsageLimitError,
-  BlackUsageLimitError,
-} from "./error"
 import { createBodyConverter, createStreamPartConverter } from "./provider/provider"
 import { anthropicHelper } from "./provider/anthropic"
 import { googleHelper } from "./provider/google"
@@ -250,74 +240,7 @@ export async function handler(
 
     const streamConverter = createStreamPartConverter(providerInfo.format, opts.format)
     return createStreamingResponse(res, startTimestamp, streamConverter, responseDeps)
-  } catch (error: any) {
-    logger.metric({
-      "error.type": error.constructor.name,
-      "error.message": error.message,
-      "error.cause": error.cause?.toString(),
-    })
-    if (error.message.startsWith("Failed query")) {
-      try {
-        logger.metric({
-          "error.cause2": JSON.stringify(error.cause),
-        })
-      } catch {}
-    }
-
-    // Note: both top level "type" and "error.type" fields are used by the @ai-sdk/anthropic client to render the error message.
-    if (
-      error instanceof AuthError ||
-      error instanceof CreditsError ||
-      error instanceof MonthlyLimitError ||
-      error instanceof UserLimitError ||
-      error instanceof ModelError
-    )
-      return new Response(
-        JSON.stringify({
-          type: "error",
-          error: { type: error.constructor.name, message: error.message },
-        }),
-        { status: 401 },
-      )
-
-    if (
-      error instanceof RateLimitError ||
-      error instanceof FreeUsageLimitError ||
-      error instanceof GoUsageLimitError ||
-      error instanceof BlackUsageLimitError
-    ) {
-      const headers = new Headers()
-      if (error.retryAfter) {
-        headers.set("retry-after", String(error.retryAfter))
-      }
-      return new Response(
-        JSON.stringify({
-          type: "error",
-          error: {
-            type: error.constructor.name,
-            message: error.message,
-          },
-          metadata:
-            error instanceof GoUsageLimitError
-              ? {
-                  workspace: error.workspace,
-                  limitName: error.limitName,
-                }
-              : {},
-        }),
-        { status: 429, headers },
-      )
-    }
-
-    return new Response(
-      JSON.stringify({
-        type: "error",
-        error: {
-          type: "error",
-          message: "Internal server error",
-        },
-      }),
-      { status: 500 },
-    )
+  } catch (error) {
+    return mapErrorToResponse(error, logger)
   }
 }
