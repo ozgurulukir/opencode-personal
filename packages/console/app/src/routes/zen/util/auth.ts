@@ -88,14 +88,6 @@ export async function authenticate(
           isNull(SubscriptionTable.timeDeleted),
         ),
       )
-      .leftJoin(
-        SubscriptionTable,
-        and(
-          eq(KeyTable.workspaceID, SubscriptionTable.workspaceID),
-          eq(SubscriptionTable.userID, (UserTable as any).userID),
-          isNull(SubscriptionTable.timeDeleted),
-        ),
-      )
       .where(and(eq(KeyTable.key, zenApiKey), isNull(KeyTable.timeDeleted)))
       .then((rows: any[]) => rows[0]),
   )
