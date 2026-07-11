@@ -8,15 +8,13 @@ import { Identifier } from "@opencode-ai/console-core/identifier.js"
 import { Billing } from "@opencode-ai/console-core/billing.js"
 import { validateBilling, type BillingSource } from "./billing"
 import { authenticate } from "./auth"
-import { selectProvider } from "./provider-selector"
 import { validateModel } from "./model"
-import { fetchWith429Retry } from "./http"
 import { reload } from "./reload"
 import { trackUsage } from "./usage"
-import { validateModelSettings, updateProviderKey } from "./validation"
 import { parseRequest } from "./request"
 import { handleNonStreamingResponse, createStreamingResponse } from "./response"
 import { mapErrorToResponse } from "./error-mapping"
+import { executeRetriableRequest } from "./retry"
 import { Actor } from "@opencode-ai/console-core/actor.js"
 import { WorkspaceTable } from "@opencode-ai/console-core/schema/workspace.sql.js"
 import { ZenData } from "@opencode-ai/console-core/model.js"
@@ -26,7 +24,7 @@ import { UserTable } from "@opencode-ai/console-core/schema/user.sql.js"
 import { ModelTable } from "@opencode-ai/console-core/schema/model.sql.js"
 import { ProviderTable } from "@opencode-ai/console-core/schema/provider.sql.js"
 import { logger } from "./logger"
-import { createBodyConverter, createStreamPartConverter } from "./provider/provider"
+import { createStreamPartConverter } from "./provider/provider"
 import { anthropicHelper } from "./provider/anthropic"
 import { googleHelper } from "./provider/google"
 import { openaiHelper } from "./provider/openai"
@@ -43,10 +41,6 @@ import { localeFromRequest } from "~/lib/language"
 import { createModelTpmLimiter } from "./modelTpmLimiter"
 
 type ZenData = Awaited<ReturnType<typeof ZenData.list>>
-type RetryOptions = {
-  excludeProviders: string[]
-  retryCount: number
-}
 
 function resolve(text: string, params?: Record<string, string | number>) {
   if (!params) return text
@@ -70,10 +64,7 @@ export async function handler(
 ) {
   type AuthInfo = Awaited<ReturnType<typeof authenticate>>
   type ModelInfo = Awaited<ReturnType<typeof validateModel>>
-  type ProviderInfo = Awaited<ReturnType<typeof selectProvider>>
 
-  const MAX_FAILOVER_RETRIES = 3
-  const MAX_429_RETRIES = 3
   const dict = i18n(localeFromRequest(input.request))
   const t = (key: Key, params?: Record<string, string | number>) => resolve(dict[key], params)
   const ADMIN_WORKSPACES = [
@@ -109,106 +100,24 @@ export async function handler(
     const modelTpmLimiter = createModelTpmLimiter(modelInfo.providers)
     const modelTpmLimits = await modelTpmLimiter?.check()
 
-    const retriableRequest = async (retry: RetryOptions = { excludeProviders: [], retryCount: 0 }) => {
-      const providerInfo = selectProvider(
-        model,
-        zenData,
-        authInfo,
-        modelInfo,
-        ip,
-        sessionId,
-        trialProviders,
-        retry,
-        stickyProvider,
-        modelTpmLimits,
-        { t, opts, logger },
-      )
-      validateModelSettings(billingSource, authInfo, t)
-      updateProviderKey(authInfo, providerInfo)
-      logger.metric({
-        provider: providerInfo.id,
-        "provider.model": providerInfo.model,
-      })
-
-      const startTimestamp = Date.now()
-      const reqUrl = providerInfo.modifyUrl(providerInfo.api, isStream)
-      const reqBody = JSON.stringify(
-        providerInfo.modifyBody({
-          ...createBodyConverter(opts.format, providerInfo.format)(body),
-          model: providerInfo.model,
-          ...(() => {
-            const replacer = (obj: Record<string, any>): Record<string, any> =>
-              Object.fromEntries(
-                Object.entries(obj).flatMap(([k, v]) => {
-                  if (Array.isArray(v)) return [[k, v]]
-                  if (typeof v === "object") return [[k, replacer(v)]]
-                  if (typeof v === "string") {
-                    if (v === "$ip") return [[k, ip]]
-                    if (v === "$workspace") return authInfo?.workspaceID ? [[k, authInfo?.workspaceID]] : []
-                    if (v === "$session") return sessionId ? [[k, sessionId]] : []
-                    if (v.startsWith("$header.")) {
-                      const headerValue = input.request.headers.get(v.slice(8))
-                      return headerValue ? [[k, headerValue]] : []
-                    }
-                  }
-                  return [[k, v]]
-                }),
-              )
-            return replacer(providerInfo.payloadModifier ?? {})
-          })(),
-        }),
-      )
-      logger.debug("REQUEST URL: " + reqUrl)
-      logger.debug("REQUEST: " + reqBody.substring(0, 300) + "...")
-      const res = await fetchWith429Retry(reqUrl, {
-        method: "POST",
-        headers: (() => {
-          const headers = new Headers(input.request.headers)
-          providerInfo.modifyHeaders(headers, body, providerInfo.apiKey)
-          Object.entries(providerInfo.headerMappings ?? {}).forEach(([k, v]) => {
-            const mappedValue = headers.get(v as string)
-            if (typeof mappedValue === "string") headers.set(k, mappedValue)
-          })
-          headers.delete("host")
-          headers.delete("content-length")
-          headers.delete("x-opencode-request")
-          headers.delete("x-opencode-session")
-          headers.delete("x-opencode-project")
-          headers.delete("x-opencode-client")
-          return headers
-        })(),
-        body: reqBody,
-      })
-
-      if (res.status !== 200) {
-        logger.metric({
-          "llm.error.code": res.status,
-          "llm.error.message": res.statusText,
-        })
-      }
-
-      // Try another provider => stop retrying if using fallback provider
-      if (
-        res.status !== 200 &&
-        // ie. 400 error is usually provider error like malformed request
-        res.status !== 400 &&
-        // ie. openai 404 error: Item with id 'msg_0ead8b004a3b165d0069436a6b6834819896da85b63b196a3f' not found.
-        res.status !== 404 &&
-        // ie. cannot change codex model providers mid-session
-        modelInfo.stickyProvider !== "strict" &&
-        modelInfo.fallbackProvider &&
-        providerInfo.id !== modelInfo.fallbackProvider
-      ) {
-        return retriableRequest({
-          excludeProviders: [...retry.excludeProviders, providerInfo.id],
-          retryCount: retry.retryCount + 1,
-        })
-      }
-
-      return { providerInfo, reqBody, res, startTimestamp }
-    }
-
-    const { providerInfo, reqBody, res, startTimestamp } = await retriableRequest()
+    const { providerInfo, reqBody, res, startTimestamp } = await executeRetriableRequest({
+      model,
+      zenData,
+      authInfo,
+      modelInfo,
+      ip,
+      sessionId,
+      trialProviders,
+      stickyProvider,
+      modelTpmLimits,
+      body,
+      isStream,
+      billingSource,
+      request: input.request,
+      opts,
+      t,
+      logger,
+    })
 
     // Store model request
     dataDumper?.provideModel(providerInfo.storeModel)
