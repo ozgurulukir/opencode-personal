@@ -11,8 +11,19 @@ const hop = new Set([
   "host",
 ])
 
+// Headers that expose internal routing or allow spoofing — never forward upstream.
+const securitySensitive = new Set([
+  "set-cookie",
+  "x-forwarded-for",
+  "x-forwarded-host",
+  "x-forwarded-proto",
+  "forwarded",
+  "x-real-ip",
+])
+
 function sanitize(out: Headers) {
   for (const key of hop) out.delete(key)
+  for (const key of securitySensitive) out.delete(key)
   out.delete("accept-encoding")
   out.delete("x-opencode-directory")
   out.delete("x-opencode-workspace")

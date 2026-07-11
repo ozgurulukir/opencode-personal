@@ -11,20 +11,41 @@ function getNetworkIPs() {
   const nets = networkInterfaces()
   const results: string[] = []
 
+  // Virtual/docker interface name patterns
+  const virtualPatterns = [
+    /^docker\d+$/i,
+    /^br-[0-9a-f]+$/i,
+    /^veth[a-f0-9]+$/i,
+    /^virbr\d+$/i,
+    /^vboxnet\d+$/i,
+    /^tun\d+$/i,
+    /^tap\d+$/i,
+    /^wsl$/i,
+    /^wsl\d+$/i,
+  ]
+
+  const isVirtual = (name: string) => virtualPatterns.some((pattern) => pattern.test(name))
+
   for (const name of Object.keys(nets)) {
     const net = nets[name]
     if (!net) continue
+    if (isVirtual(name)) continue
 
     for (const netInfo of net) {
-      // Skip internal and non-IPv4 addresses
       if (netInfo.internal || netInfo.family !== "IPv4") continue
-
-      // Skip Docker bridge networks (typically 172.x.x.x)
-      if (netInfo.address.startsWith("172.")) continue
+      if (netInfo.address.startsWith("169.254.")) continue // link-local
+      if (netInfo.address.startsWith("172.")) continue // docker/vpn range
 
       results.push(netInfo.address)
     }
   }
+
+  // Sort: prefer RFC1918 private ranges (192.168.x.x, 10.x.x.x) over others
+  results.sort((a, b) => {
+    const aPrivate = a.startsWith("192.168.") || a.startsWith("10.") ? 0 : 1
+    const bPrivate = b.startsWith("192.168.") || b.startsWith("10.") ? 0 : 1
+    return aPrivate - bPrivate || a.localeCompare(b)
+  })
 
   return results
 }

@@ -3,6 +3,9 @@ import { Bonjour } from "bonjour-service"
 
 const log = Log.create({ service: "mdns" })
 
+const MAX_RETRIES = 3
+const BASE_DELAY_MS = 500
+
 let bonjour: Bonjour | undefined
 let currentPort: number | undefined
 
@@ -10,37 +13,46 @@ export function publish(port: number, domain?: string) {
   if (currentPort === port) return
   if (bonjour) unpublish()
 
-  try {
-    const host = domain ?? "opencode.local"
-    const name = `opencode-${port}`
-    bonjour = new Bonjour()
-    const service = bonjour.publish({
-      name,
-      type: "http",
-      host,
-      port,
-      txt: { path: "/" },
-    })
+  const attempt = (retriesLeft: number) => {
+    try {
+      const host = domain ?? "opencode.local"
+      const name = `opencode-${port}`
+      bonjour = new Bonjour()
+      const service = bonjour.publish({
+        name,
+        type: "http",
+        host,
+        port,
+        txt: { path: "/" },
+      })
 
-    service.on("up", () => {
-      log.info("mDNS service published", { name, port })
-    })
+      service.on("up", () => {
+        log.info("mDNS service published", { name, port })
+      })
 
-    service.on("error", (err) => {
-      log.error("mDNS service error", { error: err })
-    })
+      service.on("error", (err) => {
+        log.error("mDNS service error", { error: err })
+      })
 
-    currentPort = port
-  } catch (err) {
-    log.error("mDNS publish failed", { error: err })
-    if (bonjour) {
-      try {
-        bonjour.destroy()
-      } catch {}
+      currentPort = port
+    } catch (err) {
+      log.error("mDNS publish failed", { error: err, retriesLeft })
+      if (bonjour) {
+        try {
+          bonjour.destroy()
+        } catch {}
+      }
+      bonjour = undefined
+      currentPort = undefined
+
+      if (retriesLeft > 0) {
+        const delay = BASE_DELAY_MS * Math.pow(2, MAX_RETRIES - retriesLeft)
+        setTimeout(() => attempt(retriesLeft - 1), delay)
+      }
     }
-    bonjour = undefined
-    currentPort = undefined
   }
+
+  attempt(MAX_RETRIES)
 }
 
 export function unpublish() {

@@ -18,7 +18,7 @@ export const layer = Layer.sync(Service)(() => {
   let closing = false
   return Service.of({
     add: (close) =>
-      Effect.gen(function* () {
+      Effect.sync(() => {
         if (closing) return false
         sockets.add(close)
         return true
@@ -38,7 +38,7 @@ export const layer = Layer.sync(Service)(() => {
             Effect.catch(() => Effect.void),
           ),
         ),
-        { concurrency: "unbounded", discard: true },
+        { concurrency: 20, discard: true },
       )
     }),
   })
