@@ -447,7 +447,11 @@ export const layer = Layer.effect(
 
         const subagent = yield* agents.get(input.agent)
         if (!subagent) {
-          return yield* new NotFoundError({ sessionID: SessionID.make(input.agent) })
+          // Die (not fail) because an invalid agent name is a programming error
+          // — the LLM is given the available agents in the task tool description.
+          // V1 TaskTool also treats this as a defect via Effect.fail + orDie.
+          // NotFoundError in the return type is for the parent session lookup.
+          return yield* Effect.die(new Error(`Unknown agent type: ${input.agent} is not a valid agent type`))
         }
         const parentAgent = parent.agent
           ? yield* agents.get(parent.agent).pipe(Effect.catchCause(() => Effect.succeed(undefined)))

@@ -434,4 +434,64 @@ describe("v2.session", () => {
       expect(true).toBe(true)
     }),
   )
+
+  it.instance("subagent disables task tool by default (todowrite already denied in general agent)", () =>
+    Effect.gen(function* () {
+      const session = yield* SessionV2.Service
+      const parent = yield* session.create({ agent: "build" })
+
+      yield* session.subagent({
+        parentID: parent.id,
+        agent: "general",
+        prompt: { text: "do something" },
+      })
+
+      const lastCall = promptStub.calls.prompt.at(-1) as any
+      // general agent has todowrite: "deny" in its permission, so
+      // subagentToolRestrictions sees has("todowrite") = true and
+      // does NOT add { todowrite: false }. It does add { task: false }
+      // because general doesn't have task in its permission.
+      expect(lastCall.tools).toEqual({
+        task: false,
+      })
+    }),
+  )
+
+  it.instance("subagent passes agent name to child prompt", () =>
+    Effect.gen(function* () {
+      const session = yield* SessionV2.Service
+      const parent = yield* session.create({ agent: "build" })
+
+      yield* session.subagent({
+        parentID: parent.id,
+        agent: "explore",
+        prompt: { text: "find files" },
+      })
+
+      const lastCall = promptStub.calls.prompt.at(-1) as any
+      expect(lastCall.agent).toBe("explore")
+    }),
+  )
+
+  it.instance("subagent dies for invalid agent name", () =>
+    Effect.gen(function* () {
+      const session = yield* SessionV2.Service
+      const parent = yield* session.create({ agent: "build" })
+
+      const result = (yield* session
+        .subagent({
+          parentID: parent.id,
+          agent: "nonexistent-agent",
+          prompt: { text: "do something" },
+        })
+        .pipe(
+          Effect.map(() => ({ error: undefined as string | undefined, ok: true })),
+          Effect.catchDefect((defect) =>
+            Effect.succeed({ error: defect instanceof Error ? defect.message : String(defect), ok: false }),
+          ),
+        )) as { error: string | undefined; ok: boolean }
+
+      expect(result.error).toContain("Unknown agent type")
+    }),
+  )
 })
