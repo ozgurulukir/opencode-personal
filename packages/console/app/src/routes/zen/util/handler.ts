@@ -31,6 +31,16 @@ function resolve(text: string, params?: Record<string, string | number>) {
   })
 }
 
+export type HandlerDeps = {
+  parseRequest?: typeof parseRequest
+  setupRequest?: typeof setupRequest
+  executeRetriableRequest?: typeof executeRetriableRequest
+  handleNonStreamingResponse?: typeof handleNonStreamingResponse
+  createStreamingResponse?: typeof createStreamingResponse
+  createStreamPartConverter?: typeof createStreamPartConverter
+  mapErrorToResponse?: typeof mapErrorToResponse
+}
+
 export async function handler(
   input: APIEvent,
   opts: {
@@ -41,7 +51,15 @@ export async function handler(
     parseVariant: (url: string, body: any) => string | undefined
     parseIsStream: (url: string, body: any) => boolean
   },
+  deps?: HandlerDeps,
 ) {
+  const parseRequestFn = deps?.parseRequest ?? parseRequest
+  const setupRequestFn = deps?.setupRequest ?? setupRequest
+  const executeRetriableRequestFn = deps?.executeRetriableRequest ?? executeRetriableRequest
+  const handleNonStreamingResponseFn = deps?.handleNonStreamingResponse ?? handleNonStreamingResponse
+  const createStreamingResponseFn = deps?.createStreamingResponse ?? createStreamingResponse
+  const createStreamPartConverterFn = deps?.createStreamPartConverter ?? createStreamPartConverter
+  const mapErrorToResponseFn = deps?.mapErrorToResponse ?? mapErrorToResponse
   const dict = i18n(localeFromRequest(input.request))
   const t = (key: Key, params?: Record<string, string | number>) => resolve(dict[key], params)
   const ADMIN_WORKSPACES = [
@@ -51,7 +69,7 @@ export async function handler(
   ]
 
   try {
-    const req = await parseRequest(input, opts)
+    const req = await parseRequestFn(input, opts)
     const body = req.body
     const model = req.model
     const isStream = req.isStream
@@ -73,7 +91,7 @@ export async function handler(
       billingSource,
       modelTpmLimiter,
       modelTpmLimits,
-    } = await setupRequest({
+    } = await setupRequestFn({
       model,
       ip,
       sessionId,
@@ -99,7 +117,7 @@ export async function handler(
       createModelTpmLimiter,
     })
 
-    const { providerInfo, reqBody, res, startTimestamp } = await executeRetriableRequest({
+    const { providerInfo, reqBody, res, startTimestamp } = await executeRetriableRequestFn({
       model,
       zenData,
       authInfo,
@@ -143,12 +161,12 @@ export async function handler(
     }
 
     if (!isStream || [400, 404, 429].includes(res.status)) {
-      return handleNonStreamingResponse(res, responseDeps)
+      return handleNonStreamingResponseFn(res, responseDeps)
     }
 
-    const streamConverter = createStreamPartConverter(providerInfo.format, opts.format)
-    return createStreamingResponse(res, startTimestamp, streamConverter, responseDeps)
+    const streamConverter = createStreamPartConverterFn(providerInfo.format, opts.format)
+    return createStreamingResponseFn(res, startTimestamp, streamConverter, responseDeps)
   } catch (error) {
-    return mapErrorToResponse(error, logger)
+    return mapErrorToResponseFn(error, logger)
   }
 }
