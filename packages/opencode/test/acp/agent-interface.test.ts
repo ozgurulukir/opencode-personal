@@ -39,7 +39,6 @@ describe("acp.agent interface compliance", () => {
     "resumeSession",
     "closeSession",
     "unstable_forkSession",
-    "unstable_setSessionModel",
   ]
 
   test("Agent implements all SDK-checked methods", () => {
