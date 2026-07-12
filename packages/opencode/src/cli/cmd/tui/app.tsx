@@ -67,6 +67,7 @@ import type { RouteMap } from "@/cli/cmd/tui/plugin/api"
 import { FormatError, FormatUnknownError } from "@/cli/error"
 import { CommandPaletteProvider, useCommandPalette } from "./context/command-palette"
 import { OpencodeKeymapProvider, registerOpencodeKeymap, useBindings, useOpencodeKeymap } from "./keymap"
+import { capture as captureStderr, restore as restoreStderr } from "./stderr-capture"
 
 import type { EventSource } from "./context/sdk"
 import { DialogVariant } from "./component/dialog-variant"
@@ -163,6 +164,7 @@ export function tui(input: {
     win32DisableProcessedInput()
 
     const onExit = async () => {
+      restoreStderr()
       unguard?.()
       resolve()
     }
@@ -171,6 +173,10 @@ export function tui(input: {
       offKeymap()
       await TuiPluginRuntime.dispose()
     }
+
+    // Redirect stderr to log file so Bun JIT warnings and other stderr output
+    // don't leak onto the alternate screen buffer and corrupt the TUI display.
+    captureStderr()
 
     const renderer = await createCliRenderer(rendererConfig(input.config))
     // Prewarm palette before ThemeProvider mounts so `system` theme avoids a first-paint fallback flash.
