@@ -1,9 +1,10 @@
 import { SessionMessageTable, SessionTable } from "@/session/session.sql"
 import { SessionID } from "@/session/schema"
+import { ModelID, ProviderID } from "@/provider/schema"
 import { WorkspaceID } from "@/control-plane/schema"
 import { and, asc, desc, eq, gt, gte, isNull, like, lt, or, type SQL } from "@/storage/db"
 import * as Database from "@/storage/db"
-import { Context, DateTime, Effect, Layer, Option, Schema } from "effect"
+import { Context, DateTime, Effect, Layer, Option, Schema, Stream } from "effect"
 import { SessionMessage } from "./session-message"
 import type { Prompt } from "./session-prompt"
 import { EventV2 } from "./event"
@@ -13,6 +14,11 @@ import { V2Schema } from "./schema"
 import { optionalOmitUndefined } from "@opencode-ai/core/schema"
 import { Modelv2 } from "./model"
 import { SyncEvent } from "@/sync"
+import { Session } from "@/session/session"
+import { SessionPrompt } from "@/session/prompt"
+import { SessionCompaction } from "@/session/compaction"
+import { SessionStatus } from "@/session/status"
+import { Bus } from "@/bus"
 
 export const Delivery = Schema.Literals(["immediate", "deferred"]).annotate({
   identifier: "Session.Delivery",
@@ -111,11 +117,66 @@ export interface Interface {
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/v2/Session") {}
 
+/**
+ * Map a V1 `Session.Info` to a V2 `Info`.
+ * V1 stores timestamps as epoch millis; V2 uses `DateTime`. V1 model shape
+ * `{ id, providerID, variant? }` maps directly to `Modelv2.Ref`.
+ */
+function toV2Info(info: Session.Info): Info {
+  return new Info({
+    id: info.id,
+    parentID: info.parentID,
+    projectID: info.projectID,
+    workspaceID: info.workspaceID,
+    path: info.path,
+    agent: info.agent,
+    model: info.model
+      ? {
+          id: Modelv2.ID.make(info.model.id as string),
+          providerID: Modelv2.ProviderID.make(info.model.providerID as string),
+          variant: Modelv2.VariantID.make((info.model.variant ?? "default") as string),
+        }
+      : undefined,
+    time: {
+      created: DateTime.makeUnsafe(info.time.created),
+      updated: DateTime.makeUnsafe(info.time.updated),
+      archived: info.time.archived ? DateTime.makeUnsafe(info.time.archived) : undefined,
+    },
+    title: info.title,
+  })
+}
+
+/**
+ * Translate a V2 `Prompt` into V1 `PromptInput["parts"]`. The V1 prompt loop
+ * owns the event emission (`SessionEvent.Prompted.Sync` at `prompt.ts:1440`),
+ * so this is a pure data transform.
+ */
+function promptToParts(prompt: Prompt): SessionPrompt.PromptInput["parts"] {
+  return [
+    { type: "text", text: prompt.text },
+    ...(prompt.files ?? []).map(
+      (file) => ({ type: "file", url: file.uri, mime: file.mime, filename: file.name }) as const,
+    ),
+    ...(prompt.agents ?? []).map((agent) => ({ type: "agent", name: agent.name }) as const),
+  ]
+}
+
+
 export const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
     const sync = yield* SyncEvent.Service
     const decodeMessage = Schema.decodeUnknownSync(SessionMessage.Message)
+    // V1 services used by the delegation bridge. Captured lazily via serviceOption
+    // so read-only consumers (get/list/messages/context) still work without them.
+    const sessionsV1 = yield* Effect.serviceOption(Session.Service)
+    const promptV1 = yield* Effect.serviceOption(SessionPrompt.Service)
+    const compactionV1 = yield* Effect.serviceOption(SessionCompaction.Service)
+    const statusV1 = yield* Effect.serviceOption(SessionStatus.Service)
+    const bus = yield* Effect.serviceOption(Bus.Service)
+
+    const requireV1 = <A>(svc: Option.Option<A>, name: string) =>
+      Option.isNone(svc) ? Effect.die(`V2Session.${name} requires the V1 ${name} service to be provided`) : Effect.succeed(svc.value)
 
     const decode = (row: typeof SessionMessageTable.$inferSelect) =>
       decodeMessage({ ...row.data, id: row.id, type: row.type })
@@ -144,9 +205,30 @@ export const layer = Layer.effect(
       })
     }
 
+    // Deferred delivery queue: sessionIDs with staged-but-not-run user messages.
+    // `prompt` with delivery="deferred" stages the message and adds the session;
+    // `runDeferred` drains the queue by running the V1 loop for each session.
+    const deferredQueue = new Set<SessionID>()
+
     const result: Interface = {
-      create: Effect.fn("V2Session.create")(function* (_input) {
-        return {} as any
+      create: Effect.fn("V2Session.create")(function* (input) {
+        // TODO(v2-native): emit SessionEvent.Created and insert directly once the
+        // event/projector exist. For now delegate to V1 Session.create, which
+        // inserts via sync projectors and handles projectID/directory/slug/version.
+        const sessions = yield* requireV1(sessionsV1, "Session")
+        const info = yield* sessions.create({
+          parentID: input?.parentID,
+          agent: input?.agent,
+          model: input?.model
+            ? {
+                id: input.model.id as unknown as ModelID,
+                providerID: input.model.providerID as unknown as ProviderID,
+                variant: input.model.variant,
+              }
+            : undefined,
+          workspaceID: input?.workspaceID,
+        })
+        return toV2Info(info)
       }),
       get: Effect.fn("V2Session.get")(function* (sessionID) {
         const row = Database.use((db) => db.select().from(SessionTable).where(eq(SessionTable.id, sessionID)).get())
@@ -265,11 +347,57 @@ export const layer = Layer.effect(
         })
         return rows.map((row) => decode(row))
       }),
-      prompt: Effect.fn("V2Session.prompt")(function* (_input) {
-        return {} as any
+      prompt: Effect.fn("V2Session.prompt")(function* (input) {
+        // TODO(v2-native): drive the agent loop via V2 events directly. For now
+        // delegate to V1 SessionPrompt.prompt, which already dual-writes every
+        // SessionEvent.* behind OPENCODE_EXPERIMENTAL_EVENT_SYSTEM. The Prompted
+        // projector then populates SessionMessageTable, which `messages`/`context`
+        // already read from.
+        const promptSvc = yield* requireV1(promptV1, "SessionPrompt")
+        const delivery = input.delivery ?? DefaultDelivery
+        const parts = promptToParts(input.prompt)
+
+        // `noReply: true` tells V1 to create the user message but NOT run the
+        // loop. Used for deferred delivery — the message is staged and the loop
+        // runs later via runDeferred().
+        yield* promptSvc.prompt({
+          sessionID: input.sessionID,
+          parts,
+          noReply: delivery === "deferred",
+        })
+
+        if (delivery === "deferred") {
+          deferredQueue.add(input.sessionID)
+        }
+
+        // Read back the projected user message (the Prompted event wrote it).
+        const messages = yield* result.messages({ sessionID: input.sessionID, order: "asc" })
+        const user = messages.findLast((m): m is SessionMessage.User => m.type === "user")
+        return user ?? ({} as SessionMessage.User)
       }),
-      shell: Effect.fn("V2Session.shell")(function* (_input) {}),
-      skill: Effect.fn("V2Session.skill")(function* (_input) {}),
+      shell: Effect.fn("V2Session.shell")(function* (input) {
+        // V1 SessionPrompt.shell already emits Shell.Started/Ended at
+        // prompt.ts:884/907.
+        const promptSvc = yield* requireV1(promptV1, "SessionPrompt")
+        const session = yield* result.get(input.sessionID).pipe(Effect.orDie)
+        yield* promptSvc.shell({
+          sessionID: input.sessionID,
+          agent: session.agent ?? "build",
+          command: input.command,
+        })
+      }),
+      skill: Effect.fn("V2Session.skill")(function* (input) {
+        // Invoke a skill by prompting with the skill name as text. The skill
+        // loader in the agent loop resolves `/skill-name` into the skill content.
+        // TODO(v2-native): emit a dedicated SessionEvent.Skill.Invoked.
+        const promptSvc = yield* requireV1(promptV1, "SessionPrompt")
+        const session = yield* result.get(input.sessionID).pipe(Effect.orDie)
+        yield* promptSvc.prompt({
+          sessionID: input.sessionID,
+          agent: session.agent ?? "build",
+          parts: [{ type: "text", text: `/${input.skill}` }],
+        })
+      }),
       switchAgent: Effect.fn("V2Session.switchAgent")(function* (input) {
         yield* sync.run(SessionEvent.AgentSwitched.Sync, {
           sessionID: input.sessionID,
@@ -296,20 +424,82 @@ export const layer = Layer.effect(
           prompt: input.prompt,
           sessionID: session.id,
         })
+        // After the subagent's loop finishes, post its final text back to the
+        // parent as a synthetic message so callers can observe the result.
+        // The interface returns void; changing it to return the text is a
+        // breaking change deferred to v2-native.
+        // TODO(v2-native): return the result instead of posting synthetically.
         yield* Effect.gen(function* () {
           yield* result.wait(session.id)
           const messages = yield* result.messages({ sessionID: session.id, order: "desc" })
           const assistant = messages.find((msg) => msg.type === "assistant")
-          if (!assistant) return
+          if (!assistant || assistant.type !== "assistant") return
           const text = assistant.content.findLast((part) => part.type === "text")
-          if (!text) return
+          if (!text || text.type !== "text") return
+          yield* sync.run(SessionEvent.Synthetic.Sync, {
+            sessionID: input.parentID,
+            timestamp: DateTime.makeUnsafe(Date.now()),
+            text: text.text,
+          })
         }).pipe(Effect.forkChild())
       }),
-      compact: Effect.fn("V2Session.compact")(function* (_sessionID) {}),
-      wait: Effect.fn("V2Session.wait")(function* (_sessionID) {}),
+      compact: Effect.fn("V2Session.compact")(function* (sessionID) {
+        // Stage a compaction. V1 SessionCompaction.create appends a user message
+        // with a CompactionPart + emits SessionEvent.Compaction.Started.Sync. The
+        // actual summarization runs on the next loop iteration (manual trigger:
+        // the caller should call prompt() or the loop must be running).
+        // TODO(v2-native): run the summarization inline via the V2 event stream.
+        const compactionSvc = yield* requireV1(compactionV1, "SessionCompaction")
+        const session = yield* result.get(sessionID).pipe(Effect.orDie)
+        const model = session.model ?? {
+          id: Modelv2.ID.make("default"),
+          providerID: Modelv2.ProviderID.make("opencode"),
+          variant: Modelv2.VariantID.make("default"),
+        }
+        yield* compactionSvc.create({
+          sessionID,
+          agent: session.agent ?? "build",
+          model: {
+            providerID: model.providerID as unknown as ProviderID,
+            modelID: model.id as unknown as ModelID,
+          },
+          auto: false,
+        })
+      }),
+      wait: Effect.fn("V2Session.wait")(function* (sessionID) {
+        // Block until the session's agent loop goes idle. V1 has no explicit
+        // "wait" primitive — it uses Runner.ensureRunning to join in-flight runs.
+        // Here we subscribe to the SessionStatus bus: if currently busy, wait for
+        // the next idle event for this session.
+        const status = Option.isSome(statusV1) ? statusV1.value : null
+        const busSvc = Option.isSome(bus) ? bus.value : null
+        if (!status || !busSvc) return // no status service available — nothing to wait on
+        const current = yield* status.get(sessionID)
+        if (current.type === "idle") return
+        yield* busSvc
+          .subscribe(SessionStatus.Event.Idle)
+          .pipe(
+            Stream.filter((e) => e.properties.sessionID === sessionID),
+            Stream.take(1),
+            Stream.runDrain,
+          )
+      }),
     }
 
-    return Service.of(result)
+    /**
+     * Drain deferred-delivery prompts for a session by running the V1 loop.
+     * Exposed via an extended service so tests/callers can trigger deferred
+     * processing. A real background worker can be wired later.
+     * TODO(v2-native): replace with a V2-native event-driven scheduler.
+     */
+    const runDeferred = (sessionID: SessionID): Effect.Effect<void> =>
+      Effect.gen(function* () {
+        if (!deferredQueue.delete(sessionID)) return
+        const promptSvc = yield* requireV1(promptV1, "SessionPrompt")
+        yield* promptSvc.loop({ sessionID })
+      })
+
+    return Service.of(Object.assign(result, { runDeferred }))
   }),
 )
 

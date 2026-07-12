@@ -741,16 +741,46 @@ const scenarios: Scenario[] = [
     }))
     .status(400, undefined, "none"),
   http.protected
-    .post("/api/session/{sessionID}/compact", "v2.session.compact")
+    .post("/api/session/{sessionID}/prompt", "v2.session.prompt")
+    .preserveDatabase()
+    .withLlm()
+    .seeded((ctx) =>
+      Effect.gen(function* () {
+        const session = yield* ctx.session({ title: "V2 prompt session" })
+        yield* ctx.llmText("fake v2 assistant")
+        yield* ctx.llmText("fake v2 assistant")
+        return session
+      }),
+    )
     .at((ctx) => ({
-      path: route("/api/session/{sessionID}/compact", { sessionID: "ses_httpapi_missing" }),
+      path: route("/api/session/{sessionID}/prompt", { sessionID: ctx.state.id }),
+      headers: ctx.headers(),
+      body: { prompt: { text: "hello v2" } },
+    }))
+    .json(200, (body, ctx) => {
+      object(body)
+      check(
+        isRecord(body) && body.type === "user",
+        "v2 prompt should return a user message",
+      )
+      check(
+        isRecord(body) && typeof body.text === "string" && body.text.includes("hello v2"),
+        "v2 user message should contain the prompt text",
+      )
+    }),
+  http.protected
+    .post("/api/session/{sessionID}/compact", "v2.session.compact")
+    .seeded((ctx) => ctx.session({ title: "Compact session" }))
+    .at((ctx) => ({
+      path: route("/api/session/{sessionID}/compact", { sessionID: ctx.state.id }),
       headers: ctx.headers(),
     }))
     .status(204, undefined, "none"),
   http.protected
     .post("/api/session/{sessionID}/wait", "v2.session.wait")
+    .seeded((ctx) => ctx.session({ title: "Wait session" }))
     .at((ctx) => ({
-      path: route("/api/session/{sessionID}/wait", { sessionID: "ses_httpapi_missing" }),
+      path: route("/api/session/{sessionID}/wait", { sessionID: ctx.state.id }),
       headers: ctx.headers(),
     }))
     .status(204, undefined, "none"),
@@ -1367,6 +1397,7 @@ const llmScenarios = new Set([
   "session.prompt_async",
   "session.command",
   "session.summarize",
+  "v2.session.prompt",
 ])
 
 const main = Effect.gen(function* () {
