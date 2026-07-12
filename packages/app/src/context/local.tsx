@@ -266,7 +266,15 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
       setStore("draft", state)
     }
 
-    const recent = createMemo(() => models.recent.list().map(models.find).filter(Boolean))
+    const recent = createMemo(() => {
+      const recents = models.recent.list()
+      const result = []
+      for (let i = 0; i < recents.length; i++) {
+        const found = models.find(recents[i])
+        if (found) result.push(found)
+      }
+      return result
+    })
 
     const model = {
       ready: models.ready,
