@@ -54,14 +54,14 @@ function defer<T>() {
   return { promise, resolve }
 }
 
-const seed = Effect.fn("TaskToolTest.seed")(function* (title = "Pinned") {
+const seed = Effect.fn("TaskToolTest.seed")(function* (title = "Pinned", agent?: string) {
   const session = yield* Session.Service
-  const chat = yield* session.create({ title })
+  const chat = yield* session.create(agent ? { title, agent } : { title })
   const user = yield* session.updateMessage({
     id: MessageID.ascending(),
     role: "user",
     sessionID: chat.id,
-    agent: "build",
+    agent: agent ?? "build",
     model: ref,
     time: { created: Date.now() },
   })
@@ -70,8 +70,8 @@ const seed = Effect.fn("TaskToolTest.seed")(function* (title = "Pinned") {
     role: "assistant",
     parentID: user.id,
     sessionID: chat.id,
-    mode: "build",
-    agent: "build",
+    mode: agent ?? "build",
+    agent: agent ?? "build",
     cost: 0,
     path: { cwd: "/tmp", root: "/tmp" },
     tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
@@ -443,5 +443,76 @@ describe("tool.task", () => {
         },
       },
     },
+  )
+
+  it.instance("execute resumes any session by task_id regardless of parent (characterization)", () =>
+    Effect.gen(function* () {
+      const sessions = yield* Session.Service
+      const { chat, assistant } = yield* seed()
+      const other = yield* sessions.create({ title: "Other session" })
+      const tool = yield* TaskTool
+      const def = yield* tool.init()
+      let seen: SessionPrompt.PromptInput | undefined
+      const promptOps = stubOps({ text: "resumed", onPrompt: (input) => (seen = input) })
+
+      const result = yield* def.execute(
+        {
+          description: "inspect bug",
+          prompt: "look into the cache key path",
+          subagent_type: "general",
+          task_id: other.id,
+        },
+        {
+          sessionID: chat.id,
+          messageID: assistant.id,
+          agent: "build",
+          abort: new AbortController().signal,
+          extra: { promptOps },
+          messages: [],
+          metadata: () => Effect.void,
+          ask: () => Effect.void,
+        },
+      )
+
+      // Current behavior: resumes the session even though it's not a child.
+      // This test documents the insecure behavior — Phase 2 will fix it and
+      // update this test to assert the rejection.
+      expect(result.metadata.sessionId).toBe(other.id)
+      expect(result.output).toContain(`task_id: ${other.id}`)
+      expect(seen?.sessionID).toBe(other.id)
+    }),
+  )
+
+  it.instance("execute proceeds when parent agent is missing from config (characterization)", () =>
+    Effect.gen(function* () {
+      const { chat, assistant } = yield* seed("Pinned", "deleted-agent")
+      const tool = yield* TaskTool
+      const def = yield* tool.init()
+      const promptOps = stubOps({ text: "done" })
+
+      const result = yield* def.execute(
+        {
+          description: "inspect bug",
+          prompt: "look into the cache key path",
+          subagent_type: "general",
+        },
+        {
+          sessionID: chat.id,
+          messageID: assistant.id,
+          agent: "deleted-agent",
+          abort: new AbortController().signal,
+          extra: { promptOps },
+          messages: [],
+          metadata: () => Effect.void,
+          ask: () => Effect.void,
+        },
+      )
+
+      // Current behavior: succeeds even though parent agent is not found.
+      // The parentAgent lookup silently returns undefined via catchCause,
+      // skipping parent agent deny rules. This test documents that behavior.
+      expect(result.metadata.sessionId).toBeDefined()
+      expect(result.output).toContain("<task_result>")
+    }),
   )
 })
