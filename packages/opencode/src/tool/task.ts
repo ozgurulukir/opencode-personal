@@ -4,7 +4,7 @@ import { Session } from "@/session/session"
 import { SessionID, MessageID } from "../session/schema"
 import { MessageV2 } from "../session/message-v2"
 import { Agent } from "../agent/agent"
-import { deriveSubagentSessionPermission } from "../agent/subagent-permissions"
+import { subagentSessionPermission, subagentToolRestrictions } from "../agent/subagent-permissions"
 import type { SessionPrompt } from "../session/prompt"
 import { Config } from "@/config/config"
 import { Effect, Exit, Schema } from "effect"
@@ -72,18 +72,12 @@ export const TaskTool = Tool.define(
         (yield* sessions.create({
           parentID: ctx.sessionID,
           title: params.description + ` (@${next.name} subagent)`,
-          permission: [
-            ...deriveSubagentSessionPermission({
-              parentSessionPermission: parent.permission ?? [],
-              parentAgent,
-              subagent: next,
-            }),
-            ...(cfg.experimental?.primary_tools?.map((item) => ({
-              pattern: "*",
-              action: "allow" as const,
-              permission: item,
-            })) ?? []),
-          ],
+          permission: subagentSessionPermission({
+            parentSessionPermission: parent.permission ?? [],
+            parentAgent,
+            subagent: next,
+            primaryTools: cfg.experimental?.primary_tools,
+          }),
         }))
 
       const msg = yield* Effect.sync(() => MessageV2.get({ sessionID: ctx.sessionID, messageID: ctx.messageID }))
@@ -128,11 +122,10 @@ export const TaskTool = Tool.define(
                 providerID: model.providerID,
               },
               agent: next.name,
-              tools: {
-                ...(next.permission.some((rule) => rule.permission === "todowrite") ? {} : { todowrite: false }),
-                ...(next.permission.some((rule) => rule.permission === id) ? {} : { task: false }),
-                ...Object.fromEntries((cfg.experimental?.primary_tools ?? []).map((item) => [item, false])),
-              },
+              tools: subagentToolRestrictions({
+                subagent: next,
+                primaryTools: cfg.experimental?.primary_tools,
+              }),
               parts,
             })
 
