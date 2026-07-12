@@ -1197,17 +1197,27 @@ export function UserMessageDisplay(props: { message: UserMessage; parts: PartTyp
 type HighlightSegment = { text: string; type?: "file" | "agent" }
 
 function HighlightedText(props: { text: string; references: FilePart[]; agents: AgentPart[] }) {
+  // ⚡ Bolt Optimization: Replace chained .filter().map() with direct loops
   const segments = createMemo(() => {
     const text = props.text
 
-    const allRefs: { start: number; end: number; type: "file" | "agent" }[] = [
-      ...props.references
-        .filter((r) => r.source?.text?.start !== undefined && r.source?.text?.end !== undefined)
-        .map((r) => ({ start: r.source!.text!.start, end: r.source!.text!.end, type: "file" as const })),
-      ...props.agents
-        .filter((a) => a.source?.start !== undefined && a.source?.end !== undefined)
-        .map((a) => ({ start: a.source!.start, end: a.source!.end, type: "agent" as const })),
-    ].sort((a, b) => a.start - b.start)
+    const allRefs: { start: number; end: number; type: "file" | "agent" }[] = []
+
+    for (let i = 0; i < props.references.length; i++) {
+      const r = props.references[i]
+      if (r.source?.text?.start !== undefined && r.source?.text?.end !== undefined) {
+        allRefs.push({ start: r.source.text.start, end: r.source.text.end, type: "file" })
+      }
+    }
+
+    for (let i = 0; i < props.agents.length; i++) {
+      const a = props.agents[i]
+      if (a.source?.start !== undefined && a.source?.end !== undefined) {
+        allRefs.push({ start: a.source.start, end: a.source.end, type: "agent" })
+      }
+    }
+
+    allRefs.sort((a, b) => a.start - b.start)
 
     const result: HighlightSegment[] = []
     let lastIndex = 0
@@ -2035,7 +2045,15 @@ ToolRegistry.register({
       if (list.length === 0) return
       if (seeded) return
       seeded = true
-      setExpanded(list.filter((f) => f.type !== "delete").map((f) => f.filePath))
+
+      // ⚡ Bolt Optimization: Replace chained .filter().map() with direct loops
+      const expandedFiles: string[] = []
+      for (let i = 0; i < list.length; i++) {
+        if (list[i].type !== "delete") {
+          expandedFiles.push(list[i].filePath)
+        }
+      }
+      setExpanded(expandedFiles)
     })
 
     const subtitle = createMemo(() => {
