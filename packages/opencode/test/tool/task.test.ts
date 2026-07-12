@@ -445,41 +445,44 @@ describe("tool.task", () => {
     },
   )
 
-  it.instance("execute resumes any session by task_id regardless of parent (characterization)", () =>
+  it.instance("execute rejects task_id that does not belong to this session", () =>
     Effect.gen(function* () {
       const sessions = yield* Session.Service
       const { chat, assistant } = yield* seed()
       const other = yield* sessions.create({ title: "Other session" })
       const tool = yield* TaskTool
       const def = yield* tool.init()
-      let seen: SessionPrompt.PromptInput | undefined
-      const promptOps = stubOps({ text: "resumed", onPrompt: (input) => (seen = input) })
+      const promptOps = stubOps({ text: "resumed" })
 
-      const result = yield* def.execute(
-        {
-          description: "inspect bug",
-          prompt: "look into the cache key path",
-          subagent_type: "general",
-          task_id: other.id,
-        },
-        {
-          sessionID: chat.id,
-          messageID: assistant.id,
-          agent: "build",
-          abort: new AbortController().signal,
-          extra: { promptOps },
-          messages: [],
-          metadata: () => Effect.void,
-          ask: () => Effect.void,
-        },
-      )
+      const result = yield* def
+        .execute(
+          {
+            description: "inspect bug",
+            prompt: "look into the cache key path",
+            subagent_type: "general",
+            task_id: other.id,
+          },
+          {
+            sessionID: chat.id,
+            messageID: assistant.id,
+            agent: "build",
+            abort: new AbortController().signal,
+            extra: { promptOps },
+            messages: [],
+            metadata: () => Effect.void,
+            ask: () => Effect.void,
+          },
+        )
+        .pipe(
+          Effect.map((r) => ({ error: undefined as string | undefined, result: r })),
+          Effect.catchDefect((defect) =>
+            Effect.succeed({ error: defect instanceof Error ? defect.message : String(defect), result: undefined }),
+          ),
+        )
 
-      // Current behavior: resumes the session even though it's not a child.
-      // This test documents the insecure behavior — Phase 2 will fix it and
-      // update this test to assert the rejection.
-      expect(result.metadata.sessionId).toBe(other.id)
-      expect(result.output).toContain(`task_id: ${other.id}`)
-      expect(seen?.sessionID).toBe(other.id)
+      // Phase 2 fix: resuming a session that is not a child of the current
+      // session is now rejected to prevent cross-session context leakage.
+      expect(result.error).toContain("does not belong to this session")
     }),
   )
 
