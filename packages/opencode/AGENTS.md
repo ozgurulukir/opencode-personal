@@ -224,6 +224,29 @@ const cb = Instance.bind((err, evts) => {
 nativeAddon.subscribe(dir, cb)
 ```
 
+## V2 session service — delegation bridge
+
+The V2 session service (`src/v2/session.ts`) is a **hybrid delegation bridge** to V1. The V1 agent loop (`session/prompt.ts`, `session/processor.ts`, `session/compaction.ts`) already dual-writes every V2 `SessionEvent.*` behind `OPENCODE_EXPERIMENTAL_EVENT_SYSTEM` (forced ON in tests via `test/preload.ts:37`). The V2 projectors (`session/projectors-next.ts`) are wired globally and populate `SessionMessageTable`. So the V2 read methods (`get`, `list`, `messages`, `context`) already work, and the V2 write methods delegate to V1 (which runs the real loop AND emits the events).
+
+**Implementation** (`src/v2/session.ts`):
+- `create` → V1 `Session.create` + `toV2Info()` mapper (V1 `Info` → V2 `Info`, handling `DateTime` timestamps and `Modelv2.Ref` brand conversion)
+- `prompt` → V1 `SessionPrompt.prompt`; `delivery: "immediate"` runs the loop synchronously, `delivery: "deferred"` stages the message (`noReply: true`) and enqueues for `runDeferred()`
+- `compact` → V1 `SessionCompaction.create` (stages compaction; summarization runs on next loop iteration)
+- `wait` → subscribes to `SessionStatus.Event.Idle` bus event (`bus.subscribe` + `Stream.filter` + `Stream.take(1)` + `Stream.runDrain`); returns immediately if already idle
+- `shell` → V1 `SessionPrompt.shell` (already emits `Shell.Started/Ended`)
+- `skill` → prompts with `/{skill}` text prefix
+- `subagent` → creates child session, prompts it, posts result back to parent as `SessionEvent.Synthetic`
+
+**V1 service capture**: V1 services (`Session`, `SessionPrompt`, `SessionCompaction`, `SessionStatus`, `Bus`) are captured via `Effect.serviceOption` at layer build time. Read-only methods work without them; write methods die with a clear message if missing (`requireV1()` helper). In production, all V1 services are available via `instanceContextLayer` (`server/routes/instance/httpapi/server.ts:208-225`).
+
+**Brand conversion**: V1 uses `ModelID`/`ProviderID` brands (`provider/schema.ts`); V2 uses `Modelv2.ID`/`Modelv2.ProviderID` brands (`v2/model.ts`). They're incompatible — convert via `as unknown as` casts at the boundary (see `toV2Info` and `create`).
+
+**Deferred delivery queue**: An in-memory `Set<SessionID>` tracks sessions with staged deferred prompts. `runDeferred(sessionID)` drains a session by calling `SessionPrompt.loop`. Exposed via `Object.assign(result, { runDeferred })` on the service object. A background worker is NOT wired yet — callers/tests trigger `runDeferred` explicitly.
+
+**`TODO(v2-native)` markers**: All delegated methods are marked for a future native-loop swap (port `runLoop`/`processor` into V2-native code that emits `SessionEvent` directly without V1).
+
+**Testing** (`test/v2/session.test.ts`, 11 tests): Uses stubbed V1 services (`stubPromptLayer` emits `SessionEvent.Prompted.Sync` to exercise the projector; `stubCompactionLayer` records calls) with real `Session`/`SyncEvent`/`Bus`. Follows the `task.test.ts` `stubOps` pattern, not the 20-layer `prompt.test.ts` tower.
+
 ## Known Issues
 
 - `Plugin.defaultLayer` includes `Config.defaultLayer` (real filesystem config) and triggers `import("../server/server")` inside the layer init closure (`plugin/index.ts:123`). Tests using `Plugin.defaultLayer` directly (`trigger.test.ts`, `workspace-adapter.test.ts`) time out because the server import block is too heavy for test context. Fix: use `TestConfig.layer()` mock + `Plugin.layer` (not `defaultLayer`) in tests that need Plugin service — see `auth-override.test.ts` and `loader-shared.test.ts` for the working pattern.
