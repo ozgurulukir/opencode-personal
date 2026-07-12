@@ -612,6 +612,11 @@ export const layer: Layer.Layer<
               },
               { text: ctx.currentText.text },
             )).text
+            // Some providers (e.g. MiniMax) return thinking/reasoning content
+            // inline as XML tags (<mm:think>...</mm:think>) inside the text
+            // content rather than in a separate reasoning_text field. Strip
+            // these tags so they don't appear as raw markers in the output.
+            ctx.currentText.text = ctx.currentText.text.replace(/<\/?mm:think>/g, "")
             if (!ctx.assistantMessage.summary) {
               // TODO(v2): Temporary dual-write while migrating session messages to v2 events.
               if (Flag.OPENCODE_EXPERIMENTAL_EVENT_SYSTEM) {
