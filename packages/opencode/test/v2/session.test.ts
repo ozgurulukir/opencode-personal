@@ -1,6 +1,7 @@
 import { afterEach, describe, expect } from "bun:test"
 import { Effect, Layer } from "effect"
 import { Config } from "@/config/config"
+import { Agent } from "../../src/agent/agent"
 import { CrossSpawnSpawner } from "@opencode-ai/core/cross-spawn-spawner"
 import { Session as SessionV1 } from "../../src/session/session"
 import { SessionPrompt } from "../../src/session/prompt"
@@ -173,6 +174,7 @@ function makeTestLayer() {
   const infra = Layer.mergeAll(
     SessionV1.defaultLayer,
     Config.defaultLayer,
+    Agent.defaultLayer,
     CrossSpawnSpawner.defaultLayer,
     SessionStatus.defaultLayer,
     Bus.layer,
