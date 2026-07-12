@@ -1,46 +1,26 @@
 import type { APIEvent } from "@solidjs/start/server"
-import { and, Database, eq, isNull, lt, or, sql } from "@opencode-ai/console-core/drizzle/index.js"
-import { KeyTable } from "@opencode-ai/console-core/schema/key.sql.js"
-import { BillingTable, LiteTable, SubscriptionTable, UsageTable } from "@opencode-ai/console-core/schema/billing.sql.js"
-import { centsToMicroCents } from "@opencode-ai/console-core/util/price.js"
-import { getMonthlyBounds, getWeekBounds } from "@opencode-ai/console-core/util/date.js"
-import { Identifier } from "@opencode-ai/console-core/identifier.js"
-import { Billing } from "@opencode-ai/console-core/billing.js"
-import { validateBilling, type BillingSource } from "./billing"
-import { authenticate } from "./auth"
-import { validateModel } from "./model"
-import { reload } from "./reload"
-import { trackUsage } from "./usage"
-import { parseRequest } from "./request"
-import { handleNonStreamingResponse, createStreamingResponse } from "./response"
-import { mapErrorToResponse } from "./error-mapping"
-import { executeRetriableRequest } from "./retry"
-import { Actor } from "@opencode-ai/console-core/actor.js"
-import { WorkspaceTable } from "@opencode-ai/console-core/schema/workspace.sql.js"
+import { Database } from "@opencode-ai/console-core/drizzle/index.js"
 import { ZenData } from "@opencode-ai/console-core/model.js"
-import { Subscription } from "@opencode-ai/console-core/subscription.js"
-import { BlackData } from "@opencode-ai/console-core/black.js"
-import { UserTable } from "@opencode-ai/console-core/schema/user.sql.js"
-import { ModelTable } from "@opencode-ai/console-core/schema/model.sql.js"
-import { ProviderTable } from "@opencode-ai/console-core/schema/provider.sql.js"
-import { logger } from "./logger"
-import { createStreamPartConverter } from "./provider/provider"
-import { anthropicHelper } from "./provider/anthropic"
-import { googleHelper } from "./provider/google"
-import { openaiHelper } from "./provider/openai"
-import { oaCompatHelper } from "./provider/openai-compatible"
-import { createRateLimiter as createIpRateLimiter } from "./ipRateLimiter"
-import { createRateLimiter as createKeyRateLimiter } from "./keyRateLimiter"
-import { createDataDumper } from "./dataDumper"
-import { createTrialLimiter } from "./trialLimiter"
-import { createStickyTracker } from "./stickyProviderTracker"
-import { LiteData } from "@opencode-ai/console-core/lite.js"
-import { Resource } from "@opencode-ai/console-resource"
 import { i18n, type Key } from "~/i18n"
 import { localeFromRequest } from "~/lib/language"
+import { logger } from "./logger"
+import { parseRequest } from "./request"
+import { handleNonStreamingResponse, createStreamingResponse } from "./response"
+import { createStreamPartConverter } from "./provider/provider"
+import { mapErrorToResponse } from "./error-mapping"
+import { executeRetriableRequest } from "./retry"
+import { setupRequest } from "./setup"
+import { reload } from "./reload"
+import { trackUsage } from "./usage"
+import { authenticate } from "./auth"
+import { validateBilling } from "./billing"
+import { validateModel } from "./model"
+import { createDataDumper } from "./dataDumper"
+import { createRateLimiter as createIpRateLimiter } from "./ipRateLimiter"
+import { createRateLimiter as createKeyRateLimiter } from "./keyRateLimiter"
+import { createStickyTracker } from "./stickyProviderTracker"
+import { createTrialLimiter } from "./trialLimiter"
 import { createModelTpmLimiter } from "./modelTpmLimiter"
-
-type ZenData = Awaited<ReturnType<typeof ZenData.list>>
 
 function resolve(text: string, params?: Record<string, string | number>) {
   if (!params) return text
@@ -62,9 +42,6 @@ export async function handler(
     parseIsStream: (url: string, body: any) => boolean
   },
 ) {
-  type AuthInfo = Awaited<ReturnType<typeof authenticate>>
-  type ModelInfo = Awaited<ReturnType<typeof validateModel>>
-
   const dict = i18n(localeFromRequest(input.request))
   const t = (key: Key, params?: Record<string, string | number>) => resolve(dict[key], params)
   const ADMIN_WORKSPACES = [
@@ -83,22 +60,44 @@ export async function handler(
     const sessionId = req.sessionId
     const requestId = req.requestId
     const projectId = req.projectId
-    const zenData = ZenData.list(opts.modelList)
-    const modelInfo = validateModel(zenData, model, { format: opts.format, t })
-    const dataDumper = createDataDumper(sessionId, requestId, projectId)
-    const trialLimiter = createTrialLimiter(modelInfo.trialProvider, ip)
-    const trialProviders = await trialLimiter?.check()
-    const rateLimiter = modelInfo.allowAnonymous
-      ? createIpRateLimiter(modelInfo.id, modelInfo.rateLimit, ip, input.request)
-      : createKeyRateLimiter(modelInfo.id, modelInfo.rateLimit, zenApiKey, input.request)
-    await rateLimiter?.check()
-    const stickyTracker = createStickyTracker(modelInfo.stickyProvider, sessionId)
-    const stickyProvider = await stickyTracker?.get()
-    const authInfo = await authenticate(modelInfo, zenApiKey, { t, Database, ADMIN_WORKSPACES })
-    const billingSource = validateBilling(authInfo as any, modelInfo, { t, modelList: opts.modelList })
-    logger.metric({ source: billingSource })
-    const modelTpmLimiter = createModelTpmLimiter(modelInfo.providers)
-    const modelTpmLimits = await modelTpmLimiter?.check()
+    const {
+      zenData,
+      modelInfo,
+      dataDumper,
+      trialLimiter,
+      trialProviders,
+      rateLimiter,
+      stickyTracker,
+      stickyProvider,
+      authInfo,
+      billingSource,
+      modelTpmLimiter,
+      modelTpmLimits,
+    } = await setupRequest({
+      model,
+      ip,
+      sessionId,
+      requestId,
+      projectId,
+      zenApiKey,
+      modelList: opts.modelList,
+      format: opts.format,
+      request: input.request,
+      ADMIN_WORKSPACES,
+      t,
+      Database,
+      logger,
+      ZenData,
+      validateModel,
+      createDataDumper,
+      createTrialLimiter,
+      createIpRateLimiter,
+      createKeyRateLimiter,
+      createStickyTracker,
+      authenticate,
+      validateBilling,
+      createModelTpmLimiter,
+    })
 
     const { providerInfo, reqBody, res, startTimestamp } = await executeRetriableRequest({
       model,
