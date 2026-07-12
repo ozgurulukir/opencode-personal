@@ -2,6 +2,7 @@ import type { ZenData } from "@opencode-ai/console-core/model.js"
 import { calculateCost, calculateOccurredCost, type CostInfo } from "./cost"
 import { buildCostChunk, createResponseConverter, type UsageInfo } from "./provider/provider"
 import type { BillingSource } from "./billing"
+import type { AuthInfo } from "./auth"
 
 export type ResponseDeps = {
     providerInfo: {
@@ -32,7 +33,7 @@ export type ResponseDeps = {
     }
   }
   billingSource: BillingSource
-  authInfo: any
+  authInfo: AuthInfo | undefined
   sessionId: string
   format: ZenData.Format
   rateLimiter: { track: () => Promise<void> } | undefined
@@ -53,7 +54,7 @@ export type ResponseDeps = {
   trackUsage: (
     sessionId: string,
     billingSource: string,
-    authInfo: any,
+    authInfo: AuthInfo | undefined,
     modelInfo: { id: string },
     providerInfo: { id: string },
     usageInfo: UsageInfo,
@@ -63,7 +64,7 @@ export type ResponseDeps = {
   ) => Promise<{ costInMicroCents: number } | undefined>
   reload: (
     billingSource: string,
-    authInfo: any,
+    authInfo: AuthInfo | undefined,
     costInfo: { totalCostInCent: number },
     Database: { use: (fn: (tx: any) => Promise<any>) => Promise<any> },
   ) => Promise<void>

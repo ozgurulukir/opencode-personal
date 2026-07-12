@@ -6,6 +6,7 @@ import { createBodyConverter } from "./provider/provider"
 import { validateModelSettings, updateProviderKey } from "./validation"
 import { validateModel } from "./model"
 import { authenticate } from "./auth"
+import type { AuthInfo } from "./auth"
 import type { Key } from "~/i18n"
 
 export type RetryOptions = {
@@ -16,7 +17,7 @@ export type RetryOptions = {
 export type RetryDeps = {
   model: string
   zenData: Awaited<ReturnType<typeof ZenData.list>>
-  authInfo: Awaited<ReturnType<typeof authenticate>>
+  authInfo: AuthInfo | undefined
   modelInfo: Awaited<ReturnType<typeof validateModel>>
   ip: string
   sessionId: string

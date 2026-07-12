@@ -3,12 +3,12 @@ import { BlackData } from "@opencode-ai/console-core/black.js"
 import { LiteData } from "@opencode-ai/console-core/lite.js"
 import { Subscription } from "@opencode-ai/console-core/subscription.js"
 import { centsToMicroCents } from "@opencode-ai/console-core/util/price.js"
+import type { AuthInfo } from "./auth"
 
 export type BillingSource = "anonymous" | "free" | "byok" | "subscription" | "lite" | "balance"
-export type AuthInfo = Record<string, any>
 
 export function validateBilling(
-  authInfo: any,
+  authInfo: AuthInfo | undefined,
   modelInfo: { allowAnonymous?: boolean },
   deps: {
     t: (key: any, params?: Record<string, string | number>) => string
@@ -30,62 +30,70 @@ export function validateBilling(
   }
 
   if (authInfo.billing?.subscription && authInfo.black) {
-    try {
-      const sub = authInfo.black
-      const plan = String(authInfo.billing.subscription.plan ?? "20") as "20" | "100" | "200"
+    const sub = authInfo.black
+    const plan = String(authInfo.billing.subscription.plan ?? "20") as "20" | "100" | "200"
+    const useBalance = authInfo.billing.subscription.useBalance
 
-      if (sub.fixedUsage && sub.timeFixedUpdated) {
-        const blackData = BlackData.getLimits({ plan })
-        const result = Subscription.analyzeWeeklyUsage({
-          limit: blackData.fixedLimit,
-          usage: sub.fixedUsage,
-          timeUpdated: sub.timeFixedUpdated,
-        })
-        if (result.status === "rate-limited")
+    let limited = false
+
+    if (sub.fixedUsage && sub.timeFixedUpdated) {
+      const blackData = BlackData.getLimits({ plan })
+      const result = Subscription.analyzeWeeklyUsage({
+        limit: blackData.fixedLimit,
+        usage: sub.fixedUsage,
+        timeUpdated: sub.timeFixedUpdated,
+      })
+      if (result.status === "rate-limited") {
+        if (!useBalance)
           throw new BlackUsageLimitError(
             deps.t("zen.api.error.subscriptionQuotaExceeded", {
               retryIn: formatRetryTime(result.resetInSec),
             }),
             result.resetInSec,
           )
+        limited = true
       }
-
-      if (sub.rollingUsage && sub.timeRollingUpdated) {
-        const blackData = BlackData.getLimits({ plan })
-        const result = Subscription.analyzeRollingUsage({
-          limit: blackData.rollingLimit,
-          window: blackData.rollingWindow,
-          usage: sub.rollingUsage,
-          timeUpdated: sub.timeRollingUpdated,
-        })
-        if (result.status === "rate-limited")
-          throw new BlackUsageLimitError(
-            deps.t("zen.api.error.subscriptionQuotaExceeded", {
-              retryIn: formatRetryTime(result.resetInSec),
-            }),
-            result.resetInSec,
-          )
-      }
-
-      return "subscription"
-    } catch (e) {
-      if (!authInfo.billing.subscription.useBalance) throw e
     }
+
+    if (!limited && sub.rollingUsage && sub.timeRollingUpdated) {
+      const blackData = BlackData.getLimits({ plan })
+      const result = Subscription.analyzeRollingUsage({
+        limit: blackData.rollingLimit,
+        window: blackData.rollingWindow,
+        usage: sub.rollingUsage,
+        timeUpdated: sub.timeRollingUpdated,
+      })
+      if (result.status === "rate-limited") {
+        if (!useBalance)
+          throw new BlackUsageLimitError(
+            deps.t("zen.api.error.subscriptionQuotaExceeded", {
+              retryIn: formatRetryTime(result.resetInSec),
+            }),
+            result.resetInSec,
+          )
+        limited = true
+      }
+    }
+
+    if (!limited) return "subscription"
   }
 
   if (deps.modelList === "lite" && authInfo.billing?.lite && authInfo.lite) {
-    try {
-      const consoleGoUrl = `https://opencode.ai/workspace/${authInfo.workspaceID}/go`
-      const sub = authInfo.lite
-      const liteData = LiteData.getLimits()
+    const consoleGoUrl = `https://opencode.ai/workspace/${authInfo.workspaceID}/go`
+    const sub = authInfo.lite
+    const liteData = LiteData.getLimits()
+    const useBalance = authInfo.billing.lite.useBalance
 
-      if (sub.weeklyUsage && sub.timeWeeklyUpdated) {
-        const result = Subscription.analyzeWeeklyUsage({
-          limit: liteData.weeklyLimit,
-          usage: sub.weeklyUsage,
-          timeUpdated: sub.timeWeeklyUpdated,
-        })
-        if (result.status === "rate-limited")
+    let limited = false
+
+    if (sub.weeklyUsage && sub.timeWeeklyUpdated) {
+      const result = Subscription.analyzeWeeklyUsage({
+        limit: liteData.weeklyLimit,
+        usage: sub.weeklyUsage,
+        timeUpdated: sub.timeWeeklyUpdated,
+      })
+      if (result.status === "rate-limited") {
+        if (!useBalance)
           throw new GoUsageLimitError(
             deps.t("zen.api.error.goSubscriptionWeeklyLimitExceeded", {
               retryIn: formatRetryTime(result.resetInSec),
@@ -95,16 +103,19 @@ export function validateBilling(
             "weekly",
             result.resetInSec,
           )
+        limited = true
       }
+    }
 
-      if (sub.monthlyUsage && sub.timeMonthlyUpdated && sub.timeCreated) {
-        const result = Subscription.analyzeMonthlyUsage({
-          limit: liteData.monthlyLimit,
-          usage: sub.monthlyUsage,
-          timeUpdated: sub.timeMonthlyUpdated,
-          timeSubscribed: sub.timeCreated,
-        })
-        if (result.status === "rate-limited")
+    if (!limited && sub.monthlyUsage && sub.timeMonthlyUpdated && sub.timeCreated) {
+      const result = Subscription.analyzeMonthlyUsage({
+        limit: liteData.monthlyLimit,
+        usage: sub.monthlyUsage,
+        timeUpdated: sub.timeMonthlyUpdated,
+        timeSubscribed: sub.timeCreated,
+      })
+      if (result.status === "rate-limited") {
+        if (!useBalance)
           throw new GoUsageLimitError(
             deps.t("zen.api.error.goSubscriptionMonthlyLimitExceeded", {
               retryIn: formatRetryTime(result.resetInSec),
@@ -114,16 +125,19 @@ export function validateBilling(
             "monthly",
             result.resetInSec,
           )
+        limited = true
       }
+    }
 
-      if (sub.rollingUsage && sub.timeRollingUpdated) {
-        const result = Subscription.analyzeRollingUsage({
-          limit: liteData.rollingLimit,
-          window: liteData.rollingWindow,
-          usage: sub.rollingUsage,
-          timeUpdated: sub.timeRollingUpdated,
-        })
-        if (result.status === "rate-limited")
+    if (!limited && sub.rollingUsage && sub.timeRollingUpdated) {
+      const result = Subscription.analyzeRollingUsage({
+        limit: liteData.rollingLimit,
+        window: liteData.rollingWindow,
+        usage: sub.rollingUsage,
+        timeUpdated: sub.timeRollingUpdated,
+      })
+      if (result.status === "rate-limited") {
+        if (!useBalance)
           throw new GoUsageLimitError(
             deps.t("zen.api.error.goSubscriptionRollingLimitExceeded", {
               retryIn: formatRetryTime(result.resetInSec),
@@ -133,12 +147,11 @@ export function validateBilling(
             "5 hour",
             result.resetInSec,
           )
+        limited = true
       }
-
-      return "lite"
-    } catch (e) {
-      if (!authInfo.billing.lite.useBalance) throw e
     }
+
+    if (!limited) return "lite"
   }
 
   const billing = authInfo.billing

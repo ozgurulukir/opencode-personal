@@ -8,15 +8,57 @@ import { WorkspaceTable } from "@opencode-ai/console-core/schema/workspace.sql.j
 import { Resource } from "@opencode-ai/console-resource"
 import { AuthError } from "./error"
 
+export interface AuthInfo {
+  apiKeyId: string
+  workspaceID: string
+  billing: {
+    balance: number
+    paymentMethodID?: string | null
+    monthlyLimit?: number | null
+    monthlyUsage?: number | null
+    timeMonthlyUsageUpdated?: Date | null
+    reloadTrigger?: number | null
+    timeReloadLockedTill?: Date | null
+    subscription?: { plan: string; useBalance?: boolean } | null
+    lite?: { useBalance: boolean } | null
+  }
+  user: {
+    id: string
+    monthlyLimit?: number | null
+    monthlyUsage?: number | null
+    timeMonthlyUsageUpdated?: Date | null
+  }
+  black?: {
+    id: string
+    rollingUsage?: number | null
+    fixedUsage?: number | null
+    timeRollingUpdated?: Date | null
+    timeFixedUpdated?: Date | null
+  } | null
+  lite?: {
+    id: string
+    timeCreated?: Date | null
+    rollingUsage?: number | null
+    weeklyUsage?: number | null
+    monthlyUsage?: number | null
+    timeRollingUpdated?: Date | null
+    timeWeeklyUpdated?: Date | null
+    timeMonthlyUpdated?: Date | null
+  } | null
+  provider?: { credentials: string } | null
+  isFree: boolean
+  isDisabled: boolean
+}
+
 export async function authenticate(
-  modelInfo: any,
+  modelInfo: { id: string; allowAnonymous?: boolean; byokProvider?: string },
   zenApiKey: string | undefined,
   deps: {
     t: (key: any, params?: Record<string, string | number>) => string
     Database: { use: (fn: (tx: any) => Promise<any>) => Promise<any> }
     ADMIN_WORKSPACES: string[]
   },
-): Promise<any> {
+): Promise<AuthInfo | undefined> {
   if (!zenApiKey) {
     if (modelInfo.allowAnonymous) return
     throw new AuthError(deps.t("zen.api.error.missingApiKey"))
