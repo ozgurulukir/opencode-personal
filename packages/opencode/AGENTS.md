@@ -180,6 +180,8 @@ See `specs/effect/migration.md` for the compact pattern reference and examples.
 - In `Effect.gen` / `Effect.fn`, the `Effect.catch` callback must return an `Effect` — wrap `Effect.succeed(undefined)` / `Effect.void` directly, never the bare value (the type signature requires it).
 - `Effect.tryPromise` with a `catch` callback transforms the caught error into the error channel type. The catch callback returns a value (not an Effect) — that value becomes the error. To recover from the error, chain `.pipe(Effect.catch(() => Effect.void))` after `Effect.tryPromise`. This is the canonical pattern for "try an async fn, log on failure, continue" in Effect v4. See `plugin/index.ts:275-284`.
 - `Effect.runPromiseExit()` returns `Promise<Exit>`, NOT an Effect — do NOT use `.pipe()` on the result. For error handling, use `.catch()` on the Promise or wrap the Effect before running.
+- `Effect.orDie` converts `Effect.fail` to a defect (untracked). Tools wrapped with `.pipe(Effect.orDie)` (e.g., `TaskTool.execute`) turn typed errors into defects. Test error paths with `Effect.catchDefect`, not `Effect.flip` or `Effect.catchAll`.
+- `Effect.catchDefect` exists in Effect v4; `Effect.catchDie` does not. Use `Effect.catchDefect((defect) => ...)` to catch defects from `Effect.orDie` or `Effect.die`.
 
 ## LLM side-channels (predict, summaries, classification)
 
@@ -235,7 +237,7 @@ The V2 session service (`src/v2/session.ts`) is a **hybrid delegation bridge** t
 - `wait` → subscribes to `SessionStatus.Event.Idle` bus event (`bus.subscribe` + `Stream.filter` + `Stream.take(1)` + `Stream.runDrain`); returns immediately if already idle
 - `shell` → V1 `SessionPrompt.shell` (already emits `Shell.Started/Ended`)
 - `skill` → prompts with `/{skill}` text prefix
-- `subagent` → creates child session, prompts it, posts result back to parent as `SessionEvent.Synthetic`
+- `subagent` → creates child session with derived permissions (`subagentSessionPermission`), restricted tools (`subagentToolRestrictions`), abort handling, and error propagation via `catchCause` → synthetic error message. Posts result back to parent as `SessionEvent.Synthetic`. Requires `Agent.Service` and `Config.Service` in addition to the other V1 services.
 
 **V1 service capture**: V1 services (`Session`, `SessionPrompt`, `SessionCompaction`, `SessionStatus`, `Bus`) are captured via `Effect.serviceOption` at layer build time. Read-only methods work without them; write methods die with a clear message if missing (`requireV1()` helper). In production, all V1 services are available via `instanceContextLayer` (`server/routes/instance/httpapi/server.ts:208-225`).
 
@@ -245,7 +247,7 @@ The V2 session service (`src/v2/session.ts`) is a **hybrid delegation bridge** t
 
 **`TODO(v2-native)` markers**: All delegated methods are marked for a future native-loop swap (port `runLoop`/`processor` into V2-native code that emits `SessionEvent` directly without V1).
 
-**Testing** (`test/v2/session.test.ts`, 11 tests): Uses stubbed V1 services (`stubPromptLayer` emits `SessionEvent.Prompted.Sync` to exercise the projector; `stubCompactionLayer` records calls) with real `Session`/`SyncEvent`/`Bus`. Follows the `task.test.ts` `stubOps` pattern, not the 20-layer `prompt.test.ts` tower.
+**Testing** (`test/v2/session.test.ts`, 17 tests): Uses stubbed V1 services (`stubPromptLayer` emits `SessionEvent.Prompted.Sync` + assistant message events to exercise the projector; `stubCompactionLayer` records calls) with real `Session`/`SyncEvent`/`Bus`/`Agent`/`Config`. Follows the `task.test.ts` `stubOps` pattern, not the 20-layer `prompt.test.ts` tower.
 
 ## Known Issues
 
