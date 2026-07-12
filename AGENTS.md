@@ -21,6 +21,13 @@ Bun workspace monorepo: `packages/*`, `packages/console/*`, `packages/sdk/js`, `
 - `bun run typecheck` (turbo typecheck)
 - Regenerate JS SDK: `./packages/sdk/js/script/build.ts`
 
+## Bulk Dependency Updates
+
+- Use `bun run script/check-updates.ts` to scan all pinned deps across the monorepo and check npm registry for available minor/patch upgrades.
+- `--apply` writes new versions to package.json files; `--apply --install` also runs `bun install`.
+- The script skips `catalog:`, `workspace:*`, `npm:`, `github:`, `file:`, and `https://` references automatically.
+- After applying, always run `bun run --cwd packages/opencode typecheck` to catch breaking changes in minor/patch bumps (some packages silently remove or rename exports in minor versions).
+
 ## Style Guide
 
 ### General Principles

@@ -22,7 +22,6 @@ import {
   type ResumeSessionResponse,
   type Role,
   type SessionInfo,
-  type SetSessionModelRequest,
   type SessionConfigOption,
   type SetSessionConfigOptionRequest,
   type SetSessionConfigOptionResponse,
@@ -1148,14 +1147,17 @@ export class Agent implements ACPAgent {
     const mcpServers: Record<string, ConfigMCP.Info> = {}
     for (const server of params.mcpServers) {
       if ("type" in server) {
-        mcpServers[server.name] = {
-          url: server.url,
-          headers: server.headers.reduce<Record<string, string>>((acc, { name, value }) => {
-            acc[name] = value
-            return acc
-          }, {}),
-          type: "remote",
+        if (server.type === "http" || server.type === "sse") {
+          mcpServers[server.name] = {
+            url: server.url,
+            headers: server.headers.reduce<Record<string, string>>((acc, { name, value }) => {
+              acc[name] = value
+              return acc
+            }, {}),
+            type: "remote",
+          }
         }
+        // acp type: skip — ACP transport MCP servers are handled by the ACP channel
       } else {
         mcpServers[server.name] = {
           type: "local",
@@ -1212,46 +1214,6 @@ export class Agent implements ACPAgent {
       _meta: buildVariantMeta({
         model,
         variant: this.sessionManager.getVariant(sessionId),
-        availableVariants,
-      }),
-    }
-  }
-
-  async unstable_setSessionModel(params: SetSessionModelRequest) {
-    const session = this.sessionManager.get(params.sessionId)
-    const providers = await this.sdk.config
-      .providers({ directory: session.cwd }, { throwOnError: true })
-      .then((x) => x.data!.providers)
-
-    const selection = parseModelSelection(params.modelId, providers)
-    this.sessionManager.setModel(session.id, selection.model)
-    this.sessionManager.setVariant(session.id, selection.variant)
-
-    const entries = sortProvidersByName(providers)
-    const availableVariants = modelVariantsFromProviders(entries, selection.model)
-    const modeState = await this.resolveModeState(session.cwd, session.id)
-    const modes = modeState.currentModeId
-      ? { availableModes: modeState.availableModes, currentModeId: modeState.currentModeId }
-      : undefined
-
-    await this.connection.sessionUpdate({
-      sessionId: session.id,
-      update: {
-        sessionUpdate: "config_option_update",
-        configOptions: buildConfigOptions({
-          currentModelId: formatModelIdWithVariant(selection.model, selection.variant, availableVariants, false),
-          availableModels: buildAvailableModels(entries),
-          currentVariant: selection.variant,
-          availableVariants,
-          modes,
-        }),
-      },
-    })
-
-    return {
-      _meta: buildVariantMeta({
-        model: selection.model,
-        variant: selection.variant,
         availableVariants,
       }),
     }

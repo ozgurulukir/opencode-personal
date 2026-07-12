@@ -6,7 +6,7 @@ const log = Log.create({ service: "mdns" })
 const MAX_RETRIES = 3
 const BASE_DELAY_MS = 500
 
-let bonjour: Bonjour | undefined
+let bonjour: InstanceType<typeof Bonjour> | undefined
 let currentPort: number | undefined
 
 export function publish(port: number, domain?: string) {

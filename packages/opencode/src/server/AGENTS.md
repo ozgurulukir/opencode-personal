@@ -81,6 +81,10 @@ const virtualPatterns = [
 - Exponential backoff: `BASE_DELAY_MS * Math.pow(2, MAX_RETRIES - retriesLeft)`
 - 3 retries max, then give up permanently (same as single-shot failure)
 
+## `bonjour-service` type import
+
+`bonjour-service` uses `export = Bonjour` (CommonJS). With `esModuleInterop`, `import { Bonjour } from "bonjour-service"` imports the class constructor as a value, but it cannot be used as a type. Use `InstanceType<typeof Bonjour>` instead of `Bonjour` for type annotations.
+
 ## WebSocket Tracker
 
 - Use `Effect.sync` for simple state mutations (no yield needed)
