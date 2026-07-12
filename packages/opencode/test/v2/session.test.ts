@@ -17,6 +17,7 @@ import { SessionV2 } from "../../src/v2/session"
 import { SessionEvent } from "../../src/v2/session-event"
 import { FileAttachment, AgentAttachment } from "../../src/v2/session-prompt"
 import * as DateTime from "effect/DateTime"
+import { Modelv2 } from "../../src/v2/model"
 
 afterEach(async () => {
   await disposeAllInstances()
@@ -76,15 +77,46 @@ function stubPromptLayer(opts?: {
             const textPart = input.parts?.find((p: any) => p.type === "text")
             const fileParts = (input.parts ?? []).filter((p: any) => p.type === "file")
             const agentParts = (input.parts ?? []).filter((p: any) => p.type === "agent")
+            const ts = DateTime.makeUnsafe(Date.now())
             yield* sync.run(SessionEvent.Prompted.Sync, {
               sessionID: input.sessionID,
-              timestamp: DateTime.makeUnsafe(Date.now()),
+              timestamp: ts,
               prompt: {
                 text: textPart?.text ?? "",
                 // Prompt schema: files have {uri, mime, name?}, agents have {name, source?}
                 files: fileParts.map((p: any) => new FileAttachment({ uri: p.url, mime: p.mime, name: p.filename })),
                 agents: agentParts.map((p: any) => new AgentAttachment({ name: p.name })),
               },
+            })
+            // Emit assistant message events so the V2 projector creates an
+            // assistant message with text content. This mirrors what the real
+            // V1 prompt loop does and lets the V2 `subagent()` method find an
+            // assistant message to post back as a synthetic message.
+            yield* sync.run(SessionEvent.Step.Started.Sync, {
+              sessionID: input.sessionID,
+              timestamp: ts,
+              agent: input.agent ?? "general",
+              model: {
+                id: Modelv2.ID.make("test-model"),
+                providerID: Modelv2.ProviderID.make("test"),
+                variant: Modelv2.VariantID.make("default"),
+              },
+            })
+            yield* sync.run(SessionEvent.Text.Started.Sync, {
+              sessionID: input.sessionID,
+              timestamp: ts,
+            })
+            yield* sync.run(SessionEvent.Text.Ended.Sync, {
+              sessionID: input.sessionID,
+              timestamp: ts,
+              text: "stub result",
+            })
+            yield* sync.run(SessionEvent.Step.Ended.Sync, {
+              sessionID: input.sessionID,
+              timestamp: ts,
+              finish: "stop",
+              cost: 0,
+              tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
             })
             return {
               info: {
@@ -334,6 +366,70 @@ describe("v2.session", () => {
 
       const fetched = yield* session.get(info.id)
       expect(fetched.agent).toBe("plan")
+    }),
+  )
+
+  it.instance("subagent creates a child session and prompts it", () =>
+    Effect.gen(function* () {
+      const session = yield* SessionV2.Service
+      const parent = yield* session.create({ agent: "build" })
+
+      yield* session.subagent({
+        parentID: parent.id,
+        agent: "general",
+        prompt: { text: "do something" },
+      })
+
+      expect(promptStub.calls.prompt.length).toBeGreaterThan(0)
+      const lastCall = promptStub.calls.prompt.at(-1) as any
+      expect(lastCall.sessionID).not.toBe(parent.id)
+
+      const textPart = lastCall.parts?.find((p: any) => p.type === "text")
+      expect(textPart?.text).toBe("do something")
+    }),
+  )
+
+  it.instance("subagent posts synthetic message to parent after child completes", () =>
+    Effect.gen(function* () {
+      const session = yield* SessionV2.Service
+      const parent = yield* session.create({ agent: "build" })
+
+      yield* session.subagent({
+        parentID: parent.id,
+        agent: "general",
+        prompt: { text: "do something" },
+      })
+
+      // The subagent forks a child fiber that posts a synthetic message.
+      // Poll until it appears (the stub prompt returns immediately, so this
+      // should resolve on the first or second iteration).
+      const messages = yield* Effect.gen(function* () {
+        for (let i = 0; i < 50; i++) {
+          const msgs = yield* session.messages({ sessionID: parent.id, order: "desc" })
+          if (msgs.some((m) => m.type === "synthetic")) return msgs
+          yield* Effect.sleep("10 millis")
+        }
+        throw new Error("timed out waiting for synthetic message")
+      })
+
+      const synthetic = messages.find((m) => m.type === "synthetic")
+      expect(synthetic?.type).toBe("synthetic")
+      if (synthetic?.type === "synthetic") expect(synthetic.text).toBeTruthy()
+    }),
+  )
+
+  it.instance("subagent returns void and does not throw on happy path", () =>
+    Effect.gen(function* () {
+      const session = yield* SessionV2.Service
+      const parent = yield* session.create({ agent: "build" })
+
+      // subagent returns void — just assert it completes without error
+      yield* session.subagent({
+        parentID: parent.id,
+        agent: "general",
+        prompt: { text: "hello" },
+      })
+      expect(true).toBe(true)
     }),
   )
 })
