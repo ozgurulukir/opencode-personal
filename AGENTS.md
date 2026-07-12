@@ -115,6 +115,7 @@ const table = sqliteTable("session", {
 - Test actual implementation, do not duplicate logic into tests
 - Tests cannot run from repo root (guard: `do-not-run-tests-from-root`); run from package dirs like `packages/opencode`
 - Package test directories follow `packages/<name>/test/` or `packages/<name>/test/<subpath>/`
+- `mock.module()` in bun:test persists across test files — always use `afterAll(() => mock.restore())` to prevent leakage. Without cleanup, mocks applied in one test file affect imports in other test files that import the same module.
 
 ## Type Checking
 
@@ -135,7 +136,7 @@ const table = sqliteTable("session", {
 - Do not split files without tests first (Rule 3). `packages/opencode/src/cli/cmd/run/tool.ts` was split into 6 modules (tool.types.ts, tool.helpers.ts, tool.path.ts, tool.rules.ts, tool.display.ts, barrel) only after 26 display function tests were written (26/26 pass). The original 213-line `TOOL_RULES` dict and 1464-line file are now properly decomposed.
 - Type HTTP boundaries with zod before eliminating `as any` casts. Provider files (openai.ts, anthropic.ts, openai-compatible.ts) had 213+ instances — resolved in d82e6af by removing redundant casts (all `body: any` property accesses). Remaining `as any` casts are limited to library internals (effect-zod: 3, slack: 1, plugin: 1, desktop: 1) and test assertions accessing Effect Schema internals.
 - Large icon component files (>300 lines) should be split by Heroicons prefix category (arrows, coding, communication, data, file, general, layout, media, social). See `packages/web/src/components/icons/` for the pattern.
-- Before splitting a god function, extract small single-responsibility modules first (e.g., cost, billing, auth, model validation) to reduce risk. `packages/console/app/src/routes/zen/util/handler.ts` went from 1132 to 468 lines via 9 extractions in `zen/util/`: cost.ts (65 lines), billing.ts (185 lines), usage.ts (207 lines), auth.ts (122 lines), provider-selector.ts (88 lines), model.ts (33 lines), reload.ts (39 lines), validation.ts (16 lines), http.ts (13 lines). Remaining nested functions: `authenticate`, `selectProvider`, `validateModelSettings`, `trackUsage`, `retriableRequest`.
+- Before splitting a god function, extract small single-responsibility modules first (e.g., cost, billing, auth, model validation) to reduce risk. `packages/console/app/src/routes/zen/util/handler.ts` went from 1132 → 468 → 154 lines via two phases of extraction. Phase 1 (9 modules): cost.ts, billing.ts, usage.ts, auth.ts, provider-selector.ts, model.ts, reload.ts, validation.ts, http.ts. Phase 2 (6 modules): request.ts, setup.ts, retry.ts, response.ts, error-mapping.ts, plus HandlerDeps injection. handler.ts is now a thin orchestrator: `parseRequest → setupRequest → executeRetriableRequest → handleResponse → mapErrorToResponse`.
 - Drizzle ORM type mismatches (e.g., `UserTable.userID`, `WorkspaceTable.workspaceID`) often require runtime `any` casts during extraction. Accept them as necessary boundary violations, not technical debt to immediately resolve.
 - Avoid sed for code extraction; prefer manual refactor or structural search tools (ast-grep) to prevent stray syntax artifacts.
 - System prompts use a shared core (`session/prompt/core.txt`) plus provider-specific deltas (`session/prompt/delta-*.txt`). Do not duplicate universal rules across deltas — put them in core.txt. Provider deltas contain only provider-specific guidance (TodoWrite emphasis for Claude, apply_patch for GPT, autonomous mode for GPT-4/o1/o3, etc.). Provider matching is in `system.ts:matchDelta()`.
@@ -145,8 +146,8 @@ const table = sqliteTable("session", {
 
 ## Known Issues
 
-- `packages/console/app/src/routes/zen/util/handler.ts` is a 468-line god function (was 1132 lines) with deep closure coupling; 8 modules extracted in `zen/util/`: cost.ts, billing.ts, usage.ts, auth.ts, provider-selector.ts, model.ts, reload.ts, validation.ts, http.ts; remaining nested functions: `authenticate`, `selectProvider`, `validateModelSettings`, `trackUsage`, `retriableRequest`
-- `packages/console/app/src/routes/zen/util/billing.ts`, `reload.ts`, `usage.ts` require SST cloud resources (`ZEN_LITE_PRICE`, `ZEN_BLACK_PRICE`) — tests blocked in local environment without `sst dev`
+- `packages/console/app/src/routes/zen/util/handler.ts` is now a 154-line thin orchestrator (was 468, originally 1132). Fully decomposed into 15 modules in `zen/util/`: cost.ts, billing.ts, usage.ts, auth.ts, provider-selector.ts, model.ts, reload.ts, validation.ts, http.ts, request.ts, setup.ts, retry.ts, response.ts, error-mapping.ts, plus HandlerDeps injection. 93 tests across 14 files.
+- `packages/console/app/src/routes/zen/util/billing.ts`, `reload.ts`, `usage.ts` require SST cloud resources at module load time (`@opencode-ai/console-core/lite.js`). Tests use `mock.module()` to mock these 3 modules with `afterAll(() => mock.restore())` cleanup. See `packages/console/app/src/routes/zen/util/AGENTS.md` for details.
 - Typecheck in `packages/web` requires `--skipLibCheck` due to astro/starlight type errors
 - Root `test` script always fails: `echo 'do not run tests from root' && exit 1`
 - `packages/opencode/src/session/prompt.ts:1480` — `runLoop` is a ~230-line Effect-based infinite loop; future extraction target
