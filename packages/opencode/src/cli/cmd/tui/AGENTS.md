@@ -2,6 +2,16 @@
 
 This file covers TUI-specific patterns for `packages/opencode/src/cli/cmd/tui/`.
 
+## OpenTUI stderr handling — critical gotcha
+
+**OpenTUI core only intercepts `process.stdout.write`, never `process.stderr.write`.** This is not documented and causes display corruption if stderr writes occur during TUI rendering.
+
+- TUI uses `alternate-screen` mode with `externalOutputMode: "passthrough"` (default)
+- Any stderr output — Bun JIT warnings, `console.error`, unhandled rejection traces — leaks directly onto the alternate screen buffer
+- **Fix:** Override `process.stderr.write` before creating the renderer and restore on exit. See `stderr-capture.ts` for the pattern.
+- Bun Workers share the same process stderr, so worker output also leaks unless captured.
+- `console.error`/`console.warn` internally call `process.stderr.write` in Bun/Node, so overriding it captures console output too.
+
 ## OpenTUI keymap — event order and global keys
 
 - Global keymap runs **before** renderable handlers. `e.preventDefault()` in a textarea's `onKeyDown` does NOT block a global keybind — only `ctx.consume()` from a `keymap.intercept("key", fn, opts)` callback does.
