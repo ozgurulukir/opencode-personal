@@ -7,8 +7,11 @@ import { Agent } from "../agent/agent"
 import { subagentSessionPermission, subagentToolRestrictions } from "../agent/subagent-permissions"
 import type { SessionPrompt } from "../session/prompt"
 import { Config } from "@/config/config"
-import { Effect, Exit, Schema } from "effect"
+import { Cause, Effect, Exit, Schema } from "effect"
 import { EffectBridge } from "@/effect/bridge"
+import * as Log from "@opencode-ai/core/util/log"
+
+const log = Log.create({ service: "tool.task" })
 
 export interface TaskPromptOps {
   cancel(sessionID: SessionID): Effect.Effect<void>
@@ -63,9 +66,22 @@ export const TaskTool = Tool.define(
       const session = taskID
         ? yield* sessions.get(SessionID.make(taskID)).pipe(Effect.catchCause(() => Effect.succeed(undefined)))
         : undefined
+      if (session && session.parentID !== ctx.sessionID) {
+        return yield* Effect.fail(new Error(`task_id ${taskID} does not belong to this session`))
+      }
       const parent = yield* sessions.get(ctx.sessionID)
       const parentAgent = parent.agent
-        ? yield* agent.get(parent.agent).pipe(Effect.catchCause(() => Effect.succeed(undefined)))
+        ? yield* agent.get(parent.agent).pipe(
+            Effect.catchCause((cause) =>
+              Effect.gen(function* () {
+                log.warn("parent agent not found, skipping parent deny rules", {
+                  parentAgent: parent.agent,
+                  cause: Cause.squash(cause),
+                })
+                return undefined
+              }),
+            ),
+          )
         : undefined
       const nextSession =
         session ??
@@ -102,8 +118,11 @@ export const TaskTool = Tool.define(
 
       const messageID = MessageID.ascending()
       const cancel = ops.cancel(nextSession.id)
+      let cancelled = false
 
       function onAbort() {
+        if (cancelled) return
+        cancelled = true
         runCancel.fork(cancel)
       }
 
@@ -146,7 +165,10 @@ export const TaskTool = Tool.define(
           }),
         (_, exit) =>
           Effect.gen(function* () {
-            if (Exit.hasInterrupts(exit)) yield* cancel
+            if (Exit.hasInterrupts(exit) && !cancelled) {
+              cancelled = true
+              yield* cancel
+            }
           }).pipe(
             Effect.ensuring(
               Effect.sync(() => {
