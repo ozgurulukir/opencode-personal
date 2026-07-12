@@ -4,7 +4,7 @@ import { ModelID, ProviderID } from "@/provider/schema"
 import { WorkspaceID } from "@/control-plane/schema"
 import { and, asc, desc, eq, gt, gte, isNull, like, lt, or, type SQL } from "@/storage/db"
 import * as Database from "@/storage/db"
-import { Context, DateTime, Effect, Layer, Option, Schema, Stream } from "effect"
+import { Context, DateTime, Effect, Exit, Layer, Option, Schema, Stream } from "effect"
 import { SessionMessage } from "./session-message"
 import type { Prompt } from "./session-prompt"
 import { EventV2 } from "./event"
@@ -19,6 +19,13 @@ import { SessionPrompt } from "@/session/prompt"
 import { SessionCompaction } from "@/session/compaction"
 import { SessionStatus } from "@/session/status"
 import { Bus } from "@/bus"
+import { Agent } from "@/agent/agent"
+import { Config } from "@/config/config"
+import { Permission } from "@/permission"
+import { subagentSessionPermission, subagentToolRestrictions } from "@/agent/subagent-permissions"
+import * as Log from "@opencode-ai/core/util/log"
+
+const log = Log.create({ service: "v2.session" })
 
 export const Delivery = Schema.Literals(["immediate", "deferred"]).annotate({
   identifier: "Session.Delivery",
@@ -41,6 +48,7 @@ export class Info extends Schema.Class<Info>("Session.Info")({
     archived: optionalOmitUndefined(V2Schema.DateTimeUtcFromMillis),
   }),
   title: Schema.String,
+  permission: optionalOmitUndefined(Permission.Ruleset),
   /*
   slug: Schema.String,
   directory: Schema.String,
@@ -51,7 +59,6 @@ export class Info extends Schema.Class<Info>("Session.Info")({
   title: Schema.String,
   version: Schema.String,
   time: Time,
-  permission: optionalOmitUndefined(Permission.Ruleset),
   revert: optionalOmitUndefined(Revert),
   */
 }) {}
@@ -66,6 +73,8 @@ export interface Interface {
     model?: Modelv2.Ref
     parentID?: SessionID
     workspaceID?: WorkspaceID
+    title?: string
+    permission?: Permission.Ruleset
   }) => Effect.Effect<Info>
   readonly get: (sessionID: SessionID) => Effect.Effect<Info, NotFoundError>
   readonly list: (input: {
@@ -99,6 +108,9 @@ export interface Interface {
     sessionID: SessionID
     prompt: Prompt
     delivery?: Delivery
+    model?: Modelv2.Ref
+    agent?: string
+    tools?: Record<string, boolean>
   }) => Effect.Effect<SessionMessage.User, never>
   readonly shell: (input: { id?: EventV2.ID; sessionID: SessionID; command: string }) => Effect.Effect<void, never>
   readonly skill: (input: { id?: EventV2.ID; sessionID: SessionID; skill: string }) => Effect.Effect<void, never>
@@ -108,6 +120,7 @@ export interface Interface {
     prompt: Prompt
     agent: string
     model?: Modelv2.Ref
+    abort?: AbortSignal
   }) => Effect.Effect<void, NotFoundError>
   readonly switchAgent: (input: { sessionID: SessionID; agent: string }) => Effect.Effect<void, never>
   readonly switchModel: (input: { sessionID: SessionID; model: Modelv2.Ref }) => Effect.Effect<void, never>
@@ -143,6 +156,7 @@ function toV2Info(info: Session.Info): Info {
       archived: info.time.archived ? DateTime.makeUnsafe(info.time.archived) : undefined,
     },
     title: info.title,
+    permission: info.permission,
   })
 }
 
@@ -174,6 +188,8 @@ export const layer = Layer.effect(
     const compactionV1 = yield* Effect.serviceOption(SessionCompaction.Service)
     const statusV1 = yield* Effect.serviceOption(SessionStatus.Service)
     const bus = yield* Effect.serviceOption(Bus.Service)
+    const agentsV1 = yield* Effect.serviceOption(Agent.Service)
+    const configV1 = yield* Effect.serviceOption(Config.Service)
 
     const requireV1 = <A>(svc: Option.Option<A>, name: string) =>
       Option.isNone(svc) ? Effect.die(`V2Session.${name} requires the V1 ${name} service to be provided`) : Effect.succeed(svc.value)
@@ -197,6 +213,7 @@ export const layer = Layer.effect(
               variant: Modelv2.VariantID.make(row.model.variant ?? "default"),
             }
           : undefined,
+        permission: row.permission ?? undefined,
         time: {
           created: DateTime.makeUnsafe(row.time_created),
           updated: DateTime.makeUnsafe(row.time_updated),
@@ -227,6 +244,8 @@ export const layer = Layer.effect(
               }
             : undefined,
           workspaceID: input?.workspaceID,
+          title: input?.title,
+          permission: input?.permission,
         })
         return toV2Info(info)
       }),
@@ -364,6 +383,14 @@ export const layer = Layer.effect(
           sessionID: input.sessionID,
           parts,
           noReply: delivery === "deferred",
+          model: input.model
+            ? {
+                modelID: input.model.id as unknown as ModelID,
+                providerID: input.model.providerID as unknown as ProviderID,
+              }
+            : undefined,
+          agent: input.agent,
+          tools: input.tools,
         })
 
         if (delivery === "deferred") {
@@ -413,35 +440,105 @@ export const layer = Layer.effect(
         })
       }),
       subagent: Effect.fn("V2Session.subagent")(function* (input) {
+        const agents = yield* requireV1(agentsV1, "Agent")
+        const cfg = yield* requireV1(configV1, "Config")
+        const cfgInfo = yield* cfg.get()
         const parent = yield* result.get(input.parentID)
+
+        const subagent = yield* agents.get(input.agent)
+        if (!subagent) {
+          return yield* new NotFoundError({ sessionID: SessionID.make(input.agent) })
+        }
+        const parentAgent = parent.agent
+          ? yield* agents.get(parent.agent).pipe(Effect.catchCause(() => Effect.succeed(undefined)))
+          : undefined
+
+        const permission = subagentSessionPermission({
+          parentSessionPermission: parent.permission ?? [],
+          parentAgent,
+          subagent,
+          primaryTools: cfgInfo.experimental?.primary_tools,
+        })
+
         const session = yield* result.create({
           agent: input.agent,
           model: input.model,
           parentID: input.parentID,
           workspaceID: parent.workspaceID,
+          title: `Subagent @${input.agent}`,
+          permission,
         })
-        yield* result.prompt({
-          prompt: input.prompt,
-          sessionID: session.id,
+
+        const tools = subagentToolRestrictions({
+          subagent,
+          primaryTools: cfgInfo.experimental?.primary_tools,
         })
-        // After the subagent's loop finishes, post its final text back to the
-        // parent as a synthetic message so callers can observe the result.
-        // The interface returns void; changing it to return the text is a
-        // breaking change deferred to v2-native.
-        // TODO(v2-native): return the result instead of posting synthetically.
-        yield* Effect.gen(function* () {
-          yield* result.wait(session.id)
-          const messages = yield* result.messages({ sessionID: session.id, order: "desc" })
-          const assistant = messages.find((msg) => msg.type === "assistant")
-          if (!assistant || assistant.type !== "assistant") return
-          const text = assistant.content.findLast((part) => part.type === "text")
-          if (!text || text.type !== "text") return
-          yield* sync.run(SessionEvent.Synthetic.Sync, {
-            sessionID: input.parentID,
-            timestamp: DateTime.makeUnsafe(Date.now()),
-            text: text.text,
-          })
-        }).pipe(Effect.forkChild())
+
+        // Abort handling: cancel the child session if the parent's abort
+        // signal fires. The prompt call blocks until the child loop finishes,
+        // so we don't need a separate wait() — the result is available
+        // immediately after prompt returns.
+        const promptSvc = yield* requireV1(promptV1, "SessionPrompt")
+        const cancelChild = promptSvc.cancel(session.id)
+        let cancelled = false
+        const onAbort = () => {
+          if (cancelled) return
+          cancelled = true
+          Effect.runPromise(cancelChild)
+        }
+        if (input.abort) input.abort.addEventListener("abort", onAbort)
+
+        yield* Effect.acquireUseRelease(
+          Effect.sync(() => {}),
+          () =>
+            Effect.gen(function* () {
+              yield* result.prompt({
+                prompt: input.prompt,
+                sessionID: session.id,
+                model: input.model,
+                agent: input.agent,
+                tools,
+              })
+              // After the subagent's loop finishes, post its final text back to
+              // the parent as a synthetic message so callers can observe the
+              // result. The interface returns void; changing it to return the
+              // text is a breaking change deferred to v2-native.
+              // TODO(v2-native): return the result instead of posting synthetically.
+              const messages = yield* result.messages({ sessionID: session.id, order: "desc" })
+              const assistant = messages.find((msg) => msg.type === "assistant")
+              if (!assistant || assistant.type !== "assistant") return
+              const text = assistant.content.findLast((part) => part.type === "text")
+              if (!text || text.type !== "text") return
+              yield* sync.run(SessionEvent.Synthetic.Sync, {
+                sessionID: input.parentID,
+                timestamp: DateTime.makeUnsafe(Date.now()),
+                text: text.text,
+              })
+            }).pipe(
+              Effect.catchCause((cause) =>
+                Effect.gen(function* () {
+                  log.error("subagent failed", {
+                    cause: cause,
+                    parentID: input.parentID,
+                    agent: input.agent,
+                  })
+                  yield* sync.run(SessionEvent.Synthetic.Sync, {
+                    sessionID: input.parentID,
+                    timestamp: DateTime.makeUnsafe(Date.now()),
+                    text: `Subagent error: ${cause instanceof Error ? cause.message : String(cause)}`,
+                  })
+                }),
+              ),
+            ),
+          (_, exit) =>
+            Effect.gen(function* () {
+              if (input.abort) input.abort.removeEventListener("abort", onAbort)
+              if (Exit.hasInterrupts(exit) && !cancelled) {
+                cancelled = true
+                yield* cancelChild
+              }
+            }),
+        )
       }),
       compact: Effect.fn("V2Session.compact")(function* (sessionID) {
         // Stage a compaction. V1 SessionCompaction.create appends a user message
