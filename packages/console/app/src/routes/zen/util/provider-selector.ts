@@ -29,7 +29,7 @@ type RetryOptions = {
 export function selectProvider(
   reqModel: string,
   zenData: { providers: Record<string, ZenProvider> },
-  authInfo: { workspaceID?: string; provider?: { credentials?: unknown } },
+  authInfo: { workspaceID?: string; provider?: { credentials?: unknown } | null } | undefined,
   modelInfo: { id: string; providers: ModelProvider[]; fallbackProvider?: string; byokProvider?: string },
   ip: string,
   sessionId: string,
@@ -44,7 +44,7 @@ export function selectProvider(
   },
 ) {
   const modelProvider = (() => {
-    if (authInfo.provider?.credentials) {
+    if (authInfo?.provider?.credentials) {
       return modelInfo.providers.find((provider) => provider.id === modelInfo.byokProvider)
     }
 
@@ -104,7 +104,7 @@ export function selectProvider(
         reqModel,
         providerModel: modelProvider.model,
         adjustCacheUsage: providerProps.adjustCacheUsage,
-        workspaceID: authInfo.workspaceID,
+        workspaceID: authInfo?.workspaceID,
       }
       const format = providerProps.format
       if (format === "anthropic") return anthropicHelper(opts)

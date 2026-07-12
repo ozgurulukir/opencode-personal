@@ -34,7 +34,7 @@ describe("setupRequest", () => {
       createIpRateLimiter: mock(() => ({ check: async () => {}, track: async () => {} })),
       createKeyRateLimiter: mock(() => ({ check: async () => {}, track: async () => {} })),
       createStickyTracker: mock(() => ({ get: async () => undefined, set: async () => {} })),
-      authenticate: mock(async () => ({ workspaceID: "ws-1", apiKeyId: "k1", isFree: false, isDisabled: false })),
+      authenticate: mock(async () => ({ workspaceID: "ws-1", apiKeyId: "k1", billing: { balance: 1000 }, user: { id: "u1" }, isFree: false, isDisabled: false })),
       validateBilling: mock(() => "balance"),
       createModelTpmLimiter: mock(() => ({ check: async () => undefined, track: async () => {} })),
       ...overrides.deps,
@@ -46,7 +46,14 @@ describe("setupRequest", () => {
     const result = await setupRequest(deps)
 
     expect(result.modelInfo.id).toBe("gpt-4o")
-    expect(result.authInfo).toEqual({ workspaceID: "ws-1", apiKeyId: "k1", isFree: false, isDisabled: false })
+    expect(result.authInfo).toEqual({
+      workspaceID: "ws-1",
+      apiKeyId: "k1",
+      billing: { balance: 1000 },
+      user: { id: "u1" },
+      isFree: false,
+      isDisabled: false,
+    })
     expect(result.billingSource).toBe("balance")
     expect(deps.validateModel).toHaveBeenCalledTimes(1)
     expect(deps.authenticate).toHaveBeenCalledTimes(1)

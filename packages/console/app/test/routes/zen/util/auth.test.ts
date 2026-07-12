@@ -21,12 +21,12 @@ function createDeps(row: any, adminWs: string[] = []) {
 
 describe("authenticate", () => {
   test("returns undefined when zenApiKey is empty and allowAnonymous", async () => {
-    expect(await authenticate({ allowAnonymous: true }, undefined, createDeps(null))).toBeUndefined()
-    expect(await authenticate({ allowAnonymous: true }, "", createDeps(null))).toBeUndefined()
+    expect(await authenticate({ id: "test", allowAnonymous: true }, undefined, createDeps(null))).toBeUndefined()
+    expect(await authenticate({ id: "test", allowAnonymous: true }, "", createDeps(null))).toBeUndefined()
   })
 
   test("throws AuthError when zenApiKey is empty and no anonymous", () => {
-    expect(() => authenticate({ allowAnonymous: false }, undefined, createDeps(null))).toThrow(
+    expect(() => authenticate({ id: "test", allowAnonymous: false }, undefined, createDeps(null))).toThrow(
       "zen.api.error.missingApiKey",
     )
   })
@@ -43,8 +43,8 @@ describe("authenticate", () => {
       timeDisabled: null,
     }
     const result = await authenticate({ id: "gpt-4o" }, "key", createDeps(row))
-    expect(result.workspaceID).toBe("ws-1")
-    expect(result.billing.balance).toBe(1000)
+    expect(result!.workspaceID).toBe("ws-1")
+    expect(result!.billing.balance).toBe(1000)
   })
 
   test("marks admin workspace as isFree", async () => {
@@ -59,7 +59,7 @@ describe("authenticate", () => {
       timeDisabled: null,
     }
     const result = await authenticate({ id: "gpt-4o" }, "key", createDeps(row, ["ws-a"]))
-    expect(result.isFree).toBe(true)
+    expect(result!.isFree).toBe(true)
   })
 
   test("marks non-admin workspace as not isFree", async () => {
@@ -74,6 +74,6 @@ describe("authenticate", () => {
       timeDisabled: null,
     }
     const result = await authenticate({ id: "gpt-4o" }, "key", createDeps(row, ["other-ws"]))
-    expect(result.isFree).toBe(false)
+    expect(result!.isFree).toBe(false)
   })
 })

@@ -11,11 +11,12 @@ import { LiteData } from "@opencode-ai/console-core/lite.js"
 import { Subscription } from "@opencode-ai/console-core/subscription.js"
 import { centsToMicroCents } from "@opencode-ai/console-core/util/price.js"
 import { getMonthlyBounds, getWeekBounds } from "@opencode-ai/console-core/util/date.js"
+import type { AuthInfo } from "./auth"
 
 export async function trackUsage(
   sessionId: string,
   billingSource: string,
-  authInfo: any,
+  authInfo: AuthInfo | undefined,
   modelInfo: { id: string },
   providerInfo: { id: string },
   usageInfo: {
@@ -63,11 +64,12 @@ export async function trackUsage(
 
   if (billingSource === "anonymous") return
 
+  const info = authInfo!
   const cost = centsToMicroCents(totalCostInCent)
   await Database.use((db) =>
     Promise.all([
       db.insert(UsageTable).values({
-        workspaceID: authInfo.workspaceID,
+        workspaceID: info.workspaceID,
         id: Identifier.create("usage"),
         model: modelInfo.id,
         provider: providerInfo.id,
@@ -78,7 +80,7 @@ export async function trackUsage(
         cacheWrite5mTokens,
         cacheWrite1hTokens,
         cost,
-        keyID: authInfo.apiKeyId,
+        keyID: info.apiKeyId,
         sessionID: sessionId.substring(0, 30),
         enrichment: (() => {
           if (billingSource === "subscription") return { plan: "sub" }
@@ -90,10 +92,10 @@ export async function trackUsage(
       db
         .update(KeyTable)
         .set({ timeUsed: sql`now()` })
-        .where(and(eq(KeyTable.workspaceID, authInfo.workspaceID), eq(KeyTable.id, authInfo.apiKeyId))),
+        .where(and(eq(KeyTable.workspaceID, info.workspaceID), eq(KeyTable.id, info.apiKeyId))),
       ...(() => {
         if (billingSource === "subscription") {
-          const plan = authInfo.billing.subscription!.plan
+          const plan = info.billing.subscription!.plan as "20" | "100" | "200"
           const black = BlackData.getLimits({ plan })
           const week = getWeekBounds(new Date())
           const rollingWindowSeconds = black.rollingWindow * 3600
@@ -123,8 +125,8 @@ export async function trackUsage(
               })
               .where(
                 and(
-                  eq(SubscriptionTable.workspaceID, authInfo.workspaceID),
-                  eq(SubscriptionTable.userID, authInfo.user.id),
+                  eq(SubscriptionTable.workspaceID, info.workspaceID),
+                  eq(SubscriptionTable.userID, info.user.id),
                 ),
               ),
           ]
@@ -132,7 +134,7 @@ export async function trackUsage(
         if (billingSource === "lite") {
           const lite = LiteData.getLimits()
           const week = getWeekBounds(new Date())
-          const month = getMonthlyBounds(new Date(), authInfo.lite!.timeCreated)
+          const month = getMonthlyBounds(new Date(), info.lite!.timeCreated!)
           const rollingWindowSeconds = lite.rollingWindow * 3600
           return [
             db
@@ -165,7 +167,7 @@ export async function trackUsage(
               END
             `,
               })
-              .where(and(eq(LiteTable.workspaceID, authInfo.workspaceID), eq(LiteTable.userID, authInfo.user.id))),
+              .where(and(eq(LiteTable.workspaceID, info.workspaceID), eq(LiteTable.userID, info.user.id))),
           ]
         }
 
@@ -185,7 +187,7 @@ export async function trackUsage(
           `,
               timeMonthlyUsageUpdated: sql`now()`,
             })
-            .where(eq(BillingTable.workspaceID, authInfo.workspaceID)),
+            .where(eq(BillingTable.workspaceID, info.workspaceID)),
           db
             .update(UserTable)
             .set({
@@ -197,7 +199,7 @@ export async function trackUsage(
           `,
               timeMonthlyUsageUpdated: sql`now()`,
             })
-            .where(and(eq(UserTable.workspaceID, authInfo.workspaceID), eq(UserTable.id, authInfo.user.id))),
+            .where(and(eq(UserTable.workspaceID, info.workspaceID), eq(UserTable.id, info.user.id))),
         ]
       })(),
     ]),
