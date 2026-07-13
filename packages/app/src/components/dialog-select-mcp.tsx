@@ -35,7 +35,15 @@ export const DialogSelectMcp: Component = () => {
     onSuccess: () => queryClient.refetchQueries({ queryKey: mcpQueryKey(sync.directory) }),
   }))
 
-  const enabledCount = createMemo(() => items().filter((i) => i.status === "connected").length)
+  // ⚡ Bolt Optimization: Replace .filter().length with loop to avoid GC
+  const enabledCount = createMemo(() => {
+    let count = 0
+    const list = items()
+    for (let i = 0; i < list.length; i++) {
+      if (list[i].status === "connected") count++
+    }
+    return count
+  })
   const totalCount = createMemo(() => items().length)
 
   return (

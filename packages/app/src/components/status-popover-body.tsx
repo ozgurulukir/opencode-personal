@@ -195,7 +195,15 @@ export function StatusPopoverBody(props: { shown: Accessor<boolean> }) {
   const defaultServer = useDefaultServerKey(platform.getDefaultServer)
   const mcpNames = createMemo(() => Object.keys(sync.data.mcp ?? {}).sort((a, b) => a.localeCompare(b)))
   const mcpStatus = (name: string) => sync.data.mcp?.[name]?.status
-  const mcpConnected = createMemo(() => mcpNames().filter((name) => mcpStatus(name) === "connected").length)
+  // ⚡ Bolt Optimization: Replace .filter().length with loop to avoid GC
+  const mcpConnected = createMemo(() => {
+    let count = 0
+    const names = mcpNames()
+    for (let i = 0; i < names.length; i++) {
+      if (mcpStatus(names[i]) === "connected") count++
+    }
+    return count
+  })
   const lspItems = createMemo(() => sync.data.lsp ?? [])
   const lspCount = createMemo(() => lspItems().length)
   const plugins = createMemo(() =>

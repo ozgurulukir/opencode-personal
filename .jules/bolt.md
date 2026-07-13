@@ -20,3 +20,6 @@
 ## 2024-03-24 - Array Map vs Loop in createMemo
 **Learning:** In SolidJS `createMemo`, using `new Array(length)` with an index-based `for` loop avoids intermediate array allocations that come from chaining `.map()` on observable lists or doing `new Map(list.map(...))`. This drastically reduces garbage collection pressure on frequently re-rendered or large lists (like `visibleUserMessages`, `diffs`, `renderedUserMessages`, `terminal.all()`).
 **Action:** Replace `.map()` chains inside high-frequency `createMemo`s with pre-allocated arrays and index-based `for` loops, or single-pass iteration to build Maps.
+## 2025-03-09 - Avoid Intermediate Arrays in SolidJS Counting
+**Learning:** In SolidJS applications, using chained array methods like `.filter().length` or `.map().filter()` inside a `createMemo` (especially during high-frequency updates) leads to unnecessary intermediate array allocations, which creates Garbage Collection (GC) pressure.
+**Action:** Use single-pass, index-based `for` loops to calculate counts or filtered values directly. This avoids intermediate allocations and preserves performance.
