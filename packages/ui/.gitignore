@@ -21,6 +21,9 @@ dist
 # Temp
 gitignore
 
+# Test artifacts
+.artifacts
+
 # System Files
 .DS_Store
 Thumbs.db
