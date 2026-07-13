@@ -182,10 +182,24 @@ export const SessionReview = (props: SessionReviewProps) => {
   const opened = () => store.opened
 
   const open = () => props.open ?? store.open
-  const items = createMemo<Item[]>(() =>
-    list(props.diffs).map((diff) => ({ ...normalize(diff), preloaded: diff.preloaded })),
-  )
-  const files = createMemo(() => items().map((diff) => diff.file))
+  // ⚡ Bolt Optimization: Use pre-allocated arrays and for-loops to avoid chained .map() GC pressure
+  const items = createMemo<Item[]>(() => {
+    const diffs = list(props.diffs)
+    const result = new Array<Item>(diffs.length)
+    for (let i = 0; i < diffs.length; i++) {
+      result[i] = { ...normalize(diffs[i]), preloaded: diffs[i].preloaded }
+    }
+    return result
+  })
+  // ⚡ Bolt Optimization: Avoid .map() array allocations
+  const files = createMemo(() => {
+    const diffs = items()
+    const result = new Array<string>(diffs.length)
+    for (let i = 0; i < diffs.length; i++) {
+      result[i] = diffs[i].file
+    }
+    return result
+  })
   const grouped = createMemo(() => {
     const next = new Map<string, SessionReviewComment[]>()
     for (const comment of props.comments ?? []) {
@@ -400,7 +414,15 @@ export const SessionReview = (props: SessionReviewProps) => {
                     const force = () => !!store.force[file]
 
                     const comments = createMemo(() => grouped().get(file) ?? [])
-                    const commentedLines = createMemo(() => comments().map((c) => c.selection))
+                    // ⚡ Bolt Optimization: Avoid .map() array allocations
+                    const commentedLines = createMemo(() => {
+                      const c = comments()
+                      const result = new Array<SelectedLineRange>(c.length)
+                      for (let i = 0; i < c.length; i++) {
+                        result[i] = c[i].selection
+                      }
+                      return result
+                    })
 
                     const beforeText = () => text(diff, "deletions")
                     const afterText = () => text(diff, "additions")
