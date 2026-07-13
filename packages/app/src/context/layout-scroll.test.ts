@@ -1,10 +1,9 @@
 import { describe, expect, test, vi } from "bun:test"
 import { createScrollPersistence } from "./layout-scroll"
 
-import { mock } from "bun:test"
-
 describe("createScrollPersistence", () => {
-  test("debounces persisted scroll writes", async () => {
+  test("debounces persisted scroll writes", () => {
+    vi.useFakeTimers()
     try {
       const snapshot = {
         session: {
@@ -25,20 +24,21 @@ describe("createScrollPersistence", () => {
         scroll.setScroll("session", "review", { x: 0, y: i })
       }
 
-      await new Promise((r) => setTimeout(r, 9))
+      vi.advanceTimersByTime(9)
       expect(writes).toHaveLength(0)
 
-      await new Promise((r) => setTimeout(r, 2))
+      vi.advanceTimersByTime(1)
 
       expect(writes).toHaveLength(1)
       expect(writes[0]?.review).toEqual({ x: 0, y: 30 })
 
       scroll.setScroll("session", "review", { x: 0, y: 30 })
-      await new Promise((r) => setTimeout(r, 20))
+      vi.advanceTimersByTime(20)
 
       expect(writes).toHaveLength(1)
       scroll.dispose()
     } finally {
+      vi.useRealTimers()
     }
   })
 
