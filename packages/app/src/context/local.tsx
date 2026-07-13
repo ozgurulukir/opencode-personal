@@ -268,7 +268,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
 
     const recent = createMemo(() => {
       const recents = models.recent.list()
-      const result = []
+      const result: NonNullable<ReturnType<typeof models.find>>[] = []
       for (let i = 0; i < recents.length; i++) {
         const found = models.find(recents[i])
         if (found) result.push(found)
