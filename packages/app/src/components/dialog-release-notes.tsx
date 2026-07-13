@@ -108,7 +108,7 @@ export function DialogReleaseNotes(props: { highlights: Highlight[] }) {
                       "w-8": i === index(),
                       "w-3": i !== index(),
                     }}
-                    aria-label={props.highlights[i].title}
+                    aria-label={props.highlights[i]?.title}
                     aria-current={i === index() ? "true" : undefined}
                     onClick={() => setIndex(i)}
                   >
