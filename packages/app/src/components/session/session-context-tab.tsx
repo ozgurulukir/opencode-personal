@@ -108,17 +108,35 @@ export function SessionContextTab() {
     { equals: same },
   )
 
+  // ⚡ Bolt Optimization: Replace .filter() with a single-pass loop to reduce GC pressure
   const userMessages = createMemo(
-    () => messages().filter((m) => m.role === "user") as UserMessage[],
+    () => {
+      const list = messages()
+      const result: UserMessage[] = []
+      for (let i = 0; i < list.length; i++) {
+        if (list[i].role === "user") {
+          result.push(list[i] as UserMessage)
+        }
+      }
+      return result
+    },
     emptyUserMessages,
     { equals: same },
   )
 
+  // ⚡ Bolt Optimization: Replace .filter() with a single-pass loop to reduce GC pressure
   const visibleUserMessages = createMemo(
     () => {
       const revert = info()?.revert?.messageID
-      if (!revert) return userMessages()
-      return userMessages().filter((m) => m.id < revert)
+      const list = userMessages()
+      if (!revert) return list
+      const result: UserMessage[] = []
+      for (let i = 0; i < list.length; i++) {
+        if (list[i].id < revert) {
+          result.push(list[i])
+        }
+      }
+      return result
     },
     emptyUserMessages,
     { equals: same },
