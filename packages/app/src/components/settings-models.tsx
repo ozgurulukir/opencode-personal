@@ -77,7 +77,12 @@ export const SettingsModels: Component = () => {
               class="flex-1"
             />
             <Show when={list.filter()}>
-              <IconButton icon="circle-x" variant="ghost" onClick={list.clear} />
+              <IconButton
+                icon="circle-x"
+                variant="ghost"
+                aria-label={language.t("dialog.server.default.clear")}
+                onClick={list.clear}
+              />
             </Show>
           </div>
         </div>
