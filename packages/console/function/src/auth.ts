@@ -172,6 +172,9 @@ export default {
             await Workspace.create({ name: "Default" })
           }
         })
+        // @ts-expect-error - openauth 0.4.3 type bug: conditional type in `properties` parameter
+        // causes tsgo/tsc to skip the `id: string` parameter, treating the method as 2-arg.
+        // Runtime correctly expects subject(type, id, properties, opts?).
         return ctx.subject("account", accountID, { accountID, email })
       },
     }).fetch(request, env, ctx)
