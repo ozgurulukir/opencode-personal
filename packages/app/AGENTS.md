@@ -21,6 +21,10 @@
 
 - ALWAYS USE PARALLEL TOOLS WHEN APPLICABLE.
 
+## i18n
+
+- Use `common.*` namespace for generic UI labels (Clear, Cancel, Open, etc.). Don't reuse domain-specific keys (e.g., `dialog.server.default.clear`) for generic icon buttons — it creates fragile coupling between unrelated components. Adding a new `common.*` key requires updating all 17 locale files; `parity.test.ts` only spot-checks specific keys, not full parity.
+
 ## Browser Automation
 
 Use `agent-browser` for web automation. Run `agent-browser --help` for all commands.
