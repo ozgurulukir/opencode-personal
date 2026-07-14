@@ -20,3 +20,7 @@
 ## 2024-03-24 - Array Map vs Loop in createMemo
 **Learning:** In SolidJS `createMemo`, using `new Array(length)` with an index-based `for` loop avoids intermediate array allocations that come from chaining `.map()` on observable lists or doing `new Map(list.map(...))`. This drastically reduces garbage collection pressure on frequently re-rendered or large lists (like `visibleUserMessages`, `diffs`, `renderedUserMessages`, `terminal.all()`).
 **Action:** Replace `.map()` chains inside high-frequency `createMemo`s with pre-allocated arrays and index-based `for` loops, or single-pass iteration to build Maps.
+
+## 2024-03-24 - Array Methods vs Manual Loops in Typical UI Components
+**Learning:** In SolidJS, while chaining array methods (`.map().filter()`) inside `createMemo` can cause GC pressure for extremely large or highly reactive lists, replacing standard methods like `.find()` or `.filter()` with verbose `for` loops in typical UI components (where arrays are small) is an unmeasurable micro-optimization that degrades readability. Crucially, `.find()` does not allocate a new array, and `.sort()` sorts in-place.
+**Action:** Do not replace native array methods with manual `for` loops unless dealing with a proven bottleneck or a massive dataset. Prefer readable, idiomatic code for typical UI components.
