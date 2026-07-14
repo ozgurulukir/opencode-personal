@@ -239,6 +239,7 @@ export const dict = {
   "common.goForward": "前进",
   "common.loading": "加载中",
   "common.loading.ellipsis": "...",
+  "common.clear": "清除",
   "common.cancel": "取消",
   "common.connect": "连接",
   "common.disconnect": "断开连接",

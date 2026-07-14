@@ -200,6 +200,7 @@ export const dict = {
   "common.goForward": "進む",
   "common.loading": "読み込み中",
   "common.loading.ellipsis": "...",
+  "common.clear": "クリア",
   "common.cancel": "キャンセル",
   "common.connect": "接続",
   "common.disconnect": "切断",

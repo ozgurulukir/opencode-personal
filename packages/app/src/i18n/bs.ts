@@ -218,6 +218,7 @@ export const dict = {
   "common.goForward": "Naprijed",
   "common.loading": "Učitavanje",
   "common.loading.ellipsis": "...",
+  "common.clear": "Očisti",
   "common.cancel": "Otkaži",
   "common.connect": "Poveži",
   "common.disconnect": "Prekini vezu",

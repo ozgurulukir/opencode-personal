@@ -219,6 +219,7 @@ export const dict = {
   "common.goForward": "Navigate forward",
   "common.loading": "Loading",
   "common.loading.ellipsis": "...",
+  "common.clear": "Clear",
   "common.cancel": "Cancel",
   "common.open": "Open",
   "common.connect": "Connect",
