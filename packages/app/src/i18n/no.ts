@@ -220,6 +220,7 @@ export const dict = {
   "common.goForward": "Gå frem",
   "common.loading": "Laster",
   "common.loading.ellipsis": "...",
+  "common.clear": "Tøm",
   "common.cancel": "Avbryt",
   "common.connect": "Koble til",
   "common.disconnect": "Koble fra",
