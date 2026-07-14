@@ -183,13 +183,21 @@ export default function () {
                       const [store, setStore] = createStore({
                         messageId: undefined as string | undefined,
                       })
-                      const messages = createMemo(() =>
-                        data().sessionID
-                          ? (data().message[data().sessionID]?.filter((m) => m.role === "user") ?? []).sort(
-                              (a, b) => a.time.created - b.time.created,
-                            )
-                          : [],
-                      )
+                      // ⚡ Bolt Optimization: Avoid .filter().sort() chained array allocations
+                      const messages = createMemo(() => {
+                        const sid = data().sessionID
+                        if (!sid) return []
+                        const allMessages = data().message[sid]
+                        if (!allMessages) return []
+                        const result = new Array<UserMessage>()
+                        for (let i = 0; i < allMessages.length; i++) {
+                          const m = allMessages[i]!
+                          if (m.role === "user") {
+                            result.push(m as UserMessage)
+                          }
+                        }
+                        return result.sort((a, b) => a.time.created - b.time.created)
+                      })
                       const firstUserMessage = createMemo(() => messages().at(0))
                       const activeMessage = createMemo(
                         () => messages().find((m) => m.id === store.messageId) ?? firstUserMessage(),
