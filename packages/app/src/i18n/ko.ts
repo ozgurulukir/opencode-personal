@@ -200,6 +200,7 @@ export const dict = {
   "common.goForward": "앞으로 가기",
   "common.loading": "로딩 중",
   "common.loading.ellipsis": "...",
+  "common.clear": "지우기",
   "common.cancel": "취소",
   "common.connect": "연결",
   "common.disconnect": "연결 해제",
