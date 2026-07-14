@@ -298,6 +298,7 @@ export const dict = {
   "dialog.mcp.title": "MCPs",
   "dialog.mcp.description": "{{enabled}} of {{total}} enabled",
   "dialog.mcp.empty": "No MCPs configured",
+  "dialog.mcp.toggle": "Toggle {{name}} MCP",
 
   "dialog.lsp.empty": "LSPs auto-detected from file types",
   "dialog.plugins.empty": "Plugins configured in opencode.json",
@@ -609,6 +610,7 @@ export const dict = {
   "status.popover.tab.lsp": "LSP",
   "status.popover.tab.plugins": "Plugins",
   "status.popover.action.manageServers": "Manage servers",
+  "status.popover.server.switch": "Switch to {{name}}",
 
   "session.share.popover.title": "Publish on web",
   "session.share.popover.description.shared":
@@ -860,6 +862,7 @@ export const dict = {
   "settings.shortcuts.conflict.description": "{{keybind}} is already assigned to {{titles}}.",
   "settings.shortcuts.unassigned": "Unassigned",
   "settings.shortcuts.pressKeys": "Press keys",
+  "settings.shortcuts.edit": "Edit {{title}} shortcut",
   "settings.shortcuts.search.placeholder": "Search shortcuts",
   "settings.shortcuts.search.empty": "No shortcuts found",
 

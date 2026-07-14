@@ -12,7 +12,7 @@ import { ServerHealthIndicator, ServerRow } from "@/components/server/server-row
 import { useLanguage } from "@/context/language"
 import { usePlatform } from "@/context/platform"
 import { useSDK } from "@/context/sdk"
-import { normalizeServerUrl, ServerConnection, useServer } from "@/context/server"
+import { normalizeServerUrl, ServerConnection, serverName, useServer } from "@/context/server"
 import { useSync } from "@/context/sync"
 import { useCheckServerHealth, type ServerHealth } from "@/utils/server-health"
 import { mcpQueryKey } from "@/context/global-sync"
@@ -256,6 +256,7 @@ export function StatusPopoverBody(props: { shown: Accessor<boolean> }) {
                         "cursor-not-allowed": blocked(),
                       }}
                       aria-disabled={blocked()}
+                      aria-label={language.t("status.popover.server.switch", { name: serverName(s) })}
                       onClick={() => {
                         if (blocked()) return
                         navigate("/")
@@ -322,6 +323,7 @@ export function StatusPopoverBody(props: { shown: Accessor<boolean> }) {
                       <button
                         type="button"
                         class="flex items-center gap-2 w-full h-8 pl-3 pr-2 py-1 rounded-md hover:bg-surface-raised-base-hover transition-colors text-left"
+                        aria-label={language.t("dialog.mcp.toggle", { name })}
                         onClick={() => {
                           if (toggleMcp.isPending) return
                           toggleMcp.mutate(name)

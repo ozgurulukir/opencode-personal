@@ -415,6 +415,7 @@ export const SettingsKeybinds: Component = () => {
                         <button
                           type="button"
                           data-keybind-id={id}
+                          aria-label={language.t("settings.shortcuts.edit", { title: title(id) })}
                           classList={{
                             "h-8 px-3 rounded-md text-12-regular": true,
                             "bg-surface-base text-text-subtle hover:bg-surface-raised-base-hover active:bg-surface-raised-base-active":
