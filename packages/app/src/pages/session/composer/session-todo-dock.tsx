@@ -55,7 +55,14 @@ export function SessionTodoDock(props: {
   const toggle = () => setStore("collapsed", (value) => !value)
 
   const total = createMemo(() => props.todos.length)
-  const done = createMemo(() => props.todos.filter((todo) => todo.status === "completed").length)
+  const done = createMemo(() => {
+    let count = 0
+    const list = props.todos
+    for (let i = 0; i < list.length; i++) {
+      if (list[i].status === "completed") count++
+    }
+    return count
+  })
   const label = createMemo(() => language.t("session.todo.progress", { done: done(), total: total() }))
   const progress = createMemo(() =>
     language
