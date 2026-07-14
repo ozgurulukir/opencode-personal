@@ -222,6 +222,7 @@ export const dict = {
   "common.goForward": "İleri git",
   "common.loading": "Yükleniyor",
   "common.loading.ellipsis": "...",
+  "common.clear": "Temizle",
   "common.cancel": "İptal",
   "common.connect": "Bağlan",
   "common.disconnect": "Bağlantı Kes",
