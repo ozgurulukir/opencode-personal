@@ -418,7 +418,21 @@ NOTE: At any point in time through this workflow you should feel free to ask the
       return appendParts([part])
     })
 
-    const resolveTools = Effect.fn("SessionPrompt.resolveTools")(function* (input: {
+    // Extract meaningful patterns from MCP tool arguments for permission scoping.
+    // Looks for common path/URL fields so "always allow" grants access to a
+    // specific resource rather than all invocations. Falls back to ["*"] when
+    // no pattern can be derived.
+    function deriveMcpPatterns(args: unknown): string[] {
+  if (!args || typeof args !== "object") return ["*"]
+  const input = args as Record<string, unknown>
+  for (const key of ["filepath", "path", "url", "directory", "file", "pattern", "repo", "repository"]) {
+    const val = input[key]
+    if (typeof val === "string" && val.length > 0) return [val]
+  }
+  return ["*"]
+}
+
+const resolveTools = Effect.fn("SessionPrompt.resolveTools")(function* (input: {
       agent: Agent.Info
       model: Provider.Model
       session: Session.Info
@@ -530,8 +544,9 @@ NOTE: At any point in time through this workflow you should feel free to ask the
                   { tool: key, sessionID: ctx.sessionID, callID: opts.toolCallId },
                   { args },
                 )
+                const mcpPatterns = deriveMcpPatterns(args)
                 const result: Awaited<ReturnType<NonNullable<typeof execute>>> = yield* Effect.gen(function* () {
-                  yield* ctx.ask({ permission: key, metadata: {}, patterns: ["*"], always: ["*"] })
+                  yield* ctx.ask({ permission: key, metadata: {}, patterns: mcpPatterns, always: mcpPatterns })
                   return yield* Effect.promise(() => execute(args, opts))
                 }).pipe(
                   Effect.withSpan("Tool.execute", {
