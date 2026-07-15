@@ -312,9 +312,19 @@ export function disabled(tools: string[], ruleset: Ruleset): Set<string> {
   const result = new Set<string>()
   for (const tool of tools) {
     const permission = EDIT_TOOLS.includes(tool) ? "edit" : tool
-    const rule = ruleset.findLast((rule) => Wildcard.match(permission, rule.permission))
-    if (!rule) continue
-    if (rule.pattern === "*" && rule.action === "deny") result.add(tool)
+    const matchingRules = ruleset.filter((rule) => Wildcard.match(permission, rule.permission))
+    if (matchingRules.length === 0) continue
+    // A tool is disabled only when there's a catch-all deny (pattern === "*")
+    // that isn't overridden by a specific allow/ask rule for this tool.
+    // Specific pattern denies (e.g., "rm *": "deny") never disable the tool
+    // since non-matching patterns default to "ask" at runtime.
+    const hasCatchAllDeny = matchingRules.some(
+      (rule) => rule.pattern === "*" && rule.action === "deny",
+    )
+    const hasSpecificOverride = matchingRules.some(
+      (rule) => rule.permission !== "*" && rule.action !== "deny",
+    )
+    if (hasCatchAllDeny && !hasSpecificOverride) result.add(tool)
   }
   return result
 }

@@ -86,26 +86,24 @@ describe("Permission.disabled for task tool", () => {
       action,
     }))
 
-  test("task tool is disabled when global deny pattern exists (even with specific allows)", () => {
-    // When "*": "deny" exists, the task tool is disabled because the disabled() function
-    // only checks for wildcard deny patterns - it doesn't consider that specific subagents might be allowed
+  test("task tool is NOT disabled when global deny has specific allow overrides", () => {
+    // When there's a specific allow rule, the tool stays visible — the permission
+    // layer handles the deny at runtime for non-matching patterns.
     const ruleset = createRuleset({
       "orchestrator-*": "allow",
       "*": "deny",
     })
     const disabled = Permission.disabled(["task", "bash", "read"], ruleset)
-    // The task tool IS disabled because there's a pattern: "*" with action: "deny"
-    expect(disabled.has("task")).toBe(true)
+    expect(disabled.has("task")).toBe(false)
   })
 
-  test("task tool is disabled when global deny pattern exists (even with ask overrides)", () => {
+  test("task tool is NOT disabled when global deny has ask overrides", () => {
     const ruleset = createRuleset({
       "orchestrator-*": "ask",
       "*": "deny",
     })
     const disabled = Permission.disabled(["task"], ruleset)
-    // The task tool IS disabled because there's a pattern: "*" with action: "deny"
-    expect(disabled.has("task")).toBe(true)
+    expect(disabled.has("task")).toBe(false)
   })
 
   test("task tool is disabled when global deny pattern exists", () => {
@@ -114,15 +112,15 @@ describe("Permission.disabled for task tool", () => {
     expect(disabled.has("task")).toBe(true)
   })
 
-  test("task tool is NOT disabled when only specific patterns are denied (no wildcard)", () => {
-    // The disabled() function only disables tools when pattern: "*" && action: "deny"
-    // Specific subagent denies don't disable the task tool - those are handled at runtime
+  test("task tool is NOT disabled when only specific patterns are denied (no catch-all)", () => {
+    // Specific pattern denies never disable the tool — non-matching patterns
+    // default to "ask" at runtime. Only a catch-all deny (pattern: "*") can
+    // disable the tool, and only if no specific allow/ask overrides it.
     const ruleset = createRuleset({
       "orchestrator-*": "deny",
       general: "deny",
     })
     const disabled = Permission.disabled(["task"], ruleset)
-    // The task tool is NOT disabled because no rule has pattern: "*" with action: "deny"
     expect(disabled.has("task")).toBe(false)
   })
 
@@ -261,7 +259,7 @@ describe("permission.task with real config files", () => {
     })
   })
 
-  test("task tool disabled when global deny comes last in config", async () => {
+  test("task tool NOT disabled when global deny has specific allow overrides", async () => {
     await using tmp = await tmpdir({
       git: true,
       config: {
@@ -280,15 +278,15 @@ describe("permission.task with real config files", () => {
         const config = await load()
         const ruleset = Permission.fromConfig(config.permission ?? {})
 
-        // Last matching rule wins - "*" deny is last, so all agents are denied
+        // Evaluate uses findLast - "*" deny is last, so all agents are denied
         expect(Permission.evaluate("task", "general", ruleset).action).toBe("deny")
         expect(Permission.evaluate("task", "code-reviewer", ruleset).action).toBe("deny")
         expect(Permission.evaluate("task", "unknown", ruleset).action).toBe("deny")
 
-        // Since "*": "deny" is the last rule, disabled() finds it with findLast
-        // and sees pattern: "*" with action: "deny", so task is disabled
+        // Since there are allow rules, not ALL rules are deny, so task stays visible.
+        // The permission layer handles the deny at runtime.
         const disabled = Permission.disabled(["task"], ruleset)
-        expect(disabled.has("task")).toBe(true)
+        expect(disabled.has("task")).toBe(false)
       },
     })
   })
