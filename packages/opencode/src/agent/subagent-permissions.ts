@@ -19,8 +19,8 @@ export function deriveSubagentSessionPermission(input: {
   parentAgent: Agent.Info | undefined
   subagent: Agent.Info
 }): Permission.Ruleset {
-  const canTask = input.subagent.permission.some((rule) => rule.permission === "task")
-  const canTodo = input.subagent.permission.some((rule) => rule.permission === "todowrite")
+  const canTask = input.subagent.permission.some((rule) => rule.permission === "task" && rule.action === "allow")
+  const canTodo = input.subagent.permission.some((rule) => rule.permission === "todowrite" && rule.action === "allow")
   const parentAgentDenies = input.parentAgent?.permission.filter((rule) => rule.action === "deny") ?? []
   return [
     ...parentAgentDenies,
@@ -68,7 +68,7 @@ export function subagentToolRestrictions(input: {
   subagent: Agent.Info
   primaryTools?: string[]
 }): Record<string, boolean> {
-  const has = (id: string) => input.subagent.permission.some((r) => r.permission === id)
+  const has = (id: string) => input.subagent.permission.some((r) => r.permission === id && r.action === "allow")
   return {
     ...(has("todowrite") ? {} : { todowrite: false }),
     ...(has("task") ? {} : { task: false }),
