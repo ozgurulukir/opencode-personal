@@ -1,8 +1,8 @@
 # Agent system
 
-## subagentToolRestrictions has() — deny rules count as "having" permission
+## subagentToolRestrictions has() — only allow rules count as "having" permission
 
-`subagentToolRestrictions` checks `subagent.permission.some((r) => r.permission === id)` to decide whether to add `{ tool: false }`. A deny rule (`action: "deny"`) counts as "having" the permission — so `general` agent (which has `todowrite: "deny"`) does NOT get `{ todowrite: false }` in its tools map. The tool is already restricted at the permission layer; adding `false` to the tools map would be redundant. Only tools NOT mentioned in the agent's permission get `false`d.
+`subagentToolRestrictions` checks `subagent.permission.some((r) => r.permission === id && r.action === "allow")` to decide whether to add `{ tool: false }`. A deny rule (`action: "deny"`) does NOT count as "having" the permission — so `general` agent (which has `todowrite: "deny"`) DOES get `{ todowrite: false }` in its tools map. The tool is hidden from the LLM entirely, not just blocked at the permission layer. Only tools with an explicit `allow` rule avoid being `false`d.
 
 ## primary_tools — allow in permission, false in tools
 
