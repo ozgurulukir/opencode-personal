@@ -11,3 +11,7 @@
 ## `fromConfig` converts config to ruleset — no special expansion
 
 `Permission.fromConfig()` iterates config entries and creates rules directly. It does NOT expand shorthand keys (e.g., `mcp` → `mcp_*`). Any such expansion would need to be added explicitly in `fromConfig()`.
+
+## `reply("always")` persists to database
+
+When the user replies with `"always"`, the approved ruleset is persisted to `PermissionTable` (keyed by `project_id`). This means "always allow" decisions survive restarts. The ruleset is loaded from the database on service init via `InstanceState.make()`. The `PermissionTable` is an upsert — each project has at most one row containing the full approved ruleset.
