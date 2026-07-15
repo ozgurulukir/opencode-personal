@@ -327,7 +327,7 @@ test(
 
         // Tools should be empty after disconnect
         const tools = yield* mcp.tools()
-        const serverTools = Object.keys(tools).filter((k) => k.startsWith("disc-server"))
+        const serverTools = Object.keys(tools).filter((k) => k.startsWith("mcp_disc-server"))
         expect(serverTools.length).toBe(0)
       }),
   ),
@@ -773,7 +773,7 @@ test(
         const keys = Object.keys(tools)
 
         // Server name dots should be replaced with underscores
-        expect(keys.some((k) => k.startsWith("my_special-server_"))).toBe(true)
+        expect(keys.some((k) => k.startsWith("mcp_my_special-server_"))).toBe(true)
         // Tool name dots should be replaced with underscores
         expect(keys.some((k) => k.endsWith("tool_b"))).toBe(true)
         expect(keys.length).toBe(2)
