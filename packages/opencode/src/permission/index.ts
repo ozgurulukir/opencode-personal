@@ -182,7 +182,8 @@ export const layer = Layer.effect(
       let needsAsk = false
 
       for (const pattern of request.patterns) {
-        const rule = evaluate(request.permission, pattern, ruleset, approved)
+        // Config rules (ruleset) must come last so they override DB-persisted approvals
+        const rule = evaluate(request.permission, pattern, approved, ruleset)
         log.info("evaluated", { permission: request.permission, pattern, action: rule })
         if (rule.action === "deny") {
           return yield* new DeniedError({
@@ -254,6 +255,15 @@ export const layer = Layer.effect(
           action: "allow",
         })
       }
+
+      // Persist approved ruleset to database so "always allow" survives restarts
+      const ctx = yield* InstanceState.context
+      Database.use((db) => {
+        db.insert(PermissionTable)
+          .values({ project_id: ctx.project.id, data: approved })
+          .onConflictDoUpdate({ target: PermissionTable.project_id, set: { data: approved } })
+          .run()
+      })
 
       for (const [id, item] of pending.entries()) {
         if (item.info.sessionID !== existing.info.sessionID) continue
