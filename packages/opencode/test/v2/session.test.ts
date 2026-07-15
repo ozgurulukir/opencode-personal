@@ -447,11 +447,11 @@ describe("v2.session", () => {
       })
 
       const lastCall = promptStub.calls.prompt.at(-1) as any
-      // general agent has todowrite: "deny" in its permission, so
-      // subagentToolRestrictions sees has("todowrite") = true and
-      // does NOT add { todowrite: false }. It does add { task: false }
-      // because general doesn't have task in its permission.
+      // general agent has todowrite: "deny" in its permission, but deny
+      // does not count as "having" the permission — only allow rules do.
+      // So subagentToolRestrictions adds { todowrite: false } and { task: false }.
       expect(lastCall.tools).toEqual({
+        todowrite: false,
         task: false,
       })
     }),
