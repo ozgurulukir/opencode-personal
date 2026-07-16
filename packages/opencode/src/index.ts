@@ -1,3 +1,4 @@
+import { EventEmitter } from "events"
 import yargs from "yargs"
 import { hideBin } from "yargs/helpers"
 import { RunCommand } from "./cli/cmd/run"
@@ -40,6 +41,13 @@ import { Heap } from "./cli/heap"
 import { drizzle } from "drizzle-orm/bun-sqlite"
 import { ensureProcessMetadata } from "@opencode-ai/core/util/opencode-process"
 import { setupOpenTUILib } from "@/util/opentui-lib"
+
+// AbortSignal.any() creates internal EventTarget listeners on constituent
+// signals. When a long-lived signal (e.g. session-level) is reused across many
+// requests, these listeners accumulate because AbortSignal.any() only uses
+// { once: true } for the firing signal — if the signal never fires, listeners
+// persist. Raise the default to avoid spurious MaxListenersExceededWarning.
+EventEmitter.defaultMaxListeners = 100
 
 const processMetadata = ensureProcessMetadata("main")
 
