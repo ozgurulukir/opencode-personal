@@ -11,3 +11,7 @@
 ## `Database.use` falls back to `Client()` when no transaction context exists
 
 `Database.use()` (line 137) first tries to read from `LocalContext` (set by `Database.transaction()`). If no transaction context exists (common in tests), it falls back to `Client()` directly. This means `Database.use()` in `InstanceState.make` init functions reads from the global singleton, not from any test-scoped transaction.
+
+## `NotPromise<T>` on wrapper functions requires an `as` cast
+
+The 4 wrapper functions (`const db = <T>(fn) => Effect.sync(() => Database.use(fn))` in `workspace.ts`, `project.ts`, `session.ts`, `share-next.ts`) cannot use `NotPromise<T>` directly as a generic constraint — TypeScript rejects it as a circular constraint. The fix is `fn as (trx: Database.TxOrDb) => Database.NotPromise<T>` at the call site. All 41 `Database.use()` callers are synchronous, so the cast is safe.
