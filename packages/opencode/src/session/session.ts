@@ -478,7 +478,7 @@ export class Service extends Context.Service<Service, Interface>()("@opencode/Se
 export type Patch = Types.DeepMutable<SyncEvent.Event<typeof Event.Updated>["data"]["info"]>
 
 const db = <T>(fn: (d: Parameters<typeof Database.use>[0] extends (trx: infer D) => any ? D : never) => T) =>
-  Effect.sync(() => Database.use(fn))
+  Effect.sync(() => Database.use(fn as (trx: Database.TxOrDb) => Database.NotPromise<T>))
 
 export const layer: Layer.Layer<Service, never, Bus.Service | Storage.Service | SyncEvent.Service | Snapshot.Service> = Layer.effect(
   Service,

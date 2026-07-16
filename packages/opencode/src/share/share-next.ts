@@ -77,7 +77,7 @@ export interface Interface {
 export class Service extends Context.Service<Service, Interface>()("@opencode/ShareNext") {}
 
 const db = <T>(fn: (d: Parameters<typeof Database.use>[0] extends (trx: infer D) => any ? D : never) => T) =>
-  Effect.sync(() => Database.use(fn))
+  Effect.sync(() => Database.use(fn as (trx: Database.TxOrDb) => Database.NotPromise<T>))
 
 function api(resource: string): Api {
   return {
