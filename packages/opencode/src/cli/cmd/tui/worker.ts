@@ -1,3 +1,4 @@
+import { EventEmitter } from "events"
 import { Installation } from "@/installation"
 import { Server } from "@/server/server"
 import * as Log from "@opencode-ai/core/util/log"
@@ -14,6 +15,13 @@ import { AppRuntime } from "@/effect/app-runtime"
 import { ensureProcessMetadata } from "@opencode-ai/core/util/opencode-process"
 import { Effect } from "effect"
 import { disposeAllInstancesAndEmitGlobalDisposed } from "@/server/global-lifecycle"
+
+// AbortSignal.any() creates internal EventTarget listeners on constituent
+// signals. When a long-lived signal (e.g. session-level) is reused across many
+// requests, these listeners accumulate because AbortSignal.any() only uses
+// { once: true } for the firing signal — if the signal never fires, listeners
+// persist. Raise the default to avoid spurious MaxListenersExceededWarning.
+EventEmitter.defaultMaxListeners = 100
 
 ensureProcessMetadata("worker")
 

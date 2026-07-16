@@ -135,6 +135,12 @@ it.instance("uses the temp directory", () =>
 
 Use `provideTmpdirInstance(...)` or `tmpdirScoped()` plus `provideInstance(...)` when a test needs multiple directories, custom setup before binding, needs to switch instance context within one test, or explicitly tests instance disposal/reload lifetime.
 
+### `provideInstance` creates a separate Effect runtime per call
+
+Each call to `provideInstance(dir)` creates a new `Effect.runPromiseWith` runtime with its own root scope. Effects piped through separate `provideInstance` calls run in different runtimes. This matters for `InstanceState` (backed by `ScopedCache`): while the `ScopedCache` object is shared across runtimes, concurrent `ScopedCache.get` calls from different runtimes can race on cache entry creation, leading to flaky test timeouts.
+
+**Rule of thumb:** Use `provideTmpdirInstance` (or `withDir`) to wrap all effects that share the same `InstanceState` in a single `provideInstance` call. Avoid piping individual effects through separate `provideInstance` calls when they access the same `InstanceState`-managed state. `tmpdirScoped` + `withProvided` is only safe when effects don't share `InstanceState` state (e.g., different directories).
+
 ### Style
 
 - Define `const it = testEffect(...)` near the top of the file.

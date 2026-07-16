@@ -769,33 +769,33 @@ it.live("reply - reject with message throws CorrectedError", () =>
 )
 
 it.live("reply - always persists approval and resolves", () =>
-  Effect.gen(function* () {
-    const dir = yield* tmpdirScoped({ git: true })
-    const run = withProvided(dir)
-    const fiber = yield* ask({
-      id: PermissionID.make("per_test3"),
-      sessionID: SessionID.make("session_test"),
-      permission: "bash",
-      patterns: ["ls"],
-      metadata: {},
-      always: ["ls"],
-      ruleset: [],
-    }).pipe(run, Effect.forkScoped)
+  withDir({ git: true }, () =>
+    Effect.gen(function* () {
+      const fiber = yield* ask({
+        id: PermissionID.make("per_test3"),
+        sessionID: SessionID.make("session_test"),
+        permission: "bash",
+        patterns: ["ls"],
+        metadata: {},
+        always: ["ls"],
+        ruleset: [],
+      }).pipe(Effect.forkScoped)
 
-    yield* waitForPending(1).pipe(run)
-    yield* reply({ requestID: PermissionID.make("per_test3"), reply: "always" }).pipe(run)
-    yield* Fiber.join(fiber)
+      yield* waitForPending(1)
+      yield* reply({ requestID: PermissionID.make("per_test3"), reply: "always" })
+      yield* Fiber.join(fiber)
 
-    const result = yield* ask({
-      sessionID: SessionID.make("session_test2"),
-      permission: "bash",
-      patterns: ["ls"],
-      metadata: {},
-      always: [],
-      ruleset: [],
-    }).pipe(run)
-    expect(result).toBeUndefined()
-  }),
+      const result = yield* ask({
+        sessionID: SessionID.make("session_test2"),
+        permission: "bash",
+        patterns: ["ls"],
+        metadata: {},
+        always: [],
+        ruleset: [],
+      })
+      expect(result).toBeUndefined()
+    }),
+  ),
 )
 
 it.live("reply - reject cancels all pending for same session", () =>
@@ -952,8 +952,6 @@ it.live("permission requests stay isolated by directory", () =>
   Effect.gen(function* () {
     const one = yield* tmpdirScoped({ git: true })
     const two = yield* tmpdirScoped({ git: true })
-    const runOne = withProvided(one)
-    const runTwo = withProvided(two)
 
     const a = yield* ask({
       id: PermissionID.make("per_dir_a"),
@@ -963,7 +961,7 @@ it.live("permission requests stay isolated by directory", () =>
       metadata: {},
       always: [],
       ruleset: [],
-    }).pipe(runOne, Effect.forkScoped)
+    }).pipe(provideInstance(one), Effect.forkScoped)
 
     const b = yield* ask({
       id: PermissionID.make("per_dir_b"),
@@ -973,18 +971,18 @@ it.live("permission requests stay isolated by directory", () =>
       metadata: {},
       always: [],
       ruleset: [],
-    }).pipe(runTwo, Effect.forkScoped)
+    }).pipe(provideInstance(two), Effect.forkScoped)
 
-    const onePending = yield* waitForPending(1).pipe(runOne)
-    const twoPending = yield* waitForPending(1).pipe(runTwo)
+    const onePending = yield* waitForPending(1).pipe(provideInstance(one))
+    const twoPending = yield* waitForPending(1).pipe(provideInstance(two))
 
     expect(onePending).toHaveLength(1)
     expect(twoPending).toHaveLength(1)
     expect(onePending[0].id).toBe(PermissionID.make("per_dir_a"))
     expect(twoPending[0].id).toBe(PermissionID.make("per_dir_b"))
 
-    yield* reply({ requestID: onePending[0].id, reply: "reject" }).pipe(runOne)
-    yield* reply({ requestID: twoPending[0].id, reply: "reject" }).pipe(runTwo)
+    yield* reply({ requestID: onePending[0].id, reply: "reject" }).pipe(provideInstance(one))
+    yield* reply({ requestID: twoPending[0].id, reply: "reject" }).pipe(provideInstance(two))
 
     yield* Fiber.await(a)
     yield* Fiber.await(b)
@@ -992,51 +990,51 @@ it.live("permission requests stay isolated by directory", () =>
 )
 
 it.live("pending permission rejects on instance dispose", () =>
-  Effect.gen(function* () {
-    const dir = yield* tmpdirScoped({ git: true })
-    const run = withProvided(dir)
-    const fiber = yield* ask({
-      id: PermissionID.make("per_dispose"),
-      sessionID: SessionID.make("session_dispose"),
-      permission: "bash",
-      patterns: ["ls"],
-      metadata: {},
-      always: [],
-      ruleset: [],
-    }).pipe(run, Effect.forkScoped)
+  withDir({ git: true }, (dir) =>
+    Effect.gen(function* () {
+      const fiber = yield* ask({
+        id: PermissionID.make("per_dispose"),
+        sessionID: SessionID.make("session_dispose"),
+        permission: "bash",
+        patterns: ["ls"],
+        metadata: {},
+        always: [],
+        ruleset: [],
+      }).pipe(Effect.forkScoped)
 
-    expect(yield* waitForPending(1).pipe(run)).toHaveLength(1)
-    yield* Effect.promise(() =>
-      WithInstance.provide({ directory: dir, fn: () => void InstanceRuntime.disposeInstance(Instance.current) }),
-    )
+      expect(yield* waitForPending(1)).toHaveLength(1)
+      yield* Effect.promise(() =>
+        WithInstance.provide({ directory: dir, fn: () => void InstanceRuntime.disposeInstance(Instance.current) }),
+      )
 
-    const exit = yield* Fiber.await(fiber)
-    expect(Exit.isFailure(exit)).toBe(true)
-    if (Exit.isFailure(exit)) expect(Cause.squash(exit.cause)).toBeInstanceOf(Permission.RejectedError)
-  }),
+      const exit = yield* Fiber.await(fiber)
+      expect(Exit.isFailure(exit)).toBe(true)
+      if (Exit.isFailure(exit)) expect(Cause.squash(exit.cause)).toBeInstanceOf(Permission.RejectedError)
+    }),
+  ),
 )
 
 it.live("pending permission rejects on instance reload", () =>
-  Effect.gen(function* () {
-    const dir = yield* tmpdirScoped({ git: true })
-    const run = withProvided(dir)
-    const fiber = yield* ask({
-      id: PermissionID.make("per_reload"),
-      sessionID: SessionID.make("session_reload"),
-      permission: "bash",
-      patterns: ["ls"],
-      metadata: {},
-      always: [],
-      ruleset: [],
-    }).pipe(run, Effect.forkScoped)
+  withDir({ git: true }, (dir) =>
+    Effect.gen(function* () {
+      const fiber = yield* ask({
+        id: PermissionID.make("per_reload"),
+        sessionID: SessionID.make("session_reload"),
+        permission: "bash",
+        patterns: ["ls"],
+        metadata: {},
+        always: [],
+        ruleset: [],
+      }).pipe(Effect.forkScoped)
 
-    expect(yield* waitForPending(1).pipe(run)).toHaveLength(1)
-    yield* Effect.promise(() => reloadTestInstance({ directory: dir }))
+      expect(yield* waitForPending(1)).toHaveLength(1)
+      yield* Effect.promise(() => reloadTestInstance({ directory: dir }))
 
-    const exit = yield* Fiber.await(fiber)
-    expect(Exit.isFailure(exit)).toBe(true)
-    if (Exit.isFailure(exit)) expect(Cause.squash(exit.cause)).toBeInstanceOf(Permission.RejectedError)
-  }),
+      const exit = yield* Fiber.await(fiber)
+      expect(Exit.isFailure(exit)).toBe(true)
+      if (Exit.isFailure(exit)) expect(Cause.squash(exit.cause)).toBeInstanceOf(Permission.RejectedError)
+    }),
+  ),
 )
 
 it.live("reply - does nothing for unknown requestID", () =>
@@ -1109,26 +1107,25 @@ it.live("ask - should deny even when an earlier pattern is ask", () =>
 )
 
 it.live("ask - abort should clear pending request", () =>
-  Effect.gen(function* () {
-    const dir = yield* tmpdirScoped({ git: true })
-    const run = withProvided(dir)
+  withDir({ git: true }, (dir) =>
+    Effect.gen(function* () {
+      const fiber = yield* ask({
+        id: PermissionID.make("per_reload"),
+        sessionID: SessionID.make("session_reload"),
+        permission: "bash",
+        patterns: ["ls"],
+        metadata: {},
+        always: [],
+        ruleset: [{ permission: "bash", pattern: "*", action: "ask" }],
+      }).pipe(Effect.forkScoped)
 
-    const fiber = yield* ask({
-      id: PermissionID.make("per_reload"),
-      sessionID: SessionID.make("session_reload"),
-      permission: "bash",
-      patterns: ["ls"],
-      metadata: {},
-      always: [],
-      ruleset: [{ permission: "bash", pattern: "*", action: "ask" }],
-    }).pipe(run, Effect.forkScoped)
+      const pending = yield* waitForPending(1)
+      expect(pending).toHaveLength(1)
+      yield* Effect.promise(() => reloadTestInstance({ directory: dir }))
 
-    const pending = yield* waitForPending(1).pipe(run)
-    expect(pending).toHaveLength(1)
-    yield* Effect.promise(() => reloadTestInstance({ directory: dir }))
-
-    const exit = yield* Fiber.await(fiber)
-    expect(Exit.isFailure(exit)).toBe(true)
-    if (Exit.isFailure(exit)) expect(Cause.squash(exit.cause)).toBeInstanceOf(Permission.RejectedError)
-  }),
+      const exit = yield* Fiber.await(fiber)
+      expect(Exit.isFailure(exit)).toBe(true)
+      if (Exit.isFailure(exit)) expect(Cause.squash(exit.cause)).toBeInstanceOf(Permission.RejectedError)
+    }),
+  ),
 )
