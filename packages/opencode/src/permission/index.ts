@@ -248,17 +248,18 @@ export const layer = Layer.effect(
       yield* Deferred.succeed(existing.deferred, undefined)
       if (input.reply === "once") return
 
-      for (const pattern of existing.info.always) {
-        approved.push({
-          permission: existing.info.permission,
-          pattern,
-          action: "allow",
-        })
-      }
-
       // Persist approved ruleset to database so "always allow" survives restarts
+      // Use transaction for atomicity — the approved array construction and insert
+      // must be atomic to prevent race conditions between concurrent reply("always") calls.
       const ctx = yield* InstanceState.context
-      Database.use((db) => {
+      Database.transaction((db) => {
+        for (const pattern of existing.info.always) {
+          approved.push({
+            permission: existing.info.permission,
+            pattern,
+            action: "allow",
+          })
+        }
         db.insert(PermissionTable)
           .values({ project_id: ctx.project.id, data: approved })
           .onConflictDoUpdate({ target: PermissionTable.project_id, set: { data: approved } })
