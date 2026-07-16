@@ -134,7 +134,7 @@ const ctx = LocalContext.create<{
   effects: (() => void | Promise<void>)[]
 }>("database")
 
-export function use<T>(callback: (trx: TxOrDb) => T): T {
+export function use<T>(callback: (trx: TxOrDb) => NotPromise<T>): NotPromise<T> {
   try {
     return callback(ctx.use().tx)
   } catch (err) {
@@ -157,7 +157,7 @@ export function effect(fn: () => any | Promise<any>) {
   }
 }
 
-type NotPromise<T> = T extends Promise<any> ? never : T
+export type NotPromise<T> = T extends Promise<any> ? never : T
 
 export function transaction<T>(
   callback: (tx: TxOrDb) => NotPromise<T>,

@@ -74,7 +74,7 @@ function fromRow(row: typeof WorkspaceTable.$inferSelect): Info {
 }
 
 const db = <T>(fn: (d: Parameters<typeof Database.use>[0] extends (trx: infer D) => any ? D : never) => T) =>
-  Effect.sync(() => Database.use(fn))
+  Effect.sync(() => Database.use(fn as (trx: Database.TxOrDb) => Database.NotPromise<T>))
 
 const log = Log.create({ service: "workspace-sync" })
 
