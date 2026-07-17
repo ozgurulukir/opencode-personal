@@ -27,3 +27,7 @@
 ## 2025-07-28 - Optimizing useFilteredList array allocations
 **Learning:** The `useFilteredList` hook processes large datasets for File Search and command palettes. Using chained array methods (like `pipe(..., flatMap(...))` and `.map(...)`) inside `createMemo` hooks for the `flat` and `keys` arrays caused unnecessary intermediate array allocations, creating GC pressure on every keystroke during text filtering.
 **Action:** Replace `pipe/flatMap` and `.map()` inside high-frequency `createMemo` blocks with pre-allocated arrays (`new Array(size)`) and standard `for` loops. This avoids creating closure arrays and reduces memory thrashing during typing in large lists.
+
+## 2025-07-28 - O(N^2) Array operations when parsing paths
+**Learning:** Parsing large lists of file paths for directory structure using array methods (`split`/`slice`/`join`) inside a `createMemo` (like `filter` in `file-tree.tsx`) causes significant GC pressure and O(D^2) complexity per path. For large workspaces, this makes rendering file trees extremely slow.
+**Action:** Replace `split`/`slice`/`join` operations with a simple `indexOf()` loop and `slice()` to parse paths iteratively. This changes the complexity to O(D) and avoids creating multiple arrays per path segment.
