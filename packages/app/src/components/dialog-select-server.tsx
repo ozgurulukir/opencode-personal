@@ -15,6 +15,7 @@ import { ServerHealthIndicator, ServerRow } from "@/components/server/server-row
 import { useLanguage } from "@/context/language"
 import { usePlatform } from "@/context/platform"
 import { normalizeServerUrl, ServerConnection, useServer } from "@/context/server"
+import { Spinner } from "@opencode-ai/ui/spinner"
 import { type ServerHealth, useCheckServerHealth } from "@/utils/server-health"
 
 const DEFAULT_USERNAME = "opencode"
@@ -635,11 +636,16 @@ export function DialogSelectServer() {
             }
           >
             <Button variant="primary" size="large" onClick={submitForm} disabled={formBusy()} class="px-3 py-1.5">
-              {formBusy()
-                ? language.t("dialog.server.add.checking")
-                : isAddMode()
-                  ? language.t("dialog.server.add.button")
-                  : language.t("common.save")}
+              {formBusy() ? (
+                <div class="flex items-center gap-2">
+                  <Spinner class="size-4" />
+                  <span>{language.t("dialog.server.add.checking")}</span>
+                </div>
+              ) : isAddMode() ? (
+                language.t("dialog.server.add.button")
+              ) : (
+                language.t("common.save")
+              )}
             </Button>
           </Show>
         </div>

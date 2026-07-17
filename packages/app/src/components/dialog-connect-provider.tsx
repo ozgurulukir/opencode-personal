@@ -196,6 +196,7 @@ export function DialogConnectProvider(props: { provider: string }) {
     const [formStore, setFormStore] = createStore({
       value: {} as Record<string, string>,
       index: 0,
+      pending: false,
     })
 
     const prompts = createMemo<NonNullable<ProviderAuthMethod["prompts"]>>(() => {
@@ -239,8 +240,13 @@ export function DialogConnectProvider(props: { provider: string }) {
       e.preventDefault()
       const item = current()
       if (!item || item.prompt.type !== "text") return
-      if (!valid()) return
-      await next(item.index, formStore.value)
+      if (!valid() || formStore.pending) return
+      setFormStore("pending", true)
+      try {
+        await next(item.index, formStore.value)
+      } finally {
+        setFormStore("pending", false)
+      }
     }
 
     const item = () => current()
@@ -270,8 +276,15 @@ export function DialogConnectProvider(props: { provider: string }) {
                 setFormStore("value", prompt.key, value)
               }}
             />
-            <Button class="w-auto" type="submit" size="large" variant="primary" disabled={!valid()}>
-              {language.t("common.continue")}
+            <Button class="w-auto" type="submit" size="large" variant="primary" disabled={!valid() || formStore.pending}>
+              {formStore.pending ? (
+                <div class="flex items-center gap-2">
+                  <Spinner class="size-4" />
+                  <span>{language.t("common.continue")}</span>
+                </div>
+              ) : (
+                language.t("common.continue")
+              )}
             </Button>
           </Match>
           <Match when={item()?.prompt.type === "select"}>
@@ -394,10 +407,12 @@ export function DialogConnectProvider(props: { provider: string }) {
     const [formStore, setFormStore] = createStore({
       value: "",
       error: undefined as string | undefined,
+      pending: false,
     })
 
     async function handleSubmit(e: SubmitEvent) {
       e.preventDefault()
+      if (formStore.pending) return
 
       const form = e.currentTarget as HTMLFormElement
       const formData = new FormData(form)
@@ -409,14 +424,19 @@ export function DialogConnectProvider(props: { provider: string }) {
       }
 
       setFormStore("error", undefined)
-      await globalSDK.client.auth.set({
-        providerID: props.provider,
-        auth: {
-          type: "api",
-          key: apiKey,
-        },
-      })
-      await complete()
+      setFormStore("pending", true)
+      try {
+        await globalSDK.client.auth.set({
+          providerID: props.provider,
+          auth: {
+            type: "api",
+            key: apiKey,
+          },
+        })
+        await complete()
+      } finally {
+        setFormStore("pending", false)
+      }
     }
 
     return (
@@ -453,8 +473,15 @@ export function DialogConnectProvider(props: { provider: string }) {
             validationState={formStore.error ? "invalid" : undefined}
             error={formStore.error}
           />
-          <Button class="w-auto" type="submit" size="large" variant="primary">
-            {language.t("common.continue")}
+          <Button class="w-auto" type="submit" size="large" variant="primary" disabled={formStore.pending}>
+            {formStore.pending ? (
+              <div class="flex items-center gap-2">
+                <Spinner class="size-4" />
+                <span>{language.t("common.continue")}</span>
+              </div>
+            ) : (
+              language.t("common.continue")
+            )}
           </Button>
         </form>
       </div>
@@ -465,10 +492,12 @@ export function DialogConnectProvider(props: { provider: string }) {
     const [formStore, setFormStore] = createStore({
       value: "",
       error: undefined as string | undefined,
+      pending: false,
     })
 
     async function handleSubmit(e: SubmitEvent) {
       e.preventDefault()
+      if (formStore.pending) return
 
       const form = e.currentTarget as HTMLFormElement
       const formData = new FormData(form)
@@ -480,19 +509,24 @@ export function DialogConnectProvider(props: { provider: string }) {
       }
 
       setFormStore("error", undefined)
-      const result = await globalSDK.client.provider.oauth
-        .callback({
-          providerID: props.provider,
-          method: store.methodIndex,
-          code,
-        })
-        .then((value) => (value.error ? { ok: false as const, error: value.error } : { ok: true as const }))
-        .catch((error) => ({ ok: false as const, error }))
-      if (result.ok) {
-        await complete()
-        return
+      setFormStore("pending", true)
+      try {
+        const result = await globalSDK.client.provider.oauth
+          .callback({
+            providerID: props.provider,
+            method: store.methodIndex,
+            code,
+          })
+          .then((value) => (value.error ? { ok: false as const, error: value.error } : { ok: true as const }))
+          .catch((error) => ({ ok: false as const, error }))
+        if (result.ok) {
+          await complete()
+          return
+        }
+        setFormStore("error", formatError(result.error, language.t("provider.connect.oauth.code.invalid")))
+      } finally {
+        setFormStore("pending", false)
       }
-      setFormStore("error", formatError(result.error, language.t("provider.connect.oauth.code.invalid")))
     }
 
     return (
@@ -514,8 +548,15 @@ export function DialogConnectProvider(props: { provider: string }) {
             validationState={formStore.error ? "invalid" : undefined}
             error={formStore.error}
           />
-          <Button class="w-auto" type="submit" size="large" variant="primary">
-            {language.t("common.continue")}
+          <Button class="w-auto" type="submit" size="large" variant="primary" disabled={formStore.pending}>
+            {formStore.pending ? (
+              <div class="flex items-center gap-2">
+                <Spinner class="size-4" />
+                <span>{language.t("common.continue")}</span>
+              </div>
+            ) : (
+              language.t("common.continue")
+            )}
           </Button>
         </form>
       </div>
