@@ -219,6 +219,7 @@ export default function FileTree(props: {
       .replaceAll("\\", "/")
   const chain = props._chain ? [...props._chain, key(props.path)] : [key(props.path)]
 
+  // ⚡ Bolt Optimization: Use manual string parsing instead of expensive split()/slice()/join() to reduce GC pressure and O(D^2) complexity
   const filter = createMemo(() => {
     if (props._filter) return props._filter
 
@@ -229,11 +230,13 @@ export default function FileTree(props: {
     const dirs = new Set<string>()
 
     for (const item of allowed) {
-      const parts = item.split("/")
-      const parents = parts.slice(0, -1)
-      for (const [idx] of parents.entries()) {
-        const dir = parents.slice(0, idx + 1).join("/")
+      let idx = 0
+      while (true) {
+        idx = item.indexOf("/", idx)
+        if (idx === -1) break
+        const dir = item.slice(0, idx)
         if (dir) dirs.add(dir)
+        idx++
       }
     }
 
