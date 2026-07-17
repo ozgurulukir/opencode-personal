@@ -39,12 +39,19 @@ export function MessageNav(
                     tabindex={0}
                     onClick={handleClick}
                     onKeyDown={handleKeyPress}
+                    aria-label={local.getLabel?.(message) ?? message.summary?.title ?? i18n.t("ui.messageNav.newMessage")}
+                    aria-current={message.id === local.current?.id ? "true" : undefined}
                   >
                     <div data-slot="message-nav-tick-line" />
                   </div>
                 </Match>
                 <Match when={local.size === "normal"}>
-                  <button data-slot="message-nav-message-button" onClick={handleClick} onKeyDown={handleKeyPress}>
+                  <button
+                    data-slot="message-nav-message-button"
+                    onClick={handleClick}
+                    onKeyDown={handleKeyPress}
+                    aria-current={message.id === local.current?.id ? "true" : undefined}
+                  >
                     <DiffChanges changes={message.summary?.diffs ?? []} variant="bars" />
                     <div
                       data-slot="message-nav-title-preview"
