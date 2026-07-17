@@ -1677,7 +1677,10 @@ const resolveTools = Effect.fn("SessionPrompt.resolveTools")(function* (input: {
               ...(lastUser.system ? [lastUser.system] : []),
             ]
             const system: LLMSystemPrompt = {
-              prefix: "", // LLM.stream fills this from agent.prompt or SystemPrompt.provider
+              // Intentionally empty — LLM.stream resolves the prefix from
+              // `agent.prompt ?? SystemPrompt.provider(model).prefix`. See the
+              // SystemPrompt type JSDoc in llm.ts for the two-phase assembly rationale.
+              prefix: "",
               suffix: suffixParts.filter((x) => x).join("\n"),
             }
             const result = yield* handle.process({
