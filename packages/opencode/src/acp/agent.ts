@@ -207,7 +207,7 @@ export class Agent implements ACPAgent {
     switch (event.type) {
       case "permission.asked": {
         const permission = event.properties
-        const session = this.sessionManager.tryGet(permission.sessionID)
+        const session = await this.sessionManager.tryGetOrLoad(permission.sessionID)
         if (!session) return
 
         const prev = this.permissionQueues.get(permission.sessionID) ?? Promise.resolve()
@@ -290,7 +290,7 @@ export class Agent implements ACPAgent {
         log.info("message part updated", { event: event.properties })
         const props = event.properties
         const part = props.part
-        const session = this.sessionManager.tryGet(part.sessionID)
+        const session = await this.sessionManager.tryGetOrLoad(part.sessionID)
         if (!session) return
         const sessionId = session.id
 
@@ -309,7 +309,7 @@ export class Agent implements ACPAgent {
 
       case "message.part.delta": {
         const props = event.properties
-        const session = this.sessionManager.tryGet(props.sessionID)
+        const session = await this.sessionManager.tryGetOrLoad(props.sessionID)
         if (!session) return
         const sessionId = session.id
 
@@ -993,7 +993,7 @@ export class Agent implements ACPAgent {
     sessionId: string,
   ): Promise<{ availableModes: ModeOption[]; currentModeId?: string }> {
     const availableModes = await this.loadAvailableModes(directory)
-    const storedModeId = this.sessionManager.get(sessionId).modeId
+    const storedModeId = (await this.sessionManager.getOrLoad(sessionId)).modeId
     if (storedModeId && availableModes.some((mode) => mode.id === storedModeId)) {
       return { availableModes, currentModeId: storedModeId }
     }
@@ -1012,7 +1012,7 @@ export class Agent implements ACPAgent {
   private async loadSessionMode(params: LoadSessionRequest) {
     const directory = params.cwd
     const sessionId = params.sessionId
-    const model = this.sessionManager.get(sessionId).model ?? (await defaultModel(this.config, directory))
+    const model = (await this.sessionManager.getOrLoad(sessionId)).model ?? (await defaultModel(this.config, directory))
 
     const providers = await this.sdk.config.providers({ directory }).then((x) => x.data!.providers)
     const entries = sortProvidersByName(providers)
@@ -1127,7 +1127,7 @@ export class Agent implements ACPAgent {
   }
 
   async setSessionMode(params: SetSessionModeRequest): Promise<SetSessionModeResponse | void> {
-    const session = this.sessionManager.get(params.sessionId)
+    const session = await this.sessionManager.getOrLoad(params.sessionId)
     const availableModes = await this.loadAvailableModes(session.cwd)
     if (!availableModes.some((mode) => mode.id === params.modeId)) {
       throw new Error(`Agent not found: ${params.modeId}`)
@@ -1136,7 +1136,7 @@ export class Agent implements ACPAgent {
   }
 
   async setSessionConfigOption(params: SetSessionConfigOptionRequest): Promise<SetSessionConfigOptionResponse> {
-    const session = this.sessionManager.get(params.sessionId)
+    const session = await this.sessionManager.getOrLoad(params.sessionId)
     const providers = await this.sdk.config
       .providers({ directory: session.cwd }, { throwOnError: true })
       .then((x) => x.data!.providers)
@@ -1166,7 +1166,7 @@ export class Agent implements ACPAgent {
       throw RequestError.invalidParams(JSON.stringify({ error: `Unknown config option: ${params.configId}` }))
     }
 
-    const updatedSession = this.sessionManager.get(session.id)
+    const updatedSession = await this.sessionManager.getOrLoad(session.id)
     const model = updatedSession.model ?? (await defaultModel(this.config, session.cwd))
     const availableVariants = modelVariantsFromProviders(entries, model)
     const currentModelId = formatModelIdWithVariant(model, updatedSession.variant, availableVariants, false)
@@ -1189,7 +1189,7 @@ export class Agent implements ACPAgent {
 
   async prompt(params: PromptRequest) {
     const sessionID = params.sessionId
-    const session = this.sessionManager.get(sessionID)
+    const session = await this.sessionManager.getOrLoad(sessionID)
     const directory = session.cwd
 
     const current = session.model
@@ -1371,7 +1371,7 @@ export class Agent implements ACPAgent {
   }
 
   async cancel(params: CancelNotification) {
-    const session = this.sessionManager.get(params.sessionId)
+    const session = await this.sessionManager.getOrLoad(params.sessionId)
     await this.config.sdk.session.abort(
       {
         sessionID: params.sessionId,
