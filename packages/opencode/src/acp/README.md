@@ -108,21 +108,23 @@ This implementation follows the ACP specification v1:
 
 ## Current Limitations
 
+### Implemented
+
+1. **Streaming Responses** - Streams progressive responses via `session/update` notifications (text deltas, reasoning chunks)
+2. **Tool Call Reporting** - Reports tool execution progress (pending → in_progress → completed/failed) with content, diffs, and raw output
+3. **Session Modes** - Mode switching via `setSessionMode` and `setSessionConfigOption`
+4. **Session Persistence** - `session/load` replays full conversation history including tool calls
+5. **Plan Updates** - `todowrite` tool results are forwarded as `plan` session updates
+6. **Usage Tracking** - Token usage and cost reported via `usage_update` notifications
+7. **Permission Requests** - Forwarded to ACP client with allow/reject options
+
 ### Not Yet Implemented
 
-1. **Streaming Responses** - Currently returns complete responses instead of streaming via `session/update` notifications
-2. **Tool Call Reporting** - Doesn't report tool execution progress
-3. **Session Modes** - No mode switching support yet
-4. **Authentication** - No actual auth implementation
-5. **Terminal Support** - Placeholder only
-6. **Session Persistence** - `session/load` doesn't restore actual conversation history
+1. **Authentication** - No actual auth implementation (stub)
+2. **Terminal Support** - Placeholder only
 
 ### Future Enhancements
 
-- **Real-time Streaming**: Implement `session/update` notifications for progressive responses
-- **Tool Call Visibility**: Report tool executions as they happen
-- **Session Persistence**: Save and restore full conversation history
-- **Mode Support**: Implement different operational modes (ask, code, etc.)
 - **Enhanced Permissions**: More sophisticated permission handling
 - **Terminal Integration**: Full terminal support via opencode's bash tool
 
