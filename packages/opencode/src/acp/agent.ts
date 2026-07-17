@@ -62,6 +62,19 @@ const DEFAULT_VARIANT_VALUE = "default"
 
 const log = Log.create({ service: "acp-agent" })
 
+function unwrapSyncEvent(event: any): any {
+  if (event?.type !== "sync" || !event.syncEvent) return event
+  const syncEvent = event.syncEvent
+  // Strip version suffix: "message.part.updated.1" → "message.part.updated"
+  const type = syncEvent.type.replace(/\.\d+$/, "")
+  const data = syncEvent.data ?? {}
+  return {
+    id: syncEvent.id ?? event.id,
+    type,
+    properties: data,
+  }
+}
+
 async function getContextLimit(
   sdk: OpencodeClient,
   providerID: ProviderID,
@@ -189,7 +202,8 @@ export class Agent implements ACPAgent {
     }
   }
 
-  private async handleEvent(event: Event) {
+  private async handleEvent(rawEvent: Event) {
+    const event = unwrapSyncEvent(rawEvent) as Event
     switch (event.type) {
       case "permission.asked": {
         const permission = event.properties
@@ -281,152 +295,8 @@ export class Agent implements ACPAgent {
         const sessionId = session.id
 
         if (part.type === "tool") {
-          await this.toolStart(sessionId, part)
-
-          switch (part.state.status) {
-            case "pending":
-              this.shellSnapshots.delete(part.callID)
-              return
-
-            case "running":
-              const output = this.shellOutput(part)
-              const content: ToolCallContent[] = []
-              if (output) {
-                const hash = Hash.fast(output)
-                if (part.tool === ShellID.ToolID) {
-                  if (this.shellSnapshots.get(part.callID) === hash) {
-                    await this.connection
-                      .sessionUpdate({
-                        sessionId,
-                        update: {
-                          sessionUpdate: "tool_call_update",
-                          toolCallId: part.callID,
-                          status: "in_progress",
-                          kind: toToolKind(part.tool),
-                          title: part.tool,
-                          locations: toLocations(part.tool, part.state.input),
-                          rawInput: part.state.input,
-                        },
-                      })
-                      .catch((error) => {
-                        log.error("failed to send tool in_progress to ACP", { error })
-                      })
-                    return
-                  }
-                  this.shellSnapshots.set(part.callID, hash)
-                }
-                content.push({
-                  type: "content",
-                  content: {
-                    type: "text",
-                    text: output,
-                  },
-                })
-              }
-              await this.connection
-                .sessionUpdate({
-                  sessionId,
-                  update: {
-                    sessionUpdate: "tool_call_update",
-                    toolCallId: part.callID,
-                    status: "in_progress",
-                    kind: toToolKind(part.tool),
-                    title: part.tool,
-                    locations: toLocations(part.tool, part.state.input),
-                    rawInput: part.state.input,
-                    ...(content.length > 0 && { content }),
-                  },
-                })
-                .catch((error) => {
-                  log.error("failed to send tool in_progress to ACP", { error })
-                })
-              return
-
-            case "completed": {
-              this.toolStarts.delete(part.callID)
-              this.shellSnapshots.delete(part.callID)
-              const kind = toToolKind(part.tool)
-              const content = completedToolContent(part, kind)
-
-              if (part.tool === "todowrite") {
-                const parsedTodos = decodeTodos(part.state.output)
-                if (Result.isSuccess(parsedTodos)) {
-                  await this.connection
-                    .sessionUpdate({
-                      sessionId,
-                      update: {
-                        sessionUpdate: "plan",
-                        entries: parsedTodos.success.map((todo) => {
-                          const status: PlanEntry["status"] =
-                            todo.status === "cancelled" ? "completed" : (todo.status as PlanEntry["status"])
-                          return {
-                            priority: "medium",
-                            status,
-                            content: todo.content,
-                          }
-                        }),
-                      },
-                    })
-                    .catch((error) => {
-                      log.error("failed to send session update for todo", { error })
-                    })
-                } else {
-                  log.error("failed to parse todo output", { error: parsedTodos.failure })
-                }
-              }
-
-              await this.connection
-                .sessionUpdate({
-                  sessionId,
-                  update: {
-                    sessionUpdate: "tool_call_update",
-                    toolCallId: part.callID,
-                    status: "completed",
-                    kind,
-                    content,
-                    title: part.state.title,
-                    rawInput: part.state.input,
-                    rawOutput: completedToolRawOutput(part),
-                  },
-                })
-                .catch((error) => {
-                  log.error("failed to send tool completed to ACP", { error })
-                })
-              return
-            }
-            case "error":
-              this.toolStarts.delete(part.callID)
-              this.shellSnapshots.delete(part.callID)
-              await this.connection
-                .sessionUpdate({
-                  sessionId,
-                  update: {
-                    sessionUpdate: "tool_call_update",
-                    toolCallId: part.callID,
-                    status: "failed",
-                    kind: toToolKind(part.tool),
-                    title: part.tool,
-                    rawInput: part.state.input,
-                    content: [
-                      {
-                        type: "content",
-                        content: {
-                          type: "text",
-                          text: part.state.error,
-                        },
-                      },
-                    ],
-                    rawOutput: {
-                      error: part.state.error,
-                      metadata: part.state.metadata,
-                    },
-                  },
-                })
-                .catch((error) => {
-                  log.error("failed to send tool error to ACP", { error })
-                })
-              return
-          }
+          await this.handleToolPartUpdate(sessionId, part)
+          return
         }
 
         // ACP clients already know the prompt they just submitted, so replaying
@@ -499,6 +369,11 @@ export class Agent implements ACPAgent {
               log.error("failed to send reasoning delta to ACP", { error })
             })
         }
+        return
+      }
+
+      case "message.part.removed": {
+        // No-op: part removal doesn't need to be forwarded to ACP clients
         return
       }
     }
@@ -791,125 +666,7 @@ export class Agent implements ACPAgent {
 
     for (const part of message.parts) {
       if (part.type === "tool") {
-        await this.toolStart(sessionId, part)
-        switch (part.state.status) {
-          case "pending":
-            this.shellSnapshots.delete(part.callID)
-            break
-          case "running":
-            const output = this.shellOutput(part)
-            const runningContent: ToolCallContent[] = []
-            if (output) {
-              runningContent.push({
-                type: "content",
-                content: {
-                  type: "text",
-                  text: output,
-                },
-              })
-            }
-            await this.connection
-              .sessionUpdate({
-                sessionId,
-                update: {
-                  sessionUpdate: "tool_call_update",
-                  toolCallId: part.callID,
-                  status: "in_progress",
-                  kind: toToolKind(part.tool),
-                  title: part.tool,
-                  locations: toLocations(part.tool, part.state.input),
-                  rawInput: part.state.input,
-                  ...(runningContent.length > 0 && { content: runningContent }),
-                },
-              })
-              .catch((err) => {
-                log.error("failed to send tool in_progress to ACP", { error: err })
-              })
-            break
-          case "completed":
-            this.toolStarts.delete(part.callID)
-            this.shellSnapshots.delete(part.callID)
-            const kind = toToolKind(part.tool)
-            const content = completedToolContent(part, kind)
-
-            if (part.tool === "todowrite") {
-              const parsedTodos = decodeTodos(part.state.output)
-              if (Result.isSuccess(parsedTodos)) {
-                await this.connection
-                  .sessionUpdate({
-                    sessionId,
-                    update: {
-                      sessionUpdate: "plan",
-                      entries: parsedTodos.success.map((todo) => {
-                        const status: PlanEntry["status"] =
-                          todo.status === "cancelled" ? "completed" : (todo.status as PlanEntry["status"])
-                        return {
-                          priority: "medium",
-                          status,
-                          content: todo.content,
-                        }
-                      }),
-                    },
-                  })
-                  .catch((err) => {
-                    log.error("failed to send session update for todo", { error: err })
-                  })
-              } else {
-                log.error("failed to parse todo output", { error: parsedTodos.failure })
-              }
-            }
-
-            await this.connection
-              .sessionUpdate({
-                sessionId,
-                update: {
-                  sessionUpdate: "tool_call_update",
-                  toolCallId: part.callID,
-                  status: "completed",
-                  kind,
-                  content,
-                  title: part.state.title,
-                  rawInput: part.state.input,
-                  rawOutput: completedToolRawOutput(part),
-                },
-              })
-              .catch((err) => {
-                log.error("failed to send tool completed to ACP", { error: err })
-              })
-            break
-          case "error":
-            this.toolStarts.delete(part.callID)
-            this.shellSnapshots.delete(part.callID)
-            await this.connection
-              .sessionUpdate({
-                sessionId,
-                update: {
-                  sessionUpdate: "tool_call_update",
-                  toolCallId: part.callID,
-                  status: "failed",
-                  kind: toToolKind(part.tool),
-                  title: part.tool,
-                  rawInput: part.state.input,
-                  content: [
-                    {
-                      type: "content",
-                      content: {
-                        type: "text",
-                        text: part.state.error,
-                      },
-                    },
-                  ],
-                  rawOutput: {
-                    error: part.state.error,
-                    metadata: part.state.metadata,
-                  },
-                },
-              })
-              .catch((err) => {
-                log.error("failed to send tool error to ACP", { error: err })
-              })
-            break
-        }
+        await this.handleToolPartUpdate(sessionId, part)
       } else if (part.type === "text") {
         if (part.text) {
           const audience: Role[] | undefined = part.synthetic ? ["assistant"] : part.ignored ? ["user"] : undefined
@@ -1030,6 +787,156 @@ export class Agent implements ACPAgent {
             })
         }
       }
+    }
+  }
+
+  private async handleToolPartUpdate(sessionId: string, part: ToolPart) {
+    await this.toolStart(sessionId, part)
+    switch (part.state.status) {
+      case "pending":
+        this.shellSnapshots.delete(part.callID)
+        return
+
+      case "running": {
+        const output = this.shellOutput(part)
+        const content: ToolCallContent[] = []
+        if (output) {
+          const hash = Hash.fast(output)
+          if (part.tool === ShellID.ToolID) {
+            if (this.shellSnapshots.get(part.callID) === hash) {
+              await this.connection
+                .sessionUpdate({
+                  sessionId,
+                  update: {
+                    sessionUpdate: "tool_call_update",
+                    toolCallId: part.callID,
+                    status: "in_progress",
+                    kind: toToolKind(part.tool),
+                    title: part.tool,
+                    locations: toLocations(part.tool, part.state.input),
+                    rawInput: part.state.input,
+                  },
+                })
+                .catch((error) => {
+                  log.error("failed to send tool in_progress to ACP", { error })
+                })
+              return
+            }
+            this.shellSnapshots.set(part.callID, hash)
+          }
+          content.push({
+            type: "content",
+            content: {
+              type: "text",
+              text: output,
+            },
+          })
+        }
+        await this.connection
+          .sessionUpdate({
+            sessionId,
+            update: {
+              sessionUpdate: "tool_call_update",
+              toolCallId: part.callID,
+              status: "in_progress",
+              kind: toToolKind(part.tool),
+              title: part.tool,
+              locations: toLocations(part.tool, part.state.input),
+              rawInput: part.state.input,
+              ...(content.length > 0 && { content }),
+            },
+          })
+          .catch((error) => {
+            log.error("failed to send tool in_progress to ACP", { error })
+          })
+        return
+      }
+
+      case "completed": {
+        this.toolStarts.delete(part.callID)
+        this.shellSnapshots.delete(part.callID)
+        const kind = toToolKind(part.tool)
+        const content = completedToolContent(part, kind)
+
+        if (part.tool === "todowrite") {
+          const parsedTodos = decodeTodos(part.state.output)
+          if (Result.isSuccess(parsedTodos)) {
+            await this.connection
+              .sessionUpdate({
+                sessionId,
+                update: {
+                  sessionUpdate: "plan",
+                  entries: parsedTodos.success.map((todo) => {
+                    const status: PlanEntry["status"] =
+                      todo.status === "cancelled" ? "completed" : (todo.status as PlanEntry["status"])
+                    return {
+                      priority: "medium",
+                      status,
+                      content: todo.content,
+                    }
+                  }),
+                },
+              })
+              .catch((error) => {
+                log.error("failed to send session update for todo", { error })
+              })
+          } else {
+            log.error("failed to parse todo output", { error: parsedTodos.failure })
+          }
+        }
+
+        await this.connection
+          .sessionUpdate({
+            sessionId,
+            update: {
+              sessionUpdate: "tool_call_update",
+              toolCallId: part.callID,
+              status: "completed",
+              kind,
+              content,
+              title: part.state.title,
+              rawInput: part.state.input,
+              rawOutput: completedToolRawOutput(part),
+            },
+          })
+          .catch((error) => {
+            log.error("failed to send tool completed to ACP", { error })
+          })
+        return
+      }
+
+      case "error":
+        this.toolStarts.delete(part.callID)
+        this.shellSnapshots.delete(part.callID)
+        await this.connection
+          .sessionUpdate({
+            sessionId,
+            update: {
+              sessionUpdate: "tool_call_update",
+              toolCallId: part.callID,
+              status: "failed",
+              kind: toToolKind(part.tool),
+              title: part.tool,
+              rawInput: part.state.input,
+              content: [
+                {
+                  type: "content",
+                  content: {
+                    type: "text",
+                    text: part.state.error,
+                  },
+                },
+              ],
+              rawOutput: {
+                error: part.state.error,
+                metadata: part.state.metadata,
+              },
+            },
+          })
+          .catch((error) => {
+            log.error("failed to send tool error to ACP", { error })
+          })
+        return
     }
   }
 
