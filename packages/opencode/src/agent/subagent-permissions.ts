@@ -2,6 +2,23 @@ import type { Permission } from "../permission"
 import type { Agent } from "./agent"
 
 /**
+ * Deduplicate a permission ruleset by `permission:pattern` key, preserving
+ * first-occurrence order. Used to collapse duplicate `(permission, pattern)`
+ * entries from parent agent + parent session deny rules.
+ */
+function dedupe(rules: Permission.Ruleset): Permission.Ruleset {
+  const seen = new Set<string>()
+  const result: Permission.Ruleset = []
+  for (const rule of rules) {
+    const key = `${rule.permission}:${rule.pattern}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    result.push(rule)
+  }
+  return result
+}
+
+/**
  * Build the `permission` ruleset for a subagent's session when it's spawned
  * via the task tool. Combines:
  *
@@ -13,6 +30,10 @@ import type { Agent } from "./agent"
  *    same forwarding the original code already did.
  * 3. Default `todowrite` and `task` denies if the subagent's own ruleset
  *    doesn't already permit them.
+ *
+ * Duplicate `(permission, pattern)` entries from parent agent + parent
+ * session are collapsed (first wins, so parent agent denies take priority
+ * since they're listed first).
  */
 export function deriveSubagentSessionPermission(input: {
   parentSessionPermission: Permission.Ruleset
@@ -22,14 +43,14 @@ export function deriveSubagentSessionPermission(input: {
   const canTask = input.subagent.permission.some((rule) => rule.permission === "task" && rule.action === "allow")
   const canTodo = input.subagent.permission.some((rule) => rule.permission === "todowrite" && rule.action === "allow")
   const parentAgentDenies = input.parentAgent?.permission.filter((rule) => rule.action === "deny") ?? []
-  return [
+  return dedupe([
     ...parentAgentDenies,
     ...input.parentSessionPermission.filter(
       (rule) => rule.permission === "external_directory" || rule.action === "deny",
     ),
     ...(canTodo ? [] : [{ permission: "todowrite" as const, pattern: "*" as const, action: "deny" as const }]),
     ...(canTask ? [] : [{ permission: "task" as const, pattern: "*" as const, action: "deny" as const }]),
-  ]
+  ])
 }
 
 /**

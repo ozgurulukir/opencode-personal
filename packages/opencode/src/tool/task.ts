@@ -112,7 +112,7 @@ export const TaskTool = Tool.define(
         },
       })
 
-      const ops = ctx.extra?.promptOps as TaskPromptOps
+      const ops = ctx.extra?.promptOps
       if (!ops) return yield* Effect.fail(new Error("TaskTool requires promptOps in ctx.extra"))
       const runCancel = yield* EffectBridge.make()
 
