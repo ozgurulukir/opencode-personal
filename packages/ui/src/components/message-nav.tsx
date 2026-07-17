@@ -49,7 +49,6 @@ export function MessageNav(
                   <button
                     data-slot="message-nav-message-button"
                     onClick={handleClick}
-                    onKeyDown={handleKeyPress}
                     aria-current={message.id === local.current?.id ? "true" : undefined}
                   >
                     <DiffChanges changes={message.summary?.diffs ?? []} variant="bars" />
