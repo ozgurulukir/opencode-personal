@@ -7,6 +7,7 @@ const log = Log.create({ service: "acp-session-manager" })
 
 export class ACPSessionManager {
   private sessions = new Map<string, ACPSessionState>()
+  private pendingLoads = new Map<string, Promise<ACPSessionState>>()
   private sdk: OpencodeClient
 
   constructor(sdk: OpencodeClient) {
@@ -15,6 +16,50 @@ export class ACPSessionManager {
 
   tryGet(sessionId: string): ACPSessionState | undefined {
     return this.sessions.get(sessionId)
+  }
+
+  async getOrLoad(sessionId: string): Promise<ACPSessionState> {
+    const cached = this.sessions.get(sessionId)
+    if (cached) return cached
+
+    const pending = this.pendingLoads.get(sessionId)
+    if (pending) return pending
+
+    const loadPromise = this.loadFromServer(sessionId)
+    this.pendingLoads.set(sessionId, loadPromise)
+    try {
+      const session = await loadPromise
+      return session
+    } finally {
+      this.pendingLoads.delete(sessionId)
+    }
+  }
+
+  async tryGetOrLoad(sessionId: string): Promise<ACPSessionState | undefined> {
+    const cached = this.sessions.get(sessionId)
+    if (cached) return cached
+
+    try {
+      return await this.getOrLoad(sessionId)
+    } catch {
+      return undefined
+    }
+  }
+
+  private async loadFromServer(sessionId: string): Promise<ACPSessionState> {
+    const session = await this.sdk.session
+      .get({ sessionID: sessionId }, { throwOnError: true })
+      .then((x) => x.data!)
+
+    const state: ACPSessionState = {
+      id: sessionId,
+      cwd: session.directory,
+      mcpServers: [],
+      createdAt: new Date(session.time.created),
+    }
+    log.info("auto_loaded_session", { sessionId, directory: state.cwd })
+    this.sessions.set(sessionId, state)
+    return state
   }
 
   async create(cwd: string, mcpServers: McpServer[], model?: ACPSessionState["model"]): Promise<ACPSessionState> {
