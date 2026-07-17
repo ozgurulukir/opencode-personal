@@ -3,7 +3,7 @@ import * as Log from "@opencode-ai/core/util/log"
 import { Context, Effect, Layer, Record } from "effect"
 import * as Stream from "effect/Stream"
 import { streamText, wrapLanguageModel, type ModelMessage, type Tool, tool, jsonSchema } from "ai"
-import { mergeDeep } from "remeda"
+import { MergeOptions } from "./merge-options"
 import { GitLabWorkflowLanguageModel } from "gitlab-ai-provider"
 import { ProviderTransform } from "@/provider/transform"
 import { Config } from "@/config/config"
@@ -30,12 +30,22 @@ const log = Log.create({ service: "llm" })
 export const OUTPUT_TOKEN_MAX = ProviderTransform.OUTPUT_TOKEN_MAX
 type Result = Awaited<ReturnType<typeof streamText>>
 
-// Avoid re-instantiating remeda's deep merge types in this hot LLM path; the runtime behavior is still mergeDeep.
-const mergeOptions = (target: Record<string, any>, source: Record<string, any> | undefined): Record<string, any> =>
-  mergeDeep(target, source ?? {}) as Record<string, any>
+// Extracted to merge-options.ts for testability
 
+/**
+ * Two-phase system prompt assembly.
+ *
+ * The prefix (cacheable core identity) is filled by `LLM.stream` from
+ * `agent.prompt ?? SystemPrompt.provider(model).prefix`. Callers in
+ * `prompt.ts` leave `prefix` as an empty string and only populate `suffix`
+ * (dynamic context: environment, skills, structured output, user system prompt).
+ *
+ * This split keeps the core+delta selection (which depends on the resolved
+ * model and agent) co-located with the LLM submission logic, while the
+ * dynamic suffix is assembled in the runLoop where session context is available.
+ */
 export type SystemPrompt = {
-  /** Cacheable core identity prompt (core + provider delta). */
+  /** Cacheable core identity prompt (core + provider delta). Set by LLM.stream. */
   prefix: string
   /** Dynamic context: environment, skills, structured output hints, user system prompt. */
   suffix: string
@@ -107,7 +117,9 @@ const live: Layer.Layer<
 
       const delivery = ProviderTransform.systemPromptDelivery(item.id, info)
 
-      // Cacheable prefix: core identity prompt (stable across turns for same model/agent)
+      // Prefix resolution: agent-level override takes precedence, otherwise use
+      // the provider-specific core+delta. This is the second phase of the
+      // two-phase assembly documented on the SystemPrompt type.
       const prefix = input.agent.prompt ?? SystemPrompt.provider(input.model).prefix
       // Dynamic suffix: environment, skills, structured output, user system
       const suffix = input.system.suffix
@@ -138,7 +150,15 @@ const live: Layer.Layer<
             sessionID: input.sessionID,
             providerOptions: item.options,
           })
-      const options = mergeOptions(mergeOptions(mergeOptions(base, input.model.options), input.agent.options), variant)
+      const options = MergeOptions.mergeOptions(
+        MergeOptions.mergeOptions(
+          MergeOptions.mergeOptions(base, input.model.options, "model.options"),
+          input.agent.options,
+          "agent.options",
+        ),
+        variant,
+        "variant",
+      )
       if (delivery.type === "instructions") {
         options.instructions = [system.prefix, system.suffix].filter((x) => x).join("\n")
       }

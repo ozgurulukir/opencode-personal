@@ -28,15 +28,16 @@ export function provider(model: Provider.Model): Prompt {
 
 function matchDelta(model: Provider.Model): string {
   const id = model.api.id
-  if (id.includes("gpt-4") || id.includes("o1") || id.includes("o3")) return PROMPT_DELTA_BEAST
-  if (id.includes("gpt")) {
-    if (id.includes("codex")) return PROMPT_DELTA_CODEX
-    return PROMPT_DELTA_GPT
-  }
-  if (id.includes("gemini-")) return PROMPT_DELTA_GEMINI
-  if (id.includes("claude")) return PROMPT_DELTA_ANTHROPIC
-  if (id.toLowerCase().includes("trinity")) return PROMPT_DELTA_TRINITY
-  if (id.toLowerCase().includes("kimi")) return PROMPT_DELTA_KIMI
+  // Beast delta: GPT-4 family (incl. gpt-4o, gpt-4.1) and o1/o3 reasoning models.
+  // Anchored so "megpt-4" can't false-match, but "gpt-4o-beast" still does (starts with gpt-4).
+  if (/(?:^|\/)gpt-4|(?:\b|-)o[13]\b/.test(id)) return PROMPT_DELTA_BEAST
+  // Codex checked before generic GPT to avoid false match on the broader gpt rule.
+  if (/codex/i.test(id)) return PROMPT_DELTA_CODEX
+  if (/(?:^|\/)gpt/.test(id)) return PROMPT_DELTA_GPT
+  if (/gemini-/i.test(id)) return PROMPT_DELTA_GEMINI
+  if (/claude/i.test(id)) return PROMPT_DELTA_ANTHROPIC
+  if (/trinity/i.test(id)) return PROMPT_DELTA_TRINITY
+  if (/kimi/i.test(id)) return PROMPT_DELTA_KIMI
   return PROMPT_DELTA_DEFAULT
 }
 

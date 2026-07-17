@@ -13,7 +13,6 @@ import type { MessageID } from "./schema"
 const FILES = [
   "AGENTS.md",
   ...(Flag.OPENCODE_DISABLE_CLAUDE_CODE_PROMPT ? [] : ["CLAUDE.md"]),
-  "CONTEXT.md", // deprecated
 ]
 
 function extract(messages: MessageV2.WithParts[]) {
