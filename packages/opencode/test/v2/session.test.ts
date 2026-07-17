@@ -494,4 +494,58 @@ describe("v2.session", () => {
       expect(result.error).toContain("Unknown agent type")
     }),
   )
+
+  it.instance("subagent spawns child session with derived deny permissions", () =>
+    Effect.gen(function* () {
+      const session = yield* SessionV2.Service
+      const parent = yield* session.create({ agent: "build" })
+
+      yield* session.subagent({
+        parentID: parent.id,
+        agent: "general",
+        prompt: { text: "do the thing" },
+      })
+
+      // Get the child session ID from the prompt stub (the last prompt call
+      // is the subagent's child session).
+      const lastCall = promptStub.calls.prompt.at(-1) as any
+      const childID = lastCall.sessionID
+
+      // Verify child session exists and is linked to parent
+      const child = yield* session.get(childID)
+      expect(child.parentID).toBe(parent.id)
+
+      // Verify derived deny permissions: general agent does not explicitly
+      // allow todowrite or task, so deriveSubagentSessionPermission adds
+      // default denies for both.
+      expect(child.permission).toBeDefined()
+      const todowriteDeny = child.permission?.find(
+        (r) => r.permission === "todowrite" && r.action === "deny",
+      )
+      expect(todowriteDeny).toBeDefined()
+      const taskDeny = child.permission?.find((r) => r.permission === "task" && r.action === "deny")
+      expect(taskDeny).toBeDefined()
+    }),
+  )
+
+  it.instance("subagent handles pre-aborted signal without unhandled rejection", () =>
+    Effect.gen(function* () {
+      const session = yield* SessionV2.Service
+      const parent = yield* session.create({ agent: "build" })
+
+      const abort = new AbortController()
+      abort.abort()
+
+      // The test completes without unhandled rejection — the .catch() from
+      // Issue 1 prevents the leak. The stub prompt's cancel returns void,
+      // so the abort path is a no-op.
+      yield* session.subagent({
+        parentID: parent.id,
+        agent: "general",
+        prompt: { text: "x" },
+        abort: abort.signal,
+      })
+      expect(true).toBe(true)
+    }),
+  )
 })

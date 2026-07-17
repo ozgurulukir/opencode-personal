@@ -1,6 +1,7 @@
 import { Effect, Schema } from "effect"
 import { HttpClient } from "effect/unstable/http"
 import * as Tool from "./tool"
+import type { ToolContextExtra } from "./tool"
 import * as McpWebSearch from "./mcp-websearch"
 import DESCRIPTION from "./websearch.txt"
 import { Flag } from "@opencode-ai/core/flag/flag"
@@ -45,13 +46,11 @@ export function webSearchProviderLabel(provider: unknown) {
   return "Web Search"
 }
 
-export function webSearchModelName(extra: Tool.Context["extra"]) {
+export function webSearchModelName(extra: ToolContextExtra | undefined) {
   const model = extra?.model
-  if (!model || typeof model !== "object") return undefined
-  const api = "api" in model && model.api && typeof model.api === "object" ? model.api : undefined
-  const apiID = api && "id" in api && typeof api.id === "string" ? api.id : undefined
-  const id = "id" in model && typeof model.id === "string" ? model.id : undefined
-  return (apiID ?? id)?.slice(0, 100)
+  if (!model) return undefined
+  const apiID = model.api?.id
+  return (apiID ?? model.id)?.slice(0, 100)
 }
 
 function parallelAuthHeaders() {

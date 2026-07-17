@@ -4,6 +4,7 @@ import type { Permission } from "../permission"
 import type { SessionID, MessageID } from "../session/schema"
 import * as Truncate from "./truncate"
 import { Agent } from "@/agent/agent"
+import type { TaskPromptOps } from "./task"
 
 interface Metadata {
   [key: string]: any
@@ -12,13 +13,30 @@ interface Metadata {
 // TODO: remove this hack
 export type DynamicDescription = (agent: Agent.Info) => Effect.Effect<string>
 
+/**
+ * Typed extensions passed to tools via `ctx.extra`. Known fields are typed;
+ * the index signature preserves extensibility for tool-specific data.
+ */
+export interface ToolContextExtra {
+  /** When true, the task tool skips its per-call agent-type permission ask (used by /agent slash commands). */
+  bypassAgentCheck?: boolean
+  /** When true, the read tool skips the reference/cwd containment check. */
+  bypassCwdCheck?: boolean
+  /** Model context forwarded from the parent session to spawned subagents / tool execution. */
+  model?: { id: string; providerID?: string; api?: { id?: string }; [key: string]: unknown }
+  /** Prompt operations injected by the session prompt service for the task tool. */
+  promptOps?: TaskPromptOps
+  /** Tool-specific extensions. */
+  [key: string]: unknown
+}
+
 export type Context<M extends Metadata = Metadata> = {
   sessionID: SessionID
   messageID: MessageID
   agent: string
   abort: AbortSignal
   callID?: string
-  extra?: { [key: string]: unknown }
+  extra?: ToolContextExtra
   messages: MessageV2.WithParts[]
   metadata(input: { title?: string; metadata?: M }): Effect.Effect<void>
   ask(input: Omit<Permission.Request, "id" | "sessionID" | "tool">): Effect.Effect<void>

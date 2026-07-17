@@ -4,7 +4,7 @@ import { ModelID, ProviderID } from "@/provider/schema"
 import { WorkspaceID } from "@/control-plane/schema"
 import { and, asc, desc, eq, gt, gte, isNull, like, lt, or, type SQL } from "@/storage/db"
 import * as Database from "@/storage/db"
-import { Context, DateTime, Effect, Exit, Layer, Option, Schema, Stream } from "effect"
+import { Cause, Context, DateTime, Effect, Exit, Layer, Option, Schema, Stream } from "effect"
 import { SessionMessage } from "./session-message"
 import type { Prompt } from "./session-prompt"
 import { EventV2 } from "./event"
@@ -454,7 +454,17 @@ export const layer = Layer.effect(
           return yield* Effect.die(new Error(`Unknown agent type: ${input.agent} is not a valid agent type`))
         }
         const parentAgent = parent.agent
-          ? yield* agents.get(parent.agent).pipe(Effect.catchCause(() => Effect.succeed(undefined)))
+          ? yield* agents.get(parent.agent).pipe(
+              Effect.catchCause((cause) =>
+                Effect.sync(() => {
+                  log.warn("parent agent not found, skipping parent deny rules", {
+                    parentAgent: parent.agent,
+                    cause: Cause.squash(cause),
+                  })
+                  return undefined
+                }),
+              ),
+            )
           : undefined
 
         const permission = subagentSessionPermission({
@@ -488,7 +498,7 @@ export const layer = Layer.effect(
         const onAbort = () => {
           if (cancelled) return
           cancelled = true
-          Effect.runPromise(cancelChild)
+          Effect.runPromise(cancelChild).catch((error) => log.warn("subagent cancel failed", { error: String(error) }))
         }
         if (input.abort) input.abort.addEventListener("abort", onAbort)
 
