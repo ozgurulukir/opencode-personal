@@ -31,3 +31,11 @@
 ## 2025-07-28 - O(N^2) Array operations when parsing paths
 **Learning:** Parsing large lists of file paths for directory structure using array methods (`split`/`slice`/`join`) inside a `createMemo` (like `filter` in `file-tree.tsx`) causes significant GC pressure and O(D^2) complexity per path. For large workspaces, this makes rendering file trees extremely slow.
 **Action:** Replace `split`/`slice`/`join` operations with a simple `indexOf()` loop and `slice()` to parse paths iteratively. This changes the complexity to O(D) and avoids creating multiple arrays per path segment.
+
+## 2024-03-24 - Backward Loops for Array Find Last
+**Learning:** In SolidJS applications, using `.filter(...).at(-1)` inside a `createMemo` to find the last matching element in an array forces a full O(N) traversal and creates an intermediate array on every evaluation. This is particularly problematic in high-frequency update paths like message streaming.
+**Action:** Replace `.filter(...).at(-1)` with a backward `for` loop. This avoids intermediate array allocations and provides an early return, bringing the best-case time complexity down to O(1) and significantly reducing GC pressure.
+
+## 2024-03-24 - Consolidating Multiple Filter Counts
+**Learning:** Calling `.filter(condition).length` multiple times on the same array to calculate multiple counts forces multiple O(N) passes and allocates multiple intermediate arrays.
+**Action:** Consolidate multiple `.filter(...).length` calls into a single `for` loop that iterates over the array once, incrementing local count variables. This reduces the number of traversals to 1 and eliminates all intermediate array allocations.

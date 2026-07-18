@@ -781,9 +781,16 @@ function contextToolTrigger(part: ToolPart, i18n: ReturnType<typeof useI18n>) {
 }
 
 function contextToolSummary(parts: ToolPart[]) {
-  const read = parts.filter((part) => part.tool === "read").length
-  const search = parts.filter((part) => part.tool === "glob" || part.tool === "grep").length
-  const list = parts.filter((part) => part.tool === "list").length
+  // ⚡ Bolt Optimization: Replace multiple .filter().length with a single loop to reduce GC pressure
+  let read = 0
+  let search = 0
+  let list = 0
+  for (let i = 0; i < parts.length; i++) {
+    const tool = parts[i].tool
+    if (tool === "read") read++
+    else if (tool === "glob" || tool === "grep") search++
+    else if (tool === "list") list++
+  }
   return { read, search, list }
 }
 
@@ -1489,9 +1496,16 @@ PART_MAPPING["text"] = function TextPartDisplay(props) {
   )
   const text = () => (part().text ?? "").trim()
   const isLastTextPart = createMemo(() => {
-    const last = (data.store.part?.[props.message.id] ?? [])
-      .filter((item): item is TextPart => item?.type === "text" && !!item.text?.trim())
-      .at(-1)
+    const parts = data.store.part?.[props.message.id] ?? []
+    // ⚡ Bolt Optimization: Use a backward loop to avoid creating an intermediate array and exit early
+    let last: TextPart | undefined
+    for (let i = parts.length - 1; i >= 0; i--) {
+      const item = parts[i]
+      if (item?.type === "text" && !!item.text?.trim()) {
+        last = item as TextPart
+        break
+      }
+    }
     return last?.id === part().id
   })
   const showCopy = createMemo(() => {
