@@ -14,6 +14,7 @@ import {
 } from "solid-js"
 import { createStore } from "solid-js/store"
 import stripAnsi from "strip-ansi"
+import { contextToolSummary, findLastTextPart } from "./message-part-utils"
 import { Dynamic } from "solid-js/web"
 import {
   AgentPart,
@@ -780,19 +781,6 @@ function contextToolTrigger(part: ToolPart, i18n: ReturnType<typeof useI18n>) {
   }
 }
 
-function contextToolSummary(parts: ToolPart[]) {
-  // ⚡ Bolt Optimization: Replace multiple .filter().length with a single loop to reduce GC pressure
-  let read = 0
-  let search = 0
-  let list = 0
-  for (let i = 0; i < parts.length; i++) {
-    const tool = parts[i].tool
-    if (tool === "read") read++
-    else if (tool === "glob" || tool === "grep") search++
-    else if (tool === "list") list++
-  }
-  return { read, search, list }
-}
 
 function ExaOutput(props: { output?: string }) {
   const links = createMemo(() => urls(props.output))
@@ -1495,19 +1483,7 @@ PART_MAPPING["text"] = function TextPartDisplay(props) {
     () => props.message.role === "assistant" && typeof (props.message as AssistantMessage).time.completed !== "number",
   )
   const text = () => (part().text ?? "").trim()
-  const isLastTextPart = createMemo(() => {
-    const parts = data.store.part?.[props.message.id] ?? []
-    // ⚡ Bolt Optimization: Use a backward loop to avoid creating an intermediate array and exit early
-    let last: TextPart | undefined
-    for (let i = parts.length - 1; i >= 0; i--) {
-      const item = parts[i]
-      if (item?.type === "text" && !!item.text?.trim()) {
-        last = item as TextPart
-        break
-      }
-    }
-    return last?.id === part().id
-  })
+  const isLastTextPart = createMemo(() => findLastTextPart(data.store.part?.[props.message.id] ?? [], part().id))
   const showCopy = createMemo(() => {
     if (props.message.role !== "assistant") return isLastTextPart()
     if (props.showAssistantCopyPartID === null) return false
