@@ -122,6 +122,7 @@ const table = sqliteTable("session", {
 - Test actual implementation, do not duplicate logic into tests
 - Tests cannot run from repo root (guard: `do-not-run-tests-from-root`); run from package dirs like `packages/opencode`
 - Package test directories follow `packages/<name>/test/` or `packages/<name>/test/<subpath>/`
+- Exception: `packages/ui` co-locates tests in `src/components/` alongside source files. See `packages/ui/AGENTS.md`.
 - `mock.module()` in bun:test persists across test files — always use `afterAll(() => mock.restore())` to prevent leakage. Without cleanup, mocks applied in one test file affect imports in other test files that import the same module.
 
 ## Type Checking
@@ -167,6 +168,7 @@ const table = sqliteTable("session", {
 - bun.lock stores catalog versions with `catalog:` prefix
 - `new Array<T>()` in `.tsx` files is parsed as JSX (angle brackets). Use `Array<T>()` (without `new`) or `[] as T[]` instead.
 - Squash-merged PR branches (`gh pr merge --squash`) remain "unmerged" from git's perspective — `git branch -d` refuses them, `git branch --no-merged` shows them. Use `git branch -D` or `git push origin --delete` to clean up.
+- `gh pr merge --squash --delete-branch` produces no output on success. Check `gh pr view <number>` for `state: MERGED` to confirm.
 - Sequential squash merges: the first merge updates `main`, so subsequent PRs fail with "Base branch was modified". Rebase the remaining PR branches onto the updated `main` before retrying.
 - PR branches created from a stale base (not the current `main` tip) carry unrelated changes in `gh pr diff`. A 2-line PR fix can appear to touch 100+ files. Fix by creating a clean branch from `main` and applying only the intended changes.
 - `bun install` can silently modify `bun.lock` (configVersion removal, integrity hash stripping, formatting churn) even without dependency changes. Revert lockfile to match the base branch unless intentionally updating dependencies.
