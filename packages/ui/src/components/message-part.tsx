@@ -14,6 +14,7 @@ import {
 } from "solid-js"
 import { createStore } from "solid-js/store"
 import stripAnsi from "strip-ansi"
+import { contextToolSummary, findLastTextPart } from "./message-part-utils"
 import { Dynamic } from "solid-js/web"
 import {
   AgentPart,
@@ -780,12 +781,6 @@ function contextToolTrigger(part: ToolPart, i18n: ReturnType<typeof useI18n>) {
   }
 }
 
-function contextToolSummary(parts: ToolPart[]) {
-  const read = parts.filter((part) => part.tool === "read").length
-  const search = parts.filter((part) => part.tool === "glob" || part.tool === "grep").length
-  const list = parts.filter((part) => part.tool === "list").length
-  return { read, search, list }
-}
 
 function ExaOutput(props: { output?: string }) {
   const links = createMemo(() => urls(props.output))
@@ -1488,12 +1483,7 @@ PART_MAPPING["text"] = function TextPartDisplay(props) {
     () => props.message.role === "assistant" && typeof (props.message as AssistantMessage).time.completed !== "number",
   )
   const text = () => (part().text ?? "").trim()
-  const isLastTextPart = createMemo(() => {
-    const last = (data.store.part?.[props.message.id] ?? [])
-      .filter((item): item is TextPart => item?.type === "text" && !!item.text?.trim())
-      .at(-1)
-    return last?.id === part().id
-  })
+  const isLastTextPart = createMemo(() => findLastTextPart(data.store.part?.[props.message.id] ?? [], part().id))
   const showCopy = createMemo(() => {
     if (props.message.role !== "assistant") return isLastTextPart()
     if (props.showAssistantCopyPartID === null) return false
