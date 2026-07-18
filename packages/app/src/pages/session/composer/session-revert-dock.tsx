@@ -66,6 +66,7 @@ export function SessionRevertDock(props: {
             aria-label={
               store.collapsed ? language.t("session.revertDock.expand") : language.t("session.revertDock.collapse")
             }
+            aria-expanded={!store.collapsed}
           />
         </div>
       </div>

@@ -439,6 +439,7 @@ export const SessionQuestionDock: Component<{ request: QuestionRequest; onSubmit
                   disabled={sending()}
                   onClick={() => jump(i())}
                   aria-label={`${language.t("ui.tool.questions")} ${i() + 1}`}
+                  aria-current={i() === store.tab ? "true" : undefined}
                 />
               )}
             </For>
