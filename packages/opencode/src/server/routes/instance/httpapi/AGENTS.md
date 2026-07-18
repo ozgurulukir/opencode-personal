@@ -63,3 +63,11 @@ const handler = Effect.fn("SessionHttpApi.foo")(function* (ctx) {
 ```
 
 Stable services (like `SessionPrompt.Service`) are yielded once at handler-group construction and closed over. Don't `Effect.provide` layers inside handlers — provide them at the app boundary instead.
+
+## `session.get()` only needs `sessionID`, not `directory`
+
+The `session.get()` handler (`handlers/session.ts:74-76`) calls `session.get(ctx.params.sessionID)` — the `directory` parameter in SDK calls is for HTTP instance routing, not session lookup. The ACP agent's `sdk.session.get({ sessionID })` works without `directory` because the agent connects to a specific server instance directly.
+
+## Two SSE endpoints with different event shapes
+
+`/global/event` (`handlers/global.ts`) subscribes to `GlobalBus` (Node EventEmitter) and delivers events wrapped in `{ payload: { type, properties } }` — SyncEvents arrive inside a `sync` envelope. `/event` (`event.ts`) subscribes to the per-instance `Bus` (Effect PubSub) and delivers unwrapped `{ id, type, properties }` events directly. The global endpoint is for cross-instance consumers (ACP agent, CLI run command); the instance endpoint is for per-project consumers (TUI, web UI).

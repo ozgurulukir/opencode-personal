@@ -10,3 +10,27 @@
 ## `setSessionMode` vs `setSessionConfigOption`
 
 The SDK renamed `unstable_setSessionModel` to `setSessionMode`, but the new method sets the **mode** (not the model). Setting the model is now done via `setSessionConfigOption` with `configId: "model"`. The old `unstable_setSessionModel` method should be removed entirely when upgrading — its functionality is fully covered by `setSessionConfigOption`.
+
+## Session manager is in-memory only
+
+`ACPSessionManager` stores sessions in a plain `Map<string, ACPSessionState>` with no persistence or serialization. When the ACP process restarts, the Map is empty. Clients like Zed store session IDs across restarts and will get "Session not found" errors on subsequent `prompt`/`setSessionMode` calls unless `getOrLoad()` auto-recovers from the server.
+
+## `get()` (throws) vs `tryGet()` (silent drop) dual pattern
+
+Agent API methods (`prompt`, `setSessionMode`, `cancel`) use `sessionManager.get()` which throws "Session not found" when the session isn't in the in-memory Map. `handleEvent` uses `sessionManager.tryGet()` which returns `undefined` — live events (tool results, text deltas, permissions) for unknown sessions are silently dropped. Both should use `getOrLoad()`/`tryGetOrLoad()` to auto-recover from the server.
+
+## ACP protocol methods don't send `cwd` with every request
+
+Only `newSession`, `loadSession`, `resumeSession`, and `forkSession` include `cwd`. Methods like `prompt`, `setSessionMode`, `setSessionConfigOption`, and `cancel` only send `sessionId`. The ACP agent must store `cwd` per-session in `ACPSessionState.cwd` and cannot rely on the client to provide it for subsequent calls.
+
+## `pendingLoads` Map for concurrent request deduplication
+
+`getOrLoad()` uses a `Map<string, Promise<ACPSessionState>>` with `finally` cleanup to deduplicate concurrent server calls for the same session ID. This is a simple alternative to `Effect.cached` for non-Effect code. The `finally` block is critical — without it, a failed promise stays in the map and blocks future recovery.
+
+## `handleToolPartUpdate` deduplicates tool state logic
+
+The tool state switch (pending/running/completed/error + todowrite plan) was duplicated verbatim between `handleEvent` (live events) and `processMessage` (session replay). Extracted into `handleToolPartUpdate()` — both callers now delegate to it. The shell snapshot dedup (hash-based output dedup for shell tools) was only in `handleEvent`; it's safe to apply to `processMessage` too since the snapshot map is empty during replay.
+
+## ACP test pattern: `createTestAgent()` + `(agent as any)`
+
+ACP tests use a `createTestAgent()` helper that creates a real `ACP.Agent` with a minimal mock `AgentSideConnection` and captures `sessionUpdates`. Private methods like `handleEvent` and `processMessage` are accessed via `(agent as any)`. The `sessionManager.sessions` Map is populated directly via `(agent as any).sessionManager.sessions.set(...)` for tests that need a pre-existing session. Tests use `mock.function()` (not `mock.module()`) for SDK stubs, with `afterAll(() => mock.restore())` cleanup.
