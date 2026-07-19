@@ -12,6 +12,14 @@
 
 `Permission.fromConfig()` iterates config entries and creates rules directly. It does NOT expand shorthand keys (e.g., `mcp` → `mcp_*`). Any such expansion would need to be added explicitly in `fromConfig()`.
 
+## `evaluate()` — last-match-wins, default "ask"
+
+`Permission.evaluate(permission, pattern, ...rulesets)` flattens all rulesets then uses `findLast` — the **last** matching rule wins. This means `Permission.merge(agent, session)` puts session rules last, so session overrides agent. If no rule matches, the default is `{ action: "ask" }` — tool calls require user approval unless explicitly allowed.
+
+## `Permission.merge` is `rulesets.flat()` — order matters
+
+`Permission.merge(...rulesets)` simply concatenates: `[...ruleset1, ...ruleset2, ...]`. Combined with `findLast`, later rulesets override earlier ones. When merging agent + session permissions, session comes last and wins conflicts.
+
 ## `reply("always")` persists to database
 
 When the user replies with `"always"`, the approved ruleset is persisted to `PermissionTable` (keyed by `project_id`). This means "always allow" decisions survive restarts. The ruleset is loaded from the database on service init via `InstanceState.make()`. The `PermissionTable` is an upsert — each project has at most one row containing the full approved ruleset.
