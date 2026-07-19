@@ -9,6 +9,7 @@ import { Database } from "@/storage/db"
 import { eq } from "drizzle-orm"
 import { asc } from "drizzle-orm"
 import { TodoTable } from "./session.sql"
+import { applyAutoclose } from "./todo-autoclose"
 
 export const Info = Schema.Struct({
   content: Schema.String.annotate({ description: "Brief description of the task" }),
@@ -79,31 +80,8 @@ export const layer = Layer.effect(
     })
     const autoclose = Effect.fn("Todo.autoclose")(function* (sessionID: SessionID, fileChanges: Array<{ filePath: string; diff: string }>) {
       const currentTodos = yield* get(sessionID)
-      if (currentTodos.length === 0) return
-
-      let updated = false
-      const nextTodos = currentTodos.map((todo) => {
-        if (todo.status === "completed" || todo.status === "cancelled") return todo
-
-        // Simple keyword-based semantic matching in diffs
-        const contentLower = todo.content.toLowerCase()
-        const words = contentLower.split(/\s+/).filter((w) => w.length > 3)
-        if (words.length === 0) return todo
-
-        // Check if all significant words appear in any of the diffs
-        const match = fileChanges.some((change) => {
-          const diffLower = change.diff.toLowerCase()
-          return words.every((word) => diffLower.includes(word))
-        })
-
-        if (match) {
-          updated = true
-          return { ...todo, status: "completed" }
-        }
-        return todo
-      })
-
-      if (updated) {
+      const nextTodos = applyAutoclose(currentTodos, fileChanges)
+      if (nextTodos !== currentTodos) {
         yield* update({ sessionID, todos: nextTodos })
       }
     })
