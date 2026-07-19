@@ -70,13 +70,25 @@ export function SessionTodoDock(props: {
       .split(/(\u0000done\u0000|\u0000total\u0000)/),
   )
 
-  const active = createMemo(
-    () =>
-      props.todos.find((todo) => todo.status === "in_progress") ??
-      props.todos.find((todo) => todo.status === "pending") ??
-      props.todos.filter((todo) => todo.status === "completed").at(-1) ??
-      props.todos[0],
-  )
+  const active = createMemo(() => {
+    let inProgress: Todo | undefined
+    let pending: Todo | undefined
+    let lastCompleted: Todo | undefined
+
+    // Bolt: Single pass to avoid intermediate array allocations and multiple traversals
+    for (let i = 0; i < props.todos.length; i++) {
+      const todo = props.todos[i]
+      if (todo.status === "in_progress" && !inProgress) {
+        inProgress = todo
+      } else if (todo.status === "pending" && !pending) {
+        pending = todo
+      } else if (todo.status === "completed") {
+        lastCompleted = todo
+      }
+    }
+
+    return inProgress ?? pending ?? lastCompleted ?? props.todos[0]
+  })
 
   const preview = createMemo(() => active()?.content ?? "")
   const collapse = useSpring(() => (store.collapsed ? 1 : 0), { visualDuration: 0.3, bounce: 0 })
