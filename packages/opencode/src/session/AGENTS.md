@@ -20,6 +20,10 @@ Delta selection uses anchored regex in a fixed order: `gpt-4`/`o1`/`o3` → beas
 
 The `as Record<string, any>` cast in `mergeOptions` is deliberate — remeda's `mergeDeep` type instantiation is expensive and this runs on every LLM call. The 3rd `layer?` parameter enables debug logging of which option layer (model/agent/variant) contributed which keys. Tests in `test/session/merge-options.test.ts`.
 
+## `prompt()` tools-derived permissions must merge with existing session permission
+
+`prompt.ts:1486-1493` converts `input.tools` (from `subagentToolRestrictions`) into permission rules. It **must** merge with existing `session.permission` using `Permission.merge(session.permission ?? [], permissions)`, not overwrite. Overwriting destroys parent denies (e.g., Plan Mode `edit: { "*": "deny" }`) set by `subagentSessionPermission` — the #26514 fix was ineffective at runtime because of this overwrite. The merge is safe: `Permission.merge` = `rulesets.flat()`, and `findLast` in `evaluate` means tools-derived rules (appended last) override earlier rules for the same `(permission, pattern)` key.
+
 ## TodoWrite tool — autoclose architecture
 
 **Autoclose matching** (`session/todo-autoclose.ts`): pure function extraction for testability (AGENTS.md Rule 3). Algorithm: all >3-char words from todo content must appear in at least one diff (case-insensitive substring match). `applyAutoclose` returns same array reference if no changes (enables `nextTodos !== currentTodos` guard in caller).

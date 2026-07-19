@@ -8,6 +8,14 @@
 
 `primary_tools` are simultaneously `allow`ed in the session permission (`subagentSessionPermission`) and `false`d in the tools list (`subagentToolRestrictions`). This is intentional: session permission `allow` means slash-command invocations don't block, but tools list `false` means the LLM can't call them directly. Primary tools are for the primary agent only; indirect access via slash commands is permitted.
 
+## `deriveSubagentSessionPermission` — deny-only forwarding, dedupe first-wins
+
+`deriveSubagentSessionPermission` forwards **only deny rules and external_directory rules** from the parent, NOT allow or ask rules. This is least-privilege by design — parent allows don't automatically grant subagent access. `dedupe()` collapses duplicate `(permission, pattern)` entries keeping the first occurrence, so parent agent denies (listed first) take priority over parent session denies for the same key.
+
+## `prompt()` must merge, not overwrite, session permission
+
+`session/prompt.ts:1486-1493` converts `input.tools` to permission rules and **must use `Permission.merge(session.permission ?? [], permissions)`**, not overwrite (`session.permission = permissions`). Overwriting destroys parent denies set by `subagentSessionPermission`, making Plan Mode's `edit: { "*": "deny" }` ineffective at runtime (the #26514 fix). Tests that stub `prompt()` (e.g., `v2/session.test.ts`) don't catch this — only a real `prompt()` call triggers the overwrite path.
+
 ## Shared helpers between V1 and V2
 
 `subagentSessionPermission()` and `subagentToolRestrictions()` in `agent/subagent-permissions.ts` are shared between V1 `tool/task.ts` (TaskTool) and V2 `v2/session.ts` (subagent method). Both must use these helpers to maintain parity — any change to subagent permission derivation or tool restriction logic must go through these functions, not be inlined.

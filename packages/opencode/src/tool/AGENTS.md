@@ -14,6 +14,8 @@ export interface ToolContextExtra {
   model?: { id: string; providerID?: string; api?: { id?: string }; [key: string]: unknown }
   /** Prompt operations injected by session prompt service for the task tool. */
   promptOps?: TaskPromptOps
+  /** Merged permission ruleset (agent + session) for deny evaluation without asking. */
+  permissionRuleset?: Permission.Ruleset
   /** Tool-specific extensions. */
   [key: string]: unknown
 }
@@ -22,6 +24,10 @@ export interface ToolContextExtra {
 **Producers** (`session/prompt.ts`): lines 454, 712, 1191 construct object literals matching this shape. **Consumers** (`tool/task.ts`, `tool/read.ts`, `tool/websearch.ts`) now access typed fields directly — no `as` casts or bracket notation needed.
 
 The index signature preserves backward compatibility for any other tool reading `ctx.extra` via bracket access.
+
+## `bypassAgentCheck` only skips the "ask" prompt, NOT deny evaluation
+
+`bypassAgentCheck: true` (set when user types `/agent` slash command) skips the interactive `ctx.ask()` prompt in `task.ts`, but deny rules are still enforced via `Permission.evaluate()` before the guard. This means config deny rules (e.g., `task: { "dangerous-agent": "deny" }`) cannot be bypassed by slash commands. The deny check uses `permissionRuleset` from `ToolContextExtra` (merged agent + session permission) so it has the full ruleset available without calling `ctx.ask`.
 
 ## TaskPromptOps — type-only import to avoid circular deps
 
