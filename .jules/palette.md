@@ -13,3 +13,6 @@
 ## 2026-07-28 - ARIA Current for Navigation State
 **Learning:** Adding `data-active` attributes to items provides clear visual styling for the currently selected item, but screen readers require `aria-current="true"` to denote the active state of interactive list elements or navigation items. This helps users relying on assistive tech understand their current location within a widget or list (like the message timeline/nav).
 **Action:** When applying a `data-active` or similar state-tracking property to a focusable or interactive element inside a navigation context or list, always supplement it with `aria-current={isActive ? "true" : undefined}`.
+## 2026-07-19 - Missing ARIA Expansion States on Docks
+**Learning:** Collapsible side/dock panels that manage state using purely visual indicators (`data-collapsed="true"`) miss screen reader cues because `aria-expanded` is not set on their respective toggle buttons.
+**Action:** When implementing expandable or toggleable sections, alongside custom state attributes like `data-collapsed` or `data-active`, always include corresponding semantic ARIA attributes (`aria-expanded`, `aria-current`) for screen readers.

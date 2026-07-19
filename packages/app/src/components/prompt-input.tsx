@@ -1444,6 +1444,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                   disabled={store.mode !== "normal"}
                   tabIndex={store.mode === "normal" ? undefined : -1}
                   aria-label={language.t("prompt.action.attachFile")}
+                  iconSize="normal"
                 />
               </TooltipKeybind>
             </div>
