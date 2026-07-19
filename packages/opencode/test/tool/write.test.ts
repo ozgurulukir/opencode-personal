@@ -1,5 +1,5 @@
-import { afterEach, describe, expect } from "bun:test"
-import { Effect, Layer } from "effect"
+import { afterEach, describe, expect, test } from "bun:test"
+import { Effect, Layer, ManagedRuntime } from "effect"
 import path from "path"
 import fs from "fs/promises"
 import { WriteTool } from "../../src/tool/write"
@@ -13,8 +13,11 @@ import { Tool } from "@/tool/tool"
 import { Agent } from "../../src/agent/agent"
 import { SessionID, MessageID } from "../../src/session/schema"
 import { CrossSpawnSpawner } from "@opencode-ai/core/cross-spawn-spawner"
-import { disposeAllInstances, provideTmpdirInstance, TestInstance } from "../fixture/fixture"
+import { disposeAllInstances, provideTmpdirInstance, TestInstance, tmpdir } from "../fixture/fixture"
 import { testEffect } from "../lib/effect"
+import { Todo } from "../../src/session/todo"
+import { WithInstance } from "../../src/project/with-instance"
+import { Session } from "../../src/session/session"
 
 const ctx = {
   sessionID: SessionID.make("ses_test-write-session"),
@@ -40,6 +43,7 @@ const it = testEffect(
     CrossSpawnSpawner.defaultLayer,
     Truncate.defaultLayer,
     Agent.defaultLayer,
+    Layer.provideMerge(Todo.layer, Bus.layer),
   ),
 )
 
@@ -273,5 +277,69 @@ describe("tool.write", () => {
         expect(result.title).toEndWith(path.join("src", "components", "Button.tsx"))
       }),
     )
+  })
+
+  describe("autoclose", () => {
+    test("autocloses matching todos after writing a file", async () => {
+      await using tmp = await tmpdir()
+      const filepath = path.join(tmp.path, "feature.ts")
+
+      await WithInstance.provide({
+        directory: tmp.path,
+        fn: async () => {
+          const runtime = ManagedRuntime.make(
+            Layer.mergeAll(
+              LSP.defaultLayer,
+              AppFileSystem.defaultLayer,
+              Format.defaultLayer,
+              Bus.layer,
+              Truncate.defaultLayer,
+              Agent.defaultLayer,
+              Todo.defaultLayer,
+              Session.defaultLayer,
+            ),
+          )
+
+          try {
+            const todo = await runtime.runPromise(Todo.Service.use((svc) => Effect.succeed(svc)))
+            const session = await runtime.runPromise(Session.Service.use((svc) => Effect.succeed(svc)))
+
+            const info = await runtime.runPromise(session.create({ agent: "build" }))
+
+            const autocloseCtx = { ...ctx, sessionID: info.id }
+
+            await runtime.runPromise(
+              todo.update({
+                sessionID: info.id,
+                todos: [
+                  { content: "Export the feature function", status: "pending", priority: "high" },
+                  { content: "Unrelated task", status: "pending", priority: "medium" },
+                ],
+              }),
+            )
+
+            const edit = await runtime.runPromise(
+              Effect.gen(function* () {
+                const info = yield* WriteTool
+                return yield* info.init()
+              }),
+            )
+
+            await runtime.runPromise(
+              edit.execute(
+                { filePath: filepath, content: "export function feature() { return 'done' }" },
+                autocloseCtx,
+              ),
+            )
+
+            const todos = await runtime.runPromise(todo.get(info.id))
+            expect(todos[0].status).toBe("completed")
+            expect(todos[1].status).toBe("pending")
+          } finally {
+            await runtime.dispose()
+          }
+        },
+      })
+    })
   })
 })
