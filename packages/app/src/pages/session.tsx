@@ -671,7 +671,14 @@ export default function Page() {
     })[0]
     if (near) return near.id
 
-    return list.filter((item) => item.top <= line).at(-1)?.id ?? list[0]?.id ?? store.messageId
+    // Bolt: Using backward loop instead of .filter().at(-1) to avoid intermediate array allocation
+    for (let i = list.length - 1; i >= 0; i--) {
+      if (list[i].top <= line) {
+        return list[i].id
+      }
+    }
+
+    return list[0]?.id ?? store.messageId
   }
 
   function navigateMessageByOffset(offset: number) {

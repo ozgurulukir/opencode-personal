@@ -70,13 +70,22 @@ export function SessionTodoDock(props: {
       .split(/(\u0000done\u0000|\u0000total\u0000)/),
   )
 
-  const active = createMemo(
-    () =>
-      props.todos.find((todo) => todo.status === "in_progress") ??
-      props.todos.find((todo) => todo.status === "pending") ??
-      props.todos.filter((todo) => todo.status === "completed").at(-1) ??
-      props.todos[0],
-  )
+  const active = createMemo(() => {
+    const inProgress = props.todos.find((todo) => todo.status === "in_progress")
+    if (inProgress) return inProgress
+
+    const pending = props.todos.find((todo) => todo.status === "pending")
+    if (pending) return pending
+
+    // Bolt: Using backward loop instead of .filter().at(-1) to avoid intermediate array allocation
+    for (let i = props.todos.length - 1; i >= 0; i--) {
+      if (props.todos[i].status === "completed") {
+        return props.todos[i]
+      }
+    }
+
+    return props.todos[0]
+  })
 
   const preview = createMemo(() => active()?.content ?? "")
   const collapse = useSpring(() => (store.collapsed ? 1 : 0), { visualDuration: 0.3, bounce: 0 })
