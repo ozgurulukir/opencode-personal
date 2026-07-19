@@ -1101,10 +1101,16 @@ function filetype(input?: string) {
 }
 
 function todoIcon(status?: string) {
-  if (status === "completed") return "✓"
-  if (status === "in_progress") return "~"
-  if (status === "cancelled") return "✕"
-  return "☐"
+  switch (status) {
+    case "completed":
+      return "✓"
+    case "in_progress":
+      return "~"
+    case "cancelled":
+      return "✕"
+    default:
+      return "☐"
+  }
 }
 
 function formatAnswer(answer: unknown) {

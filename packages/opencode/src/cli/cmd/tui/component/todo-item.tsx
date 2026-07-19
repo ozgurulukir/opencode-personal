@@ -1,8 +1,22 @@
+import type { Todo } from "@/session/todo"
 import { useTheme } from "../context/theme"
 
 export interface TodoItemProps {
-  status: string
+  status: Todo.TodoStatus
   content: string
+}
+
+function todoIcon(status: Todo.TodoStatus): string {
+  switch (status) {
+    case "completed":
+      return "✓"
+    case "in_progress":
+      return "•"
+    case "cancelled":
+      return "✕"
+    case "pending":
+      return " "
+  }
 }
 
 export function TodoItem(props: TodoItemProps) {
@@ -16,7 +30,7 @@ export function TodoItem(props: TodoItemProps) {
           fg: props.status === "in_progress" ? theme.warning : theme.textMuted,
         }}
       >
-        [{props.status === "completed" ? "✓" : props.status === "in_progress" ? "•" : " "}]{" "}
+        [{todoIcon(props.status)}]{" "}
       </text>
       <text
         flexGrow={1}

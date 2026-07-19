@@ -11,12 +11,47 @@ import { asc } from "drizzle-orm"
 import { TodoTable } from "./session.sql"
 import { applyAutoclose } from "./todo-autoclose"
 
+export const TodoStatus = Schema.Union([
+  Schema.Literal("pending"),
+  Schema.Literal("in_progress"),
+  Schema.Literal("completed"),
+  Schema.Literal("cancelled"),
+]).annotate({
+  description: "Current status of the task: pending, in_progress, completed, cancelled",
+})
+export type TodoStatus = Schema.Schema.Type<typeof TodoStatus>
+
+export const TodoPriority = Schema.Union([
+  Schema.Literal("high"),
+  Schema.Literal("medium"),
+  Schema.Literal("low"),
+]).annotate({
+  description: "Priority level of the task: high, medium, low",
+})
+export type TodoPriority = Schema.Schema.Type<typeof TodoPriority>
+
+/**
+ * Normalize a raw status string to a valid TodoStatus.
+ * Falls back to "pending" for unknown values (backward compatibility with old data).
+ */
+export function normalizeStatus(raw: string): TodoStatus {
+  if (raw === "pending" || raw === "in_progress" || raw === "completed" || raw === "cancelled") return raw
+  return "pending"
+}
+
+/**
+ * Normalize a raw priority string to a valid TodoPriority.
+ * Falls back to "medium" for unknown values (backward compatibility with old data).
+ */
+export function normalizePriority(raw: string): TodoPriority {
+  if (raw === "high" || raw === "medium" || raw === "low") return raw
+  return "medium"
+}
+
 export const Info = Schema.Struct({
   content: Schema.String.annotate({ description: "Brief description of the task" }),
-  status: Schema.String.annotate({
-    description: "Current status of the task: pending, in_progress, completed, cancelled",
-  }),
-  priority: Schema.String.annotate({ description: "Priority level of the task: high, medium, low" }),
+  status: TodoStatus,
+  priority: TodoPriority,
 })
   .annotate({ identifier: "Todo" })
   .pipe(withStatics((s) => ({ zod: zod(s) })))
@@ -74,8 +109,8 @@ export const layer = Layer.effect(
       )
       return rows.map((row) => ({
         content: row.content,
-        status: row.status,
-        priority: row.priority,
+        status: normalizeStatus(row.status),
+        priority: normalizePriority(row.priority),
       }))
     })
     const autoclose = Effect.fn("Todo.autoclose")(function* (sessionID: SessionID, fileChanges: Array<{ filePath: string; diff: string }>) {
