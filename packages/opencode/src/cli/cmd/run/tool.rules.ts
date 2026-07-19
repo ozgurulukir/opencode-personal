@@ -139,6 +139,19 @@ export function runTask(p: ToolProps<typeof TaskTool>): ToolInline {
   }
 }
 
+function todoMark(status: string): string {
+  switch (status) {
+    case "completed":
+      return "[✓]"
+    case "in_progress":
+      return "[•]"
+    case "cancelled":
+      return "[✕]"
+    default:
+      return "[ ]"
+  }
+}
+
 export function runTodo(p: ToolProps<typeof TodoWriteTool>): ToolInline {
   return {
     icon: "#",
@@ -151,8 +164,7 @@ export function runTodo(p: ToolProps<typeof TodoWriteTool>): ToolInline {
           return []
         }
 
-        const mark = item.status === "completed" ? "[✓]" : item.status === "in_progress" ? "[•]" : "[ ]"
-        return [`${mark} ${body}`]
+        return [`${todoMark(item.status ?? "")} ${body}`]
       })
       .join("\n"),
   }
@@ -566,13 +578,17 @@ export function scrollTodoFinal(p: ToolProps<typeof TodoWriteTool>): string {
 
   const doneN = items.filter((item) => item.status === "completed").length
   const runN = items.filter((item) => item.status === "in_progress").length
-  const left = items.length - doneN - runN
+  const cancelledN = items.filter((item) => item.status === "cancelled").length
+  const left = items.length - doneN - runN - cancelledN
   const tail = [`${items.length} total`]
   if (doneN > 0) {
     tail.push(`${doneN} done`)
   }
   if (runN > 0) {
     tail.push(`${runN} active`)
+  }
+  if (cancelledN > 0) {
+    tail.push(`${cancelledN} cancelled`)
   }
   if (left > 0) {
     tail.push(`${left} pending`)

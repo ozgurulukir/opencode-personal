@@ -305,7 +305,7 @@ type ToolProps = {
 interface Todo {
   id: string
   content: string
-  status: "pending" | "in_progress" | "completed"
+  status: "pending" | "in_progress" | "completed" | "cancelled"
   priority: "low" | "medium" | "high"
 }
 
@@ -392,6 +392,7 @@ export function TodoWriteTool(props: ToolProps) {
     in_progress: 0,
     pending: 1,
     completed: 2,
+    cancelled: 3,
   }
   const todos = createMemo(() =>
     ((props.state.input?.todos ?? []) as Todo[]).slice().sort((a, b) => priority[a.status] - priority[b.status]),
