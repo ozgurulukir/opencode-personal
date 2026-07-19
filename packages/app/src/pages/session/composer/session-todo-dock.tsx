@@ -114,6 +114,7 @@ export function SessionTodoDock(props: {
           class="pl-3 pr-2 py-2 flex items-center gap-2 overflow-visible"
           role="button"
           tabIndex={0}
+          aria-expanded={!store.collapsed}
           onClick={toggle}
           onKeyDown={(event) => {
             if (event.key !== "Enter" && event.key !== " ") return
@@ -172,6 +173,7 @@ export function SessionTodoDock(props: {
               icon="chevron-down"
               size="normal"
               variant="ghost"
+              tabIndex={-1}
               style={{ transform: `rotate(${turn() * 180}deg)` }}
               onMouseDown={(event) => {
                 event.preventDefault()
