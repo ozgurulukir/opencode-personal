@@ -13,7 +13,7 @@ import { withStatics } from "@opencode-ai/core/schema"
 import { Wildcard } from "@/util/wildcard"
 import { Deferred, Effect, Layer, Schema, Context } from "effect"
 import os from "os"
-import { evaluate as evalRule } from "./evaluate"
+import { evaluate as evalRule, evaluateWithSource as evalWithSource } from "./evaluate"
 import { PermissionID } from "./schema"
 
 const log = Log.create({ service: "permission" })
@@ -102,9 +102,11 @@ export class CorrectedError extends Schema.TaggedErrorClass<CorrectedError>()("P
 
 export class DeniedError extends Schema.TaggedErrorClass<DeniedError>()("PermissionDeniedError", {
   ruleset: Schema.Any,
+  source: Schema.optional(Schema.String),
 }) {
   override get message() {
-    return `The user has specified a rule which prevents you from using this specific tool call. Here are some of the relevant rules ${JSON.stringify(this.ruleset)}`
+    const source = this.source ? ` (from ${this.source})` : ""
+    return `The user has specified a rule which prevents you from using this specific tool call. Here are some of the relevant rules ${JSON.stringify(this.ruleset)}${source}`
   }
 }
 
@@ -145,6 +147,14 @@ interface State {
 
 export function evaluate(permission: string, pattern: string, ...rulesets: Ruleset[]): Rule {
   return evalRule(permission, pattern, ...rulesets)
+}
+
+export function evaluateWithSource(
+  permission: string,
+  pattern: string,
+  ...rulesets: { source: string; rules: Ruleset }[]
+): Rule & { source?: string } {
+  return evalWithSource(permission, pattern, ...rulesets)
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/Permission") {}

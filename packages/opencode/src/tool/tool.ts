@@ -26,6 +26,8 @@ export interface ToolContextExtra {
   model?: { id: string; providerID?: string; api?: { id?: string }; [key: string]: unknown }
   /** Prompt operations injected by the session prompt service for the task tool. */
   promptOps?: TaskPromptOps
+  /** Merged permission ruleset (agent + session) for deny evaluation without asking. */
+  permissionRuleset?: Permission.Ruleset
   /** Tool-specific extensions. */
   [key: string]: unknown
 }
