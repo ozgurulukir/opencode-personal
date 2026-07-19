@@ -30,3 +30,13 @@ The index signature preserves backward compatibility for any other tool reading 
 ## webSearchModelName — simplified by typed extra
 
 `webSearchModelName(ctx.extra)` in `tool/websearch.ts` previously had defensive `typeof`/`in` guards. With `ToolContextExtra.model` typed, the body simplifies to `model.api?.id ?? model.id` — equivalent and type-safe.
+
+## File-mutating tools — autoclose pattern
+
+`apply_patch`, `write`, `edit` tools trigger todo autoclose after file changes. Pattern:
+1. Compute diff via `createTwoFilesPatch` (already done for permission metadata)
+2. Publish `FileWatcher.Event.Updated` / `File.Event.Edited`
+3. Call `yield* todo.autoclose(ctx.sessionID, [{ filePath, diff }])`
+4. Continue with LSP diagnostics
+
+**Diff reuse**: existing diff variable is reused (no recalculation). `edit.ts` has two paths (create via `oldString === ""` and edit existing) — both call autoclose. Shell tool excluded (non-deterministic, diff unknown).

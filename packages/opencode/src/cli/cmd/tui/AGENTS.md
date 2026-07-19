@@ -42,3 +42,24 @@ This file covers TUI-specific patterns for `packages/opencode/src/cli/cmd/tui/`.
 - The `api.command` shim (`plugin/command-shim.ts`) bridges v1 plugins to the v2 keymap API. It warns once per deprecated API call via `console.warn`. Remove the shim entirely in v2.
 - `api.slots.register` and `api.theme.install` throw errors when called outside a plugin context (from `api.tsx`). They are only available inside the scoped plugin API created in `runtime.ts:pluginApi()`.
 - Plugin enabled/disabled state is persisted in KV store under key `"plugin_enabled"` and merged with `tuiConfig.plugin_enabled` at startup. See `plugin/runtime.ts:447-466`.
+
+## TodoWrite component — single source pattern
+
+**Gate/iteration consistency**: Use single source `props.input.todos` for both gate and iteration. Avoid `<Match when={props.metadata.todos?.length}>` + `<For each={props.input.todos ?? []}>` mismatch.
+
+**Pattern**:
+```tsx
+{(() => {
+  const todos = props.input.todos ?? []
+  if (todos.length === 0) {
+    return <InlineTool ...>Updating todos...</InlineTool>
+  }
+  return (
+    <BlockTool ...>
+      <For each={todos}>{(todo) => <TodoItem ... />}</For>
+    </BlockTool>
+  )
+})()}
+```
+
+**Priority badge**: `[H]`/`[M]`/`[L]` before status icon. TUI uses `theme.error/warning/success` colors. See `todo-item.tsx:priorityBadge()`, `todo-item.tsx:priorityColor()`.
