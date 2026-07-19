@@ -2,6 +2,7 @@ import type { TuiPlugin, TuiPluginApi } from "@opencode-ai/plugin/tui"
 import type { InternalTuiPlugin } from "../../plugin/internal-types"
 import { createMemo, For, Show, createSignal } from "solid-js"
 import { TodoItem } from "../../component/todo-item"
+import { normalizePriority, normalizeStatus } from "@/session/todo"
 
 const id = "internal:sidebar-todo"
 
@@ -23,7 +24,7 @@ function View(props: { api: TuiPluginApi; session_id: string }) {
           </text>
         </box>
         <Show when={list().length <= 2 || open()}>
-          <For each={list()}>{(item) => <TodoItem status={item.status} content={item.content} />}</For>
+          <For each={list()}>{(item) => <TodoItem status={normalizeStatus(item.status)} content={item.content} priority={normalizePriority(item.priority)} />}</For>
         </Show>
       </box>
     </Show>

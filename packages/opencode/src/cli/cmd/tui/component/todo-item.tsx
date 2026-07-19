@@ -1,9 +1,11 @@
 import type { Todo } from "@/session/todo"
+import { RGBA } from "@opentui/core"
 import { useTheme } from "../context/theme"
 
 export interface TodoItemProps {
   status: Todo.TodoStatus
   content: string
+  priority?: Todo.TodoPriority
 }
 
 function todoIcon(status: Todo.TodoStatus): string {
@@ -19,6 +21,32 @@ function todoIcon(status: Todo.TodoStatus): string {
   }
 }
 
+function priorityBadge(priority?: Todo.TodoPriority): string {
+  switch (priority) {
+    case "high":
+      return "[H]"
+    case "medium":
+      return "[M]"
+    case "low":
+      return "[L]"
+    default:
+      return ""
+  }
+}
+
+function priorityColor(priority: Todo.TodoPriority | undefined, theme: ReturnType<typeof useTheme>["theme"]): RGBA | undefined {
+  switch (priority) {
+    case "high":
+      return theme.error
+    case "medium":
+      return theme.warning
+    case "low":
+      return theme.success
+    default:
+      return undefined
+  }
+}
+
 export function TodoItem(props: TodoItemProps) {
   const { theme } = useTheme()
 
@@ -27,10 +55,10 @@ export function TodoItem(props: TodoItemProps) {
       <text
         flexShrink={0}
         style={{
-          fg: props.status === "in_progress" ? theme.warning : theme.textMuted,
+          fg: priorityColor(props.priority, theme) ?? (props.status === "in_progress" ? theme.warning : theme.textMuted),
         }}
       >
-        [{todoIcon(props.status)}]{" "}
+        {priorityBadge(props.priority)}{todoIcon(props.status)}{" "}
       </text>
       <text
         flexGrow={1}

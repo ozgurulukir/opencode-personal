@@ -120,6 +120,7 @@ export type ToolTodoSnapshot = {
   items: Array<{
     status: string
     content: string
+    priority?: string
   }>
   tail: string
 }
