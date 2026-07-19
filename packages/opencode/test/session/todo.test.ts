@@ -17,10 +17,10 @@ describe("session todo autoclose", () => {
 
         // Seed initial todos
         const initialTodos = [
-          { content: "implement verification logic", status: "pending", priority: "high" },
-          { content: "unrelated task to keep pending", status: "pending", priority: "medium" },
-          { content: "already completed task", status: "completed", priority: "low" },
-        ]
+          { content: "implement verification logic", status: "pending" as const, priority: "high" as const },
+          { content: "unrelated task to keep pending", status: "pending" as const, priority: "medium" as const },
+          { content: "already completed task", status: "completed" as const, priority: "low" as const },
+        ] satisfies Todo.Info[]
         
         await AppRuntime.runPromise(Todo.Service.use((svc) => svc.update({ sessionID, todos: initialTodos })))
 
