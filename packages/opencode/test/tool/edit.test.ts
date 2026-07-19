@@ -14,6 +14,8 @@ import { Bus } from "../../src/bus"
 import { BusEvent } from "../../src/bus/bus-event"
 import { Truncate } from "@/tool/truncate"
 import { SessionID, MessageID } from "../../src/session/schema"
+import { Todo } from "../../src/session/todo"
+import { Session } from "../../src/session/session"
 
 const ctx = {
   sessionID: SessionID.make("ses_test-edit-session"),
@@ -38,6 +40,7 @@ const runtime = ManagedRuntime.make(
     Bus.layer,
     Truncate.defaultLayer,
     Agent.defaultLayer,
+    Todo.defaultLayer,
   ),
 )
 
@@ -748,6 +751,139 @@ describe("tool.edit", () => {
           expect(results[0]?.status).toBe("fulfilled")
           expect(results[1]?.status).toBe("fulfilled")
           expect(await fs.readFile(filepath, "utf-8")).toBe("top = 1\nmiddle = keep\nbottom = 2\n")
+        },
+      })
+    })
+  })
+
+  describe("autoclose", () => {
+    test("autocloses matching todos after creating a new file via edit", async () => {
+      await using tmp = await tmpdir()
+      const filepath = path.join(tmp.path, "feature.ts")
+
+      await WithInstance.provide({
+        directory: tmp.path,
+        fn: async () => {
+          const autocloseRuntime = ManagedRuntime.make(
+            Layer.mergeAll(
+              LSP.defaultLayer,
+              AppFileSystem.defaultLayer,
+              Format.defaultLayer,
+              Bus.layer,
+              Truncate.defaultLayer,
+              Agent.defaultLayer,
+              Todo.defaultLayer,
+              Session.defaultLayer,
+            ),
+          )
+
+          try {
+            const todo = await autocloseRuntime.runPromise(Todo.Service.use((svc) => Effect.succeed(svc)))
+            const session = await autocloseRuntime.runPromise(Session.Service.use((svc) => Effect.succeed(svc)))
+
+            const info = await autocloseRuntime.runPromise(session.create({ agent: "build" }))
+            const autocloseCtx = { ...ctx, sessionID: info.id }
+
+            await autocloseRuntime.runPromise(
+              todo.update({
+                sessionID: info.id,
+                todos: [
+                  { content: "Export the feature function", status: "pending", priority: "high" },
+                  { content: "Unrelated task", status: "pending", priority: "medium" },
+                ],
+              }),
+            )
+
+            const edit = await autocloseRuntime.runPromise(
+              Effect.gen(function* () {
+                const info = yield* EditTool
+                return yield* info.init()
+              }),
+            )
+
+            await autocloseRuntime.runPromise(
+              edit.execute(
+                {
+                  filePath: filepath,
+                  oldString: "",
+                  newString: "export function feature() { return 'done' }",
+                },
+                autocloseCtx,
+              ),
+            )
+
+            const todos = await autocloseRuntime.runPromise(todo.get(info.id))
+            expect(todos[0].status).toBe("completed")
+            expect(todos[1].status).toBe("pending")
+          } finally {
+            await autocloseRuntime.dispose()
+          }
+        },
+      })
+    })
+
+    test("autocloses matching todos after editing an existing file", async () => {
+      await using tmp = await tmpdir()
+      const filepath = path.join(tmp.path, "feature.ts")
+      await fs.writeFile(filepath, "// old code\n", "utf-8")
+
+      await WithInstance.provide({
+        directory: tmp.path,
+        fn: async () => {
+          const autocloseRuntime = ManagedRuntime.make(
+            Layer.mergeAll(
+              LSP.defaultLayer,
+              AppFileSystem.defaultLayer,
+              Format.defaultLayer,
+              Bus.layer,
+              Truncate.defaultLayer,
+              Agent.defaultLayer,
+              Todo.defaultLayer,
+              Session.defaultLayer,
+            ),
+          )
+
+          try {
+            const todo = await autocloseRuntime.runPromise(Todo.Service.use((svc) => Effect.succeed(svc)))
+            const session = await autocloseRuntime.runPromise(Session.Service.use((svc) => Effect.succeed(svc)))
+
+            const info = await autocloseRuntime.runPromise(session.create({ agent: "build" }))
+            const autocloseCtx = { ...ctx, sessionID: info.id }
+
+            await autocloseRuntime.runPromise(
+              todo.update({
+                sessionID: info.id,
+                todos: [
+                  { content: "Export the feature function", status: "pending", priority: "high" },
+                  { content: "Unrelated task", status: "pending", priority: "medium" },
+                ],
+              }),
+            )
+
+            const edit = await autocloseRuntime.runPromise(
+              Effect.gen(function* () {
+                const info = yield* EditTool
+                return yield* info.init()
+              }),
+            )
+
+            await autocloseRuntime.runPromise(
+              edit.execute(
+                {
+                  filePath: filepath,
+                  oldString: "// old code",
+                  newString: "export function feature() { return 'done' }",
+                },
+                autocloseCtx,
+              ),
+            )
+
+            const todos = await autocloseRuntime.runPromise(todo.get(info.id))
+            expect(todos[0].status).toBe("completed")
+            expect(todos[1].status).toBe("pending")
+          } finally {
+            await autocloseRuntime.dispose()
+          }
         },
       })
     })

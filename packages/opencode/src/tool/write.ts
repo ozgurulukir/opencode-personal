@@ -14,6 +14,7 @@ import { InstanceState } from "@/effect/instance-state"
 import { trimDiff } from "./edit.replacer"
 import { assertExternalDirectoryEffect } from "./external-directory"
 import * as Bom from "@/util/bom"
+import { Todo } from "../session/todo"
 
 const MAX_PROJECT_DIAGNOSTICS_FILES = 5
 
@@ -24,13 +25,18 @@ export const Parameters = Schema.Struct({
   }),
 })
 
-export const WriteTool = Tool.define(
+export const WriteTool = Tool.define<
+  typeof Parameters,
+  { diagnostics: Record<string, any>; filepath: string; exists: boolean },
+  LSP.Service | AppFileSystem.Service | Bus.Service | Format.Service | Todo.Service
+>(
   "write",
   Effect.gen(function* () {
     const lsp = yield* LSP.Service
     const fs = yield* AppFileSystem.Service
     const bus = yield* Bus.Service
     const format = yield* Format.Service
+    const todo = yield* Todo.Service
 
     return {
       description: DESCRIPTION,
@@ -70,6 +76,8 @@ export const WriteTool = Tool.define(
             file: filepath,
             event: exists ? "change" : "add",
           })
+
+          yield* todo.autoclose(ctx.sessionID, [{ filePath: filepath, diff }])
 
           let output = "Wrote file successfully."
           yield* lsp.touchFile(filepath, "document")

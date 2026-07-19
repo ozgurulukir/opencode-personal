@@ -14,6 +14,7 @@ import { assertExternalDirectoryEffect } from "./external-directory"
 import { AppFileSystem } from "@opencode-ai/core/filesystem"
 import * as Bom from "@/util/bom"
 import { replace, trimDiff } from "./edit.replacer"
+import { Todo } from "../session/todo"
 
 function normalizeLineEndings(text: string): string {
   return text.replaceAll("\r\n", "\n")
@@ -51,13 +52,18 @@ export const Parameters = Schema.Struct({
   }),
 })
 
-export const EditTool = Tool.define(
+export const EditTool = Tool.define<
+  typeof Parameters,
+  { diagnostics: Record<string, any>; diff: string; filediff: Snapshot.FileDiff },
+  LSP.Service | AppFileSystem.Service | Format.Service | Bus.Service | Todo.Service
+>(
   "edit",
   Effect.gen(function* () {
     const lsp = yield* LSP.Service
     const afs = yield* AppFileSystem.Service
     const format = yield* Format.Service
     const bus = yield* Bus.Service
+    const todo = yield* Todo.Service
 
     return {
       description: DESCRIPTION,
@@ -109,6 +115,7 @@ export const EditTool = Tool.define(
                   file: filePath,
                   event: existed ? "change" : "add",
                 })
+                yield* todo.autoclose(ctx.sessionID, [{ filePath, diff }])
                 return
               }
 
@@ -184,6 +191,8 @@ export const EditTool = Tool.define(
               diagnostics: {},
             },
           })
+
+          yield* todo.autoclose(ctx.sessionID, [{ filePath, diff }])
 
           let output = "Edit applied successfully."
           yield* lsp.touchFile(filePath, "document")
