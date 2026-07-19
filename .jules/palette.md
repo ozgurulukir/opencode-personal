@@ -13,3 +13,6 @@
 ## 2026-07-28 - ARIA Current for Navigation State
 **Learning:** Adding `data-active` attributes to items provides clear visual styling for the currently selected item, but screen readers require `aria-current="true"` to denote the active state of interactive list elements or navigation items. This helps users relying on assistive tech understand their current location within a widget or list (like the message timeline/nav).
 **Action:** When applying a `data-active` or similar state-tracking property to a focusable or interactive element inside a navigation context or list, always supplement it with `aria-current={isActive ? "true" : undefined}`.
+## 2024-07-18 - Model visibility toggles missing ARIA label
+**Learning:** The `Switch` component uses `<Kobalte.Input />` under the hood. When used without children (e.g. just as a toggle element next to text), it has no accessible name unless `aria-label` is provided. This meant the model visibility toggles were announced just as generic switches to screen readers.
+**Action:** When using `Switch` components purely as UI toggles without textual children, always provide an `aria-label` (such as the name of the item being toggled) so screen readers can announce what the toggle controls.

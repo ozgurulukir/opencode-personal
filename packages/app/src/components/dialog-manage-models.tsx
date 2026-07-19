@@ -91,6 +91,7 @@ export const DialogManageModels: Component = () => {
                 onChange={(checked) => {
                   local.model.setVisibility({ modelID: i.id, providerID: i.provider.id }, checked)
                 }}
+                aria-label={i.name}
               />
             </div>
           </div>
