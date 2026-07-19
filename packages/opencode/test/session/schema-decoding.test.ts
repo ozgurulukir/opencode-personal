@@ -279,7 +279,7 @@ describe("Todo.Info", () => {
   const decode = decodeUnknown(Todo.Info)
 
   test("three-field round-trip", () => {
-    const input = { content: "do a thing", status: "pending", priority: "high" }
+    const input = { content: "do a thing", status: "pending" as const, priority: "high" as const }
     expect(decode(input)).toEqual(input)
     expect(Todo.Info.zod.parse(input)).toEqual(input)
   })

@@ -34,7 +34,7 @@ import { color, printHeader, printResults } from "./report"
 import { coverageResult, parseOptions, routeKey, routeKeys, selectedScenarios } from "./routing"
 import { runScenario } from "./runner"
 import { runtime } from "./runtime"
-import { type Scenario } from "./types"
+import { type Scenario, type TodoInfo } from "./types"
 
 void (await import("@opencode-ai/core/util/log")).init({ print: false })
 
@@ -890,7 +890,7 @@ const scenarios: Scenario[] = [
     .seeded((ctx) =>
       Effect.gen(function* () {
         const session = yield* ctx.session({ title: "Todo session" })
-        const todos = [{ content: "cover session todo", status: "pending", priority: "high" }]
+        const todos: TodoInfo[] = [{ content: "cover session todo", status: "pending", priority: "high" }]
         yield* ctx.todos(session.id, todos)
         return { session, todos }
       }),
