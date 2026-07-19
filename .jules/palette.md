@@ -16,3 +16,13 @@
 ## 2026-07-19 - Model visibility toggles missing ARIA label
 **Learning:** The `Switch` component uses `<Kobalte.Input />` under the hood. When used without children (e.g. just as a toggle element next to text), it has no accessible name unless `aria-label` is provided. This meant the model visibility toggles were announced just as generic switches to screen readers.
 **Action:** When using `Switch` components purely as UI toggles without textual children, always provide children and use `hideLabel` (such as the name of the item being toggled) so screen readers can announce what the toggle controls.
+
+## 2026-07-19 - Redundant Nested Tab Stops
+
+**Learning:** When using custom container components that act as a button (like `div role="button"`), nesting an `IconButton` inside it creates a double tab-stop and redundant screen reader announcement. Keyboard users have to press tab twice to pass through a single logical action.
+
+**Action:** Added `tabIndex={-1}` to the inner `IconButton` elements inside the `session-*-dock` collapsible headers. This keeps the icon clickable by mouse but removes it from the keyboard focus order, letting the parent `div role="button"` handle all keyboard interaction.
+
+## 2026-07-19 - Missing ARIA Expansion States on Docks
+**Learning:** Collapsible side/dock panels that manage state using purely visual indicators (`data-collapsed="true"`) miss screen reader cues because `aria-expanded` is not set on their respective toggle buttons.
+**Action:** When implementing expandable or toggleable sections, alongside custom state attributes like `data-collapsed` or `data-active`, always include corresponding semantic ARIA attributes (`aria-expanded`, `aria-current`) for screen readers.
