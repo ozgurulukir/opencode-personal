@@ -9,6 +9,7 @@ import type { SessionPrompt } from "../session/prompt"
 import { Config } from "@/config/config"
 import { Cause, Effect, Exit, Schema } from "effect"
 import { EffectBridge } from "@/effect/bridge"
+import { Permission } from "../permission"
 import * as Log from "@opencode-ai/core/util/log"
 
 const log = Log.create({ service: "tool.task" })
@@ -44,6 +45,18 @@ export const TaskTool = Tool.define(
       ctx: Tool.Context,
     ) {
       const cfg = yield* config.get()
+
+      // Check permission ruleset for deny even when bypassAgentCheck is true.
+      // bypassAgentCheck only skips the user-facing ask dialog, not deny enforcement.
+      const ruleset = ctx.extra?.permissionRuleset ?? []
+      const rule = Permission.evaluate(id, params.subagent_type, ruleset)
+      if (rule.action === "deny") {
+        return yield* Effect.fail(
+          new Error(
+            `Permission denied: task tool cannot spawn subagent "${params.subagent_type}" — denied by permission rules`,
+          ),
+        )
+      }
 
       if (!ctx.extra?.bypassAgentCheck) {
         yield* ctx.ask({

@@ -518,4 +518,64 @@ describe("tool.task", () => {
       expect(result.output).toContain("<task_result>")
     }),
   )
+
+  it.instance(
+    "bypassAgentCheck still enforces deny rules from permissionRuleset",
+    () =>
+      Effect.gen(function* () {
+        const { chat, assistant } = yield* seed()
+        const tool = yield* TaskTool
+        const def = yield* tool.init()
+        const promptOps = stubOps({ text: "should not reach" })
+
+        // Permission ruleset that denies "dangerous-agent" subagent type
+        const permissionRuleset = [
+          { permission: "task", pattern: "dangerous-agent", action: "deny" as const },
+        ]
+
+        const result = yield* def
+          .execute(
+            {
+              description: "dangerous task",
+              prompt: "do something dangerous",
+              subagent_type: "dangerous-agent",
+            },
+            {
+              sessionID: chat.id,
+              messageID: assistant.id,
+              agent: "build",
+              abort: new AbortController().signal,
+              extra: { promptOps, bypassAgentCheck: true, permissionRuleset },
+              messages: [],
+              metadata: () => Effect.void,
+              ask: () => Effect.void,
+            },
+          )
+          .pipe(
+            Effect.map((r) => ({ error: undefined as string | undefined, ok: true })),
+            Effect.catchDefect((defect) =>
+              Effect.succeed({
+                error: defect instanceof Error ? defect.message : String(defect),
+                ok: false,
+              }),
+            ),
+          )
+
+        // BUG: on current code, bypassAgentCheck skips the ask AND skips
+        // deny evaluation, so the subagent spawns successfully despite the
+        // deny rule. After the fix, this should fail with a permission error.
+        expect(result.ok).toBe(false)
+        expect(result.error).toContain("denied")
+      }),
+    {
+      config: {
+        agent: {
+          "dangerous-agent": {
+            description: "A dangerous subagent",
+            mode: "subagent",
+          },
+        },
+      },
+    },
+  )
 })

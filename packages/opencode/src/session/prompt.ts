@@ -451,7 +451,12 @@ const resolveTools = Effect.fn("SessionPrompt.resolveTools")(function* (input: {
         abort: options.abortSignal!,
         messageID: input.processor.message.id,
         callID: options.toolCallId,
-        extra: { model: input.model, bypassAgentCheck: input.bypassAgentCheck, promptOps },
+        extra: {
+          model: input.model,
+          bypassAgentCheck: input.bypassAgentCheck,
+          promptOps,
+          permissionRuleset: Permission.merge(input.agent.permission, input.session.permission ?? []),
+        },
         agent: input.agent.name,
         messages: input.messages,
         metadata: (val) =>
@@ -1488,8 +1493,8 @@ const resolveTools = Effect.fn("SessionPrompt.resolveTools")(function* (input: {
           permissions.push({ permission: t, action: enabled ? "allow" : "deny", pattern: "*" })
         }
         if (permissions.length > 0) {
-          session.permission = permissions
-          yield* sessions.setPermission({ sessionID: session.id, permission: permissions })
+          session.permission = Permission.merge(session.permission ?? [], permissions)
+          yield* sessions.setPermission({ sessionID: session.id, permission: session.permission })
         }
 
         if (input.noReply === true) return message
