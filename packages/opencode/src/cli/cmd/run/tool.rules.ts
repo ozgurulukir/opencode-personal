@@ -152,19 +152,32 @@ function todoMark(status: string): string {
   }
 }
 
+function priorityBadge(priority?: string): string {
+  switch (priority) {
+    case "high":
+      return "[H]"
+    case "medium":
+      return "[M]"
+    case "low":
+      return "[L]"
+    default:
+      return ""
+  }
+}
+
 export function runTodo(p: ToolProps<typeof TodoWriteTool>): ToolInline {
   return {
     icon: "#",
     title: "Todos",
     mode: "block",
-    body: list<{ status?: string; content?: string }>(p.frame.input.todos)
+    body: list<{ status?: string; content?: string; priority?: string }>(p.frame.input.todos)
       .flatMap((item) => {
         const body = typeof item?.content === "string" ? item.content : ""
         if (!body) {
           return []
         }
 
-        return [`${todoMark(item.status ?? "")} ${body}`]
+        return [`${priorityBadge(item.priority)}${todoMark(item.status ?? "")} ${body}`]
       })
       .join("\n"),
   }
@@ -358,7 +371,7 @@ export function snapTask(p: ToolProps<typeof TaskTool>): ToolSnapshot {
 }
 
 export function snapTodo(p: ToolProps<typeof TodoWriteTool>): ToolSnapshot {
-  const items = list<{ status?: string; content?: string }>(p.frame.input.todos).flatMap((item) => {
+  const items = list<{ status?: string; content?: string; priority?: string }>(p.frame.input.todos).flatMap((item) => {
     const content = typeof item?.content === "string" ? item.content : ""
     if (!content) {
       return []
@@ -368,6 +381,7 @@ export function snapTodo(p: ToolProps<typeof TodoWriteTool>): ToolSnapshot {
       {
         status: typeof item.status === "string" ? item.status : "",
         content,
+        priority: typeof item.priority === "string" ? item.priority : undefined,
       },
     ]
   })

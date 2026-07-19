@@ -386,6 +386,19 @@ function formatErrorString(error: string, label: string): JSX.Element {
   )
 }
 
+function priorityLabel(priority?: string): string {
+  switch (priority) {
+    case "high":
+      return "[H]"
+    case "medium":
+      return "[M]"
+    case "low":
+      return "[L]"
+    default:
+      return ""
+  }
+}
+
 export function TodoWriteTool(props: ToolProps) {
   const messages = useShareMessages()
   const priority: Record<Todo["status"], number> = {
@@ -414,8 +427,9 @@ export function TodoWriteTool(props: ToolProps) {
         <ul data-component="todos">
           <For each={todos()}>
             {(todo) => (
-              <li data-slot="item" data-status={todo.status}>
+              <li data-slot="item" data-status={todo.status} data-priority={todo.priority}>
                 <span></span>
+                <span data-slot="priority">{priorityLabel(todo.priority)}</span>
                 {todo.content}
               </li>
             )}

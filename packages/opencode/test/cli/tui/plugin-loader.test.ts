@@ -410,7 +410,7 @@ export default {
             },
             todo(sessionID) {
               if (sessionID !== "ses_test") return []
-              return [{ content: "ship it", status: "pending" }]
+              return [{ content: "ship it", status: "pending", priority: "medium" }]
             },
           },
           lsp() {
