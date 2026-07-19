@@ -91,7 +91,10 @@ export const DialogManageModels: Component = () => {
                 onChange={(checked) => {
                   local.model.setVisibility({ modelID: i.id, providerID: i.provider.id }, checked)
                 }}
-              />
+                hideLabel
+              >
+                {i.name}
+              </Switch>
             </div>
           </div>
         )}
