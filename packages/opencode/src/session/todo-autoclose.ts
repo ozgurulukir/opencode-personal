@@ -1,4 +1,4 @@
-import type { Info } from "./todo"
+import type { Info, TodoStatus } from "./todo"
 
 export interface FileChange {
   filePath: string
@@ -40,7 +40,7 @@ export function applyAutoclose(todos: Info[], fileChanges: FileChange[]): Info[]
   const next = todos.map((todo) => {
     if (shouldComplete(todo, fileChanges)) {
       changed = true
-      return { ...todo, status: "completed" }
+      return { ...todo, status: "completed" as TodoStatus }
     }
     return todo
   })
