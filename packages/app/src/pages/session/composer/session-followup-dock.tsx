@@ -38,6 +38,7 @@ export function SessionFollowupDock(props: {
         class="pl-3 pr-2 py-2 flex items-center gap-2"
         role="button"
         tabIndex={0}
+        aria-expanded={!store.collapsed}
         onClick={toggle}
         onKeyDown={(event) => {
           if (event.key !== "Enter" && event.key !== " ") return
@@ -55,6 +56,7 @@ export function SessionFollowupDock(props: {
             icon="chevron-down"
             size="normal"
             variant="ghost"
+            tabIndex={-1}
             style={{ transform: `rotate(${store.collapsed ? 180 : 0}deg)` }}
             onMouseDown={(event) => {
               event.preventDefault()
