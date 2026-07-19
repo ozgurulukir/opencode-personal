@@ -67,6 +67,7 @@ export function SessionFollowupDock(props: {
             aria-label={
               store.collapsed ? language.t("session.followupDock.expand") : language.t("session.followupDock.collapse")
             }
+            aria-expanded={!store.collapsed}
           />
         </div>
       </div>
