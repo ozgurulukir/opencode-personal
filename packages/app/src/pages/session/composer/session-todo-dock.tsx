@@ -184,6 +184,7 @@ export function SessionTodoDock(props: {
                 toggle()
               }}
               aria-label={store.collapsed ? props.expandLabel : props.collapseLabel}
+              aria-expanded={!store.collapsed}
             />
           </div>
         </div>

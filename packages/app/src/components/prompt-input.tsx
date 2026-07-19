@@ -1433,9 +1433,10 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                 title={language.t("prompt.action.attachFile")}
                 keybind={command.keybind("file.attach")}
               >
-                <Button
+                <IconButton
                   data-action="prompt-attach"
                   type="button"
+                  icon="plus"
                   variant="ghost"
                   class="size-8 p-0"
                   style={buttons()}
@@ -1443,9 +1444,8 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                   disabled={store.mode !== "normal"}
                   tabIndex={store.mode === "normal" ? undefined : -1}
                   aria-label={language.t("prompt.action.attachFile")}
-                >
-                  <Icon name="plus" class="size-4.5" />
-                </Button>
+                  iconSize="normal"
+                />
               </TooltipKeybind>
             </div>
           </div>
