@@ -26,3 +26,20 @@
 ## 2026-07-19 - Missing ARIA Expansion States on Docks
 **Learning:** Collapsible side/dock panels that manage state using purely visual indicators (`data-collapsed="true"`) miss screen reader cues because `aria-expanded` is not set on their respective toggle buttons.
 **Action:** When implementing expandable or toggleable sections, alongside custom state attributes like `data-collapsed` or `data-active`, always include corresponding semantic ARIA attributes (`aria-expanded`, `aria-current`) for screen readers.
+WebUI is UX-ready
+## 2024-07-20 - [WebUI Polish Audit]
+
+**Major Findings:**
+- No major missing ARIA labels on IconButtons (`aria-label` used broadly via `language.t(...)`).
+- Focus traps and `tabIndex` are managed correctly (e.g., hidden links, off-screen dialog controls, empty terminals).
+- No obvious regression in visual polish that would be high-impact.
+
+**Patterns to Repeat:**
+- Comprehensive use of `i18n.t()` or `language.t()` for dynamically generated ARIA labels.
+- Using Kobalte for core components effectively manages accessibility states like `aria-expanded` and focus.
+
+**Patterns to Avoid:**
+- None found during this audit.
+
+**Lessons Learned:**
+- WebUI is already highly polished and accessible. Suggest future user testing to find real friction points.
