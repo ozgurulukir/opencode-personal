@@ -78,6 +78,30 @@ if (condition) foo = 1
 else foo = 2
 ```
 
+### In-Place Mutation for Performance
+
+Reducers (e.g., `session-data.ts`) **mutate state in-place** for performance but have **no external side effects**:
+
+```ts
+// The reducer mutates SessionData in place for performance but has no
+// external side effects -- no IO, no footer calls.
+export function reduceSessionData(input: SessionDataInput): SessionDataOutput {
+  const data = input.data // mutated internally
+  // ... handlers mutate data.maps, data.lists
+  return out(data, commits, footer)
+}
+```
+
+**When to use:**
+- High-frequency event processing (100+ events/sec)
+- State is owned by caller (no shared references)
+- Function has no IO, network, or filesystem side effects
+
+**When NOT to use:**
+- State is shared across modules
+- Function performs IO or network calls
+- Immutability is required for time-travel debugging
+
 ### Control Flow
 
 Avoid `else` statements. Prefer early returns.
@@ -95,6 +119,28 @@ function foo() {
   else return 2
 }
 ```
+
+### Pure State Machines (`.shared.ts` pattern)
+
+Modules ending in `.shared.ts` (e.g., `prompt.shared.ts`, `permission.shared.ts`) export **pure functions** that:
+- Take state as input, return new state as output
+- Have **no side effects** (no IO, no footer calls, no mutations)
+- Are tested via **characterization tests** that lock down behavior before refactoring
+
+Example signature:
+```ts
+export function movePromptHistory(
+  state: PromptHistoryState,
+  dir: -1 | 1,
+  text: string,
+  cursor: number,
+): PromptMove // { state, text?, cursor?, apply: boolean }
+```
+
+This pattern enables:
+- Deterministic unit tests without mocks
+- Safe extraction of logic from reactive UI components
+- Clear separation between computation (`.shared.ts`) and rendering (`.tsx`)
 
 ### Schema Definitions (Drizzle)
 

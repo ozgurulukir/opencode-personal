@@ -9,145 +9,15 @@ import { useData } from "../context"
 import { useFileComponent } from "../context/file"
 
 import { Binary } from "@opencode-ai/core/util/binary"
-import { getDirectory, getFilename } from "@opencode-ai/core/util/path"
-import { createEffect, createMemo, createSignal, For, on, ParentProps, Show } from "solid-js"
-import { createStore } from "solid-js/store"
-import { Dynamic } from "solid-js/web"
-import { AssistantParts, Message, MessageDivider, PART_MAPPING, type UserActions } from "./message-part"
-import { Card } from "./card"
-import { Accordion } from "./accordion"
-import { StickyAccordionHeader } from "./sticky-accordion-header"
-import { DiffChanges } from "./diff-changes"
-import { Icon } from "./icon"
-import { TextShimmer } from "./text-shimmer"
+import { createMemo, ParentProps, Show } from "solid-js"
+import { AssistantParts, Message, type UserActions } from "./message-part"
 import { SessionRetry } from "./session-retry"
-import { TextReveal } from "./text-reveal"
+import { SessionTurnDiffs } from "./session-turn-diffs"
+import { SessionTurnThinking } from "./session-turn-thinking"
+import { SessionTurnHeader } from "./session-turn-header"
 import { createAutoScroll } from "../hooks"
 import { useI18n } from "../context/i18n"
-import { normalize } from "./session-diff"
-
-function record(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === "object" && !Array.isArray(value)
-}
-
-function unwrap(message: string) {
-  const text = message.replace(/^Error:\s*/, "").trim()
-
-  const parse = (value: string) => {
-    try {
-      return JSON.parse(value) as unknown
-    } catch {
-      return undefined
-    }
-  }
-
-  const read = (value: string) => {
-    const first = parse(value)
-    if (typeof first !== "string") return first
-    return parse(first.trim())
-  }
-
-  let json = read(text)
-
-  if (json === undefined) {
-    const start = text.indexOf("{")
-    const end = text.lastIndexOf("}")
-    if (start !== -1 && end > start) {
-      json = read(text.slice(start, end + 1))
-    }
-  }
-
-  if (!record(json)) return message
-
-  const err = record(json.error) ? json.error : undefined
-  if (err) {
-    const type = typeof err.type === "string" ? err.type : undefined
-    const msg = typeof err.message === "string" ? err.message : undefined
-    if (type && msg) return `${type}: ${msg}`
-    if (msg) return msg
-    if (type) return type
-    const code = typeof err.code === "string" ? err.code : undefined
-    if (code) return code
-  }
-
-  const msg = typeof json.message === "string" ? json.message : undefined
-  if (msg) return msg
-
-  const reason = typeof json.error === "string" ? json.error : undefined
-  if (reason) return reason
-
-  return message
-}
-
-function same<T>(a: readonly T[], b: readonly T[]) {
-  if (a === b) return true
-  if (a.length !== b.length) return false
-  return a.every((x, i) => x === b[i])
-}
-
-function list<T>(value: T[] | undefined | null, fallback: T[]) {
-  if (Array.isArray(value)) return value
-  return fallback
-}
-
-type SummaryDiff = SnapshotFileDiff & { file: string }
-
-function summaryDiff(value: SnapshotFileDiff): value is SummaryDiff {
-  return typeof value.file === "string"
-}
-
-const hidden = new Set(["todowrite"])
-
-function partState(part: PartType, showReasoningSummaries: boolean) {
-  if (part.type === "tool") {
-    if (hidden.has(part.tool)) return
-    if (part.tool === "question" && (part.state.status === "pending" || part.state.status === "running")) return
-    return "visible" as const
-  }
-  if (part.type === "text") return part.text?.trim() ? ("visible" as const) : undefined
-  if (part.type === "reasoning") {
-    if (showReasoningSummaries && part.text?.trim()) return "visible" as const
-    return
-  }
-  if (PART_MAPPING[part.type]) return "visible" as const
-  return
-}
-
-function clean(value: string) {
-  return value
-    .replace(/`([^`]+)`/g, "$1")
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
-    .replace(/[*_~]+/g, "")
-    .trim()
-}
-
-function heading(text: string) {
-  const markdown = text.replace(/\r\n?/g, "\n")
-
-  const html = markdown.match(/<h[1-6][^>]*>([\s\S]*?)<\/h[1-6]>/i)
-  if (html?.[1]) {
-    const value = clean(html[1].replace(/<[^>]+>/g, " "))
-    if (value) return value
-  }
-
-  const atx = markdown.match(/^\s{0,3}#{1,6}[ \t]+(.+?)(?:[ \t]+#+[ \t]*)?$/m)
-  if (atx?.[1]) {
-    const value = clean(atx[1])
-    if (value) return value
-  }
-
-  const setext = markdown.match(/^([^\n]+)\n(?:=+|-+)\s*$/m)
-  if (setext?.[1]) {
-    const value = clean(setext[1])
-    if (value) return value
-  }
-
-  const strong = markdown.match(/^\s*(?:\*\*|__)(.+?)(?:\*\*|__)\s*$/m)
-  if (strong?.[1]) {
-    const value = clean(strong[1])
-    if (value) return value
-  }
-}
+import { list, partState, same, summaryDiff, type SummaryDiff, unwrap, heading } from "./session-turn-utils"
 
 export function SessionTurn(
   props: ParentProps<{
@@ -253,20 +123,7 @@ export function SessionTurn(
       }, [])
       .reverse()
   })
-  const MAX_FILES = 10
   const edited = createMemo(() => diffs().length)
-  const [state, setState] = createStore({
-    showAll: false,
-    expanded: [] as string[],
-  })
-  const showAll = () => state.showAll
-  const expanded = () => state.expanded
-  const overflow = createMemo(() => Math.max(0, edited() - MAX_FILES))
-  const visible = createMemo(() => (showAll() ? diffs() : diffs().slice(0, MAX_FILES)))
-  const toggleAll = () => {
-    autoScroll.pause()
-    setState("showAll", !showAll())
-  }
 
   const assistantMessages = createMemo(
     () => {
@@ -400,11 +257,11 @@ export function SessionTurn(
               <div data-slot="session-turn-message-content" aria-live="off">
                 <Message message={message()!} parts={parts()} actions={props.actions} />
               </div>
-              <Show when={divider()}>
-                <div data-slot="session-turn-compaction">
-                  <MessageDivider label={divider()} />
-                </div>
-              </Show>
+              <SessionTurnHeader
+                divider={divider()}
+                error={error()}
+                errorText={errorText()}
+              />
               <Show when={assistantMessages().length > 0}>
                 <div data-slot="session-turn-assistant-content" aria-hidden={working()}>
                   <AssistantParts
@@ -418,118 +275,21 @@ export function SessionTurn(
                   />
                 </div>
               </Show>
-              <Show when={showThinking()}>
-                <div data-slot="session-turn-thinking">
-                  <TextShimmer text={i18n.t("ui.sessionTurn.status.thinking")} />
-                  <Show when={!showReasoningSummaries()}>
-                    <TextReveal
-                      text={reasoningHeading()}
-                      class="session-turn-thinking-heading"
-                      travel={25}
-                      duration={700}
-                    />
-                  </Show>
-                </div>
-              </Show>
+              <SessionTurnThinking
+                show={showThinking()}
+                showReasoningSummaries={showReasoningSummaries()}
+                reasoningHeading={reasoningHeading()}
+                t={i18n.t}
+              />
               <SessionRetry status={status()} show={active()} />
-              <Show when={edited() > 0 && !working()}>
-                <div
-                  data-slot="session-turn-diffs"
-                  data-component="session-turn-diffs-group"
-                  data-show-all={showAll() || undefined}
-                >
-                  <div data-slot="session-turn-diffs-header">
-                    <span data-slot="session-turn-diffs-label">
-                      {edited()} {i18n.t("ui.sessionTurn.diffs.changed")}{" "}
-                      {i18n.t(edited() === 1 ? "ui.common.file.one" : "ui.common.file.other")}
-                    </span>
-                    <DiffChanges changes={diffs()} />
-                    <Show when={overflow() > 0}>
-                      <span data-slot="session-turn-diffs-toggle" onClick={toggleAll}>
-                        {showAll() ? i18n.t("ui.sessionTurn.diffs.showLess") : i18n.t("ui.sessionTurn.diffs.showAll")}
-                      </span>
-                    </Show>
-                  </div>
-                  <div data-component="session-turn-diffs-content">
-                    <Accordion
-                      multiple
-                      style={{ "--sticky-accordion-offset": "44px" }}
-                      value={expanded()}
-                      onChange={(value) => setState("expanded", Array.isArray(value) ? value : value ? [value] : [])}
-                    >
-                      <For each={visible()}>
-                        {(diff) => {
-                          const view = normalize(diff)
-                          const active = createMemo(() => expanded().includes(diff.file))
-                          const [shown, setShown] = createSignal(false)
-
-                          createEffect(
-                            on(
-                              active,
-                              (value) => {
-                                if (!value) {
-                                  setShown(false)
-                                  return
-                                }
-
-                                requestAnimationFrame(() => {
-                                  if (!active()) return
-                                  setShown(true)
-                                })
-                              },
-                              { defer: true },
-                            ),
-                          )
-
-                          return (
-                            <Accordion.Item value={diff.file}>
-                              <StickyAccordionHeader>
-                                <Accordion.Trigger>
-                                  <div data-slot="session-turn-diff-trigger">
-                                    <span data-slot="session-turn-diff-path">
-                                      <Show when={diff.file.includes("/")}>
-                                        <span data-slot="session-turn-diff-directory">
-                                          {`\u202A${getDirectory(diff.file)}\u202C`}
-                                        </span>
-                                      </Show>
-                                      <span data-slot="session-turn-diff-filename">{getFilename(diff.file)}</span>
-                                    </span>
-                                    <div data-slot="session-turn-diff-meta">
-                                      <span data-slot="session-turn-diff-changes">
-                                        <DiffChanges changes={diff} />
-                                      </span>
-                                      <span data-slot="session-turn-diff-chevron">
-                                        <Icon name="chevron-down" size="small" />
-                                      </span>
-                                    </div>
-                                  </div>
-                                </Accordion.Trigger>
-                              </StickyAccordionHeader>
-                              <Accordion.Content>
-                                <Show when={shown()}>
-                                  <div data-slot="session-turn-diff-view" data-scrollable>
-                                    <Dynamic component={fileComponent} mode="diff" fileDiff={view.fileDiff} />
-                                  </div>
-                                </Show>
-                              </Accordion.Content>
-                            </Accordion.Item>
-                          )
-                        }}
-                      </For>
-                    </Accordion>
-                    <Show when={!showAll() && overflow() > 0}>
-                      <div data-slot="session-turn-diffs-more" onClick={toggleAll}>
-                        {i18n.t("ui.sessionTurn.diffs.more", { count: String(overflow()) })}
-                      </div>
-                    </Show>
-                  </div>
-                </div>
-              </Show>
-              <Show when={error()}>
-                <Card variant="error" class="error-card">
-                  {errorText()}
-                </Card>
-              </Show>
+              <SessionTurnDiffs
+                diffs={diffs()}
+                edited={edited()}
+                working={working()}
+                fileComponent={fileComponent}
+                autoScroll={autoScroll}
+                t={i18n.t}
+              />
             </div>
           </Show>
           {props.children}

@@ -1,6 +1,12 @@
 import { OpenApi } from "effect/unstable/httpapi"
+import * as Log from "@opencode-ai/core/util/log"
 import { OpenCodeHttpApi } from "./api"
 import { QueryBooleanOpenApi } from "./groups/query"
+
+const log = Log.create({ service: "server" })
+
+const MAX_SCHEMA_DEPTH = 100
+const DEPTH_WARN_THRESHOLD = 80
 
 type OpenApiParameter = {
   name: string
@@ -39,6 +45,7 @@ type OpenApiSchema = {
   items?: OpenApiSchema
   maximum?: number
   minimum?: number
+  minLength?: number
   oneOf?: OpenApiSchema[]
   pattern?: string
   prefixItems?: OpenApiSchema[]
@@ -325,15 +332,22 @@ function canonicalRef(ref: string, schemas: Record<string, OpenApiSchema>) {
   return ref
 }
 
-function rewriteRefs(input: unknown, from: string, to: string): void {
+function rewriteRefs(input: unknown, from: string, to: string, _depth = 0): void {
+  if (_depth > MAX_SCHEMA_DEPTH) {
+    log.warn("schema depth limit exceeded", { depth: _depth })
+    return
+  }
+  if (_depth > DEPTH_WARN_THRESHOLD) {
+    log.warn("schema depth approaching limit", { depth: _depth })
+  }
   if (Array.isArray(input)) {
-    for (const item of input) rewriteRefs(item, from, to)
+    for (const item of input) rewriteRefs(item, from, to, _depth + 1)
     return
   }
   if (!input || typeof input !== "object") return
   const schema = input as OpenApiSchema
   if (schema.$ref === `#/components/schemas/${from}`) schema.$ref = `#/components/schemas/${to}`
-  for (const value of Object.values(input)) rewriteRefs(value, from, to)
+  for (const value of Object.values(input)) rewriteRefs(value, from, to, _depth + 1)
 }
 
 function normalizeLegacyErrorResponses(operation: OpenApiOperation) {
@@ -428,22 +442,29 @@ function fixSelfReferencingComponents(spec: OpenApiSpec) {
 }
 
 /** Strip `{type:"null"}` arms that Effect's `Schema.optional` adds to OpenAPI unions. */
-function stripOptionalNull(schema: OpenApiSchema): OpenApiSchema {
+export function stripOptionalNull(schema: OpenApiSchema, _depth = 0): OpenApiSchema {
+  if (_depth > MAX_SCHEMA_DEPTH) {
+    log.warn("schema depth limit exceeded", { depth: _depth })
+    return schema
+  }
+  if (_depth > DEPTH_WARN_THRESHOLD) {
+    log.warn("schema depth approaching limit", { depth: _depth })
+  }
   if (schema.allOf?.length === 1) {
     const [constraint] = schema.allOf
     delete schema.allOf
-    return stripOptionalNull({ ...schema, ...constraint })
+    return stripOptionalNull({ ...schema, ...constraint }, _depth + 1)
   }
   if (isEmptyObjectUnion(schema)) return { type: "object", properties: {} }
-  const options = flattenOptions(schema.anyOf ?? schema.oneOf)
+  const options = flattenOptions(schema.anyOf ?? schema.oneOf, _depth + 1)
   if (options) {
     const withoutNull = options.filter((item) => item.type !== "null")
-    if (withoutNull.length === 1) return stripOptionalNull(withoutNull[0])
-    if (schema.anyOf) schema.anyOf = withoutNull.map(stripOptionalNull)
-    if (schema.oneOf) schema.oneOf = withoutNull.map(stripOptionalNull)
+    if (withoutNull.length === 1) return stripOptionalNull(withoutNull[0], _depth + 1)
+    if (schema.anyOf) schema.anyOf = withoutNull.map((item) => stripOptionalNull(item, _depth + 1))
+    if (schema.oneOf) schema.oneOf = withoutNull.map((item) => stripOptionalNull(item, _depth + 1))
   }
   if (schema.allOf) {
-    const allOf = schema.allOf.map(stripOptionalNull)
+    const allOf = schema.allOf.map((item) => stripOptionalNull(item, _depth + 1))
     if (schema.type) {
       delete schema.allOf
       for (const item of allOf) Object.assign(schema, item)
@@ -452,14 +473,14 @@ function stripOptionalNull(schema: OpenApiSchema): OpenApiSchema {
     }
   }
   if (schema.prefixItems && schema.items) delete schema.prefixItems
-  if (schema.items) schema.items = stripOptionalNull(schema.items)
+  if (schema.items) schema.items = stripOptionalNull(schema.items, _depth + 1)
   if (schema.properties) {
     for (const [key, value] of Object.entries(schema.properties)) {
-      schema.properties[key] = stripOptionalNull(value)
+      schema.properties[key] = stripOptionalNull(value, _depth + 1)
     }
   }
   if (schema.additionalProperties && typeof schema.additionalProperties === "object") {
-    schema.additionalProperties = stripOptionalNull(schema.additionalProperties)
+    schema.additionalProperties = stripOptionalNull(schema.additionalProperties, _depth + 1)
   }
   return schema
 }
@@ -477,8 +498,15 @@ function isBareArraySchema(schema: OpenApiSchema) {
   return schema.type === "array" && !schema.items && !schema.prefixItems
 }
 
-function flattenOptions(options: OpenApiSchema[] | undefined): OpenApiSchema[] | undefined {
-  return options?.flatMap((item) => flattenOptions(item.anyOf ?? item.oneOf) ?? [item])
+function flattenOptions(options: OpenApiSchema[] | undefined, _depth = 0): OpenApiSchema[] | undefined {
+  if (_depth > MAX_SCHEMA_DEPTH) {
+    log.warn("schema depth limit exceeded", { depth: _depth })
+    return options
+  }
+  if (_depth > DEPTH_WARN_THRESHOLD) {
+    log.warn("schema depth approaching limit", { depth: _depth })
+  }
+  return options?.flatMap((item) => flattenOptions(item.anyOf ?? item.oneOf, _depth + 1) ?? [item])
 }
 
 function normalizeParameter(param: OpenApiParameter, route: string) {

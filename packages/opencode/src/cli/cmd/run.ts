@@ -25,6 +25,8 @@ import { createOpencodeClient, type OpencodeClient, type ToolPart } from "@openc
 import { Agent } from "@/agent/agent"
 import { Permission } from "@/permission"
 import { INTERACTIVE_INPUT_ERROR, resolveInteractiveStdin } from "./run/runtime.stdin"
+import { loop } from "./run/event-loop"
+import type { LoopContext } from "./run/types"
 
 const runtimeTask = import("./run/runtime")
 type ModelInput = Parameters<OpencodeClient["session"]["prompt"]>[0]["model"]
@@ -598,128 +600,6 @@ export const RunCommand = effectCmd({
         // to stdout/UI. `client` is passed explicitly because attach mode may
         // rebind the SDK to the session's directory after the subscription is
         // created, and replies issued from inside the loop must use that client.
-        async function loop(client: OpencodeClient, events: Awaited<ReturnType<typeof sdk.event.subscribe>>) {
-          const toggles = new Map<string, boolean>()
-          let error: string | undefined
-
-          for await (const event of events.stream) {
-            if (
-              event.type === "message.updated" &&
-              event.properties.sessionID === sessionID &&
-              event.properties.info.role === "assistant" &&
-              args.format !== "json" &&
-              toggles.get("start") !== true
-            ) {
-              UI.empty()
-              UI.println(`> ${event.properties.info.agent} · ${event.properties.info.modelID}`)
-              UI.empty()
-              toggles.set("start", true)
-            }
-
-            if (event.type === "message.part.updated") {
-              const part = event.properties.part
-              if (part.sessionID !== sessionID) continue
-
-              if (part.type === "tool" && (part.state.status === "completed" || part.state.status === "error")) {
-                if (emit("tool_use", { part })) continue
-                if (part.state.status === "completed") {
-                  await tool(part)
-                  continue
-                }
-                await toolError(part)
-                UI.error(part.state.error)
-              }
-
-              if (
-                part.type === "tool" &&
-                part.tool === "task" &&
-                part.state.status === "running" &&
-                args.format !== "json"
-              ) {
-                if (toggles.get(part.id) === true) continue
-                await tool(part)
-                toggles.set(part.id, true)
-              }
-
-              if (part.type === "step-start") {
-                if (emit("step_start", { part })) continue
-              }
-
-              if (part.type === "step-finish") {
-                if (emit("step_finish", { part })) continue
-              }
-
-              if (part.type === "text" && part.time?.end) {
-                if (emit("text", { part })) continue
-                const text = part.text.trim()
-                if (!text) continue
-                if (!process.stdout.isTTY) {
-                  process.stdout.write(text + EOL)
-                  continue
-                }
-                UI.empty()
-                UI.println(text)
-                UI.empty()
-              }
-
-              if (part.type === "reasoning" && part.time?.end && thinking) {
-                if (emit("reasoning", { part })) continue
-                const text = part.text.trim()
-                if (!text) continue
-                const line = `Thinking: ${text}`
-                if (process.stdout.isTTY) {
-                  UI.empty()
-                  UI.println(`${UI.Style.TEXT_DIM}\u001b[3m${line}\u001b[0m${UI.Style.TEXT_NORMAL}`)
-                  UI.empty()
-                  continue
-                }
-                process.stdout.write(line + EOL)
-              }
-            }
-
-            if (event.type === "session.error") {
-              const props = event.properties
-              if (props.sessionID !== sessionID || !props.error) continue
-              let err = String(props.error.name)
-              if ("data" in props.error && props.error.data && "message" in props.error.data) {
-                err = String(props.error.data.message)
-              }
-              error = error ? error + EOL + err : err
-              if (emit("error", { error: props.error })) continue
-              UI.error(err)
-            }
-
-            if (
-              event.type === "session.status" &&
-              event.properties.sessionID === sessionID &&
-              event.properties.status.type === "idle"
-            ) {
-              break
-            }
-
-            if (event.type === "permission.asked") {
-              const permission = event.properties
-              if (permission.sessionID !== sessionID) continue
-
-              if (args["dangerously-skip-permissions"]) {
-                await client.permission.reply({
-                  requestID: permission.id,
-                  reply: "once",
-                })
-              } else {
-                UI.println(
-                  UI.Style.TEXT_WARNING_BOLD + "!",
-                  UI.Style.TEXT_NORMAL +
-                    `permission requested: ${permission.permission} (${permission.patterns.join(", ")}); auto-rejecting`,
-                )
-                await client.permission.reply({
-                  requestID: permission.id,
-                  reply: "reject",
-                })
-              }
-            }
-          }
-        }
         const cwd = args.attach ? (directory ?? sess.directory ?? (await current(sdk))) : (directory ?? root)
         const client = args.attach ? attachSDK(cwd) : sdk
 
@@ -730,7 +610,16 @@ export const RunCommand = effectCmd({
 
         if (!args.interactive) {
           const events = await client.event.subscribe()
-          loop(client, events).catch((e) => {
+          const ctx: LoopContext = {
+            emit,
+            toggles: new Map<string, boolean>(),
+            args,
+            sessionID,
+            tool,
+            toolError,
+            client,
+          }
+          loop(ctx, events).catch((e) => {
             console.error(e)
             process.exit(1)
           })

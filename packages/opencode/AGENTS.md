@@ -77,6 +77,74 @@ ln -sf "$PWD/dist/opencode-linux-x64/bin/opencode" ~/.local/bin/opencode-dev
 
 Renaming the binary does not affect the runtime — channel/DB/data-dir are build-time baked (`OPENCODE_CHANNEL` define), not derived from the binary name. A local build uses channel `local`, so it reads/writes `opencode-local.db` (separate from the npm release's `opencode.db`). Re-running `bun run build -- --single ...` refreshes `opencode-dev` automatically since the symlink points at the fixed `dist/...` path.
 
+## CLI Event Loop Architecture
+
+### LoopContext Interface Pattern
+
+The event loop (`cli/cmd/run/event-loop.ts`) uses a `LoopContext` interface to carry state and dependencies:
+
+```ts
+export type LoopContext = {
+  emit: (type: string, data: Record<string, unknown>) => boolean
+  toggles: Map<string, boolean>
+  args: { format?: string; thinking?: boolean; "dangerously-skip-permissions"?: boolean }
+  sessionID: string
+  tool: (part: ToolPart) => Promise<void>
+  toolError: (part: ToolPart) => Promise<void>
+  client: OpencodeClient
+}
+```
+
+**Benefits:**
+- Handlers are pure functions: `function handleX(ctx: LoopContext, event: Event)`
+- Easy to test: construct `LoopContext` with stubbed `emit`, `tool`, `client`
+- Dependencies are explicit, not imported globally
+
+### FooterOutput Contract
+
+The session-data reducer produces two outputs per event:
+- `StreamCommit[]`: append-only scrollback entries (text, tool, error)
+- `FooterOutput`: status bar patches and view transitions (permission, question)
+
+```ts
+export type FooterOutput = {
+  patch?: FooterPatch
+  view?: FooterView
+  subagent?: FooterSubagentState
+}
+
+// Handler signature: mutates data in-place, returns footer update
+export function syncPermission(data: SessionData, part: ToolPart): FooterOutput | undefined
+```
+
+**Key insight:** Footer updates are **optional** (`undefined` if no change) and **separate** from scrollback commits. This allows the footer to update without re-rendering the entire scrollback.
+
+### Characterization Test Strategy
+
+Private/internal functions (e.g., `reduceSessionData`, `flushInterrupted`, `pickBlockerView`) are tested directly via **characterization tests**:
+
+```ts
+// test/cli/cmd/run/session-data.characterization.test.ts
+import { reduceSessionData, flushInterrupted, pickBlockerView } from "../../../../src/cli/cmd/run/session-data"
+
+test("flushInterrupted marks all in-flight parts as interrupted", () => {
+  const data = createSessionData({ sessionID: "ses_test" })
+  const commits: SessionCommit[] = []
+  // ... setup in-flight parts
+  flushInterrupted(data, commits)
+  expect(commits).toHaveProperty("interrupted", true)
+})
+```
+
+**When to use:**
+- Refactoring private functions with no existing test coverage
+- Locking down behavior before extraction
+- Documenting edge cases that the public API doesn't expose
+
+**Not for:**
+- Testing implementation details that may change
+- Replacing integration tests for public APIs
+
 ## Module shape
 
 Do not use `export namespace Foo { ... }` for module organization. It is not

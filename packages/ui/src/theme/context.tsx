@@ -4,161 +4,14 @@ import { makeEventListener } from "@solid-primitives/event-listener"
 import { createSimpleContext } from "../context/helper"
 import oc2ThemeJson from "./themes/oc-2.json"
 import { resolveThemeVariant, themeToCss } from "./resolve"
+import { STORAGE_KEYS, clearThemeCss, normalize, read, write } from "./theme-storage"
+import { getThemeFiles, knownThemes, themeIDs, themeNames } from "./theme-glob"
+import { applyThemeCss, cacheThemeVariants, getSystemMode } from "./theme-css"
 import type { DesktopTheme } from "./types"
 
 export type ColorScheme = "light" | "dark" | "system"
 
-const STORAGE_KEYS = {
-  THEME_ID: "opencode-theme-id",
-  COLOR_SCHEME: "opencode-color-scheme",
-  THEME_CSS_LIGHT: "opencode-theme-css-light",
-  THEME_CSS_DARK: "opencode-theme-css-dark",
-} as const
-
-const THEME_STYLE_ID = "oc-theme"
-let files: Record<string, () => Promise<{ default: DesktopTheme }>> | undefined
-let ids: string[] | undefined
-let known: Set<string> | undefined
-
-function getFiles() {
-  if (files) return files
-  files = import.meta.glob<{ default: DesktopTheme }>("./themes/*.json")
-  return files
-}
-
-function themeIDs() {
-  if (ids) return ids
-  ids = Object.keys(getFiles())
-    .map((path) => path.slice("./themes/".length, -".json".length))
-    .sort()
-  return ids
-}
-
-function knownThemes() {
-  if (known) return known
-  known = new Set(themeIDs())
-  return known
-}
-
-const names: Record<string, string> = {
-  "oc-2": "OC-2",
-  amoled: "AMOLED",
-  aura: "Aura",
-  ayu: "Ayu",
-  carbonfox: "Carbonfox",
-  catppuccin: "Catppuccin",
-  "catppuccin-frappe": "Catppuccin Frappe",
-  "catppuccin-macchiato": "Catppuccin Macchiato",
-  cobalt2: "Cobalt2",
-  cursor: "Cursor",
-  dracula: "Dracula",
-  everforest: "Everforest",
-  flexoki: "Flexoki",
-  github: "GitHub",
-  gruvbox: "Gruvbox",
-  kanagawa: "Kanagawa",
-  "lucent-orng": "Lucent Orng",
-  material: "Material",
-  matrix: "Matrix",
-  mercury: "Mercury",
-  monokai: "Monokai",
-  nightowl: "Night Owl",
-  nord: "Nord",
-  "one-dark": "One Dark",
-  onedarkpro: "One Dark Pro",
-  opencode: "OpenCode",
-  orng: "Orng",
-  "osaka-jade": "Osaka Jade",
-  palenight: "Palenight",
-  rosepine: "Rose Pine",
-  shadesofpurple: "Shades of Purple",
-  solarized: "Solarized",
-  synthwave84: "Synthwave '84",
-  tokyonight: "Tokyonight",
-  vercel: "Vercel",
-  vesper: "Vesper",
-  zenburn: "Zenburn",
-}
 const oc2Theme = oc2ThemeJson as DesktopTheme
-
-function normalize(id: string | null | undefined) {
-  return id === "oc-1" ? "oc-2" : id
-}
-
-function read(key: string) {
-  if (typeof localStorage !== "object") return null
-  try {
-    return localStorage.getItem(key)
-  } catch {
-    return null
-  }
-}
-
-function write(key: string, value: string) {
-  if (typeof localStorage !== "object") return
-  try {
-    localStorage.setItem(key, value)
-  } catch {}
-}
-
-function drop(key: string) {
-  if (typeof localStorage !== "object") return
-  try {
-    localStorage.removeItem(key)
-  } catch {}
-}
-
-function clear() {
-  drop(STORAGE_KEYS.THEME_CSS_LIGHT)
-  drop(STORAGE_KEYS.THEME_CSS_DARK)
-}
-
-function ensureThemeStyleElement(): HTMLStyleElement {
-  const existing = document.getElementById(THEME_STYLE_ID) as HTMLStyleElement | null
-  if (existing) return existing
-  const element = document.createElement("style")
-  element.id = THEME_STYLE_ID
-  document.head.appendChild(element)
-  return element
-}
-
-function getSystemMode(): "light" | "dark" {
-  if (typeof window !== "object") return "light"
-  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"
-}
-
-function applyThemeCss(theme: DesktopTheme, themeId: string, mode: "light" | "dark") {
-  const isDark = mode === "dark"
-  const variant = isDark ? theme.dark : theme.light
-  const tokens = resolveThemeVariant(variant, isDark)
-  const css = themeToCss(tokens)
-
-  if (themeId !== "oc-2") {
-    write(isDark ? STORAGE_KEYS.THEME_CSS_DARK : STORAGE_KEYS.THEME_CSS_LIGHT, css)
-  }
-
-  const fullCss = `:root {
-  color-scheme: ${mode};
-  --text-mix-blend-mode: ${isDark ? "plus-lighter" : "multiply"};
-  ${css}
-}`
-
-  document.getElementById("oc-theme-preload")?.remove()
-  ensureThemeStyleElement().textContent = fullCss
-  document.documentElement.dataset.theme = themeId
-  document.documentElement.dataset.colorScheme = mode
-}
-
-function cacheThemeVariants(theme: DesktopTheme, themeId: string) {
-  if (themeId === "oc-2") return
-  for (const mode of ["light", "dark"] as const) {
-    const isDark = mode === "dark"
-    const variant = isDark ? theme.dark : theme.light
-    const tokens = resolveThemeVariant(variant, isDark)
-    const css = themeToCss(tokens)
-    write(isDark ? STORAGE_KEYS.THEME_CSS_DARK : STORAGE_KEYS.THEME_CSS_LIGHT, css)
-  }
-}
 
 export const { use: useTheme, provider: ThemeProvider } = createSimpleContext({
   name: "Theme",
@@ -186,7 +39,7 @@ export const { use: useTheme, provider: ThemeProvider } = createSimpleContext({
       if (hit) return Promise.resolve(hit)
       const pending = loads.get(next)
       if (pending) return pending
-      const file = getFiles()[`./themes/${next}.json`]
+      const file = getThemeFiles()[`./themes/${next}.json`]
       if (!file) return Promise.resolve(undefined)
       const task = file()
         .then((mod) => {
@@ -224,7 +77,7 @@ export const { use: useTheme, provider: ThemeProvider } = createSimpleContext({
         if (next !== "oc-2" && !knownThemes().has(next) && !store.themes[next]) return
         setStore("themeId", next)
         if (next === "oc-2") {
-          clear()
+          clearThemeCss()
           return
         }
         void load(next).then((theme) => {
@@ -253,7 +106,7 @@ export const { use: useTheme, provider: ThemeProvider } = createSimpleContext({
       const savedScheme = (read(STORAGE_KEYS.COLOR_SCHEME) as ColorScheme | null) ?? "system"
       if (rawTheme && rawTheme !== savedTheme) {
         write(STORAGE_KEYS.THEME_ID, savedTheme)
-        clear()
+        clearThemeCss()
       }
       if (savedTheme !== store.themeId) setStore("themeId", savedTheme)
       if (savedScheme !== store.colorScheme) setStore("colorScheme", savedScheme)
@@ -283,7 +136,7 @@ export const { use: useTheme, provider: ThemeProvider } = createSimpleContext({
       setStore("themeId", next)
       if (next === "oc-2") {
         write(STORAGE_KEYS.THEME_ID, next)
-        clear()
+        clearThemeCss()
         return
       }
       void load(next).then((theme) => {
@@ -304,7 +157,7 @@ export const { use: useTheme, provider: ThemeProvider } = createSimpleContext({
       colorScheme: () => store.colorScheme,
       mode: () => store.mode,
       ids,
-      name: (id: string) => store.themes[id]?.name ?? names[id] ?? id,
+      name: (id: string) => store.themes[id]?.name ?? themeNames[id] ?? id,
       loadThemes,
       themes: () => store.themes,
       setTheme,
