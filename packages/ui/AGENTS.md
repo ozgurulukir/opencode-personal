@@ -66,3 +66,67 @@ mock.module("../../src/theme/theme-glob", () => ({
   knownThemes: () => new Set(),
 }))
 ```
+
+## Storybook Patterns
+
+### DataProvider Wrapper Pattern
+
+Context-dependent components (e.g., `SessionTurn`) require `DataProvider` + `FileComponentProvider` wrappers in stories:
+
+```tsx
+// @ts-nocheck
+import { DataProvider } from "../context/data"
+import { FileComponentProvider } from "../context/file"
+
+const FileStub = () => <div>File viewer stub</div>
+
+export const MyStory = () => (
+  <DataProvider data={...} directory="/project">
+    <FileComponentProvider component={FileStub}>
+      <MyComponent />
+    </FileComponentProvider>
+  </DataProvider>
+)
+```
+
+**Why:** The `create()` scaffold generates empty-args stories that render nothing for context-dependent components. Manual `render` functions with wrappers are required (see `timeline-playground.stories.tsx`).
+
+### Mock Data Factory Pattern
+
+Create a shared `*-mock.ts` file with `@ts-nocheck` pragma for complex union types:
+
+```ts
+// @ts-nocheck
+// session-turn-mock.ts
+export function mkUser(text, parts = [], sessionID = "story-session") { ... }
+export function mkAssistant(parentID, sessionID = "story-session", overrides = {}) { ... }
+export const TOOL_SAMPLES = { bash: {...}, edit: {...}, ... }
+export function mkTurn(config) { ... }
+```
+
+**Why:** Avoids duplicating 200+ lines of mock data builders across stories. Use `@ts-nocheck` only in mock files (complex types), not in stories.
+
+### FileStub for Diff Viewer
+
+Use a stub component to avoid loading the real `@pierre/diffs` web component in stories:
+
+```tsx
+const FileStub = () => (
+  <div style={{ padding: "8px", color: "var(--text-weak)" }}>
+    File viewer stub
+  </div>
+)
+```
+
+**Why:** The real diff viewer requires a web worker and Shiki highlighter — too heavy for Storybook. Stubs keep stories fast and deterministic.
+
+### Deterministic IDs for Snapshots
+
+Use fixed IDs in stories for visual regression testing:
+
+```ts
+const SESSION_ID = "story-session"  // NOT Date.now()
+const USER_ID = "story-user-1"      // NOT uid()
+```
+
+**Why:** `Date.now()`-based IDs change on every render, breaking snapshot comparisons. Fixed IDs ensure stable DOM snapshots.

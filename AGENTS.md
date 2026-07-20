@@ -40,6 +40,33 @@ Bun workspace monorepo: `packages/*`, `packages/console/*`, `packages/sdk/js`, `
 - Rely on type inference when possible; avoid explicit type annotations or interfaces unless necessary for exports or clarity
 - Prefer functional array methods (flatMap, filter, map) over for loops; use type guards on filter to maintain type inference downstream
 
+### Selective JSDoc
+
+Add JSDoc **only** to complex, non-obvious functions — not to self-documenting code:
+
+**Add JSDoc:**
+- Complex algorithms (50+ lines, cognitive complexity > 20)
+- Non-obvious behavior ("does X but in Y case does Z")
+- Functions with side effects that aren't apparent from the name
+
+**Skip JSDoc:**
+- Simple data transformations (`themeIDs()`, `knownThemes()`)
+- Self-documenting names (`handlePermissionAsked`)
+- Internal helpers used in 1-2 places
+
+**Example:**
+```ts
+/**
+ * Flushes in-flight parts as interrupted commits.
+ * Called when session transitions to idle with pending tool calls.
+ * Marks all parts without `end_time` as interrupted.
+ * @see {@link handleSessionStatus} - triggers flush on idle
+ */
+export function flushInterrupted(data: SessionData, commits: SessionCommit[]): void {
+  // ...
+}
+```
+
 Reduce total variable count by inlining when a value is only used once.
 
 ```ts
@@ -188,6 +215,8 @@ const table = sqliteTable("session", {
 ## Rules
 
 - Do not split files without tests first (Rule 3). Two precedents: (1) `packages/opencode/src/cli/cmd/run/tool.ts` was split into 6 modules only after 26 display function tests were written. (2) `packages/opencode/src/provider/transform.ts` `normalizeMessages` (277 lines) was decomposed into 7 per-provider modules in `transform/` after 9 characterization tests + 225 existing `ProviderTransform.message` tests locked behavior. See `packages/opencode/src/provider/AGENTS.md` for the orchestrator pattern and early-return constraints.
+- **Characterization tests are mandatory before refactoring.** Write tests that lock existing behavior BEFORE any extraction. Example: 146 characterization tests were written for `run.ts`, `session-data.ts`, and `footer.prompt.tsx` before the 6-phase refactoring project. This eliminates regression risk and enables confident extraction.
+- **Storybook expansion is optional post-refactoring.** Add stories for visual regression testing only if: (1) component has 3+ visual states, (2) designer/PM review is needed, or (3) edge cases need documentation. Skip stories for internal components (header, thinking) that are already covered by parent component stories. See `packages/ui/AGENTS.md` for Storybook patterns.
 - Type HTTP boundaries with zod before eliminating `as any` casts. Provider files (openai.ts, anthropic.ts, openai-compatible.ts) had 213+ instances — resolved in d82e6af by removing redundant casts (all `body: any` property accesses). Remaining `as any` casts are limited to library internals (effect-zod: 3, slack: 1, plugin: 1, desktop: 1) and test assertions accessing Effect Schema internals.
 - Large icon component files (>300 lines) should be split by Heroicons prefix category (arrows, coding, communication, data, file, general, layout, media, social). See `packages/web/src/components/icons/` for the pattern.
 - Before splitting a god function, extract small single-responsibility modules first (e.g., cost, billing, auth, model validation) to reduce risk. `packages/console/app/src/routes/zen/util/handler.ts` went from 1132 → 468 → 154 lines via two phases of extraction. Phase 1 (9 modules): cost.ts, billing.ts, usage.ts, auth.ts, provider-selector.ts, model.ts, reload.ts, validation.ts, http.ts. Phase 2 (6 modules): request.ts, setup.ts, retry.ts, response.ts, error-mapping.ts, plus HandlerDeps injection. handler.ts is now a thin orchestrator: `parseRequest → setupRequest → executeRetriableRequest → handleResponse → mapErrorToResponse`.
