@@ -72,6 +72,21 @@ describe("SystemPrompt.provider — matchDelta", () => {
     expect(result.prefix).toContain("Prompt and tool use")
   })
 
+  test("qwen matches qwen delta", () => {
+    const result = SystemPrompt.provider(modelWith("qwen"))
+    expect(result.prefix).toContain("Reasoning and thinking")
+  })
+
+  test("glm matches glm delta", () => {
+    const result = SystemPrompt.provider(modelWith("glm"))
+    expect(result.prefix).toContain("Reasoning and thinking")
+  })
+
+  test("deepseek matches deepseek delta", () => {
+    const result = SystemPrompt.provider(modelWith("deepseek"))
+    expect(result.prefix).toContain("Reasoning and thinking")
+  })
+
   test("unknown-model matches default delta", () => {
     const result = SystemPrompt.provider(modelWith("unknown-model"))
     expect(result.prefix).toContain("Default delta")

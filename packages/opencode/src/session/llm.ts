@@ -403,6 +403,7 @@ const live: Layer.Layer<
           ...headers,
         },
         maxRetries: input.retries ?? 0,
+        allowSystemInMessages: true,
         system: delivery.type !== "messages" || isWorkflow ? undefined : systemMessages.map((x) => ({ role: "system" as const, content: x })),
         messages,
         model: wrapLanguageModel({

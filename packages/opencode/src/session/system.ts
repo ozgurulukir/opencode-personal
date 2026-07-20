@@ -10,6 +10,9 @@ import PROMPT_DELTA_DEFAULT from "./prompt/delta-default.txt"
 import PROMPT_DELTA_GEMINI from "./prompt/delta-gemini.txt"
 import PROMPT_DELTA_GPT from "./prompt/delta-gpt.txt"
 import PROMPT_DELTA_KIMI from "./prompt/delta-kimi.txt"
+import PROMPT_DELTA_QWEN from "./prompt/delta-qwen.txt"
+import PROMPT_DELTA_GLM from "./prompt/delta-glm.txt"
+import PROMPT_DELTA_DEEPSEEK from "./prompt/delta-deepseek.txt"
 import PROMPT_DELTA_TRINITY from "./prompt/delta-trinity.txt"
 import type { Provider } from "@/provider/provider"
 import type { Agent } from "@/agent/agent"
@@ -38,6 +41,9 @@ function matchDelta(model: Provider.Model): string {
   if (/claude/i.test(id)) return PROMPT_DELTA_ANTHROPIC
   if (/trinity/i.test(id)) return PROMPT_DELTA_TRINITY
   if (/kimi/i.test(id)) return PROMPT_DELTA_KIMI
+  if (/qwen/i.test(id)) return PROMPT_DELTA_QWEN
+  if (/glm/i.test(id)) return PROMPT_DELTA_GLM
+  if (/deepseek/i.test(id)) return PROMPT_DELTA_DEEPSEEK
   return PROMPT_DELTA_DEFAULT
 }
 
