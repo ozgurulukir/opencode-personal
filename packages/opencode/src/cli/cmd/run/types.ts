@@ -13,7 +13,7 @@
 //         → OpenTUI split-footer renderer writes to terminal
 import type { KeyEvent, Renderable } from "@opentui/core"
 import type { Binding } from "@opentui/keymap"
-import type { OpencodeClient, PermissionRequest, QuestionRequest, ToolPart } from "@opencode-ai/sdk/v2"
+import type { OpencodeClient, PermissionRequest, QuestionRequest, ToolPart, Part } from "@opencode-ai/sdk/v2"
 
 export type RunFilePart = {
   type: "file"
@@ -301,6 +301,31 @@ export type StreamCommit = {
   interrupted?: boolean
   toolState?: StreamToolState
   toolError?: string
+}
+
+// Event types emitted to stdout in JSON format.
+export type CliEvent =
+  | { type: "tool_use"; part: ToolPart }
+  | { type: "step_start"; part: Part }
+  | { type: "step_finish"; part: Part }
+  | { type: "text"; part: Part }
+  | { type: "reasoning"; part: Part }
+  | { type: "error"; error: unknown }
+
+// Context passed to every event loop handler. Carries the CLI state and
+// dependencies that the loop needs to process events.
+export type LoopContext = {
+  emit: (type: string, data: Record<string, unknown>) => boolean
+  toggles: Map<string, boolean>
+  args: {
+    format?: string
+    thinking?: boolean
+    "dangerously-skip-permissions"?: boolean
+  }
+  sessionID: string
+  tool: (part: ToolPart) => Promise<void>
+  toolError: (part: ToolPart) => Promise<void>
+  client: OpencodeClient
 }
 
 // The public contract between the stream transport / prompt queue and
