@@ -1,0 +1,11 @@
+# Reasoning and thinking
+
+Qwen models support a reasoning/thinking mode via the `enable_thinking` parameter on DashScope. When enabled, the model produces a reasoning trace before the final answer. Use this for complex multi-step tasks.
+
+# Tool use
+
+Call tools directly without explaining the decision — the tool calls are self-explanatory. Make independent tool calls in parallel to improve efficiency.
+
+# Output style
+
+Be concise and direct. Prefer step-by-step reasoning for complex tasks. Avoid verbose explanations of obvious steps.

@@ -458,6 +458,7 @@ export const layer = Layer.effect(
         const delivery = ProviderTransform.systemPromptDelivery(model.providerID, authInfo)
 
         const params = {
+          allowSystemInMessages: true,
           experimental_telemetry: {
             isEnabled: cfg.experimental?.openTelemetry,
             tracer,

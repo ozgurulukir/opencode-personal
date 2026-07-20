@@ -1964,6 +1964,7 @@ const resolveTools = Effect.fn("SessionPrompt.resolveTools")(function* (input: {
       const text = yield* Effect.tryPromise(() =>
         streamText({
           model: wrapped,
+          allowSystemInMessages: true,
           system: PREDICT_SYSTEM,
           messages: [...msgs, { role: "user", content: PREDICT_NUDGE }],
           maxOutputTokens: ProviderTransform.maxOutputTokens(model),

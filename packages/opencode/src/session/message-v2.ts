@@ -663,61 +663,98 @@ export const filterCompactedEffect = Effect.fnUntraced(function* (sessionID: Ses
   return filterCompacted(stream(sessionID))
 })
 
-export function fromError(
-  e: unknown,
-  ctx: { providerID: ProviderID; aborted?: boolean },
+function handleAbortError(e: DOMException): NonNullable<Assistant["error"]> {
+  return new AbortedError({ message: e.message }, { cause: e }).toObject()
+}
+
+function handleOutputLengthError(e: unknown): NonNullable<Assistant["error"]> {
+  return e as NonNullable<Assistant["error"]>
+}
+
+function handleLoadAPIKeyError(
+  e: LoadAPIKeyError,
+  providerID: ProviderID,
 ): NonNullable<Assistant["error"]> {
-  switch (true) {
-    case e instanceof DOMException && e.name === "AbortError":
-      return new AbortedError(
-        { message: e.message },
-        {
-          cause: e,
-        },
-      ).toObject()
-    case OutputLengthError.isInstance(e):
-      return e
-    case LoadAPIKeyError.isInstance(e):
-      return new AuthError(
-        {
-          providerID: ctx.providerID,
-          message: e.message,
-        },
-        { cause: e },
-      ).toObject()
-    case (e as SystemError)?.code === "ECONNRESET":
-      return new APIError(
-        {
-          message: "Connection reset by server",
-          isRetryable: true,
-          metadata: {
-            code: (e as SystemError).code ?? "",
-            syscall: (e as SystemError).syscall ?? "",
-            message: (e as SystemError).message ?? "",
-          },
-        },
-        { cause: e },
-      ).toObject()
-    case e instanceof Error && (e as FetchDecompressionError).code === "ZlibError":
-      if (ctx.aborted) {
-        return new AbortedError({ message: e.message }, { cause: e }).toObject()
-      }
-      return new APIError(
-        {
-          message: "Response decompression failed",
-          isRetryable: true,
-          metadata: {
-            code: (e as FetchDecompressionError).code,
-            message: e.message,
-          },
-        },
-        { cause: e },
-      ).toObject()
-    case APICallError.isInstance(e):
-      const parsed = ProviderError.parseAPICallError({
-        providerID: ctx.providerID,
-        error: e,
-      })
+  return new AuthError(
+    { providerID, message: e.message },
+    { cause: e },
+  ).toObject()
+}
+
+function handleECONNRESET(e: SystemError): NonNullable<Assistant["error"]> {
+  return new APIError(
+    {
+      message: "Connection reset by server",
+      isRetryable: true,
+      metadata: {
+        code: e.code ?? "",
+        syscall: e.syscall ?? "",
+        message: e.message ?? "",
+      },
+    },
+    { cause: e },
+  ).toObject()
+}
+
+function handleZlibError(
+  e: FetchDecompressionError,
+  aborted?: boolean,
+): NonNullable<Assistant["error"]> {
+  if (aborted) {
+    return new AbortedError({ message: e.message }, { cause: e }).toObject()
+  }
+  return new APIError(
+    {
+      message: "Response decompression failed",
+      isRetryable: true,
+      metadata: {
+        code: e.code,
+        message: e.message,
+      },
+    },
+    { cause: e },
+  ).toObject()
+}
+
+function handleAPICallError(
+  e: APICallError,
+  providerID: ProviderID,
+): NonNullable<Assistant["error"]> {
+  const parsed = ProviderError.parseAPICallError({
+    providerID,
+    error: e,
+  })
+  if (parsed.type === "context_overflow") {
+    return new ContextOverflowError(
+      {
+        message: parsed.message,
+        responseBody: parsed.responseBody,
+      },
+      { cause: e },
+    ).toObject()
+  }
+
+  return new APIError(
+    {
+      message: parsed.message,
+      statusCode: parsed.statusCode,
+      isRetryable: parsed.isRetryable,
+      responseHeaders: parsed.responseHeaders,
+      responseBody: parsed.responseBody,
+      metadata: parsed.metadata,
+    },
+    { cause: e },
+  ).toObject()
+}
+
+function handleGenericError(e: Error): NonNullable<Assistant["error"]> {
+  return new NamedError.Unknown({ message: errorMessage(e) }, { cause: e }).toObject()
+}
+
+function handleUnknownError(e: unknown): NonNullable<Assistant["error"]> {
+  try {
+    const parsed = ProviderError.parseStreamError(e)
+    if (parsed) {
       if (parsed.type === "context_overflow") {
         return new ContextOverflowError(
           {
@@ -727,47 +764,32 @@ export function fromError(
           { cause: e },
         ).toObject()
       }
-
       return new APIError(
         {
           message: parsed.message,
-          statusCode: parsed.statusCode,
           isRetryable: parsed.isRetryable,
-          responseHeaders: parsed.responseHeaders,
           responseBody: parsed.responseBody,
-          metadata: parsed.metadata,
         },
         { cause: e },
       ).toObject()
-    case e instanceof Error:
-      return new NamedError.Unknown({ message: errorMessage(e) }, { cause: e }).toObject()
-    default:
-      try {
-        const parsed = ProviderError.parseStreamError(e)
-        if (parsed) {
-          if (parsed.type === "context_overflow") {
-            return new ContextOverflowError(
-              {
-                message: parsed.message,
-                responseBody: parsed.responseBody,
-              },
-              { cause: e },
-            ).toObject()
-          }
-          return new APIError(
-            {
-              message: parsed.message,
-              isRetryable: parsed.isRetryable,
-              responseBody: parsed.responseBody,
-            },
-            {
-              cause: e,
-            },
-          ).toObject()
-        }
-      } catch {}
-      return new NamedError.Unknown({ message: JSON.stringify(e) }, { cause: e }).toObject()
-  }
+    }
+  } catch {}
+  return new NamedError.Unknown({ message: JSON.stringify(e) }, { cause: e }).toObject()
+}
+
+export function fromError(
+  e: unknown,
+  ctx: { providerID: ProviderID; aborted?: boolean },
+): NonNullable<Assistant["error"]> {
+  if (e instanceof DOMException && e.name === "AbortError") return handleAbortError(e)
+  if (OutputLengthError.isInstance(e)) return handleOutputLengthError(e)
+  if (LoadAPIKeyError.isInstance(e)) return handleLoadAPIKeyError(e, ctx.providerID)
+  if ((e as SystemError)?.code === "ECONNRESET") return handleECONNRESET(e as SystemError)
+  if (e instanceof Error && (e as FetchDecompressionError).code === "ZlibError")
+    return handleZlibError(e as FetchDecompressionError, ctx.aborted)
+  if (APICallError.isInstance(e)) return handleAPICallError(e, ctx.providerID)
+  if (e instanceof Error) return handleGenericError(e)
+  return handleUnknownError(e)
 }
 
 export * as MessageV2 from "./message-v2"
