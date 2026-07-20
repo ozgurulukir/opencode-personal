@@ -178,9 +178,16 @@ export function DebugBar() {
 
     const syncFrame = (at: number) => {
       trim(fps, span, at)
-      const total = fps.reduce((sum, entry) => sum + entry.dur, 0)
-      const gap = fps.reduce((max, entry) => Math.max(max, entry.dur), 0)
-      const jank = fps.filter((entry) => entry.dur > 32).length
+      // ⚡ Bolt Optimization: Replace multiple traversals and .filter() with a single loop to avoid intermediate array allocations
+      let total = 0
+      let gap = 0
+      let jank = 0
+      for (let i = 0; i < fps.length; i++) {
+        const dur = fps[i].dur
+        total += dur
+        if (dur > gap) gap = dur
+        if (dur > 32) jank++
+      }
       batch(() => {
         setState("fps", total > 0 ? (fps.length * 1000) / total : undefined)
         setState("gap", gap > 0 ? gap : undefined)
@@ -191,8 +198,14 @@ export function DebugBar() {
     const syncLong = (at = performance.now()) => {
       if (!hasLong) return
       trim(long, span, at)
-      const block = long.reduce((sum, entry) => sum + Math.max(0, entry.dur - 50), 0)
-      const max = long.reduce((hi, entry) => Math.max(hi, entry.dur), 0)
+      // ⚡ Bolt Optimization: Replace multiple .reduce() traversals with a single loop
+      let block = 0
+      let max = 0
+      for (let i = 0; i < long.length; i++) {
+        const dur = long[i].dur
+        if (dur > 50) block += dur - 50
+        if (dur > max) max = dur
+      }
       setState("long", { block, count: long.length, max })
     }
 
