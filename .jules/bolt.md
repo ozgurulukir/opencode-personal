@@ -39,3 +39,7 @@
 ## 2024-03-24 - Consolidating Multiple Filter Counts
 **Learning:** Calling `.filter(condition).length` multiple times on the same array to calculate multiple counts forces multiple O(N) passes and allocates multiple intermediate arrays.
 **Action:** Consolidate multiple `.filter(...).length` calls into a single `for` loop that iterates over the array once, incrementing local count variables. This reduces the number of traversals to 1 and eliminates all intermediate array allocations.
+
+## 2026-07-22 - Never modify bun.lock
+**Learning:** `bun.lock` is a lockfile that gets updated automatically by `bun install`. Including unrelated `bun.lock` changes in a PR (e.g., a ghostty-web hash update) pollutes the diff and has nothing to do with the intended code change.
+**Action:** Never include `bun.lock` changes in any PR unless the task explicitly asks to update dependencies. If `bun.lock` shows as modified, revert it before committing. Only touch source files (.ts, .tsx, .css, etc.) and `.jules/bolt.md`.
