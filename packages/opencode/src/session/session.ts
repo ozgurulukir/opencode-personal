@@ -459,6 +459,10 @@ export interface Interface {
     partID: PartID
   }) => Effect.Effect<MessageV2.Part | undefined>
   readonly updatePart: <T extends MessageV2.Part>(part: T) => Effect.Effect<T>
+  /** Updates multiple parts in a single DB write. Prefer over a loop of `updatePart`. */
+  readonly updateParts: (parts: MessageV2.Part[]) => Effect.Effect<void>
+  /** Updates multiple messages in a single DB write. Prefer over a loop of `updateMessage`. */
+  readonly updateMessages: (infos: MessageV2.Info[]) => Effect.Effect<void>
   readonly updatePartDelta: (input: {
     sessionID: SessionID
     messageID: MessageID
@@ -595,6 +599,26 @@ export const layer: Layer.Layer<Service, never, Bus.Service | Storage.Service | 
         })
         return part
       }).pipe(Effect.withSpan("Session.updatePart"))
+
+    const updateParts = Effect.fn("Session.updateParts")(function* (parts: MessageV2.Part[]) {
+      if (parts.length === 0) return
+      const sessionID = parts[0].sessionID
+      yield* sync.run(MessageV2.Event.PartUpdatedBatch, {
+        sessionID,
+        parts: parts.map((part) => structuredClone(part)),
+        time: Date.now(),
+      })
+    })
+
+    const updateMessages = Effect.fn("Session.updateMessages")(function* (infos: MessageV2.Info[]) {
+      if (infos.length === 0) return
+      const sessionID = infos[0].sessionID
+      yield* sync.run(MessageV2.Event.MessageUpdatedBatch, {
+        sessionID,
+        infos: infos.map((info) => structuredClone(info)),
+        time_created: Date.now(),
+      })
+    })
 
     const getPart: Interface["getPart"] = Effect.fn("Session.getPart")(function* (input) {
       const row = Database.use((db) =>
@@ -812,9 +836,11 @@ export const layer: Layer.Layer<Service, never, Bus.Service | Storage.Service | 
       children,
       remove,
       updateMessage,
+      updateMessages,
       removeMessage,
       removePart,
       updatePart,
+      updateParts,
       getPart,
       updatePartDelta,
       findMessage,

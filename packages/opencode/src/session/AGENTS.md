@@ -33,3 +33,12 @@ The `as Record<string, any>` cast in `mergeOptions` is deliberate — remeda's `
 **Autoclose scope**: triggered by `apply_patch`, `write`, `edit` tools (all produce diff via `createTwoFilesPatch`). Shell tool excluded (non-deterministic, diff unknown). Each tool calls `todo.autoclose(sessionID, [{ filePath, diff }])` after file write + bus events.
 
 **Priority render**: `[H]`/`[M]`/`[L]` badge before status icon (e.g., `[H][✓] Done thing`). TUI uses `theme.error/warning/success`, Web uses `border-left` red/orange/green. Eski veriler `normalizePriority` ile `"medium"`'a düşer.
+
+## Batch updates — `updateParts` / `updateMessages`
+
+When replacing per-item loops with batch writes, use the new `Session.updateParts(parts)` and `Session.updateMessages(infos)` methods. They emit a single `PartUpdatedBatch` / `MessageUpdatedBatch` event carrying the full array, and the projector in `projectors.ts` performs one multi-row `INSERT ... ON CONFLICT DO UPDATE` using `sql`excluded.data`` for SQLite upserts. Prefer batch over loops when updating >1 item in the same session.
+
+**Adding new batch event types requires coordinated changes:**
+1. Define the schema + event in `message-v2.ts`
+2. Add the projector tuple to `session/projectors.ts` default export **before** `...nextProjectors`
+3. `server/projectors.ts:initProjectors()` runs at module load and freezes the registry — import order matters

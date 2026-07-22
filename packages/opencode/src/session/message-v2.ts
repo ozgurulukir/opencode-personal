@@ -66,6 +66,18 @@ const PartUpdatedEventSchema = Schema.Struct({
   time: NonNegativeInt,
 })
 
+const PartUpdatedBatchEventSchema = Schema.Struct({
+  sessionID: SessionID,
+  parts: Schema.Array(Part),
+  time: NonNegativeInt,
+})
+
+const MessageUpdatedBatchEventSchema = Schema.Struct({
+  sessionID: SessionID,
+  infos: Schema.Array(Info),
+  time_created: NonNegativeInt,
+})
+
 const PartRemovedEventSchema = Schema.Struct({
   sessionID: SessionID,
   messageID: MessageID,
@@ -91,6 +103,12 @@ export const Event = {
     aggregate: "sessionID",
     schema: PartUpdatedEventSchema,
   }),
+  PartUpdatedBatch: SyncEvent.define({
+    type: "message.part.updated.batch",
+    version: 1,
+    aggregate: "sessionID",
+    schema: PartUpdatedBatchEventSchema,
+  }),
   PartDelta: BusEvent.define(
     "message.part.delta",
     Schema.Struct({
@@ -106,6 +124,12 @@ export const Event = {
     version: 1,
     aggregate: "sessionID",
     schema: PartRemovedEventSchema,
+  }),
+  MessageUpdatedBatch: SyncEvent.define({
+    type: "message.updated.batch",
+    version: 1,
+    aggregate: "sessionID",
+    schema: MessageUpdatedBatchEventSchema,
   }),
 }
 

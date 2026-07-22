@@ -1409,7 +1409,7 @@ const resolveTools = Effect.fn("SessionPrompt.resolveTools")(function* (input: {
       })
 
       yield* sessions.updateMessage(info)
-      for (const part of parts) yield* sessions.updatePart(part)
+      yield* sessions.updateParts(parts)
       const nextPrompt = parts.reduce(
         (result, part) => {
           if (part.type === "text") {

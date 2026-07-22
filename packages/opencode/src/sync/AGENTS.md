@@ -11,3 +11,11 @@ The `convertEvent` callback (`sync/index.ts:197, 221`) transforms event data bef
 ## BusEvent vs SyncEvent: different delivery paths
 
 `BusEvent` (e.g. `message.part.delta`) goes through `Bus.publish()` directly — no sync envelope, no version suffix, no DB persistence. `SyncEvent` (e.g. `message.part.updated`) goes through `SyncEvent.process()` — persisted to DB, wrapped in sync envelope, versioned. Consumers subscribing to the global event stream see both, but SyncEvents arrive wrapped while BusEvents arrive raw.
+
+## `SyncEvent.init()` freezes the registry
+
+After `SyncEvent.init()` is called, the registry is frozen (`frozen = true`). Any subsequent `SyncEvent.define()` call throws "Error defining sync event: sync system has been frozen". This happens at module load because `server/projectors.ts:28` calls `initProjectors()` as a side effect of import. Tests that need custom projectors must call `SyncEvent.reset()` before reinitializing.
+
+## `SyncEvent.run()` bypasses the Effect service layer
+
+`SyncEvent.run()`, `replay()`, and `replayAll()` call `runtime.runSync()` directly on the global SyncEvent runtime. They do not go through `SyncEvent.Service` and do not participate in the caller's Effect context. This is why `server/projectors.ts:initProjectors()` must be called before tests can use `SyncEvent.run()` — the projector map is populated at init time, not lazily.

@@ -502,19 +502,21 @@ export const layer: Layer.Layer<
             tools: original.tools,
             system: original.system,
           })
+          const replayParts: MessageV2.Part[] = []
           for (const part of replay.parts) {
             if (part.type === "compaction") continue
             const replayPart =
               part.type === "file" && MessageV2.isMedia(part.mime)
                 ? { type: "text" as const, text: `[Attached ${part.mime}: ${part.filename ?? "file"}]` }
                 : part
-            yield* session.updatePart({
+            replayParts.push({
               ...replayPart,
               id: PartID.ascending(),
               messageID: replayMsg.id,
               sessionID: input.sessionID,
             })
           }
+          if (replayParts.length > 0) yield* session.updateParts(replayParts)
         }
 
         if (!replay) {
