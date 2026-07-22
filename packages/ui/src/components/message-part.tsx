@@ -464,11 +464,26 @@ function taskSession(
   if (!parentID) return
   const description = typeof input.description === "string" ? input.description : ""
   const agent = taskAgent(input.subagent_type, agents).name
-  return (sessions ?? [])
-    .filter((session) => session.parentID === parentID && !session.time?.archived)
-    .filter((session) => (description ? session.title.startsWith(description) : true))
-    .filter((session) => (agent ? session.title.includes(`@${agent}`) : true))
-    .sort((a, b) => (b.time.created ?? 0) - (a.time.created ?? 0))[0]?.id
+
+  if (!sessions) return
+
+  let latestSession: Session | undefined
+  let maxTime = -Infinity
+
+  for (let i = 0; i < sessions.length; i++) {
+    const session = sessions[i]
+    if (session.parentID !== parentID || session.time?.archived) continue
+    if (description && !session.title.startsWith(description)) continue
+    if (agent && !session.title.includes(`@${agent}`)) continue
+
+    const created = session.time?.created ?? 0
+    if (created > maxTime) {
+      maxTime = created
+      latestSession = session
+    }
+  }
+
+  return latestSession?.id
 }
 
 const CONTEXT_GROUP_TOOLS = new Set(["read", "glob", "grep", "list"])
