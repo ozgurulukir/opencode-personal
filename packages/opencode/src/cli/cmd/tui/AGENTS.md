@@ -63,3 +63,12 @@ This file covers TUI-specific patterns for `packages/opencode/src/cli/cmd/tui/`.
 ```
 
 **Priority badge**: `[H]`/`[M]`/`[L]` before status icon. TUI uses `theme.error/warning/success` colors. See `todo-item.tsx:priorityBadge()`, `todo-item.tsx:priorityColor()`.
+
+## Interrupt command — separate from footer state
+
+`component/prompt/index.tsx` registers `session.interrupt` as a hidden command with its own `store.interrupt` counter and 5s `setTimeout` reset. This is **independent** from the footer's `handleInterrupt` in `cli/cmd/run/footer.ts`:
+
+- Prompt: `store.interrupt` (SolidJS store, component-local)
+- Footer: `state().interrupt` (class signal, footer-owned)
+
+They have the same name and same two-press pattern, but different substrates, different timer guards, and different second-press actions (`sdk.client.session.abort` vs `options.onInterrupt`). Do not attempt to unify them.

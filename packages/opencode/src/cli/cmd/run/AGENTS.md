@@ -77,6 +77,22 @@ export function handleEventName(
 - Mock `client`, `emit`, `tool` as needed
 - Use `asyncStream()` to wrap event arrays
 
+## Two-press interrupt and exit
+
+`footer.ts` implements two independent two-press handlers:
+
+- `handleInterrupt` — arms a 5s timer on first press, calls `options.onInterrupt` on second
+- `handleExit` — same pattern, calls `options.onExit` and `close()` on second
+
+**Important:** The prompt component (`cli/cmd/tui/component/prompt/index.tsx`) has its own separate `handleInterruptCommand` with a separate `store.interrupt` counter. The two implementations are **not shared state** and have subtly different semantics:
+
+- Footer timer guards on `isGone` / `phase !== "running"` — deliberately does NOT reset if session is gone
+- Prompt timer unconditionally resets `store.interrupt` to 0 after 5s
+- Footer patches status text on first press (`"${interruptHint} again to interrupt"`); prompt does not
+- Footer delegates action to `options.onInterrupt` callback; prompt calls `sdk.client.session.abort` directly
+
+**Do not unify these implementations.** They operate on different state substrates (class signals vs SolidJS store), have different guard requirements, and different action targets. The only shared value is the 5s timeout duration.
+
 ## Refactoring Precedents
 
 ### Phase 2 — State Machine Decomposition
