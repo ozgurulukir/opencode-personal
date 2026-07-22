@@ -12,6 +12,17 @@ The `convertEvent` callback (`sync/index.ts:197, 221`) transforms event data bef
 
 `BusEvent` (e.g. `message.part.delta`) goes through `Bus.publish()` directly — no sync envelope, no version suffix, no DB persistence. `SyncEvent` (e.g. `message.part.updated`) goes through `SyncEvent.process()` — persisted to DB, wrapped in sync envelope, versioned. Consumers subscribing to the global event stream see both, but SyncEvents arrive wrapped while BusEvents arrive raw.
 
+## SyncEvent dual delivery to GlobalBus
+
+`SyncEvent.process()` (`sync/index.ts:308-333`) publishes SyncEvents to `GlobalBus` through **two paths**:
+
+1. **Raw Bus path** (line 315): `ProjectBus.publish(def, data)` → `Bus.publish()` → `GlobalBus.emit({ payload: { type: def.type, properties: data } })` — delivers unwrapped `{ type, properties }` just like a BusEvent.
+2. **Sync envelope path** (line 322-333): Direct `GlobalBus.emit({ payload: { type: "sync", syncEvent: { ... } } })` — delivers the versioned sync envelope.
+
+TUI's `event.ts:useEvent()` filters out path 2 (`if (payload.type === "sync") return`), but path 1 passes through. This means SyncEvent handlers in `sync.tsx` for `message.updated`, `message.part.updated`, etc. ARE reachable at runtime — they are not dead code. The `sync` envelope filtering in the TUI only suppresses the versioned copy.
+
+Each newly defined SyncEvent type is also registered as a BusEvent at init time (`sync/index.ts:212-215`: `BusEvent.define(def.type, def.properties)`), which enables path 1 delivery.
+
 ## `SyncEvent.init()` freezes the registry
 
 After `SyncEvent.init()` is called, the registry is frozen (`frozen = true`). Any subsequent `SyncEvent.define()` call throws "Error defining sync event: sync system has been frozen". This happens at module load because `server/projectors.ts:28` calls `initProjectors()` as a side effect of import. Tests that need custom projectors must call `SyncEvent.reset()` before reinitializing.
