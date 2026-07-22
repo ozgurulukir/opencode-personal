@@ -10,14 +10,11 @@ interface Metadata {
   [key: string]: any
 }
 
-// TODO: remove this hack
-export type DynamicDescription = (agent: Agent.Info) => Effect.Effect<string>
-
-/**
- * Typed extensions passed to tools via `ctx.extra`. Known fields are typed;
- * the index signature preserves extensibility for tool-specific data.
- */
 export interface ToolContextExtra {
+  /**
+   * Typed extensions passed to tools via `ctx.extra`. Known fields are typed;
+   * the index signature preserves extensibility for tool-specific data.
+   */
   /** When true, the task tool skips its per-call agent-type permission ask (used by /agent slash commands). */
   bypassAgentCheck?: boolean
   /** When true, the read tool skips the reference/cwd containment check. */
