@@ -43,6 +43,10 @@
 **Learning:** Chaining multiple `.filter()` calls followed by a `.sort()[0]` to find a single max element in an array forces multiple O(N) passes, allocates multiple intermediate arrays, and performs an O(N log N) sort.
 **Action:** Replace chained `.filter().sort()[0]` with a single O(N) `for` loop to find the max/min element in one pass, eliminating intermediate array allocations and sorting overhead.
 
+## 2025-07-28 - Consolidating multiple array methods in requestAnimationFrame loops
+**Learning:** In high-frequency loops like `requestAnimationFrame` (e.g., `syncFrame` in `debug-bar.tsx`), chaining or sequential array methods (`.reduce()`, `.filter().length`) across the same array causes redundant O(N) passes and forces garbage collection due to intermediate array allocations.
+**Action:** Replace sequential functional array operations (like multiple `reduce` and `filter`s) on the same array with a single imperative `for` loop that updates all metrics simultaneously. This eliminates redundant passes and GC pressure, providing true O(N) performance per frame.
+
 ## 2026-07-22 - Never modify bun.lock
 **Learning:** `bun.lock` is a lockfile that gets updated automatically by `bun install`. Including unrelated `bun.lock` changes in a PR (e.g., a ghostty-web hash update) pollutes the diff and has nothing to do with the intended code change.
 **Action:** Never include `bun.lock` changes in any PR unless the task explicitly asks to update dependencies. If `bun.lock` shows as modified, revert it before committing. Only touch source files (.ts, .tsx, .css, etc.) and `.jules/bolt.md`.
