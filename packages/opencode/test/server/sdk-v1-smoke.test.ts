@@ -57,4 +57,17 @@ describe("v1 SDK runtime smoke", () => {
     // wire body for 404 is NamedError-shaped
     expect(result.error).toMatchObject({ name: "NotFoundError" })
   })
+
+  test("session 404 with responseStyle data returns error object instead of undefined", async () => {
+    await using tmp = await tmpdir({ git: true, config: { formatter: false, lsp: false } })
+    const sdk = client(tmp.path)
+    const result = await sdk.session.get({
+      path: { id: "ses_no_such" },
+      responseStyle: "data",
+    })
+    expect(result).toBeDefined()
+    expect(result).not.toBeUndefined()
+    expect(typeof result).toBe("object")
+    expect((result as any).name).toBe("NotFoundError")
+  })
 })

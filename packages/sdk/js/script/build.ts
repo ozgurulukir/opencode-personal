@@ -42,6 +42,28 @@ await createClient({
 
 await $`bun prettier --write src/gen`
 await $`bun prettier --write src/v2`
+
+// Post-generation patch: fix data-style error return in both v1 (static) and v2 (regenerated).
+// v1 generation is frozen, but we patch it here too so the fix is co-located with the build logic.
+for (const genDir of ["src/gen", "src/v2/gen"] as const) {
+  const clientFile = path.join(dir, genDir, "client", "client.gen.ts")
+  const typesFile = path.join(dir, genDir, "client", "types.gen.ts")
+
+  const clientText = await Bun.file(clientFile).text()
+  const patchedClient = clientText.replace(
+    `    // TODO: we probably want to return error and improve types\n    return opts.responseStyle === "data"\n      ? undefined\n      : {\n          error: finalError,\n          ...result,\n        }`,
+    `    return opts.responseStyle === "data"\n      ? finalError\n      : {\n          error: finalError,\n          ...result,\n        }`,
+  )
+  if (patchedClient !== clientText) await Bun.write(clientFile, patchedClient)
+
+  const typesText = await Bun.file(typesFile).text()
+  const patchedTypes = typesText.replace(
+    `        ? (TData extends Record<string, unknown> ? TData[keyof TData] : TData) | undefined`,
+    `        ? (TData extends Record<string, unknown> ? TData[keyof TData] : TData) | TError`,
+  )
+  if (patchedTypes !== typesText) await Bun.write(typesFile, patchedTypes)
+}
+
 await $`rm -rf dist`
 await $`bun tsc`
 await $`rm openapi.json`

@@ -81,4 +81,19 @@ describe("v2 SDK error shape", () => {
     // Whatever the server put in data.message must be what the user sees.
     expect(err.message).toBe(cause.body.data.message)
   })
+
+  test("404 with responseStyle data returns error object instead of undefined", async () => {
+    await using tmp = await tmpdir({ git: true, config: { formatter: false, lsp: false } })
+    const sdk = client(tmp.path)
+
+    const result = await sdk.session.get(
+      { sessionID: "ses_no_such" },
+      { responseStyle: "data", throwOnError: false },
+    )
+
+    expect(result).toBeDefined()
+    expect(result).not.toBeUndefined()
+    expect(typeof result).toBe("object")
+    expect((result as any).name).toBe("NotFoundError")
+  })
 })
