@@ -591,7 +591,7 @@ export function Prompt(props: PromptProps) {
         name: "session.interrupt",
         category: "Session",
         hidden: true,
-        enabled: status().type !== "idle",
+        enabled: () => status().type !== "idle",
         run: () => {
           if (auto()?.visible) return
           // TODO: this should be its own command
