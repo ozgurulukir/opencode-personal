@@ -1,11 +1,11 @@
-import { describe, expect } from "bun:test"
+import { describe, expect, test } from "bun:test"
 import { Effect, Layer } from "effect"
 import path from "path"
 import { AppFileSystem } from "@opencode-ai/core/filesystem"
 import { CrossSpawnSpawner } from "@opencode-ai/core/cross-spawn-spawner"
 import { SearchService } from "@/search/search"
 import { EmbeddingService } from "@/search/embedding"
-import { IndexWorkspace } from "@/search/indexer"
+import { IndexWorkspace, chunkFile, CHUNK_LINES, CHUNK_MIN_CHARS } from "@/search/indexer"
 import { provideInstance, tmpdirScoped } from "../fixture/fixture"
 import { testEffect } from "../lib/effect"
 
@@ -159,4 +159,70 @@ describe("IndexWorkspace", () => {
       expect(deletedIds).toEqual([`${fileB}:0`])
     }),
   )
+})
+
+describe("chunkFile", () => {
+  const longLine = "x".repeat(210)
+
+  test("returns empty array for content below CHUNK_MIN_CHARS", () => {
+    expect(chunkFile("a.ts", "short")).toEqual([])
+  })
+
+  test("returns one chunk for content at CHUNK_MIN_CHARS with no newlines", () => {
+    const content = "x".repeat(CHUNK_MIN_CHARS)
+    expect(chunkFile("a.ts", content)).toEqual([
+      { id: "a.ts:0", path: "a.ts", content }
+    ])
+  })
+
+  test("returns one chunk for file exactly at CHUNK_LINES", () => {
+    const lines = Array(CHUNK_LINES).fill(longLine).join("\n")
+    const result = chunkFile("a.ts", lines)
+    expect(result).toHaveLength(1)
+    expect(result[0]?.id).toBe("a.ts:0")
+  })
+
+  test("splits file at CHUNK_LINES + 1 into two chunks", () => {
+    const lines = Array(CHUNK_LINES + 1).fill(longLine).join("\n")
+    const result = chunkFile("a.ts", lines)
+    expect(result).toHaveLength(2)
+    expect(result[0]?.id).toBe("a.ts:0")
+    expect(result[1]?.id).toBe(`a.ts:${CHUNK_LINES}`)
+  })
+
+  test("drops chunks below CHUNK_MIN_CHARS", () => {
+    const lines = Array(CHUNK_LINES + 1).fill("x").join("\n")
+    const result = chunkFile("a.ts", lines)
+    expect(result).toHaveLength(0)
+  })
+
+  test("keeps chunks at or above CHUNK_MIN_CHARS", () => {
+    const lines = Array(CHUNK_LINES + 1).fill(longLine).join("\n")
+    const result = chunkFile("a.ts", lines)
+    expect(result).toHaveLength(2)
+    expect(result.every(c => c.content.length >= CHUNK_MIN_CHARS)).toBe(true)
+  })
+
+  test("strips ANSI escape codes before chunking", () => {
+    const content = "\u001b[31m" + "hello".repeat(50) + "\u001b[0m\n" + "world".repeat(50)
+    const result = chunkFile("a.ts", content)
+    expect(result[0]?.content).not.toContain("\u001b")
+    expect(result[0]?.content).toContain("hello")
+  })
+
+  test("trims whitespace from each chunk", () => {
+    const content = "  " + "hello".repeat(50) + "  \n\n  " + "world".repeat(50) + "  "
+    const result = chunkFile("a.ts", content)
+    // trim() only removes leading/trailing whitespace, not internal spacing
+    expect(result[0]?.content).toBe("hello".repeat(50) + "  \n\n  " + "world".repeat(50))
+  })
+
+  test("assigns sequential ids by line offset", () => {
+    const lines = Array(CHUNK_LINES * 3).fill(longLine).join("\n")
+    const result = chunkFile("a.ts", lines)
+    expect(result).toHaveLength(3)
+    expect(result[0]?.id).toBe("a.ts:0")
+    expect(result[1]?.id).toBe(`a.ts:${CHUNK_LINES}`)
+    expect(result[2]?.id).toBe(`a.ts:${CHUNK_LINES * 2}`)
+  })
 })
