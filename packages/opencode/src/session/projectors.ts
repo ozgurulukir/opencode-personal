@@ -1,6 +1,7 @@
 import { NotFoundError } from "@/storage/storage"
 import { eq } from "drizzle-orm"
 import { and } from "drizzle-orm"
+import { sql } from "drizzle-orm"
 import { SyncEvent } from "@/sync"
 import * as Session from "./session"
 import { MessageV2 } from "./message-v2"
@@ -140,6 +141,57 @@ export default [
     } catch (err) {
       if (!foreign(err)) throw err
       log.warn("ignored late part update", { partID: id, messageID, sessionID })
+    }
+  }),
+
+  SyncEvent.project(MessageV2.Event.PartUpdatedBatch, (db, data) => {
+    const rows = data.parts.map((part) => {
+      const { id, messageID, sessionID, ...rest } = part
+      return {
+        id,
+        message_id: messageID,
+        session_id: sessionID,
+        time_created: data.time,
+        data: rest,
+      }
+    })
+    if (rows.length === 0) return
+    try {
+      db.insert(PartTable)
+        .values(rows)
+        .onConflictDoUpdate({ target: PartTable.id, set: { data: sql`excluded.data` } })
+        .run()
+    } catch (err) {
+      if (!foreign(err)) throw err
+      log.warn("ignored late batch part update", {
+        sessionID: data.sessionID,
+        partIDs: rows.map((r) => r.id),
+      })
+    }
+  }),
+
+  SyncEvent.project(MessageV2.Event.MessageUpdatedBatch, (db, data) => {
+    const rows = data.infos.map((info) => {
+      const { id, sessionID, ...rest } = info
+      return {
+        id,
+        session_id: sessionID,
+        time_created: data.time_created,
+        data: rest,
+      }
+    })
+    if (rows.length === 0) return
+    try {
+      db.insert(MessageTable)
+        .values(rows)
+        .onConflictDoUpdate({ target: MessageTable.id, set: { data: sql`excluded.data` } })
+        .run()
+    } catch (err) {
+      if (!foreign(err)) throw err
+      log.warn("ignored late batch message update", {
+        sessionID: data.sessionID,
+        messageIDs: rows.map((r) => r.id),
+      })
     }
   }),
 

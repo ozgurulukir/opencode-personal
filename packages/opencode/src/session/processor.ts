@@ -668,13 +668,12 @@ export const layer: Layer.Layer<
           ctx.currentText = undefined
         }
 
-        for (const part of Object.values(ctx.reasoningMap)) {
-          const end = Date.now()
-          yield* session.updatePart({
-            ...part,
-            time: { start: part.time.start ?? end, end },
-          })
-        }
+        const end = Date.now()
+        const reasoningParts = Object.values(ctx.reasoningMap).map((part) => ({
+          ...part,
+          time: { start: part.time.start ?? end, end },
+        }))
+        if (reasoningParts.length > 0) yield* session.updateParts(reasoningParts)
         ctx.reasoningMap = {}
 
         yield* Effect.forEach(
@@ -683,13 +682,14 @@ export const layer: Layer.Layer<
           { concurrency: "unbounded" },
         )
 
+        const abortedParts: MessageV2.Part[] = []
         for (const toolCallID of Object.keys(ctx.toolcalls)) {
           const match = yield* readToolCall(toolCallID)
           if (!match) continue
           const part = match.part
           const end = Date.now()
           const metadata = "metadata" in part.state && isRecord(part.state.metadata) ? part.state.metadata : {}
-          yield* session.updatePart({
+          abortedParts.push({
             ...part,
             state: {
               ...part.state,
@@ -700,6 +700,7 @@ export const layer: Layer.Layer<
             },
           })
         }
+        if (abortedParts.length > 0) yield* session.updateParts(abortedParts)
         ctx.toolcalls = {}
         ctx.assistantMessage.time.completed = Date.now()
         yield* session.updateMessage(ctx.assistantMessage)
