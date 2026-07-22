@@ -218,6 +218,29 @@ export function Prompt(props: PromptProps) {
     setTimeout(() => setWarpNotice(undefined), 4000)
   }
 
+  function handleInterruptCommand() {
+    if (auto()?.visible) return
+    if (store.mode === "shell") {
+      setStore("mode", "normal")
+      return
+    }
+    if (!props.sessionID) return
+
+    setStore("interrupt", store.interrupt + 1)
+
+    setTimeout(() => {
+      setStore("interrupt", 0)
+    }, 5000)
+
+    if (store.interrupt >= 2) {
+      void sdk.client.session.abort({
+        sessionID: props.sessionID,
+      })
+      setStore("interrupt", 0)
+    }
+    dialog.clear()
+  }
+
   async function createWorkspace(selection: Extract<WorkspaceSelection, { type: "new" }>) {
     setCreatingWorkspace(true)
     const result = await sdk.client.experimental.workspace
@@ -592,29 +615,7 @@ export function Prompt(props: PromptProps) {
         category: "Session",
         hidden: true,
         enabled: () => status().type !== "idle",
-        run: () => {
-          if (auto()?.visible) return
-          // TODO: this should be its own command
-          if (store.mode === "shell") {
-            setStore("mode", "normal")
-            return
-          }
-          if (!props.sessionID) return
-
-          setStore("interrupt", store.interrupt + 1)
-
-          setTimeout(() => {
-            setStore("interrupt", 0)
-          }, 5000)
-
-          if (store.interrupt >= 2) {
-            void sdk.client.session.abort({
-              sessionID: props.sessionID,
-            })
-            setStore("interrupt", 0)
-          }
-          dialog.clear()
-        },
+        run: handleInterruptCommand,
       },
       {
         title: "Open editor",
