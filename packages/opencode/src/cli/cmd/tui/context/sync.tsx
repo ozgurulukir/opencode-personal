@@ -285,6 +285,31 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
           break
         }
 
+        // @ts-expect-error — SDK Event types don't include message.part.updated.batch
+        case "message.part.updated.batch": {
+          const e = event as unknown as { properties: { parts: Part[] } }
+          for (const part of e.properties.parts) {
+            const existing = store.part[part.messageID]
+            if (!existing) {
+              setStore("part", part.messageID, [part])
+              continue
+            }
+            const r = Binary.search(existing, part.id, (p: Part) => p.id)
+            if (r.found) {
+              setStore("part", part.messageID, r.index, reconcile(part))
+            } else {
+              setStore(
+                "part",
+                part.messageID,
+                produce((draft: Part[]) => {
+                  draft.splice(r.index, 0, part)
+                }),
+              )
+            }
+          }
+          break
+        }
+
         case "message.part.delta": {
           const parts = store.part[event.properties.messageID]
           if (!parts) break
