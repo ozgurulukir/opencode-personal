@@ -53,6 +53,6 @@
 **Learning:** `bun.lock` is a lockfile that gets updated automatically by `bun install`. Including unrelated `bun.lock` changes in a PR (e.g., a ghostty-web hash update) pollutes the diff and has nothing to do with the intended code change.
 **Action:** Never include `bun.lock` changes in any PR unless the task explicitly asks to update dependencies. If `bun.lock` shows as modified, revert it before committing. Only touch source files (.ts, .tsx, .css, etc.) and `.jules/bolt.md`.
 
-## 2025-08-01 - Optimizing chained array methods replacing map/flatMap/sort
+## 2026-07-23 - Optimizing chained array methods replacing map/flatMap/sort
 **Learning:** Chaining multiple array methods like `.flatMap(roots).sort()[0]` traverses arrays multiple times, constructs intermediate arrays, and performs an O(N log N) sort just to find a single extreme value (e.g. latest session).
 **Action:** Replace these chains with a single O(N) `for` loop traversal that keeps track of the max/min value to eliminate intermediate array allocations and sorting overhead.
