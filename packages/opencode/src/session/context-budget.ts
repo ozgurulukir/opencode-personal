@@ -29,15 +29,24 @@ export function compactionConfig(cfg: Config.Info) {
 }
 
 export function usable(cfg: Config.Info, model: Provider.Model) {
+  return usableWith(cfg, model, compactionConfig(cfg))
+}
+
+function usableWith(
+  cfg: Config.Info,
+  model: Provider.Model,
+  cc: ReturnType<typeof compactionConfig>,
+) {
   const context = model.limit.context
   if (context === 0) return 0
 
-  const cc = compactionConfig(cfg)
   const reserved = cc.reserved ?? Math.min(DEFAULTS.compactionBuffer, ProviderTransform.maxOutputTokens(model))
   return model.limit.input
     ? Math.max(0, model.limit.input - reserved)
     : Math.max(0, context - ProviderTransform.maxOutputTokens(model))
 }
+
+export { usableWith }
 
 export function used(tokens: MessageV2.Assistant["tokens"]) {
   return tokens.total || tokens.input + tokens.output + tokens.cache.read + tokens.cache.write

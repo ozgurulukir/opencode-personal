@@ -15,7 +15,7 @@ import { ModelID, ProviderID } from "@/provider/schema"
 import { Effect, Layer, Context, Schema } from "effect"
 import * as DateTime from "effect/DateTime"
 import { InstanceState } from "@/effect/instance-state"
-import { isOverflow as overflow, usable } from "./overflow"
+import { isOverflow as overflow } from "./overflow"
 import * as ContextBudget from "./context-budget"
 import { makeRuntime } from "@/effect/run-service"
 import { serviceUse } from "@/effect/service-use"
@@ -139,7 +139,10 @@ function preserveRecentBudget(input: { cfg: Config.Info; model: Provider.Model }
   const cc = ContextBudget.compactionConfig(input.cfg)
   return (
     cc.preserveRecentTokens ??
-    Math.min(cc.maxPreserveRecentTokens, Math.max(cc.minPreserveRecentTokens, Math.floor(usable(input) * 0.25)))
+    Math.min(
+      cc.maxPreserveRecentTokens,
+      Math.max(cc.minPreserveRecentTokens, Math.floor(ContextBudget.usableWith(input.cfg, input.model, cc) * 0.25)),
+    )
   )
 }
 
@@ -322,7 +325,7 @@ export const layer: Layer.Layer<
       loop: for (let msgIndex = msgs.length - 1; msgIndex >= 0; msgIndex--) {
         const msg = msgs[msgIndex]
         if (msg.info.role === "user") turns++
-        if (turns < 2) continue
+        if (turns < cc.tailTurns) continue
         if (msg.info.role === "assistant" && msg.info.summary) break loop
         for (let partIndex = msg.parts.length - 1; partIndex >= 0; partIndex--) {
           const part = msg.parts[partIndex]
