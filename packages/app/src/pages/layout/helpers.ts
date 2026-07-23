@@ -29,8 +29,25 @@ export const roots = (store: SessionStore) =>
 
 export const sortedRootSessions = (store: SessionStore, now: number) => roots(store).sort(sortSessions(now))
 
-export const latestRootSession = (stores: SessionStore[], now: number) =>
-  stores.flatMap(roots).sort(sortSessions(now))[0]
+export const latestRootSession = (stores: SessionStore[], now: number) => {
+  // ⚡ Bolt Optimization: Replace O(N log N) .flatMap().sort()[0] with a single O(N) pass
+  // to eliminate intermediate array allocations and sorting overhead.
+  let latest: Session | undefined
+  const sort = sortSessions(now)
+  for (let i = 0; i < stores.length; i++) {
+    const store = stores[i]
+    if (!store.session) continue
+    for (let j = 0; j < store.session.length; j++) {
+      const session = store.session[j]
+      if (isRootVisibleSession(session, store.path.directory)) {
+        if (!latest || sort(session, latest) < 0) {
+          latest = session
+        }
+      }
+    }
+  }
+  return latest
+}
 
 export function hasProjectPermissions<T>(
   request: Record<string, T[] | undefined> | undefined,
