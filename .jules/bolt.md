@@ -24,6 +24,7 @@
 ## 2024-03-24 - Array Methods vs Manual Loops in Typical UI Components
 **Learning:** In SolidJS, while chaining array methods (`.map().filter()`) inside `createMemo` can cause GC pressure for extremely large or highly reactive lists, replacing standard methods like `.find()` or `.filter()` with verbose `for` loops in typical UI components (where arrays are small) is an unmeasurable micro-optimization that degrades readability. Crucially, `.find()` does not allocate a new array, and `.sort()` sorts in-place.
 **Action:** Do not replace native array methods with manual `for` loops unless dealing with a proven bottleneck or a massive dataset. Prefer readable, idiomatic code for typical UI components.
+
 ## 2025-07-28 - Optimizing useFilteredList array allocations
 **Learning:** The `useFilteredList` hook processes large datasets for File Search and command palettes. Using chained array methods (like `pipe(..., flatMap(...))` and `.map(...)`) inside `createMemo` hooks for the `flat` and `keys` arrays caused unnecessary intermediate array allocations, creating GC pressure on every keystroke during text filtering.
 **Action:** Replace `pipe/flatMap` and `.map()` inside high-frequency `createMemo` blocks with pre-allocated arrays (`new Array(size)`) and standard `for` loops. This avoids creating closure arrays and reduces memory thrashing during typing in large lists.
@@ -39,6 +40,7 @@
 ## 2024-03-24 - Consolidating Multiple Filter Counts
 **Learning:** Calling `.filter(condition).length` multiple times on the same array to calculate multiple counts forces multiple O(N) passes and allocates multiple intermediate arrays.
 **Action:** Consolidate multiple `.filter(...).length` calls into a single `for` loop that iterates over the array once, incrementing local count variables. This reduces the number of traversals to 1 and eliminates all intermediate array allocations.
+
 ## 2026-07-22 - Array Filter and Sort Consolidation
 **Learning:** Chaining multiple `.filter()` calls followed by a `.sort()[0]` to find a single max element in an array forces multiple O(N) passes, allocates multiple intermediate arrays, and performs an O(N log N) sort.
 **Action:** Replace chained `.filter().sort()[0]` with a single O(N) `for` loop to find the max/min element in one pass, eliminating intermediate array allocations and sorting overhead.
@@ -50,3 +52,7 @@
 ## 2026-07-22 - Never modify bun.lock
 **Learning:** `bun.lock` is a lockfile that gets updated automatically by `bun install`. Including unrelated `bun.lock` changes in a PR (e.g., a ghostty-web hash update) pollutes the diff and has nothing to do with the intended code change.
 **Action:** Never include `bun.lock` changes in any PR unless the task explicitly asks to update dependencies. If `bun.lock` shows as modified, revert it before committing. Only touch source files (.ts, .tsx, .css, etc.) and `.jules/bolt.md`.
+
+## 2026-07-23 - Optimizing chained array methods replacing map/flatMap/sort
+**Learning:** Chaining multiple array methods like `.flatMap(roots).sort()[0]` traverses arrays multiple times, constructs intermediate arrays, and performs an O(N log N) sort just to find a single extreme value (e.g. latest session).
+**Action:** Replace these chains with a single O(N) `for` loop traversal that keeps track of the max/min value to eliminate intermediate array allocations and sorting overhead.
