@@ -42,6 +42,20 @@ export function invalidateEmbeddedUICache() {
 // CSP cache to avoid recomputing hashes for static embedded UI
 const cspCache = new Map<string, string>()
 
+// In-memory cache for embedded UI file contents (static for server lifetime)
+const fileCache = new Map<string, Uint8Array>()
+
+// Vite produces content-hashed filenames: assets/index-abc12345.js
+const HASHED_ASSET_REGEX = /-[0-9a-f]{8,}\.[a-z0-9]+$/i
+
+function isHashedAsset(file: string): boolean {
+  return HASHED_ASSET_REGEX.test(file)
+}
+
+function computeETag(body: Uint8Array): string {
+  return `"${createHash("sha256").update(body).digest("base64").slice(0, 27)}"`
+}
+
 export const UI_UPSTREAM = new URL("https://app.opencode.ai")
 
 export const csp = (hash = "") =>
@@ -94,12 +108,30 @@ function notFound() {
   return HttpServerResponse.jsonUnsafe({ error: "Not Found" }, { status: 404 })
 }
 
-function embeddedUIResponse(file: string, body: Uint8Array) {
+function embeddedUIResponse(
+  file: string,
+  body: Uint8Array,
+  request?: HttpServerRequest.HttpServerRequest,
+) {
   const mime = AppFileSystem.mimeType(file)
   const headers = new Headers({ "content-type": mime })
+
+  const etag = computeETag(body)
+  headers.set("etag", etag)
+
   if (mime.startsWith("text/html")) {
     headers.set("content-security-policy", cspForHtml(new TextDecoder().decode(body)))
+    headers.set("cache-control", "no-cache")
+  } else if (isHashedAsset(file)) {
+    headers.set("cache-control", "public, max-age=31536000, immutable")
+  } else {
+    headers.set("cache-control", "public, max-age=86400")
   }
+
+  if (request?.headers["if-none-match"] === etag) {
+    return HttpServerResponse.empty({ status: 304, headers })
+  }
+
   return HttpServerResponse.raw(body, { headers })
 }
 
@@ -107,12 +139,24 @@ export function serveEmbeddedUIEffect(
   requestPath: string,
   fs: AppFileSystem.Interface,
   embeddedWebUI: Record<string, string>,
+  request?: HttpServerRequest.HttpServerRequest,
 ) {
   const file = embeddedWebUI[requestPath.replace(/^\//, "")] ?? embeddedWebUI["index.html"] ?? null
   if (!file) return Effect.succeed(notFound())
 
+  const cached = fileCache.get(file)
+  if (cached) return Effect.succeed(embeddedUIResponse(file, cached, request))
+
   return fs.readFile(file).pipe(
-    Effect.map((body) => embeddedUIResponse(file, body)),
+    Effect.map((body) => {
+      // LRU eviction to prevent unbounded memory growth
+      if (fileCache.size > 256) {
+        const firstKey = fileCache.keys().next().value
+        if (firstKey) fileCache.delete(firstKey)
+      }
+      fileCache.set(file, body)
+      return embeddedUIResponse(file, body, request)
+    }),
     Effect.catchReason("PlatformError", "NotFound", () => Effect.succeed(notFound())),
     Effect.catch((error) =>
       Effect.sync(() => {
@@ -134,7 +178,7 @@ export function serveUIEffect(
     const embeddedWebUI = yield* Effect.promise(() => embeddedUI())
     const path = new URL(request.url, "http://localhost").pathname
 
-    if (embeddedWebUI) return yield* serveEmbeddedUIEffect(path, services.fs, embeddedWebUI)
+    if (embeddedWebUI) return yield* serveEmbeddedUIEffect(path, services.fs, embeddedWebUI, request)
 
     const response = yield* services.client.execute(
       HttpClientRequest.make(request.method)(upstreamURL(path), {
