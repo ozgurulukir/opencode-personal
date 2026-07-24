@@ -40,6 +40,9 @@ import type {
 } from "./types"
 import { RUN_THEME_FALLBACK, type RunTheme } from "./theme"
 
+// Frames are color-independent — cache at module scope to avoid recomputation on every theme change
+const KNIGHT_RIDER_FRAMES = createFrames({ style: "blocks" })
+
 const EMPTY_BORDER = {
   topLeft: "",
   bottomLeft: "",
@@ -157,12 +160,7 @@ export function RunFooterView(props: RunFooterViewProps) {
   const block = createMemo(() => runTheme().block)
   const spin = createMemo(() => {
     return {
-      frames: createFrames({
-        color: theme().highlight,
-        style: "blocks",
-        inactiveFactor: 0.6,
-        minAlpha: 0.3,
-      }),
+      frames: KNIGHT_RIDER_FRAMES,
       color: createColors({
         color: theme().highlight,
         style: "blocks",

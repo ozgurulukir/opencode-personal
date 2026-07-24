@@ -1757,7 +1757,7 @@ export function Prompt(props: PromptProps) {
               >
                 <box flexShrink={0} flexDirection="row" gap={1}>
                   <box marginLeft={1}>
-                    <Show when={kv.get("animations_enabled", true)} fallback={<text fg={theme.textMuted}>[⋯]</text>}>
+                    <Show when={kv.get("animations_enabled", true)} fallback={<text fg={theme.textMuted}>⋯</text>}>
                       <spinner color={spinnerDef().color} frames={spinnerDef().frames} interval={40} />
                     </Show>
                   </box>

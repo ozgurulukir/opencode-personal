@@ -1,3 +1,9 @@
+## Component Patterns
+
+### Module-level `Math.random()` breaks SSR/HMR determinism
+
+Module-level `Math.random()` calls (e.g., in `spinner.tsx` for animation delay/duration) produce different values on every HMR reload and would cause SSR hydration mismatches. Use deterministic arrays of pre-computed values instead. This applies to any module-scope initialization in SolidJS components.
+
 ## Testing
 
 - Tests are co-located in `src/components/` alongside source files (not in a separate `test/` directory). This is a deviation from the root AGENTS.md convention.

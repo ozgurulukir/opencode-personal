@@ -72,3 +72,11 @@ This file covers TUI-specific patterns for `packages/opencode/src/cli/cmd/tui/`.
 - Footer: `state().interrupt` (class signal, footer-owned)
 
 They have the same name and same two-press pattern, but different substrates, different timer guards, and different second-press actions (`sdk.client.session.abort` vs `options.onInterrupt`). Do not attempt to unify them.
+
+## Spinner component vs native `<spinner>` element
+
+The `Spinner` component (`component/spinner.tsx`) wraps the native `<spinner>` element with an `animations_enabled` KV check and a `⋯` fallback. Callers that use the native `<spinner>` element directly (prompt, footer) must duplicate this KV check themselves with a different fallback format. Prefer the `Spinner` component over the native element to keep fallback behavior consistent.
+
+## `createFrames` ignores color parameters
+
+`createFrames()` from `ui/spinner.ts` accepts `color`/`colors` in `KnightRiderOptions` but only uses structural params (`width`, `style`, `holdStart`, `holdEnd`). Color params are silently ignored — they only affect `createColors()`. Cache frames at module scope since they are color-independent.
