@@ -1,5 +1,18 @@
 # CLI Run Module Architecture
 
+## `Session.Event.Error` shape in handlers
+
+The `session.error` bus event carries `MessageV2.Assistant.fields.error` as a
+discriminated union keyed by `name`:
+
+- `"APIError"` / `"AbortedError"` / etc. → has `message` directly
+- `"UnknownError"` → has `data.message`, no top-level `message`
+- `name` itself is the discriminant, NOT a human-readable message
+
+`formatError()` and `handleSessionError()` must read `message` before
+`data.message`, then fall back to `name`. Reading only `name` produces
+"undefined" for API errors; reading only `data.message` misses APIErrors.
+
 ## Module Organization
 
 The `cli/cmd/run/` directory follows a **layered architecture**:
