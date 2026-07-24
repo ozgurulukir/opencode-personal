@@ -9,6 +9,7 @@ import { useRenderer, useTerminalDimensions, type JSX } from "@opentui/solid"
 import { TextAttributes, type BoxRenderable, type SyntaxStyle } from "@opentui/core"
 import { useBindings } from "../../keymap"
 import { Locale } from "@/util/locale"
+import { errorMessage } from "@/util/error"
 import { LANGUAGE_EXTENSIONS } from "@/lsp/language"
 import { webSearchProviderLabel } from "@/tool/websearch"
 import path from "path"
@@ -340,7 +341,7 @@ function AssistantMessage(props: {
           borderColor={theme.error}
           flexShrink={0}
         >
-          <text fg={theme.textMuted}>{props.message.error}</text>
+          <text fg={theme.textMuted}>{errorMessage(props.message.error)}</text>
         </box>
       </Show>
       <Show when={props.last || final() || props.message.error}>
@@ -529,7 +530,7 @@ function InlineTool(props: {
   const [margin, setMargin] = createSignal(0)
   const [hover, setHover] = createSignal(false)
   const [showError, setShowError] = createSignal(false)
-  const error = createMemo(() => (props.part.state.status === "error" ? props.part.state.error.message : undefined))
+  const error = createMemo(() => (props.part.state.status === "error" ? errorMessage(props.part.state.error) : undefined))
   const complete = createMemo(() => !!props.complete)
   const denied = createMemo(() => {
     const message = error()
@@ -626,7 +627,7 @@ function BlockTool(props: {
   const { theme } = useTheme()
   const renderer = useRenderer()
   const [hover, setHover] = createSignal(false)
-  const error = createMemo(() => (props.part?.state.status === "error" ? props.part.state.error.message : undefined))
+  const error = createMemo(() => (props.part?.state.status === "error" ? errorMessage(props.part.state.error) : undefined))
   return (
     <box
       border={["left"]}
