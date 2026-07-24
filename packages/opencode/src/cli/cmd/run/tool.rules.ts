@@ -24,18 +24,7 @@ import type {
   ToolRegistry,
   ToolRule,
 } from "./tool.types"
-import {
-  count,
-  dict,
-  fail,
-  info,
-  list,
-  num,
-  span,
-  text,
-  toolError,
-  toolPath,
-} from "./tool.helpers"
+import { count, dict, fail, info, list, num, span, text, toolError, toolPath } from "./tool.helpers"
 import * as Locale from "@/util/locale"
 import stripAnsi from "strip-ansi"
 
@@ -590,9 +579,15 @@ export function scrollTodoFinal(p: ToolProps<typeof TodoWriteTool>): string {
     return `0 todos · ${time}`
   }
 
-  const doneN = items.filter((item) => item.status === "completed").length
-  const runN = items.filter((item) => item.status === "in_progress").length
-  const cancelledN = items.filter((item) => item.status === "cancelled").length
+  // ⚡ Bolt Optimization: Replace multiple .filter().length with a single loop to reduce GC pressure
+  let doneN = 0,
+    runN = 0,
+    cancelledN = 0
+  for (const item of items) {
+    if (item.status === "completed") doneN++
+    else if (item.status === "in_progress") runN++
+    else if (item.status === "cancelled") cancelledN++
+  }
   const left = items.length - doneN - runN - cancelledN
   const tail = [`${items.length} total`]
   if (doneN > 0) {
