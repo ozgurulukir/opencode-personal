@@ -286,6 +286,127 @@ describe("HttpApi UI fallback", () => {
     expect(csp).toContain("connect-src * data:")
   })
 
+  test("sets immutable cache-control for hashed JS assets", async () => {
+    const response = await Effect.runPromise(
+      Effect.gen(function* () {
+        const fs = yield* AppFileSystem.Service
+        return yield* serveEmbeddedUIEffect(
+          "/assets/index-abc12345.js",
+          {
+            ...fs,
+            readFile: () => Effect.succeed(new TextEncoder().encode("console.log('ok')")),
+          },
+          { "assets/index-abc12345.js": "/$bunfs/root/assets/index-abc12345.js" },
+        )
+      }).pipe(Effect.provide(AppFileSystem.defaultLayer), Effect.map(HttpServerResponse.toWeb)),
+    )
+
+    expect(response.status).toBe(200)
+    expect(response.headers.get("cache-control")).toBe("public, max-age=31536000, immutable")
+    expect(response.headers.get("etag")).toBeTruthy()
+  })
+
+  test("sets no-cache for index.html", async () => {
+    const response = await Effect.runPromise(
+      Effect.gen(function* () {
+        const fs = yield* AppFileSystem.Service
+        return yield* serveEmbeddedUIEffect(
+          "/",
+          {
+            ...fs,
+            readFile: () =>
+              Effect.succeed(new TextEncoder().encode("<html><body>opencode</body></html>")),
+          },
+          { "index.html": "/$bunfs/root/index.html" },
+        )
+      }).pipe(Effect.provide(AppFileSystem.defaultLayer), Effect.map(HttpServerResponse.toWeb)),
+    )
+
+    expect(response.status).toBe(200)
+    expect(response.headers.get("cache-control")).toBe("no-cache")
+    expect(response.headers.get("etag")).toBeTruthy()
+  })
+
+  test("returns 304 for matching ETag", async () => {
+    const body = new TextEncoder().encode("console.log('cached')")
+    const etag = `"${createHash("sha256").update(body).digest("base64").slice(0, 27)}"`
+
+    const response = await Effect.runPromise(
+      Effect.gen(function* () {
+        const fs = yield* AppFileSystem.Service
+        return yield* serveEmbeddedUIEffect(
+          "/assets/app-abcdef12.js",
+          {
+            ...fs,
+            readFile: () => Effect.succeed(body),
+          },
+          { "assets/app-abcdef12.js": "/$bunfs/root/assets/app-abcdef12.js" },
+          HttpServerRequest.fromWeb(
+            new Request("http://localhost/assets/app-abcdef12.js", {
+              headers: { "if-none-match": etag },
+            }),
+          ),
+        )
+      }).pipe(Effect.provide(AppFileSystem.defaultLayer), Effect.map(HttpServerResponse.toWeb)),
+    )
+
+    expect(response.status).toBe(304)
+    expect(response.headers.get("etag")).toBe(etag)
+  })
+
+  test("caches embedded UI file contents in memory", async () => {
+    let readCount = 0
+
+    const run = () =>
+      Effect.runPromise(
+        Effect.gen(function* () {
+          const fs = yield* AppFileSystem.Service
+          return yield* serveEmbeddedUIEffect(
+            "/assets/app-12345678.js",
+            {
+              ...fs,
+              readFile: (path) => {
+                readCount++
+                return path === "/$bunfs/root/assets/app-12345678.js"
+                  ? Effect.succeed(new TextEncoder().encode("console.log('cached')"))
+                  : Effect.die(`unexpected path: ${path}`)
+              },
+            },
+            { "assets/app-12345678.js": "/$bunfs/root/assets/app-12345678.js" },
+          )
+        }).pipe(Effect.provide(AppFileSystem.defaultLayer), Effect.map(HttpServerResponse.toWeb)),
+      )
+
+    // First request reads from disk
+    const res1 = await run()
+    expect(res1.status).toBe(200)
+    expect(readCount).toBe(1)
+
+    // Second request reads from cache
+    const res2 = await run()
+    expect(res2.status).toBe(200)
+    expect(readCount).toBe(1) // still 1 — no additional readFile call
+  })
+
+  test("sets cache-control for non-hashed static assets", async () => {
+    const response = await Effect.runPromise(
+      Effect.gen(function* () {
+        const fs = yield* AppFileSystem.Service
+        return yield* serveEmbeddedUIEffect(
+          "/favicon.ico",
+          {
+            ...fs,
+            readFile: () => Effect.succeed(new Uint8Array(0)),
+          },
+          { "favicon.ico": "/$bunfs/root/favicon.ico" },
+        )
+      }).pipe(Effect.provide(AppFileSystem.defaultLayer), Effect.map(HttpServerResponse.toWeb)),
+    )
+
+    expect(response.status).toBe(200)
+    expect(response.headers.get("cache-control")).toBe("public, max-age=86400")
+  })
+
   test("keeps matched API routes ahead of the UI fallback", async () => {
     const response = await Server.Default().app.request("/session/ses_nope")
 
