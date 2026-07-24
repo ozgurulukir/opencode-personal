@@ -127,7 +127,9 @@ export default function Share(props: {
           }
           if (type === "message") {
             const [, messageID] = splits
-            if ("metadata" in d.content) {
+            if (d.content.type === "shell") {
+              d.content = fromShell(d.content, store.messages[messageID]?.sessionID ?? store.info?.id ?? "")
+            } else if ("metadata" in d.content) {
               d.content = fromV1(d.content)
             }
             d.content.parts = d.content.parts ?? store.messages[messageID]?.parts ?? []
@@ -641,4 +643,43 @@ export function fromV1(v1: Message.Info): MessageWithParts {
   }
 
   throw new Error("unknown message type")
+}
+
+function fromShell(shell: { id: string; command: string; output: string; time: { created: number; completed?: number } }, sessionID: string): MessageWithParts {
+  const now = Date.now()
+  return {
+    id: shell.id,
+    sessionID,
+    role: "assistant",
+    parentID: "",
+    agent: "build",
+    time: {
+      created: shell.time.created,
+      completed: shell.time.completed ?? now,
+    },
+    cost: 0,
+    path: { cwd: "/" },
+    summary: "",
+    tokens: { input: 0, output: 0, cache: { read: 0, write: 0 }, reasoning: 0 },
+    modelID: "",
+    providerID: "",
+    mode: "build",
+    parts: [
+      {
+        id: "0",
+        messageID: shell.id,
+        sessionID,
+        type: "tool",
+        callID: shell.id,
+        tool: "bash",
+        state: {
+          status: "completed",
+          input: { command: shell.command, description: `$ ${shell.command}` },
+          output: shell.output,
+          time: { start: shell.time.created, end: shell.time.completed ?? now },
+          metadata: { output: shell.output, description: `$ ${shell.command}` },
+        },
+      },
+    ],
+  }
 }
