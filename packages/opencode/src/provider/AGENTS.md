@@ -32,6 +32,18 @@ Moved out of `transform.ts` — it has NO external callers (all 8 references wer
 
 Each module self-reexports as `TransformFoo` (e.g., `export * as TransformAnthropic from "./anthropic"`). No `index.ts` — following the package's no-barrel rule for multi-sibling directories.
 
+## `provider/error.ts` — never include raw `responseBody` in user-facing messages
+
+`APICallError.responseBody` can be large JSON, HTML, or binary. The
+`message()` helper MUST extract a concise message from it (`message`,
+`error.message`, or `error` fields) rather than appending the raw body to
+the returned string. Raw body leaks through `Session.Event.Error` →
+`emit("error")` → stdout in JSON format mode, and inflates TUI error
+commits.
+
+Use `extractResponseMessage(body)` (defined in this file) instead of
+repeating inline JSON parse logic.
+
 ## `systemPromptDelivery` — OpenAI OAuth uses `instructions`, not `system`
 
 `ProviderTransform.systemPromptDelivery(providerID, authInfo)` returns `{ type: "instructions" }` for OpenAI OAuth (which doesn't support `system` role messages). The system prompt is passed via `providerOptions.instructions` instead. All other providers use `{ type: "messages" }`.
