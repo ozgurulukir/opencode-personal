@@ -91,14 +91,14 @@ function handleToolPart(
 
 function handleSessionError(
   ctx: LoopContext,
-  props: { sessionID?: string; error?: { name: string; data?: { message?: string } } },
+  props: { sessionID?: string; error?: { name: string; message?: string; data?: { message?: string } } },
   error: string | undefined,
 ): string | undefined {
   if (props.sessionID !== ctx.sessionID || !props.error) return error
-  let err = String(props.error.name)
-  if ("data" in props.error && props.error.data && "message" in props.error.data) {
-    err = String(props.error.data.message)
-  }
+  // Error is a discriminated union keyed by "name":
+  //   "APIError" / "AbortedError" / etc. → message field
+  //   "UnknownError" → data.message field
+  const err = props.error.message ?? props.error.data?.message ?? props.error.name
   const next = error ? error + EOL + err : err
   if (ctx.emit("error", { error: props.error })) return next
   UI.error(err)

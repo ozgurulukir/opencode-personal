@@ -45,11 +45,23 @@ function isOverflow(message: string) {
   return /^4(00|13)\s*(status code)?\s*\(no body\)/i.test(message)
 }
 
+function extractResponseMessage(body: string): string | undefined {
+  try {
+    const parsed = JSON.parse(body)
+    const errMsg = parsed.message || parsed.error?.message || parsed.error
+    if (typeof errMsg === "string" && errMsg) return errMsg
+  } catch {}
+  return undefined
+}
+
 function message(providerID: ProviderID, e: APICallError) {
   return iife(() => {
     const msg = e.message
     if (msg === "") {
-      if (e.responseBody) return e.responseBody
+      if (e.responseBody) {
+        const extracted = extractResponseMessage(e.responseBody)
+        if (extracted) return extracted
+      }
       if (e.statusCode) {
         const err = STATUS_CODES[e.statusCode]
         if (err) return err
@@ -60,15 +72,6 @@ function message(providerID: ProviderID, e: APICallError) {
     if (!e.responseBody || (e.statusCode && msg !== STATUS_CODES[e.statusCode])) {
       return msg
     }
-
-    try {
-      const body = JSON.parse(e.responseBody)
-      // try to extract common error message fields
-      const errMsg = body.message || body.error || body.error?.message
-      if (errMsg && typeof errMsg === "string") {
-        return `${msg}: ${errMsg}`
-      }
-    } catch {}
 
     // If responseBody is HTML (e.g. from a gateway or proxy error page),
     // provide a human-readable message instead of dumping raw markup
@@ -82,7 +85,10 @@ function message(providerID: ProviderID, e: APICallError) {
       return msg
     }
 
-    return `${msg}: ${e.responseBody}`
+    // Try to extract a concise message from the response body instead of dumping raw body
+    const extracted = extractResponseMessage(e.responseBody)
+    if (extracted) return `${msg}: ${extracted}`
+    return msg
   }).trim()
 }
 
