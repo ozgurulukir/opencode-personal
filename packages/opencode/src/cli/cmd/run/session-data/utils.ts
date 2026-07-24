@@ -52,19 +52,10 @@ export function formatError(error: {
     message?: string
   }
 }): string {
-  if (error.data?.message) {
-    return error.data.message
-  }
-
-  if (error.message) {
-    return error.message
-  }
-
-  if (error.name) {
-    return error.name
-  }
-
-  return "unknown error"
+  // Error is a discriminated union keyed by "name":
+  //   "APIError" / "AbortedError" / etc. → message field
+  //   "UnknownError" → data.message field
+  return error.data?.message ?? error.message ?? error.name ?? "unknown error"
 }
 
 export function isAbort(error: { name?: string } | undefined): boolean {
