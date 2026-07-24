@@ -24,7 +24,18 @@ import type {
   ToolRegistry,
   ToolRule,
 } from "./tool.types"
-import { count, dict, fail, info, list, num, span, text, toolError, toolPath } from "./tool.helpers"
+import {
+  count,
+  dict,
+  fail,
+  info,
+  list,
+  num,
+  span,
+  text,
+  toolError,
+  toolPath,
+} from "./tool.helpers"
 import * as Locale from "@/util/locale"
 import stripAnsi from "strip-ansi"
 
