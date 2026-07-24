@@ -29,6 +29,45 @@ stop: (close?: boolean) => {
 - Add error recovery: failed import should fallback to `null` (upstream proxy mode)
 - Export `invalidateEmbeddedUICache()` for development hot-reload scenarios
 
+## Embedded UI Caching Strategy
+
+The embedded UI has **zero browser caching by default** — every page load re-downloads the entire JS/CSS bundle. Vite's production build produces content-hashed filenames (`assets/index-abc12345.js`), so aggressive caching is safe.
+
+Apply these `Cache-Control` headers in `embeddedUIResponse()`:
+
+- **Hashed assets** (matches `-[0-9a-f]{8,}\.[a-z0-9]+$`): `public, max-age=31536000, immutable`
+- **`index.html`**: `no-cache` (must always validate — it references hashed bundles)
+- **Other static files** (favicon, manifest, etc.): `public, max-age=86400`
+
+Also add an **in-memory file content cache** (`Map<string, Uint8Array>`) with LRU eviction (256 entries) to avoid `fs.readFile` on every request. The embedded UI files are static for the server lifetime, so the cache never needs invalidation. This is separate from the `embeddedUICache` Promise cache (which caches the file-name map, not file contents).
+
+Add **ETag support** for conditional requests: compute `SHA256(body).base64.slice(0, 27)` as the ETag value. Check `If-None-Match` header and return `HttpServerResponse.empty({ status: 304 })` on match. The `embeddedUIResponse()` function must accept an optional `HttpServerRequest` parameter to read request headers.
+
+```ts
+const HASHED_ASSET_REGEX = /-[0-9a-f]{8,}\.[a-z0-9]+$/i
+
+function computeETag(body: Uint8Array): string {
+  return `"${createHash("sha256").update(body).digest("base64").slice(0, 27)}"`
+}
+
+function embeddedUIResponse(file: string, body: Uint8Array, request?: HttpServerRequest.HttpServerRequest) {
+  const headers = new Headers({ "content-type": AppFileSystem.mimeType(file) })
+  const etag = computeETag(body)
+  headers.set("etag", etag)
+  if (mime.startsWith("text/html")) {
+    headers.set("cache-control", "no-cache")
+  } else if (HASHED_ASSET_REGEX.test(file)) {
+    headers.set("cache-control", "public, max-age=31536000, immutable")
+  } else {
+    headers.set("cache-control", "public, max-age=86400")
+  }
+  if (request?.headers["if-none-match"] === etag) {
+    return HttpServerResponse.empty({ status: 304, headers })
+  }
+  return HttpServerResponse.raw(body, { headers })
+}
+```
+
 ## CSP Hash Caching
 
 - Use LRU cache (256 entry limit) for CSP hash calculations
