@@ -1,5 +1,17 @@
 # ACP Agent Implementation Guide
 
+## Module layout
+
+The ACP module is decomposed into focused files:
+
+- `agent.ts` — Thin orchestrator: Agent class with session lifecycle, event loop, prompt handling
+- `tool-dispatch.ts` — Tool state machine: `handleToolPartUpdate`, `toolStart`, `shellOutput`, `toToolKind`, `toLocations`, `completedToolContent`, `completedToolRawOutput`
+- `model-resolution.ts` — Model fallback chain: `defaultModel`, `lastUsedModel`, `getContextLimit`, `sendUsageUpdate`
+- `session-config.ts` — Pure functions for mode/model selection: `sortProvidersByName`, `modelVariantsFromProviders`, `buildAvailableModels`, `formatModelIdWithVariant`, `buildVariantMeta`, `parseModelSelection`, `buildConfigOptions`, `formatVariantName`
+- `message-replay.ts` — Session replay: `processMessage`, `parseUri`, `getNewContent`
+- `session.ts` — `ACPSessionManager` (in-memory session store)
+- `types.ts` — Shared types (`ACPConfig`, `ACPSessionState`)
+
 ## `McpServer` type narrowing
 
 `McpServer` is a union of four variants: `McpServerHttp & { type: "http" }`, `McpServerSse & { type: "sse" }`, `McpServerAcp & { type: "acp" }`, and `McpServerStdio` (no `type` field).
@@ -31,6 +43,6 @@ Only `newSession`, `loadSession`, `resumeSession`, and `forkSession` include `cw
 
 The tool state switch (pending/running/completed/error + todowrite plan) was duplicated verbatim between `handleEvent` (live events) and `processMessage` (session replay). Extracted into `handleToolPartUpdate()` — both callers now delegate to it. The shell snapshot dedup (hash-based output dedup for shell tools) was only in `handleEvent`; it's safe to apply to `processMessage` too since the snapshot map is empty during replay.
 
-## ACP test pattern: `createTestAgent()` + `(agent as any)`
+## ACP test pattern: `createTestAgent()` + standalone functions
 
-ACP tests use a `createTestAgent()` helper that creates a real `ACP.Agent` with a minimal mock `AgentSideConnection` and captures `sessionUpdates`. Private methods like `handleEvent` and `processMessage` are accessed via `(agent as any)`. The `sessionManager.sessions` Map is populated directly via `(agent as any).sessionManager.sessions.set(...)` for tests that need a pre-existing session. Tests use `mock.function()` (not `mock.module()`) for SDK stubs, with `afterAll(() => mock.restore())` cleanup.
+ACP tests use a `createTestAgent()` helper that creates a real `ACP.Agent` with a minimal mock `AgentSideConnection` and captures `sessionUpdates`. The helper also returns `connection`, `shellSnapshots`, and `toolStarts` for calling standalone functions like `processMessage` directly. Private methods like `handleEvent` are still accessed via `(agent as any)`. The `sessionManager.sessions` Map is populated directly via `(agent as any).sessionManager.sessions.set(...)` for tests that need a pre-existing session. Tests use `mock.function()` (not `mock.module()`) for SDK stubs, with `afterAll(() => mock.restore())` cleanup.
