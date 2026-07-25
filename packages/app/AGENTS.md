@@ -17,6 +17,13 @@
 - Never replace `createResource` with `createMemo` + `Object.assign` to mock the `Resource` shape. SolidJS tracks resource state internally — `List`'s `<For each={grouped.latest}>` and `grouped.loading` rely on native `Resource` reactivity. Commit `016a457` did this in `use-filtered-list.tsx` and broke async `List` dialogs (Open project, Model selection): API calls returned 200 OK but items never rendered. Reverted; the `keys` memo optimization is safe.
 - `useFilteredList` in `packages/ui/src/hooks/use-filtered-list.tsx` uses a single `createResource` for grouped/filtered data. The `items` prop can be `T[]` (static) or `(filter: string) => T[] | Promise<T[]>` (sync or async). The `createResource` fetcher handles both cases via `(await Promise.resolve(items))`.
 
+## Performance (Bolt)
+
+- Read `.jules/bolt.md` BEFORE refactoring `createMemo` loops — it documents the "Bolt" pattern, the `// ⚡ Bolt Optimization:` comment marker, and the explicit "do not micro-optimize typical UI components" guardrail.
+- The `// ⚡ Bolt Optimization: <why>` marker is the established convention for perf micro-optimizations. See `session-context-tab.tsx:111,127`, `file-tree.tsx:222`, `debug-bar.tsx:182,204`, `helpers.ts:33`. Preserve these markers when modifying code around them.
+- `.find()` does NOT allocate a new array and `.sort()` sorts in-place. Per `.jules/bolt.md` (2024-03-24 entry), do NOT replace these with manual `for` loops in typical UI components with small arrays — it's an unmeasurable micro-optimization that degrades readability.
+- `bun.lock` is auto-generated and must not appear in a perf Bolt PR. If it shows as modified, revert before committing (see `.jules/bolt.md` 2026-07-22).
+
 ## Tool Calling
 
 - ALWAYS USE PARALLEL TOOLS WHEN APPLICABLE.

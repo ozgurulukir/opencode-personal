@@ -75,38 +75,32 @@ export function estimateSessionContextBreakdown(args: {
 }) {
   if (!args.input) return []
 
-  const counts = args.messages.reduce(
-    (acc, msg) => {
-      const parts = args.parts[msg.id] ?? []
-      if (msg.role === "user") {
-        const user = parts.reduce((sum, part) => sum + charsFromUserPart(part), 0)
-        return { ...acc, user: acc.user + user }
-      }
-
-      if (msg.role !== "assistant") return acc
-      const assistant = parts.reduce(
-        (sum, part) => {
-          const next = charsFromAssistantPart(part)
-          return {
-            assistant: sum.assistant + next.assistant,
-            tool: sum.tool + next.tool,
-          }
-        },
-        { assistant: 0, tool: 0 },
-      )
-      return {
-        ...acc,
-        assistant: acc.assistant + assistant.assistant,
-        tool: acc.tool + assistant.tool,
-      }
-    },
-    {
-      system: args.systemPrompt?.length ?? 0,
-      user: 0,
-      assistant: 0,
-      tool: 0,
-    },
-  )
+  const counts = {
+    system: args.systemPrompt?.length ?? 0,
+    user: 0,
+    assistant: 0,
+    tool: 0,
+  }
+  for (let i = 0; i < args.messages.length; i++) {
+    const msg = args.messages[i]
+    const parts = args.parts[msg.id] ?? []
+    if (msg.role === "user") {
+      let user = 0
+      for (let j = 0; j < parts.length; j++) user += charsFromUserPart(parts[j])
+      counts.user += user
+      continue
+    }
+    if (msg.role !== "assistant") continue
+    let assistant = 0
+    let tool = 0
+    for (let j = 0; j < parts.length; j++) {
+      const next = charsFromAssistantPart(parts[j])
+      assistant += next.assistant
+      tool += next.tool
+    }
+    counts.assistant += assistant
+    counts.tool += tool
+  }
 
   const tokens = {
     system: estimateTokens(counts.system),
