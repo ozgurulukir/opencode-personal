@@ -2,15 +2,17 @@
 
 This file covers TUI-specific patterns for `packages/opencode/src/cli/cmd/tui/`.
 
-## OpenTUI stderr handling — critical gotcha
+## OpenTUI stdout/stderr handling — critical gotcha
 
-**OpenTUI core only intercepts `process.stdout.write`, never `process.stderr.write`.** This is not documented and causes display corruption if stderr writes occur during TUI rendering.
+**In Bun, `console.{error,warn,log,info,debug}` does NOT route through `process.stderr.write`/`process.stdout.write`** — the optimized Bun console implementation writes directly to fd 1/2. This is the opposite of Node, where `console.error` calls `process.stderr.write`. Therefore:
 
-- TUI uses `alternate-screen` mode with `externalOutputMode: "passthrough"` (default)
-- Any stderr output — Bun JIT warnings, `console.error`, unhandled rejection traces — leaks directly onto the alternate screen buffer
-- **Fix:** Override `process.stderr.write` before creating the renderer and restore on exit. See `stderr-capture.ts` for the pattern.
-- Bun Workers share the same process stderr, so worker output also leaks unless captured.
-- `console.error`/`console.warn` internally call `process.stderr.write` in Bun/Node, so overriding it captures console output too.
+- Overriding `process.stderr.write` alone is **insufficient** — every `console.error(...)` call still leaks onto the alternate screen buffer.
+- The TUI uses `alternate-screen` mode with `externalOutputMode: "passthrough"` (default). `passthrough` mode does NOT intercept `process.stdout.write` either — only `capture-stdout` mode intercepts stdout, and that requires `screenMode: "split-footer"` (which the TUI does not use). So `console.log` and direct `process.stdout.write` calls ALSO leak.
+- The exception is `tui/util/clipboard.ts:31` which writes OSC 52 escape sequences via `process.stdout.write` — these MUST reach the terminal, so `process.stdout.write` is intentionally NOT captured.
+
+**Fix:** `stderr-capture.ts` overrides BOTH `process.stderr.write` AND `console.{error,warn,log,info,debug}` to route everything to the log file (via `appendFileSync`). It does NOT touch `process.stdout.write`. Bun Workers share the parent's stderr/stdout, so worker output also needs capture at the parent level.
+
+**Specific leak vector:** `tui/plugin/runtime.ts:fail()` calls `console.error(\`[tui.plugin] ${text}\`, next)` where `next = {...data, error: errorData(error)}`. `errorData()` includes `cause: errorFormat(error.cause)` which JSON.stringifies non-Error object causes — meaning API request/response bodies attached as `error.cause` leak to the terminal. Always capture before calling plugin loading code, and prefer logging sensitive payloads via `log.error(...)` (which goes through `Log.write` → file) over `console.error`.
 
 ## OpenTUI keymap — event order and global keys
 
