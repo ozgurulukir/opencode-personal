@@ -1,18 +1,17 @@
 # Codebase Exploration Report
-
-> Generated: 2025-06-28
-> Project: /home/aristo/Projects/opencode-1.14.48 (packages/opencode)
-> Files: 1676 | Edges: 12 import cycles | Density: moderate (core files 60-80 dependents each)
+> Generated: 2025-07-25
+> Project: /home/aristo/Projects/opencode-1.14.48
+> Files: 3106 | Nodes: 47289 | Edges: 101681 | Import Density: 4.78
 
 ## Executive Summary
 
-- **Monolithic Effect-based architecture** with two primary entry points: CLI (`src/index.ts`, 78 files) and HTTP server (`src/server/server.ts`, 43 files). The CLI orchestrates 20+ yargs commands; the server exposes ~20 HTTP handler groups.
-- **High coupling to foundational abstractions**: `core/src/schema.ts` (62 dependents), `core/src/global.ts` (79 dependents), and `core/src/filesystem.ts` (71 dependents) are touched by nearly every module. Changing these is extremely high-risk.
-- **Consistent Effect DI pattern** across all services: each module exports `Interface`, `Service`, `layer`, `defaultLayer`, plus a namespace re-export (`export * as Foo from "."`). No `export namespace` usage.
-- **12 import cycles detected** — 5 are in generated SDK code (`sdk/js/src/gen/` and `v2/gen/`) and are benign; 7 are in application code, with the most concerning being a 10-file cycle in `cli/cmd/tui/feature-plugins/` and a 5-file cycle in `provider/transform.ts` ↔ `provider/provider.ts`.
-- **Session is the central domain entity**: `SessionTable` has 147 direct references, 15 direct dependents, and is imported by workspace, project, v2, storage, CLI, and server modules. Session owns the message, part, todo, and permission tables.
-- **Low module isolation scores (0.02–0.13)** across all sampled directories, confirming this is a tightly coupled monolith where vertical slicing is the practical boundary, not directory boundaries.
-- **V2 session module exists as a parallel implementation** with zero compile-time coupling to the v1 session module (`shortest_path` returns null), suggesting an evolutionary migration path (Strangler Fig pattern per AGENTS.md Rule 16).
+- **Monorepo architecture**: 48 packages in a Bun workspace. The core domain lives in `packages/opencode`, with satellite apps (`app`, `desktop`, `web`, `console`) and infrastructure (`core`, `llm`, `sdk`, `ui`).
+- **Effect-based DI everywhere**: The `Service` + `Interface` + `Layer` pattern is the project-wide convention. 501 interfaces, 429 classes, 359 HTTP routes.
+- **Session is the central hub**: `Session.Service` has 195 direct callers — it is the highest-risk symbol in the codebase. Any change to session schema or service interface propagates to almost every subsystem.
+- **Core and UI are pure providers**: `packages/core` and `packages/ui` have near-zero isolation scores (0.037 and 0.02) because they are foundational libraries depended upon by everything. They have no outgoing domain edges.
+- **8 import cycles** exist, mostly small (2–4 files). The largest are the LLM transport trio (`http.ts`, `websocket.ts`, `index.ts`) and the Zen provider quartet (4 files). None are critical tangles.
+- **V1/V2 hybrid**: V2 session (`v2/session.ts`) is a delegation bridge to V1. V1 services are captured via `Effect.serviceOption` and dual-write events for the V2 projector.
+- **No dead code found**: One file (`cli/cmd/tui/worker.ts`) appears orphaned but is dynamically imported via `new URL("./worker.ts", import.meta.url)` in `thread.ts`.
 
 ---
 
@@ -20,57 +19,53 @@
 
 ### 1a. Entry Points
 
-| Entry Point               | Role                                       | Dependency Tree Size |
-| ------------------------- | ------------------------------------------ | -------------------- |
-| `src/index.ts`            | CLI root (yargs, 20+ commands)             | 78 files             |
-| `src/server/server.ts`    | HTTP server composition root               | 43 files             |
-| `src/cli/cmd/run.ts`      | TUI run command (primary user flow)        | 40+ files            |
-| `src/cli/cmd/tui/app.tsx` | TUI application shell                      | 40+ files            |
-| `src/node.ts`             | Standalone Node entry (serve/web/generate) | 15+ files            |
+| Entry Point | Files (depth 2) | Role |
+|---|---|---|
+| `packages/opencode/src/index.ts` | 79 | Main library barrel / CLI composition root |
+| `packages/opencode/src/server/server.ts` | 43 | HTTP API server |
+| `packages/app/src/index.ts` | 34 | Desktop/web app entry |
+| `packages/opencode/src/cli/cmd/run/entry.body.ts` | 5 | CLI run command worker |
+| `packages/desktop/src/main/index.ts` | 12 | Electron main process |
+| `packages/llm/src/index.ts` | 15 | LLM abstraction layer |
+| `packages/sdk/js/src/index.ts` | 7 | JS SDK entry |
+| `packages/sdk/js/src/server.ts` | 1 | SDK server process |
 
-The `src/index.ts` is the heaviest orchestrator, pulling in every CLI command plus shared infrastructure (`server/server.ts`, `agent/agent.ts`, `session/session.ts`, `provider/provider.ts`). The server entry point is leaner but delegates to ~20 handler groups under `server/routes/instance/httpapi/handlers/`.
+**Main orchestrator**: `packages/opencode/src/index.ts` (79 files). It imports CLI commands, server, TUI, ACP, plugin, provider, session, and tool subsystems.
 
 ### 1b. Dependency Tree Overlap
 
-Both `index.ts` and `server/server.ts` share substantial infrastructure:
+The heaviest overlap between trees:
+- `packages/core/src/util/log.ts` and `packages/core/src/global.ts` appear in almost every tree.
+- `packages/opencode/src/agent/agent.ts` appears in opencode, server, and tool trees.
+- `packages/opencode/src/provider/schema.ts` appears in session, tool, and ACP trees.
 
-- `core/src/global.ts`, `core/src/schema.ts`, `core/src/filesystem.ts`
-- `session/session.ts`, `session/session.sql.ts`, `session/prompt.ts`
-- `agent/agent.ts`, `provider/provider.ts`, `provider/schema.ts`
+### 1c. Import Cycles (8 total)
 
-The TUI entry (`cli/cmd/tui/app.tsx`) has **zero** compile-time paths to both `index.ts` and `server/server.ts`. It is launched dynamically via `AttachCommand` / `TuiThreadCommand` and communicates through the server's HTTP API or shared services.
+| Cycle | Files | Size |
+|---|---|---|
+| SDK v1 gen client | `utils.gen.ts` ↔ `types.gen.ts` | 2 |
+| SDK v2 gen client | `utils.gen.ts` ↔ `types.gen.ts` | 2 |
+| App dialog providers | `dialog-custom-provider.tsx` → `dialog-select-provider.tsx` → `dialog-connect-provider.tsx` → back | 3 |
+| Global sync | `child-store.ts` ↔ `bootstrap.ts` ↔ `global-sync.tsx` | 3 |
+| Zen providers | `openai-compatible.ts` → `openai.ts` → `anthropic.ts` → `provider.ts` → back | 4 |
+| LLM transport | `http.ts` ↔ `websocket.ts` ↔ `index.ts` | 3 |
+| Session todo | `todo-autoclose.ts` ↔ `todo.ts` | 2 |
+| Tool task | `task.ts` ↔ `tool.ts` | 2 |
 
-### 1c. Import Cycles
-
-**Total: 12 cycles**
-
-| Cycle                                                                                      | Files | Severity                                 |
-| ------------------------------------------------------------------------------------------ | ----- | ---------------------------------------- |
-| `sdk/js/src/gen/client/utils.gen.ts` ↔ `types.gen.ts`                                      | 2     | Benign (generated)                       |
-| `sdk/js/src/v2/gen/client/utils.gen.ts` ↔ `types.gen.ts`                                   | 2     | Benign (generated)                       |
-| `app/src/components/dialog-*`                                                              | 3     | Console app only                         |
-| `app/src/context/global-sync/*`                                                            | 3     | Console app only                         |
-| `console/app/src/routes/zen/util/provider/*`                                               | 4     | Console app only                         |
-| `llm/src/route/transport/*`                                                                | 3     | SDK only                                 |
-| **`session/message-v2.ts` ↔ `session/session.sql.ts`**                                     | 2     | **opencode core — needs review**         |
-| `cli/cmd/tui/component/dialog-*`                                                           | 2     | TUI only                                 |
-| `cli/cmd/tui/context/editor.ts` ↔ `editor-zed.ts`                                          | 2     | TUI only                                 |
-| **`cli/cmd/tui/feature-plugins/system/*` + `sidebar/*` + `home/*` + `plugin/internal.ts`** | 10    | **TUI — largest cycle, refactor target** |
-| **`provider/transform.ts` ↔ `provider/provider.ts`**                                       | 2     | **opencode core — tight coupling**       |
-| `plugins/typegraph-mcp/disk-cache.ts` ↔ `builder.ts`                                       | 2     | Tooling only                             |
-
-**Notable Finding:** The 10-file TUI cycle involves `feature-plugins/system/which-key.tsx`, `session-v2.tsx`, `plugins.tsx`, `sidebar/footer.tsx`, `sidebar/files.tsx`, `sidebar/todo.tsx`, `sidebar/lsp.tsx`, `sidebar/mcp.tsx`, `sidebar/context.tsx`, `home/tips.tsx`, `home/footer.tsx`, and `plugin/internal.ts`. This is a classic circular feature-plugin architecture where sidebar and system plugins mutually reference each other.
+**Notable**: The Zen provider cycle (4 files) is the largest and is in the console app's experimental AI feature area. The LLM transport cycle (3 files) is a standard protocol pattern.
 
 ### 1d. Cross-Boundary Isolation
 
-| From                  | To                    | Isolated?             |
-| --------------------- | --------------------- | --------------------- |
-| `agent/agent.ts`      | `server/server.ts`    | **Yes** (`null` path) |
-| `session/session.ts`  | `cli/cmd/tui/app.tsx` | **Yes** (`null` path) |
-| `v2/session.ts`       | `session/session.ts`  | **Yes** (`null` path) |
-| `cli/cmd/tui/app.tsx` | `index.ts`            | **Yes** (`null` path) |
+| From | To | Path | Hops |
+|---|---|---|---|
+| `opencode/src/server/server.ts` | `desktop/src/main/index.ts` | **null** (isolated) | — |
+| `opencode/src/index.ts` | `app/src/index.ts` | **null** (isolated) | — |
+| `opencode/src/index.ts` | `llm/src/index.ts` | **null** (isolated) | — |
+| `opencode/src/index.ts` | `sdk/js/src/index.ts` | `providers.ts` → `plugin/index.ts` → `sdk/index.ts` | 3 |
+| `app/src/index.ts` | `desktop/src/main/index.ts` | **null** (isolated) | — |
+| `llm/src/index.ts` | `sdk/js/src/index.ts` | **null** (isolated) | — |
 
-The TUI, server, and v2 session are compile-time isolated from each other and from the CLI root. This confirms the architecture supports independent deployment modes (CLI-only, server-only, TUI-only) despite sharing a monorepo.
+**Notable**: The only compile-time boundary violation is `opencode → sdk` via the plugin system. The `providers` CLI command imports `Plugin` which re-exports the SDK client. This is intentional (plugin system bridges to SDK).
 
 ---
 
@@ -78,184 +73,152 @@ The TUI, server, and v2 session are compile-time isolated from each other and fr
 
 ### 2a. High-Fanout Infrastructure Files
 
-| File                     | Direct Dependents | Role                                                          |
-| ------------------------ | ----------------- | ------------------------------------------------------------- |
-| `core/src/global.ts`     | 79                | Global config/paths singleton                                 |
-| `core/src/filesystem.ts` | 71                | File system abstraction                                       |
-| `core/src/schema.ts`     | 62                | Effect schema primitives                                      |
-| `session/session.sql.ts` | 15                | Database tables (Session, Message, Part, Todo, Permission)    |
-| `agent/agent.ts`         | 28                | Agent service definition                                      |
-| `server/server.ts`       | 29                | HTTP server composition root                                  |
-| `provider/provider.ts`   | 0                 | Provider service (used via Effect layers, not direct imports) |
+| File | Direct Dependents | Role |
+|---|---|---|
+| `packages/core/src/util/log.ts` | 123 | Logging facade — used by almost every module |
+| `packages/core/src/global.ts` | 79 | Global paths / service locator |
+| `packages/opencode/src/bus/index.ts` | 30 | Event bus (publish/subscribe) |
+| `packages/opencode/src/agent/agent.ts` | 30 | Agent definitions |
+| `packages/opencode/src/permission/index.ts` | 16 | Permission evaluation |
+| `packages/opencode/src/session/session.ts` | 14 | Session CRUD |
+| `packages/opencode/src/session/schema.ts` | ~70+ (via outgoing) | SessionID, MessageID, PartID brands |
 
-**Notable Finding:** `provider/provider.ts` has 0 direct dependents despite being a core domain service. This is because consumers access it through Effect's DI (`yield* Provider.Service`) rather than direct module imports. The `tool/registry.ts` (1 dependent) and `agent/agent.ts` (via layer composition) pull it in transitively.
+### 2b. Module Exports
 
-### 2b. Module Exports — Service Pattern Consistency
+| File | Exports | Pattern |
+|---|---|---|
+| `packages/opencode/src/provider/provider.ts` | 18 | `Model`, `Info`, `ListResult`, `ConfigProvidersResult`, `Service`, `defaultLayer`, `ModelNotFoundError`, `InitError` — schema-heavy, 34 lines of type definitions |
+| `packages/opencode/src/session/session.ts` | 34 | `Info`, `ProjectInfo`, `GlobalInfo`, `CreateInput`, `ForkInput`, `GetInput`, `ListInput`, `Event`, `Service`, `layer`, `defaultLayer` — very large, mixes schema, service, and helpers |
+| `packages/opencode/src/agent/agent.ts` | 7 | `Info`, `Interface`, `Service`, `layer`, `defaultLayer`, `Agent` namespace — clean |
+| `packages/opencode/src/bus/index.ts` | 10 | `Interface`, `Service`, `layer`, `defaultLayer`, `publish`, `subscribe`, `subscribeAll`, `createID` — clean |
+| `packages/core/src/global.ts` | 8 | `Path`, `Service`, `Interface`, `make`, `layer`, `defaultLayer`, `layerWith` — clean |
 
-Every service module follows the same shape:
+**Notable**: `session.ts` exports 34 symbols — it is doing too much. It mixes session CRUD, schema definitions, event types, usage calculation, and slug generation. The AGENTS.md notes this file has already been partially decomposed (projectors extracted), but it remains a god file.
 
-```typescript
-export interface Interface { ... }          // Type-only contract
-export class Service extends Context.Service<...> { ... }  // Effect service
-export const layer = Layer.effect(Service, ...)            // Testable layer
-export const defaultLayer = layer.pipe(...)                // Composed defaults
-export * as Foo from "."                                   // Namespace re-export
-```
+### 2c. Module Boundaries
 
-**Consistency check across 6 key services:**
+| Module | Internal Edges | Incoming | Outgoing | Isolation Score | Role |
+|---|---|---|---|---|---|
+| `packages/core/src/*` | 28 | 729 | 0 | 0.037 | **Provider** — foundational utilities, depended on by everything |
+| `packages/ui/src/*` (sample) | 3 | ~100+ | ~15 | 0.020 | **Provider** — UI component library |
+| `packages/opencode/src/provider/*` | 6 | ~60 | ~15 | 0.076 | **Consumer/Provider hybrid** — depends on core, provides schema to domain |
+| `packages/opencode/src/session/*` | 88 | ~50 | ~40 | 0.266 | **Consumer** — depends on core, bus, provider, agent, tools |
+| `packages/opencode/src/tool/*` | 79 | ~20 | ~40 | 0.382 | **Consumer/Orchestrator** — depends on session, agent, permission, file, format |
 
-| Module                       | Exports                                                     | Pattern Match             |
-| ---------------------------- | ----------------------------------------------------------- | ------------------------- |
-| `agent/agent.ts`             | 7 (Info, Interface, Service, layer, defaultLayer, Agent)    | ✅ Clean                  |
-| `session/session.ts`         | 34 (Info, Interface, Service, layer, defaultLayer, Session) | ⚠️ Overstuffed (see Risk) |
-| `session/prompt.ts`          | 13 (Interface, Service, layer, defaultLayer, SessionPrompt) | ✅ Clean                  |
-| `session/llm.ts`             | 10 (Interface, Service, layer, defaultLayer, LLM)           | ✅ Clean                  |
-| `provider/provider.ts`       | 19 (Model, Info, Interface, Service, Provider)              | ⚠️ Large (1700+ lines)    |
-| `server/server.ts`           | 6 (Listener, Default, openapi, url, listen, Server)         | ✅ Lean composition root  |
-| `control-plane/workspace.ts` | 20 (Info, Interface, Service, layer, Workspace)             | ✅ Moderate               |
-
-### 2c. Module Boundaries — Isolation Scores
-
-| Directory/Module                            | Isolation Score | Interpretation                                               |
-| ------------------------------------------- | --------------- | ------------------------------------------------------------ |
-| `tool/edit.ts, read.ts, write.ts, shell.ts` | **0.00**        | Pure consumers — all outgoing, no incoming (except registry) |
-| `control-plane/workspace.ts`                | 0.059           | Tightly coupled to session, auth, sync                       |
-| `project/project.ts, instance.ts`           | **0.02**        | Near-zero isolation — central plumbing                       |
-| `bus/index.ts`                              | 0.095           | Event hub — many producers, few consumers                    |
-| `mcp/index.ts`                              | 0.128           | Most isolated of sampled modules                             |
-| `server/routes/instance/httpapi/*`          | **0.03**        | Server handlers — extremely coupled                          |
-| `session/session.ts + llm.ts + prompt.ts`   | 0.10            | Session subsystem — internally coupled                       |
-| `agent/agent.ts + provider/*`               | 0.08            | Agent/provider — moderate coupling                           |
-
-**Interpretation:** The project is a classic tightly-coupled monolith. Directory boundaries do not provide encapsulation; the Effect layer system provides the actual abstraction boundary.
+**Notable**: The session module has the lowest isolation among domain modules (0.266). It depends on 40+ outgoing edges to core, bus, agent, provider, and tools. This makes it the architectural center of gravity.
 
 ---
 
 ## Phase 3: Pattern Discovery
 
-### 3a. Service Pattern Prevalence
+### 3a. Service Pattern Consistency
 
-The `Interface` + `Service` + `Layer` pattern is used **project-wide** across:
+Every service module follows the same shape:
 
-- `agent/agent.ts`
-- `session/session.ts`, `session/prompt.ts`, `session/llm.ts`, `session/processor.ts`
-- `provider/provider.ts`
-- `control-plane/workspace.ts`
-- `mcp/index.ts`, `mcp/auth.ts`
-- `command/index.ts`
-- `tool/registry.ts`
-- `v2/session.ts`
-- `project/project.ts`
-- `bus/index.ts`, `bus/global.ts`
+```ts
+export interface Interface { ... }
+export class Service extends Context.Service<Service, Interface>()("@opencode/Foo") {}
+export const layer = Layer.effect(Service, ...)
+export const defaultLayer = layer.pipe(...)
+export * as Foo from "./foo"
+```
 
-This is an **intentional, enforced convention** — not accidental.
+This is **project-wide and intentional**. 429 classes, 501 interfaces, and consistent naming (`*Service`, `*Error`, `*Test`) confirm a disciplined Effect-based DI pattern.
 
-### 3b. Test Layer Coverage
+### 3b. Pattern Prevalence
 
-Every sampled service exports a `defaultLayer` (composed from `layer.pipe(...)`). Test files verify services through `Layer` composition rather than mocking interfaces directly. Evidence:
+| Symbol | Count | Interpretation |
+|---|---|---|
+| `Layer` (navigate_to) | High | DI composition is pervasive |
+| `Error` / `NamedError` | High | Typed errors are standard |
+| `Test` / `ServiceTest` | Moderate | Test doubles exist for major services |
+| `Live` | Low | No explicit `*Live` suffix — `defaultLayer` is the live implementation |
 
-- `agent/agent.test.ts` tests `Agent.Service` via composed test layers
-- `session/session.test.ts` tests `Session.Service` with real DB schema
-- `server/httpapi-*.test.ts` tests server handlers through `ExperimentalHttpApiServer`
-- `control-plane/workspace.test.ts` tests workspace with real SQLite
+### 3c. Test Layer Coverage
 
-**No explicit `ServiceTest` exports were found** in the sampled modules. The project uses **integration-style tests with real schemas** rather than test doubles, consistent with AGENTS.md Rule 12 ("Never mock your own DB schema").
+Major services with test layers:
+- `Session` — tested via `test/session/*` and `test/server/httpapi-*`
+- `Agent` — tested via `test/agent/*`
+- `Provider` — tested via `test/provider/*`
+- `Permission` — tested via `test/permission/*`
+- `Bus` — tested via `test/bus/*`
 
-### 3c. Effect Runtime Patterns
-
-- `makeRuntime` from `core/src/effect/runtime.ts` is used for service execution (7 dependents)
-- `memoMap` from `core/src/effect/memo-map.ts` is the deduplication backbone (7 dependents)
-- `InstanceState` pattern exists in `effect/instance-state.ts` for per-directory state
-- `Effect.gen` is the standard composition pattern
-- `Effect.fn` / `Effect.fnUntraced` used for named effects
+All core services have test coverage. The test pattern uses `Effect.serviceOption` for V1 services and `Layer.mock` for test doubles.
 
 ---
 
 ## Phase 4: Dead Code Detection
 
-### 4a. Orphan File Detection
+### 4a. Orphan Files
 
-Files with 0 dependents (non-test, non-entry-point) were not systematically enumerated in this pass, but key observations:
+- `packages/opencode/src/cli/cmd/tui/worker.ts` — 0 static dependents, but **dynamically imported** via `new URL("./worker.ts", import.meta.url)` in `thread.ts`. Not dead.
+- No other orphan files found in the sampled directories.
 
-- `provider/provider.ts`: 0 direct dependents (but critical — used via DI)
-- `tool/registry.ts`: 1 direct dependent (`test/tool/websearch.test.ts`)
-- `data-migration.ts`, `data-migration.sql.ts`: likely dead after JSON migration completed
-- `audio.d.ts`, `markdown.d.ts`, `sql.d.ts`: type declaration stubs — verify if still needed
+### 4b. Dead Exports
 
-### 4b. Dead Export Spot-Check
-
-`session/session.ts` exports 34 symbols. Candidates for dead-export review:
-
-- `listGlobal` — only used within `session/session.ts` itself? (needs `ts_references` check)
-- `getUsage` — used internally, but verify external callers
-- `Patch` type — verify all fields are consumed
-
-`provider/provider.ts` exports 19 symbols including `fromModelsDevProvider`, `sort`, `parseModel`, `ModelNotFoundError`, `InitError`. These are likely consumed by provider-specific code but should be verified.
+- `packages/opencode/src/provider/provider.ts` exports `Model` (re-exported from `model.ts`), `ModelNotFoundError`, and `InitError` — all are referenced.
+- `packages/opencode/src/session/session.ts` exports 34 symbols. Spot-checking the rare ones (`ArchivedTimestamp`, `plan`, `getUsage`): `plan` is used in `compaction.ts`; `getUsage` is used in `session.ts` itself. No obvious dead exports in the top-level symbols.
 
 ### 4c. Barrel File Audit
 
-The project deliberately avoids barrel `index.ts` files in multi-sibling directories (per AGENTS.md). Single-namespace directories use `export * as Foo from "."` pattern. No stale re-exports detected in the barrel files examined.
+- `packages/opencode/src/index.ts` is a barrel but its exports are all consumed by CLI commands or tests.
+- `packages/opencode/src/session/schema.ts` re-exports `SessionID`, `MessageID`, `PartID` — all are heavily used (70+ references).
+
+**No confirmed dead exports or orphan files in the sampled set.**
 
 ---
 
 ## Phase 5: Domain Topology
 
-### 5a. Entity Identification
+### 5a. Domain Entities
 
-| Entity         | Primary File                 | Schema                                                                                                            | Service                |
-| -------------- | ---------------------------- | ----------------------------------------------------------------------------------------------------------------- | ---------------------- |
-| **Session**    | `session/session.ts`         | `session/session.sql.ts` (SessionTable, MessageTable, PartTable, TodoTable, PermissionTable, SessionMessageTable) | `Session.Service`      |
-| **Agent**      | `agent/agent.ts`             | `agent/agent.ts` (Info schema)                                                                                    | `Agent.Service`        |
-| **Provider**   | `provider/provider.ts`       | `provider/provider.ts` (Model, Info)                                                                              | `Provider.Service`     |
-| **Workspace**  | `control-plane/workspace.ts` | `control-plane/workspace.sql.ts`                                                                                  | `Workspace.Service`    |
-| **Project**    | `project/project.ts`         | `project/project.sql.ts`                                                                                          | `Project.Service`      |
-| **MCP**        | `mcp/index.ts`               | `mcp/auth.ts`, `mcp/oauth-provider.ts`                                                                            | `MCP.Service`          |
-| **Command**    | `command/index.ts`           | `command/index.ts` (Info, Event)                                                                                  | `Command.Service`      |
-| **Tool**       | `tool/registry.ts`           | `tool/schema.ts`                                                                                                  | `ToolRegistry.Service` |
-| **V2 Session** | `v2/session.ts`              | `v2/schema.ts`                                                                                                    | `SessionV2.Service`    |
+| Entity | Primary File | Type |
+|---|---|---|
+| Session | `session/session.ts` | Service + Schema + Events |
+| Agent | `agent/agent.ts` | Service + Schema |
+| Provider | `provider/provider.ts` | Service + Schema |
+| Tool | `tool/tool.ts`, `tool/registry.ts` | Tool definitions + registry |
+| Permission | `permission/index.ts` | Service + evaluation |
+| Project | `project/project.ts` | Service + schema |
+| Workspace | `control-plane/workspace.ts` | Service + schema |
+| Message | `session/message-v2.ts` | Schema + V2 types |
 
 ### 5b. Entity Relationships
 
 ```
-Session ←→ Agent (session.prompt.ts uses Agent.Service)
-Session ←→ Provider (session.prompt.ts uses Provider.Service)
-Session ←→ MCP (session.prompt.ts uses MCP.Service)
-Session ←→ Bus (session.prompt.ts publishes Bus events)
-Session ←→ Workspace (workspace.ts queries SessionTable)
-Session ←→ Project (project.ts updates SessionTable)
-Session ←→ LLM (session.llm.ts uses Provider for streaming)
-Agent  ←→ Provider (agent.agent.ts uses Provider.Service)
-Agent  ←→ Skill (agent.agent.ts uses Skill.Service)
-Agent  ←→ Auth (agent.agent.ts uses Auth.Service)
-Server → Session (httpapi handlers use Session.Service)
-Server → Agent (httpapi handlers use Agent.Service)
-Server → Provider (httpapi handlers use Provider.Service)
+Session → Agent (which agent owns this session)
+Session → Provider (which model)
+Session → Permission (ruleset)
+Session → Tool (via TaskTool, PlanTool)
+Session → Bus (events)
+Session → SyncEvent (cross-device sync)
+Session → Snapshot (snapshots for revert)
+
+Agent → Provider (default model)
+Agent → Permission (agent-level rules)
+Agent → Plugin (tools, hooks)
+
+Provider → Auth (API keys, OAuth)
+Provider → Installation (version check)
 ```
 
 ### 5c. Domain Boundary Verification
 
-| Domain A       | Domain B       | Coupling Path                                    |
-| -------------- | -------------- | ------------------------------------------------ |
-| Session        | Agent          | Via `session/prompt.ts` → `agent/agent.ts`       |
-| Session        | Provider       | Via `session/prompt.ts` → `provider/provider.ts` |
-| Session        | MCP            | Via `session/prompt.ts` → `mcp/index.ts`         |
-| Agent          | Provider       | Via `agent/agent.ts` → `provider/provider.ts`    |
-| Server         | Session        | Via HTTP handlers → `session/session.ts`         |
-| **V2 Session** | **V1 Session** | **None (isolated)**                              |
+| Domain A | Domain B | Path | Independent? |
+|---|---|---|---|
+| Session | Agent | Direct import (`session/prompt.ts` → `agent/agent.ts`) | No — intentional |
+| Session | Provider | Direct import (`session/prompt.ts` → `provider/schema.ts`) | No — intentional |
+| Agent | Provider | Direct import (`agent/agent.ts` → `provider/provider.ts`) | No — intentional |
+| Tool | Session | Direct import (`tool/task.ts` → `session/session.ts`) | No — intentional |
+| Permission | Session | Direct import (`permission/index.ts` → `session/schema.ts`) | No — intentional |
 
-**Notable Finding:** The V2 session module (`v2/session.ts`) has **zero** compile-time coupling to the V1 session module. It is a fully independent implementation with its own schema (`v2/schema.ts`) and service (`SessionV2.Service`), depending only on `SyncEvent.Service`. This is a textbook Strangler Fig setup.
+All core domains are tightly coupled by design — they form a single aggregate root around the Session entity.
 
-### 5d. Blast Radius
+### 5d. Blast Radius: Session.Service
 
-| Symbol          | Files Affected                             | Risk Level   |
-| --------------- | ------------------------------------------ | ------------ |
-| `SessionTable`  | 147 references, 15 dependents              | **Critical** |
-| `ProjectID`     | 12 dependents on `project/schema.ts`       | High         |
-| `ProviderID`    | Used across agent, session, provider, tool | High         |
-| `Workspace`     | 7 direct callers                           | High         |
-| `Agent`         | 28 direct dependents                       | High         |
-| `Bus`           | 26 direct dependents                       | High         |
-| `AppFileSystem` | 71 direct dependents                       | **Critical** |
+- **195 direct callers** across 50+ files
+- Callers include: every HTTP handler, every tool, the agent loop, compaction, revert, summary, share, V2 bridge, CLI commands, and 30+ test files
+- `Session.Service` is the single most dangerous symbol to change
 
 ---
 
@@ -263,162 +226,127 @@ Server → Provider (httpapi handlers use Provider.Service)
 
 ### 6a. Request Flow Tracing
 
-**HTTP → Session → LLM → Provider chain:**
+**HTTP Handler → Service → Effect Layer**:
 
-1. `server/routes/instance/httpapi/handlers/session.ts` receives HTTP request
-2. Delegates to `session/session.ts` (Session.Service)
-3. For LLM operations, `session/prompt.ts` (SessionPrompt.Service) composes Agent + Provider + LLM
-4. `session/llm.ts` (LLM.Service) streams from `Provider.Service`
-5. Provider implementation (`provider/provider.ts`) resolves model and calls external API
+1. `server/routes/instance/httpapi/handlers/session.ts` — `HttpApiBuilder.group("session", ...)` yields `Session.Service`, `Agent.Service`, `Provider.Service`, `Bus` at layer construction
+2. Handlers call `session.list()`, `session.get()`, `session.create()`, `session.fork()`, etc.
+3. `Session.Service` methods are thin — they call `Storage.Service` (Drizzle DB) and emit `Bus` events
+4. `SessionPrompt.prompt()` in `session/prompt.ts` is the write path — it triggers the agent loop
 
-**TUI Run chain:**
+**V2 Session Delegation**:
 
-1. `cli/cmd/run.ts` → `runtime.ts` → `runtime.boot.ts`
-2. Boots `SessionPrompt.Service` with Agent + Provider + ToolRegistry
-3. `tool/registry.ts` composes ToolRegistry with 12+ tool services
-4. Shell execution flows through `tool/shell.ts` → `tool/shell/execute.ts`
+- `v2/session.ts` delegates all write methods (`create`, `prompt`, `compact`, `wait`, `shell`, `skill`, `subagent`) to V1 services via `Effect.serviceOption`
+- V1 `SessionPrompt.prompt` runs the real agent loop AND emits `SessionEvent.*` events
+- V2 projectors (`session/projectors-next.ts`) listen to these events and populate `SessionMessageTable`
+- V2 read methods (`get`, `list`, `messages`, `context`) read from the V2-populated tables
 
 ### 6b. Layer Composition
 
-The `session/prompt.ts` layer is the most complex composition point:
-
-```typescript
-layer: Layer.Layer<Service, never, Session.Service | Agent.Service | Config.Service | Provider.Service | Plugin.Service | Bus.Service | ... 17 more ...>
-```
-
-This confirms `SessionPrompt` is the **runtime orchestrator** — it wires together the entire agent execution pipeline.
+The main composition root is `packages/opencode/src/server/server.ts`:
+- It assembles `Session.layer`, `Agent.layer`, `Provider.layer`, `Bus.layer`, `Storage.layer`, `SyncEvent.layer`, `Permission.layer`, `Plugin.layer`, etc.
+- Middleware provides request-scoped services: `InstanceRef`, `WorkspaceRef`, `InstanceState.context`
+- The `InstanceHttpApi` group mounts all handler groups (`session`, `global`, `provider`, `config`, `experimental`, `mcp`, `pty`, `question`, `tui`, `workspace`)
 
 ### 6c. Service Implementation Mapping
 
-| Service       | Interface                    | Live Impl       | Test Support                |
-| ------------- | ---------------------------- | --------------- | --------------------------- |
-| Agent         | `agent/agent.ts`             | `Service` class | Integration tests           |
-| Session       | `session/session.ts`         | `Service` class | Integration tests (real DB) |
-| SessionPrompt | `session/prompt.ts`          | `Service` class | Integration tests           |
-| LLM           | `session/llm.ts`             | `Service` class | Integration tests           |
-| Provider      | `provider/provider.ts`       | `Service` class | Unit + integration          |
-| Workspace     | `control-plane/workspace.ts` | `Service` class | Integration tests           |
-| ToolRegistry  | `tool/registry.ts`           | `Service` class | Per-tool integration tests  |
+- All major services use the Effect `Service` class pattern with `defaultLayer` as the live implementation
+- No `*Live` suffix convention — live vs test is distinguished by `defaultLayer` vs `Layer.mock`
+- Test layers are defined inline in test files using `Layer.mock(Service)({...})`
 
-No `ServiceTest` or `ServiceLive` naming convention was detected. The project uses **single service class with composed test layers** at the call site.
+### 6d. Async / Event-Driven Paths
 
-### 6d. Async / Event-Driven Flows
-
-- **Bus** (`bus/index.ts`): Central event bus with 26 direct dependents. Publishes session.created, session.updated, command.executed, workspace events, etc.
-- **SyncEvent** (`sync/schema.ts`): Cross-instance sync events
-- **Projectors** (`session/projectors.ts`, `session/projectors-next.ts`): Event-sourced state projections
-- **WebSocket tracking** (`server/routes/instance/httpapi/websocket-tracker.ts`): Real-time client updates
-- **Compaction** (`session/compaction.ts`): Background session compaction triggered by Bus events
-- **FiberMap usage** in `control-plane/workspace.ts`: Per-workspace background fibers for sync operations
+- **Bus events**: `Bus.publish` / `Bus.subscribe` used for session updates, tool execution, compaction, revert
+- **SSE endpoints**: `/event` (instance Bus, Effect PubSub) and `/global/event` (global Bus, Node EventEmitter)
+- **Background fibers**: `Effect.forkScoped` used in `InstanceState.make` closures for background stream consumers (e.g., file watchers)
+- **No explicit queue/job system**: async work is done via Effect fibers and streams, not a separate job queue
 
 ### 6e. Feature Flags
 
-No feature flag framework was detected. Conditional behavior uses:
-
-- `Flag` service from `core/src/flag/flag.ts` (referenced by 10+ modules)
-- Direct `process.env` checks (e.g., `OPENCODE_PURE`, `OPENCODE_PID`)
-- Provider capability checks (e.g., `webSearchEnabled` in `tool/registry.ts`)
+- `packages/core/src/flag/flag.ts` — `Flag` type used throughout
+- `OPENCODE_EXPERIMENTAL_EVENT_SYSTEM` — forces V1 dual-write events in tests
+- `OPENCODE_CHANNEL` — build-time baked channel (local vs release)
+- No runtime feature flag system detected via grep — flags are mostly build-time or Effect-level config
 
 ---
 
 ## Phase 7: Risk Assessment
 
-### 7a. Blast Radius Ranking (Top 5)
+### 7a. Blast Radius Ranking
 
-| Rank | Symbol          | Files Affected                  | Change Risk                                             |
-| ---- | --------------- | ------------------------------- | ------------------------------------------------------- |
-| 1    | `SessionTable`  | 147 references                  | **Extreme** — schema change cascades to 15+ modules     |
-| 2    | `AppFileSystem` | 71 dependents                   | **Extreme** — every file operation touches this         |
-| 3    | `Global`        | 79 dependents                   | **Extreme** — paths/config singleton                    |
-| 4    | `Agent`         | 28 dependents                   | **High** — agent config used across CLI, session, tools |
-| 5    | `Server`        | 29 dependents (all tests + CLI) | **High** — server composition root                      |
+| Rank | Symbol | Files Affected | Risk |
+|---|---|---|---|
+| 1 | `Session.Service` | 195 | **Critical** — changes break almost every handler, tool, and test |
+| 2 | `core/src/util/log.ts` (`Log`) | 123 | **High** — but changes are usually additive (new log levels) |
+| 3 | `core/src/global.ts` (`Global`) | 79 | **High** — path changes affect all file I/O |
+| 4 | `Agent.Service` | 32 | **Medium-High** — agent loop, tools, subagents |
+| 5 | `Provider.Service` | 26 | **Medium** — model resolution, auth, LLM calls |
 
 ### 7b. Dependency Inversion Check
 
-| Interface             | Dependents Point To                          | Inverted?                           |
-| --------------------- | -------------------------------------------- | ----------------------------------- |
-| `Agent.Interface`     | `agent/agent.ts` (Service class)             | ✅ Yes (via `yield* Agent.Service`) |
-| `Session.Interface`   | `session/session.ts` (Service class)         | ✅ Yes                              |
-| `Provider.Interface`  | `provider/provider.ts` (Service class)       | ✅ Yes                              |
-| `Workspace.Interface` | `control-plane/workspace.ts` (Service class) | ✅ Yes                              |
-| `AppFileSystem`       | `core/src/filesystem.ts` (interface)         | ✅ Yes (interface file)             |
+**Well-inverted**:
+- `Session.Service` is consumed via `yield* Session.Service` everywhere — consumers depend on the interface, not the implementation
+- `Agent.Service`, `Provider.Service`, `Bus.Service` follow the same pattern
+- Changing the implementation class does not affect callers as long as the interface is preserved
 
-**Conclusion:** The system properly inverts dependencies through Effect's `Context.Service` pattern. Consumers depend on interfaces, not implementations. The highest risk is changing the **schema** (database tables), which bypasses DI entirely.
+**Not inverted**:
+- `core/src/util/log.ts` is imported directly as a module, not via a service interface. Changing its API breaks 123 files.
+- `core/src/global.ts` is also imported directly. It is a singleton service locator, not an injectable interface.
 
 ### 7c. Change Propagation Preview
 
-**Scenario: Renaming `SessionTable.workspace_id` column**
+**Scenario: Changing `Session.Info` schema**
 
-1. **Blast radius**: 147 references across 15+ files
-2. **File-level impact**: `session/session.sql.ts`, `session/session.ts`, `session/prompt.ts`, `control-plane/workspace.ts`, `project/project.ts`, `server/projectors.ts`, `v2/session.ts`, `storage/json-migration.ts`, `share/share.sql.ts`
-3. **Module boundary**: Breaks `session/`, `control-plane/`, `project/`, `server/`, `v2/`, `storage/` boundaries simultaneously
+1. `ts_blast_radius` on `Session.Info` → affects `session/session.ts`, `session/session.sql.ts`, `session/projectors.ts`, `session/prompt.ts`, `session/message-v2.ts`, and 30+ test files
+2. `ts_dependents` on `session/session.ts` → 14 direct dependents, but indirect dependents include every HTTP handler, tool, and the agent loop
+3. `ts_module_boundary` on `session/` → outgoing edges to core, bus, agent, provider, tools. Any schema change requires coordinated updates across all dependent modules
 
-**Recommendation:** Use a migration + deprecation strategy. Add new column, update writers, update readers, remove old column — over 3 releases.
+**Recommendation**: Schema changes to `Session.Info` require a migration plan (Drizzle migration + DB backfill + projector updates + SDK regeneration).
 
 ---
 
 ## Appendix: Raw Data
 
 <details>
-<summary>Phase 1: Entry Point Dependency Trees (node counts)</summary>
+<summary>Graph Schema Summary</summary>
 
-- `src/index.ts`: 78 nodes
-- `src/server/server.ts`: 43 nodes
-- `src/agent/agent.ts`: 7 nodes (direct)
-- `src/session/prompt.ts`: 28 nodes (direct)
-- `src/session/llm.ts`: 4 nodes (direct)
+- **Nodes**: 47,289 (Variable: 14,969, Section: 10,620, Function: 10,049, File: 3,106, Module: 3,083, Type: 3,052, Method: 602, Interface: 501, Class: 429, Route: 359, Folder: 509)
+- **Edges**: 101,681 (DEFINES: 43,333, CALLS: 19,032, USAGE: 16,236, IMPORTS: 14,855, CONTAINS_FILE: 3,100, SIMILAR_TO: 1,981, WRITES: 1,025, DEFINES_METHOD: 602, CONTAINS_FOLDER: 475, RAISES: 350, HTTP_CALLS: 198, INHERITS: 143, HANDLES: 142, CONFIGURES: 82, TESTS_FILE: 64, SEMANTICALLY_RELATED: 32, THROWS: 24, LISTENS_ON: 5, EMITS: 1, HAS_BRANCH: 1)
+- **Languages**: TypeScript (1,862), CSS (122), SQL (88), YAML (36), TOML (4), JavaScript (4), HTML (3), Bash (1)
 
 </details>
 
 <details>
-<summary>Phase 1: Import Cycles (12 total)</summary>
+<summary>Import Cycles Detail</summary>
 
-1. `sdk/js/src/gen/client/utils.gen.ts` ↔ `types.gen.ts`
-2. `sdk/js/src/v2/gen/client/utils.gen.ts` ↔ `types.gen.ts`
-3. `app/src/components/dialog-custom-provider.tsx` ↔ `dialog-select-provider.tsx` ↔ `dialog-connect-provider.tsx`
-4. `app/src/context/global-sync/child-store.ts` ↔ `bootstrap.ts` ↔ `global-sync.tsx`
-5. `console/app/src/routes/zen/util/provider/openai-compatible.ts` ↔ `openai.ts` ↔ `provider.ts` ↔ `anthropic.ts`
-6. `llm/src/route/transport/http.ts` ↔ `websocket.ts` ↔ `index.ts`
-7. `opencode/src/session/message-v2.ts` ↔ `session/session.sql.ts`
-8. `opencode/src/cli/cmd/tui/component/dialog-model.tsx` ↔ `dialog-provider.tsx`
-9. `opencode/src/cli/cmd/tui/context/editor.ts` ↔ `editor-zed.ts`
-10. `opencode/src/cli/cmd/tui/feature-plugins/system/which-key.tsx` ↔ `session-v2.tsx` ↔ `plugins.tsx` ↔ `sidebar/footer.tsx` ↔ `sidebar/files.tsx` ↔ `sidebar/todo.tsx` ↔ `sidebar/lsp.tsx` ↔ `sidebar/mcp.tsx` ↔ `sidebar/context.tsx` ↔ `home/tips.tsx` ↔ `home/footer.tsx` ↔ `plugin/internal.ts`
-11. `opencode/src/provider/transform.ts` ↔ `provider/provider.ts`
-12. `plugins/typegraph-mcp/disk-cache.ts` ↔ `builder.ts`
-
-</details>
-
-<details>
-<summary>Phase 2: High-Fanout File Dependents</summary>
-
-- `core/src/schema.ts`: 62 direct dependents
-- `core/src/global.ts`: 79 direct dependents
-- `core/src/filesystem.ts`: 71 direct dependents
-- `session/session.sql.ts`: 15 direct dependents, 147 total references
-- `agent/agent.ts`: 28 direct dependents
-- `server/server.ts`: 29 direct dependents (25 test files + 4 CLI commands + plugin)
-- `provider/provider.ts`: 0 direct dependents (used via DI)
+```json
+[
+  ["packages/sdk/js/src/gen/client/utils.gen.ts", "packages/sdk/js/src/gen/client/types.gen.ts"],
+  ["packages/sdk/js/src/v2/gen/client/utils.gen.ts", "packages/sdk/js/src/v2/gen/client/types.gen.ts"],
+  ["packages/app/src/components/dialog-custom-provider.tsx", "packages/app/src/components/dialog-select-provider.tsx", "packages/app/src/components/dialog-connect-provider.tsx"],
+  ["packages/app/src/context/global-sync/child-store.ts", "packages/app/src/context/global-sync/bootstrap.ts", "packages/app/src/context/global-sync.tsx"],
+  ["packages/console/app/src/routes/zen/util/provider/openai-compatible.ts", "packages/console/app/src/routes/zen/util/provider/openai.ts", "packages/console/app/src/routes/zen/util/provider/anthropic.ts", "packages/console/app/src/routes/zen/util/provider/provider.ts"],
+  ["packages/llm/src/route/transport/http.ts", "packages/llm/src/route/transport/websocket.ts", "packages/llm/src/route/transport/index.ts"],
+  ["packages/opencode/src/session/todo-autoclose.ts", "packages/opencode/src/session/todo.ts"],
+  ["packages/opencode/src/tool/task.ts", "packages/opencode/src/tool/tool.ts"]
+]
+```
 
 </details>
 
 <details>
-<summary>Phase 5: SessionTable Blast Radius (Top 20 callers)</summary>
+<summary>Hotspots (Top 10 by fan-in)</summary>
 
-1. `session/session.sql.ts` — self-referential FK definitions
-2. `session/session.ts` — CRUD operations
-3. `session/prompt.ts` — model/agent lookup
-4. `share/share.sql.ts` — FK reference
-5. `control-plane/workspace.ts` — workspace-session joins
-6. `session/projectors-next.ts` — state projection
-7. `session/projectors.ts` — event-sourced writes
-8. `server/projectors.ts` — server-side reads
-9. `v2/session.ts` — V2 API implementation
-10. `session/message-v2.ts` — message validation
-11. `project/project.ts` — project-session sync
-12. `cli/cmd/stats.ts` — stats CLI
-13. `cli/cmd/import.ts` — import CLI
-14. `storage/json-migration.ts` — legacy migration
-15. `storage/schema.ts` — schema re-export
-    Plus 6 test files.
+| Symbol | Fan In | File |
+|---|---|---|
+| `describe` | 359 | `packages/sdk/js/src/error-interceptor.ts` |
+| `t` (i18n) | 172 | `packages/storybook/.storybook/mocks/app/context/language.ts` |
+| `buildClientParams` | 125 | `packages/sdk/js/src/v2/gen/core/params.gen.ts` |
+| `eq` | 87 | `packages/ui/src/components/motion-spring.tsx` |
+| `provide` | 62 | `packages/opencode/src/project/with-instance.ts` |
+| `useDialog` | 61 | `packages/opencode/src/cli/cmd/tui/ui/dialog.tsx` |
+| `error` | 55 | `packages/core/src/util/log.ts` |
+| `zod` | 54 | `packages/core/src/effect-zod.ts` |
+| `use` | 52 | `packages/opencode/src/storage/db.ts` |
+| `withStatics` | 51 | `packages/core/src/schema.ts` |
 
 </details>

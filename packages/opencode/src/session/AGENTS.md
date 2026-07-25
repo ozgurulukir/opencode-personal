@@ -42,3 +42,20 @@ When replacing per-item loops with batch writes, use the new `Session.updatePart
 1. Define the schema + event in `message-v2.ts`
 2. Add the projector tuple to `session/projectors.ts` default export **before** `...nextProjectors`
 3. `server/projectors.ts:initProjectors()` runs at module load and freezes the registry — import order matters
+
+## Subagent permission wiring — two distinct `ctx.ask` merge strategies
+
+Normal tools merge `agent.permission + session.permission`. But subagent task's own ask (`prompt.ts:727-734`) merges `taskAgent.permission + PARENT session.permission` (not subagent session). This means a subagent's "always allow" does NOT inherit from its own session — it inherits from the parent. Don't assume subagent permissions are self-contained.
+
+## Effect Schema cross-file identity — keep schemas in the consuming module
+
+`Schema.Struct` types are not stable across module boundaries under `verbatimModuleSyntax`. Moving schema definitions from `session.ts` to `session/schemas.ts` causes `Info` types from different modules to be treated as unrelated, breaking Interface definitions. Keep schemas in the module where they're consumed.
+
+## `??` does not fall through for `0` or `""` — use `||` for falsy fallback
+
+`??` only falls through for `null`/`undefined`. When the intention is to fall through for all falsy values (including `0`), use `||`. Discovered in `getUsage`: `inputTokenDetails.cacheWriteTokens: 0` stopped the chain instead of falling back to `metadata.anthropic.cacheCreationInputTokens`.
+
+## Pre-existing flaky tests in this module
+
+- `session.system > skills output is sorted by name and stable across calls` — fails intermittently (Expected: >489, Received: 188)
+- Permission tests have pre-existing `ScopedCache` state leakage between `withDir` tests — `disposeAllInstances()` invalidates async, so "always" replies leak into subsequent tests. 2 flaky tests remain.
