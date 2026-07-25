@@ -20,6 +20,16 @@
 
 `Permission.merge(...rulesets)` simply concatenates: `[...ruleset1, ...ruleset2, ...]`. Combined with `findLast`, later rulesets override earlier ones. When merging agent + session permissions, session comes last and wins conflicts.
 
+## `ask()` evaluation order — DB-persisted approvals vs config rules
+
+`Permission.ask()` calls `evaluate(permission, pattern, approved, ruleset)` where `findLast` processes `[...approved, ...ruleset]`. Because `ruleset` comes **after** `approved`, any matching config rule (agent/session permission) overrides a DB-persisted "always allow" — even if that config rule is just `"ask"`. This silently breaks "always allow" for any permission that has an `"ask"` rule in the agent defaults (e.g., `external_directory: { "*": "ask" }`, `doom_loop: "ask"`, `read: { "*.env": "ask" }`).
+
+The fix in `ask()` splits evaluation: (1) deny from `ruleset` wins immediately (security invariant), (2) "allow" from `approved` overrides "ask" from `ruleset`, (3) config "allow" is still respected, (4) default to "ask". Do NOT change `evaluate()` itself — it is correct for single-ruleset use. The split must happen at the call site.
+
+## Test isolation — `ScopedCache` state leaks between permission tests
+
+`Permission.layer` uses `InstanceState.make` backed by `ScopedCache`. `disposeAllInstances()` invalidates entries asynchronously (`Effect.runPromise`), so a test that replies `"always"` can leak its `approved` ruleset into subsequent tests that use the same temp directory. This is pre-existing and masked by the old evaluation order (config `ruleset` would override leaked `approved` anyway). When fixing permission logic, verify with `bun test test/permission/ -t "always"` to confirm new tests don't break unrelated ones.
+
 ## `reply("always")` persists to database
 
 When the user replies with `"always"`, the approved ruleset is persisted to `PermissionTable` (keyed by `project_id`). This means "always allow" decisions survive restarts. The ruleset is loaded from the database on service init via `InstanceState.make()`. The `PermissionTable` is an upsert — each project has at most one row containing the full approved ruleset.
