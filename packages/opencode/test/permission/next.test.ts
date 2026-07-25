@@ -798,6 +798,74 @@ it.live("reply - always persists approval and resolves", () =>
   ),
 )
 
+it.live("reply - always approval overrides config ask rule on subsequent calls", () =>
+  withDir({ git: true }, () =>
+    Effect.gen(function* () {
+      const askRuleset: Permission.Ruleset = [{ permission: "external_directory", pattern: "*", action: "ask" }]
+
+      const fiber = yield* ask({
+        id: PermissionID.make("per_always_ask"),
+        sessionID: SessionID.make("session_sub"),
+        permission: "external_directory",
+        patterns: ["/tmp/ext/*"],
+        metadata: {},
+        always: ["/tmp/ext/*"],
+        ruleset: askRuleset,
+      }).pipe(Effect.forkScoped)
+
+      yield* waitForPending(1)
+      yield* reply({ requestID: PermissionID.make("per_always_ask"), reply: "always" })
+      yield* Fiber.join(fiber)
+
+      // Same ruleset with "ask" — the DB-persisted "always allow" must win
+      const result = yield* ask({
+        sessionID: SessionID.make("session_sub2"),
+        permission: "external_directory",
+        patterns: ["/tmp/ext/*"],
+        metadata: {},
+        always: [],
+        ruleset: askRuleset,
+      })
+      expect(result).toBeUndefined()
+    }),
+  ),
+)
+
+it.live("reply - always approval does not override config deny rule", () =>
+  withDir({ git: true }, () =>
+    Effect.gen(function* () {
+      const askRuleset: Permission.Ruleset = [{ permission: "edit", pattern: "*", action: "ask" }]
+
+      const fiber = yield* ask({
+        id: PermissionID.make("per_always_deny"),
+        sessionID: SessionID.make("session_deny"),
+        permission: "edit",
+        patterns: ["src/foo.ts"],
+        metadata: {},
+        always: ["*"],
+        ruleset: askRuleset,
+      }).pipe(Effect.forkScoped)
+
+      yield* waitForPending(1)
+      yield* reply({ requestID: PermissionID.make("per_always_deny"), reply: "always" })
+      yield* Fiber.join(fiber)
+
+      // Deny rule must still win over DB-persisted "always allow"
+      const err = yield* fail(
+        ask({
+          sessionID: SessionID.make("session_deny2"),
+          permission: "edit",
+          patterns: ["src/foo.ts"],
+          metadata: {},
+          always: [],
+          ruleset: [{ permission: "edit", pattern: "*", action: "deny" }],
+        }),
+      )
+      expect(err).toBeInstanceOf(Permission.DeniedError)
+    }),
+  ),
+)
+
 it.live("reply - reject cancels all pending for same session", () =>
   withDir({ git: true }, () =>
     Effect.gen(function* () {

@@ -192,15 +192,20 @@ export const layer = Layer.effect(
       let needsAsk = false
 
       for (const pattern of request.patterns) {
-        // Config rules (ruleset) must come last so they override DB-persisted approvals
-        const rule = evaluate(request.permission, pattern, approved, ruleset)
-        log.info("evaluated", { permission: request.permission, pattern, action: rule })
-        if (rule.action === "deny") {
+        // Deny rules from config/agent always win (security).
+        // DB-persisted "always allow" overrides config "ask" rules — otherwise
+        // the user's explicit approval is silently ignored on every subsequent call.
+        const configRule = evalRule(request.permission, pattern, ruleset)
+        if (configRule.action === "deny") {
+          log.info("evaluated", { permission: request.permission, pattern, action: configRule })
           return yield* new DeniedError({
             ruleset: ruleset.filter((rule) => Wildcard.match(request.permission, rule.permission)),
           })
         }
-        if (rule.action === "allow") continue
+        const approvedRule = evalRule(request.permission, pattern, approved)
+        log.info("evaluated", { permission: request.permission, pattern, config: configRule.action, approved: approvedRule.action })
+        if (approvedRule.action === "allow") continue
+        if (configRule.action === "allow") continue
         needsAsk = true
       }
 
