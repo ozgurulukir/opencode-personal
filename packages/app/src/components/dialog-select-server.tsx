@@ -107,6 +107,305 @@ function useServerPreview() {
   return { previewStatus }
 }
 
+function useServerFormState(input: {
+  language: ReturnType<typeof useLanguage>
+  previewStatus: ReturnType<typeof useServerPreview>["previewStatus"]
+}) {
+  const [store, setStore] = createStore({
+    addServer: {
+      url: "",
+      name: "",
+      username: DEFAULT_USERNAME,
+      password: "",
+      error: "",
+      showForm: false,
+      status: undefined as boolean | undefined,
+    },
+    editServer: {
+      id: undefined as string | undefined,
+      value: "",
+      name: "",
+      username: "",
+      password: "",
+      error: "",
+      status: undefined as boolean | undefined,
+    },
+  })
+
+  const resetAdd = () => {
+    setStore("addServer", {
+      url: "",
+      name: "",
+      username: DEFAULT_USERNAME,
+      password: "",
+      error: "",
+      showForm: false,
+      status: undefined,
+    })
+  }
+
+  const resetEdit = () => {
+    setStore("editServer", {
+      id: undefined,
+      value: "",
+      name: "",
+      username: "",
+      password: "",
+      error: "",
+      status: undefined,
+    })
+  }
+
+  const resetForm = () => {
+    resetAdd()
+    resetEdit()
+  }
+
+  const startAdd = () => {
+    resetEdit()
+    setStore("addServer", {
+      url: "",
+      name: "",
+      username: DEFAULT_USERNAME,
+      password: "",
+      error: "",
+      showForm: true,
+      status: undefined,
+    })
+  }
+
+  const startEdit = (conn: ServerConnection.Http, initialStatus?: boolean | undefined) => {
+    resetAdd()
+    setStore("editServer", {
+      id: conn.http.url,
+      value: conn.http.url,
+      name: conn.displayName ?? "",
+      username: conn.http.username ?? "",
+      password: conn.http.password ?? "",
+      error: "",
+      status: initialStatus,
+    })
+  }
+
+  const handleAddChange = (value: string) => {
+    setStore("addServer", { url: value, error: "" })
+    void input.previewStatus(value, store.addServer.username, store.addServer.password, (next) =>
+      setStore("addServer", { status: next }),
+    )
+  }
+
+  const handleAddNameChange = (value: string) => {
+    setStore("addServer", { name: value, error: "" })
+  }
+
+  const handleAddUsernameChange = (value: string) => {
+    setStore("addServer", { username: value, error: "" })
+    void input.previewStatus(store.addServer.url, value, store.addServer.password, (next) =>
+      setStore("addServer", { status: next }),
+    )
+  }
+
+  const handleAddPasswordChange = (value: string) => {
+    setStore("addServer", { password: value, error: "" })
+    void input.previewStatus(store.addServer.url, store.addServer.username, value, (next) =>
+      setStore("addServer", { status: next }),
+    )
+  }
+
+  const handleEditChange = (value: string) => {
+    setStore("editServer", { value, error: "" })
+    void input.previewStatus(value, store.editServer.username, store.editServer.password, (next) =>
+      setStore("editServer", { status: next }),
+    )
+  }
+
+  const handleEditNameChange = (value: string) => {
+    setStore("editServer", { name: value, error: "" })
+  }
+
+  const handleEditUsernameChange = (value: string) => {
+    setStore("editServer", { username: value, error: "" })
+    void input.previewStatus(store.editServer.value, value, store.editServer.password, (next) =>
+      setStore("editServer", { status: next }),
+    )
+  }
+
+  const handleEditPasswordChange = (value: string) => {
+    setStore("editServer", { password: value, error: "" })
+    void input.previewStatus(store.editServer.value, store.editServer.username, value, (next) =>
+      setStore("editServer", { status: next }),
+    )
+  }
+
+  const mode = createMemo<"list" | "add" | "edit">(() => {
+    if (store.editServer.id) return "edit"
+    if (store.addServer.showForm) return "add"
+    return "list"
+  })
+
+  const isFormMode = createMemo(() => mode() !== "list")
+  const isAddMode = createMemo(() => mode() === "add")
+
+  const formTitle = createMemo(() => {
+    if (!isFormMode()) return input.language.t("dialog.server.title")
+    return (
+      <div class="flex items-center gap-2 -ml-2">
+        <IconButton icon="arrow-left" variant="ghost" onClick={resetForm} aria-label={input.language.t("common.goBack")} />
+        <span>{isAddMode() ? input.language.t("dialog.server.add.title") : input.language.t("dialog.server.edit.title")}</span>
+      </div>
+    )
+  })
+
+  return {
+    store,
+    setStore,
+    addServer: store.addServer,
+    editServer: store.editServer,
+    resetAdd,
+    resetEdit,
+    resetForm,
+    startAdd,
+    startEdit,
+    handleAddChange,
+    handleAddNameChange,
+    handleAddUsernameChange,
+    handleAddPasswordChange,
+    handleEditChange,
+    handleEditNameChange,
+    handleEditUsernameChange,
+    handleEditPasswordChange,
+    mode,
+    isFormMode,
+    isAddMode,
+    formTitle,
+  }
+}
+
+function useServerMutations(input: {
+  language: ReturnType<typeof useLanguage>
+  checkServerHealth: ReturnType<typeof useCheckServerHealth>
+  server: ReturnType<typeof useServer>
+  platform: ReturnType<typeof usePlatform>
+  select: (conn: ServerConnection.Any, persist?: boolean) => Promise<void>
+  form: ReturnType<typeof useServerFormState>
+}) {
+  const addMutation = useMutation(() => ({
+    mutationFn: async (value: string) => {
+      const normalized = normalizeServerUrl(value)
+      if (!normalized) {
+        input.form.resetAdd()
+        return
+      }
+
+      const conn: ServerConnection.Http = {
+        type: "http",
+        http: { url: normalized },
+      }
+      if (input.form.store.addServer.name.trim()) conn.displayName = input.form.store.addServer.name.trim()
+      if (input.form.store.addServer.password) conn.http.password = input.form.store.addServer.password
+      if (input.form.store.addServer.password && input.form.store.addServer.username) conn.http.username = input.form.store.addServer.username
+      const result = await input.checkServerHealth(conn.http)
+      if (!result.healthy) {
+        input.form.setStore("addServer", { error: input.language.t("dialog.server.add.error") })
+        return
+      }
+
+      input.form.resetAdd()
+      await input.select(conn, true)
+    },
+  }))
+
+  const editMutation = useMutation(() => ({
+    mutationFn: async (inputData: { original: ServerConnection.Any; value: string }) => {
+      if (inputData.original.type !== "http") return
+      const normalized = normalizeServerUrl(inputData.value)
+      if (!normalized) {
+        input.form.resetEdit()
+        return
+      }
+
+      const name = input.form.store.editServer.name.trim() || undefined
+      const username = input.form.store.editServer.username || undefined
+      const password = input.form.store.editServer.password || undefined
+      const existingName = inputData.original.displayName
+      if (
+        normalized === inputData.original.http.url &&
+        name === existingName &&
+        username === inputData.original.http.username &&
+        password === inputData.original.http.password
+      ) {
+        input.form.resetEdit()
+        return
+      }
+
+      const conn: ServerConnection.Http = {
+        type: "http",
+        displayName: name,
+        http: { url: normalized, username, password },
+      }
+      const result = await input.checkServerHealth(conn.http)
+      if (!result.healthy) {
+        input.form.setStore("editServer", { error: input.language.t("dialog.server.add.error") })
+        return
+      }
+      if (normalized === inputData.original.http.url) {
+        input.server.add(conn)
+      } else {
+        replaceServer(inputData.original, conn)
+      }
+
+      input.form.resetEdit()
+    },
+  }))
+
+  const replaceServer = (original: ServerConnection.Http, next: ServerConnection.Http) => {
+    const active = input.server.key
+    const newConn = input.server.add(next)
+    if (!newConn) return
+    const nextActive = active === ServerConnection.key(original) ? ServerConnection.key(newConn) : active
+    if (nextActive) input.server.setActive(nextActive)
+    input.server.remove(ServerConnection.key(original))
+  }
+
+  const handleRemove = async (url: ServerConnection.Key) => {
+    input.server.remove(url)
+    if ((await input.platform.getDefaultServer?.()) === url) {
+      void input.platform.setDefaultServer?.(null)
+    }
+  }
+
+  const submitForm = () => {
+    if (input.form.mode() === "add") {
+      if (addMutation.isPending) return
+      input.form.setStore("addServer", { error: "" })
+      addMutation.mutate(input.form.store.addServer.url)
+      return
+    }
+    const original = editing()
+    if (!original) return
+    if (editMutation.isPending) return
+    input.form.setStore("editServer", { error: "" })
+    editMutation.mutate({ original, value: input.form.store.editServer.value })
+  }
+
+  function editing() {
+    if (!input.form.store.editServer.id) return
+    return input.server.list.find((x) => x.type === "http" && x.http.url === input.form.store.editServer.id)
+  }
+
+  const formBusy = createMemo(() => (input.form.isAddMode() ? addMutation.isPending : editMutation.isPending))
+
+  return {
+    addMutation,
+    editMutation,
+    replaceServer,
+    handleRemove,
+    submitForm,
+    editing,
+    formBusy,
+  }
+}
+
 function ServerForm(props: ServerFormProps) {
   const language = useLanguage()
   const keyDown = (event: KeyboardEvent) => {
@@ -178,131 +477,35 @@ export function DialogSelectServer() {
   const server = useServer()
   const platform = usePlatform()
   const language = useLanguage()
+
   const { defaultKey, canDefault, setDefault } = useDefaultServer()
   const { previewStatus } = useServerPreview()
   const checkServerHealth = useCheckServerHealth()
-  const [store, setStore] = createStore({
+
+  const form = useServerFormState({ language, previewStatus })
+
+  const [statusStore, setStatusStore] = createStore({
     status: {} as Record<ServerConnection.Key, ServerHealth | undefined>,
-    addServer: {
-      url: "",
-      name: "",
-      username: DEFAULT_USERNAME,
-      password: "",
-      error: "",
-      showForm: false,
-      status: undefined as boolean | undefined,
-    },
-    editServer: {
-      id: undefined as string | undefined,
-      value: "",
-      name: "",
-      username: "",
-      password: "",
-      error: "",
-      status: undefined as boolean | undefined,
-    },
   })
 
-  const resetAdd = () => {
-    setStore("addServer", {
-      url: "",
-      name: "",
-      username: DEFAULT_USERNAME,
-      password: "",
-      error: "",
-      showForm: false,
-      status: undefined,
-    })
-  }
-  const resetEdit = () => {
-    setStore("editServer", {
-      id: undefined,
-      value: "",
-      name: "",
-      username: "",
-      password: "",
-      error: "",
-      status: undefined,
-    })
-  }
-
-  const addMutation = useMutation(() => ({
-    mutationFn: async (value: string) => {
-      const normalized = normalizeServerUrl(value)
-      if (!normalized) {
-        resetAdd()
-        return
-      }
-
-      const conn: ServerConnection.Http = {
-        type: "http",
-        http: { url: normalized },
-      }
-      if (store.addServer.name.trim()) conn.displayName = store.addServer.name.trim()
-      if (store.addServer.password) conn.http.password = store.addServer.password
-      if (store.addServer.password && store.addServer.username) conn.http.username = store.addServer.username
-      const result = await checkServerHealth(conn.http)
-      if (!result.healthy) {
-        setStore("addServer", { error: language.t("dialog.server.add.error") })
-        return
-      }
-
-      resetAdd()
-      await select(conn, true)
-    },
-  }))
-
-  const editMutation = useMutation(() => ({
-    mutationFn: async (input: { original: ServerConnection.Any; value: string }) => {
-      if (input.original.type !== "http") return
-      const normalized = normalizeServerUrl(input.value)
-      if (!normalized) {
-        resetEdit()
-        return
-      }
-
-      const name = store.editServer.name.trim() || undefined
-      const username = store.editServer.username || undefined
-      const password = store.editServer.password || undefined
-      const existingName = input.original.displayName
-      if (
-        normalized === input.original.http.url &&
-        name === existingName &&
-        username === input.original.http.username &&
-        password === input.original.http.password
-      ) {
-        resetEdit()
-        return
-      }
-
-      const conn: ServerConnection.Http = {
-        type: "http",
-        displayName: name,
-        http: { url: normalized, username, password },
-      }
-      const result = await checkServerHealth(conn.http)
-      if (!result.healthy) {
-        setStore("editServer", { error: language.t("dialog.server.add.error") })
-        return
-      }
-      if (normalized === input.original.http.url) {
+  const mutations = useServerMutations({
+    language,
+    checkServerHealth,
+    server,
+    platform,
+    select: async (conn: ServerConnection.Any, persist?: boolean) => {
+      if (!persist && statusStore.status[ServerConnection.key(conn)]?.healthy === false) return
+      dialog.close()
+      if (persist && conn.type === "http") {
         server.add(conn)
-      } else {
-        replaceServer(input.original, conn)
+        navigate("/")
+        return
       }
-
-      resetEdit()
+      navigate("/")
+      queueMicrotask(() => server.setActive(ServerConnection.key(conn)))
     },
-  }))
-
-  const replaceServer = (original: ServerConnection.Http, next: ServerConnection.Http) => {
-    const active = server.key
-    const newConn = server.add(next)
-    if (!newConn) return
-    const nextActive = active === ServerConnection.key(original) ? ServerConnection.key(newConn) : active
-    if (nextActive) server.setActive(nextActive)
-    server.remove(ServerConnection.key(original))
-  }
+    form,
+  })
 
   const items = createMemo(() => {
     const current = server.current
@@ -327,7 +530,7 @@ export function DialogSelectServer() {
     return list.slice().sort((a, b) => {
       if (a === active) return -1
       if (b === active) return 1
-      const diff = rank(store.status[ServerConnection.key(a)]) - rank(store.status[ServerConnection.key(b)])
+      const diff = rank(statusStore.status[ServerConnection.key(a)]) - rank(statusStore.status[ServerConnection.key(b)])
       if (diff !== 0) return diff
       return (order.get(a) ?? 0) - (order.get(b) ?? 0)
     })
@@ -340,7 +543,7 @@ export function DialogSelectServer() {
         results[ServerConnection.key(conn)] = await checkServerHealth(conn.http)
       }),
     )
-    setStore("status", reconcile(results))
+    setStatusStore("status", reconcile(results))
   }
 
   createEffect(() => {
@@ -351,7 +554,7 @@ export function DialogSelectServer() {
   })
 
   async function select(conn: ServerConnection.Any, persist?: boolean) {
-    if (!persist && store.status[ServerConnection.key(conn)]?.healthy === false) return
+    if (!persist && statusStore.status[ServerConnection.key(conn)]?.healthy === false) return
     dialog.close()
     if (persist && conn.type === "http") {
       server.add(conn)
@@ -362,168 +565,42 @@ export function DialogSelectServer() {
     queueMicrotask(() => server.setActive(ServerConnection.key(conn)))
   }
 
-  const handleAddChange = (value: string) => {
-    if (addMutation.isPending) return
-    setStore("addServer", { url: value, error: "" })
-    void previewStatus(value, store.addServer.username, store.addServer.password, (next) =>
-      setStore("addServer", { status: next }),
-    )
+  const startEdit = (conn: ServerConnection.Http) => {
+    form.startEdit(conn, statusStore.status[ServerConnection.key(conn)]?.healthy)
   }
-
-  const handleAddNameChange = (value: string) => {
-    if (addMutation.isPending) return
-    setStore("addServer", { name: value, error: "" })
-  }
-
-  const handleAddUsernameChange = (value: string) => {
-    if (addMutation.isPending) return
-    setStore("addServer", { username: value, error: "" })
-    void previewStatus(store.addServer.url, value, store.addServer.password, (next) =>
-      setStore("addServer", { status: next }),
-    )
-  }
-
-  const handleAddPasswordChange = (value: string) => {
-    if (addMutation.isPending) return
-    setStore("addServer", { password: value, error: "" })
-    void previewStatus(store.addServer.url, store.addServer.username, value, (next) =>
-      setStore("addServer", { status: next }),
-    )
-  }
-
-  const handleEditChange = (value: string) => {
-    if (editMutation.isPending) return
-    setStore("editServer", { value, error: "" })
-    void previewStatus(value, store.editServer.username, store.editServer.password, (next) =>
-      setStore("editServer", { status: next }),
-    )
-  }
-
-  const handleEditNameChange = (value: string) => {
-    if (editMutation.isPending) return
-    setStore("editServer", { name: value, error: "" })
-  }
-
-  const handleEditUsernameChange = (value: string) => {
-    if (editMutation.isPending) return
-    setStore("editServer", { username: value, error: "" })
-    void previewStatus(store.editServer.value, value, store.editServer.password, (next) =>
-      setStore("editServer", { status: next }),
-    )
-  }
-
-  const handleEditPasswordChange = (value: string) => {
-    if (editMutation.isPending) return
-    setStore("editServer", { password: value, error: "" })
-    void previewStatus(store.editServer.value, store.editServer.username, value, (next) =>
-      setStore("editServer", { status: next }),
-    )
-  }
-
-  const mode = createMemo<"list" | "add" | "edit">(() => {
-    if (store.editServer.id) return "edit"
-    if (store.addServer.showForm) return "add"
-    return "list"
-  })
 
   const editing = createMemo(() => {
-    if (!store.editServer.id) return
-    return items().find((x) => x.type === "http" && x.http.url === store.editServer.id)
-  })
-
-  const resetForm = () => {
-    resetAdd()
-    resetEdit()
-  }
-
-  const startAdd = () => {
-    resetEdit()
-    setStore("addServer", {
-      showForm: true,
-      url: "",
-      name: "",
-      username: DEFAULT_USERNAME,
-      password: "",
-      error: "",
-      status: undefined,
-    })
-  }
-
-  const startEdit = (conn: ServerConnection.Http) => {
-    resetAdd()
-    setStore("editServer", {
-      id: conn.http.url,
-      value: conn.http.url,
-      name: conn.displayName ?? "",
-      username: conn.http.username ?? "",
-      password: conn.http.password ?? "",
-      error: "",
-      status: store.status[ServerConnection.key(conn)]?.healthy,
-    })
-  }
-
-  const submitForm = () => {
-    if (mode() === "add") {
-      if (addMutation.isPending) return
-      setStore("addServer", { error: "" })
-      addMutation.mutate(store.addServer.url)
-      return
-    }
-    const original = editing()
-    if (!original) return
-    if (editMutation.isPending) return
-    setStore("editServer", { error: "" })
-    editMutation.mutate({ original, value: store.editServer.value })
-  }
-
-  const isFormMode = createMemo(() => mode() !== "list")
-  const isAddMode = createMemo(() => mode() === "add")
-  const formBusy = createMemo(() => (isAddMode() ? addMutation.isPending : editMutation.isPending))
-
-  const formTitle = createMemo(() => {
-    if (!isFormMode()) return language.t("dialog.server.title")
-    return (
-      <div class="flex items-center gap-2 -ml-2">
-        <IconButton icon="arrow-left" variant="ghost" onClick={resetForm} aria-label={language.t("common.goBack")} />
-        <span>{isAddMode() ? language.t("dialog.server.add.title") : language.t("dialog.server.edit.title")}</span>
-      </div>
-    )
+    if (!form.editServer.id) return
+    return items().find((x) => x.type === "http" && x.http.url === form.editServer.id)
   })
 
   createEffect(() => {
-    if (!store.editServer.id) return
+    if (!form.editServer.id) return
     if (editing()) return
-    resetEdit()
+    form.resetEdit()
   })
 
-  async function handleRemove(url: ServerConnection.Key) {
-    server.remove(url)
-    if ((await platform.getDefaultServer?.()) === url) {
-      void platform.setDefaultServer?.(null)
-    }
-  }
-
   return (
-    <Dialog title={formTitle()}>
+    <Dialog title={form.formTitle()}>
       <div class="flex flex-1 min-h-0 flex-col gap-2">
         <Show
-          when={!isFormMode()}
+          when={!form.isFormMode()}
           fallback={
             <ServerForm
-              value={isAddMode() ? store.addServer.url : store.editServer.value}
-              name={isAddMode() ? store.addServer.name : store.editServer.name}
-              username={isAddMode() ? store.addServer.username : store.editServer.username}
-              password={isAddMode() ? store.addServer.password : store.editServer.password}
+              value={form.isAddMode() ? form.addServer.url : form.editServer.value}
+              name={form.isAddMode() ? form.addServer.name : form.editServer.name}
+              username={form.isAddMode() ? form.addServer.username : form.editServer.username}
+              password={form.isAddMode() ? form.addServer.password : form.editServer.password}
               placeholder={language.t("dialog.server.add.placeholder")}
-              busy={formBusy()}
-              error={isAddMode() ? store.addServer.error : store.editServer.error}
-              status={isAddMode() ? store.addServer.status : store.editServer.status}
-              onChange={isAddMode() ? handleAddChange : handleEditChange}
-              onNameChange={isAddMode() ? handleAddNameChange : handleEditNameChange}
-              onUsernameChange={isAddMode() ? handleAddUsernameChange : handleEditUsernameChange}
-              onPasswordChange={isAddMode() ? handleAddPasswordChange : handleEditPasswordChange}
-              onSubmit={submitForm}
-              onBack={resetForm}
+              busy={mutations.formBusy()}
+              error={form.isAddMode() ? form.addServer.error : form.editServer.error}
+              status={form.isAddMode() ? form.addServer.status : form.editServer.status}
+              onChange={form.isAddMode() ? form.handleAddChange : form.handleEditChange}
+              onNameChange={form.isAddMode() ? form.handleAddNameChange : form.handleEditNameChange}
+              onUsernameChange={form.isAddMode() ? form.handleAddUsernameChange : form.handleEditUsernameChange}
+              onPasswordChange={form.isAddMode() ? form.handleAddPasswordChange : form.handleEditPasswordChange}
+              onSubmit={mutations.submitForm}
+              onBack={form.resetForm}
             />
           }
         >
@@ -547,12 +624,12 @@ export function DialogSelectServer() {
               return (
                 <div class="flex items-center gap-3 min-w-0 flex-1 w-full group/item">
                   <div class="flex flex-col h-full items-start w-5">
-                    <ServerHealthIndicator health={store.status[key]} />
+                    <ServerHealthIndicator health={statusStore.status[key]} />
                   </div>
                   <ServerRow
                     conn={i}
-                    dimmed={store.status[key]?.healthy === false}
-                    status={store.status[key]}
+                    dimmed={statusStore.status[key]?.healthy === false}
+                    status={statusStore.status[key]}
                     class="flex items-center gap-3 min-w-0 flex-1"
                     badge={
                       <Show when={defaultKey() === ServerConnection.key(i)}>
@@ -604,7 +681,7 @@ export function DialogSelectServer() {
                             </Show>
                             <DropdownMenu.Separator />
                             <DropdownMenu.Item
-                              onSelect={() => handleRemove(ServerConnection.key(i))}
+                              onSelect={() => mutations.handleRemove(ServerConnection.key(i))}
                               class="text-text-on-critical-base hover:bg-surface-critical-weak"
                             >
                               <DropdownMenu.ItemLabel>{language.t("dialog.server.menu.delete")}</DropdownMenu.ItemLabel>
@@ -622,26 +699,26 @@ export function DialogSelectServer() {
 
         <div class="shrink-0 px-5 pb-5">
           <Show
-            when={isFormMode()}
+            when={form.isFormMode()}
             fallback={
               <Button
                 variant="secondary"
                 icon="plus-small"
                 size="large"
-                onClick={startAdd}
+                onClick={form.startAdd}
                 class="py-1.5 pl-1.5 pr-3 flex items-center gap-1.5"
               >
                 {language.t("dialog.server.add.button")}
               </Button>
             }
           >
-            <Button variant="primary" size="large" onClick={submitForm} disabled={formBusy()} class="px-3 py-1.5">
-              {formBusy() ? (
+            <Button variant="primary" size="large" onClick={mutations.submitForm} disabled={mutations.formBusy()} class="px-3 py-1.5">
+              {mutations.formBusy() ? (
                 <div class="flex items-center gap-2">
                   <Spinner class="size-4" />
                   <span>{language.t("dialog.server.add.checking")}</span>
                 </div>
-              ) : isAddMode() ? (
+              ) : form.isAddMode() ? (
                 language.t("dialog.server.add.button")
               ) : (
                 language.t("common.save")

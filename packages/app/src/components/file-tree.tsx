@@ -25,6 +25,39 @@ function pathToFileUrl(filepath: string): string {
   return `file://${encodeFilePath(filepath)}`
 }
 
+/** Normalize a path for use as a tree key: strip root, trailing slashes, unify separators. */
+export function normalizePath(normalize: (p: string) => string, p: string): string {
+  return normalize(p).replace(/[\\/]+$/, "").replaceAll("\\", "/")
+}
+
+/**
+ * Build a filter object from `allowed` paths.
+ * Extracts parent directories so intermediate nodes are included in filtered trees.
+ */
+export function buildFilter(
+  key: (p: string) => string,
+  allowed: readonly string[],
+): { files: Set<string>; dirs: Set<string> } | undefined {
+  if (allowed.length === 0) return
+
+  const files = new Set(allowed)
+  const dirs = new Set<string>()
+
+  for (const item of allowed) {
+    const path = key(item)
+    let idx = 0
+    while (true) {
+      idx = path.indexOf("/", idx)
+      if (idx === -1) break
+      const dir = path.slice(0, idx)
+      if (dir) dirs.add(dir)
+      idx++
+    }
+  }
+
+  return { files, dirs }
+}
+
 type Kind = "add" | "del" | "mix"
 
 type Filter = {
@@ -226,21 +259,7 @@ export default function FileTree(props: {
     const allowed = props.allowed
     if (!allowed) return
 
-    const files = new Set(allowed)
-    const dirs = new Set<string>()
-
-    for (const item of allowed) {
-      let idx = 0
-      while (true) {
-        idx = item.indexOf("/", idx)
-        if (idx === -1) break
-        const dir = item.slice(0, idx)
-        if (dir) dirs.add(dir)
-        idx++
-      }
-    }
-
-    return { files, dirs }
+    return buildFilter(key, allowed)
   })
 
   const marks = createMemo(() => {

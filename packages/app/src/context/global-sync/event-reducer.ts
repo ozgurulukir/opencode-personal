@@ -90,6 +90,318 @@ export function cleanupDroppedSessionCaches(
   )
 }
 
+function sessionUpdatedAt(session: Session) {
+  return session.time.updated ?? session.time.created
+}
+
+function handleSessionCreated(input: {
+  store: Store<State>
+  setStore: SetStoreFunction<State>
+  info: Session
+  setSessionTodo?: (sessionID: string, todos: Todo[] | undefined) => void
+}) {
+  const result = Binary.search(input.store.session, input.info.id, (s) => s.id)
+  if (result.found) {
+    input.setStore("session", result.index, reconcile(input.info))
+    return
+  }
+  const next = input.store.session.slice()
+  next.splice(result.index, 0, input.info)
+  const trimmed = trimSessions(next, { limit: input.store.limit, permission: input.store.permission })
+  input.setStore("session", reconcile(trimmed, { key: "id" }))
+  cleanupDroppedSessionCaches(input.store, input.setStore, trimmed, input.setSessionTodo)
+  if (!input.info.parentID) input.setStore("sessionTotal", (value) => value + 1)
+}
+
+function handleSessionUpdated(input: {
+  store: Store<State>
+  setStore: SetStoreFunction<State>
+  info: Session
+  setSessionTodo?: (sessionID: string, todos: Todo[] | undefined) => void
+}) {
+  const result = Binary.search(input.store.session, input.info.id, (s) => s.id)
+  if (input.info.time.archived) {
+    if (result.found) {
+      input.setStore(
+        "session",
+        produce((draft) => {
+          draft.splice(result.index, 1)
+        }),
+      )
+    }
+    cleanupSessionCaches(input.setStore, input.info.id, input.setSessionTodo)
+    if (input.info.parentID) return
+    input.setStore("sessionTotal", (value) => Math.max(0, value - 1))
+    return
+  }
+  if (result.found) {
+    input.setStore("session", result.index, reconcile(input.info))
+    return
+  }
+  const next = input.store.session.slice()
+  next.splice(result.index, 0, input.info)
+  const trimmed = trimSessions(next, { limit: input.store.limit, permission: input.store.permission })
+  input.setStore("session", reconcile(trimmed, { key: "id" }))
+  cleanupDroppedSessionCaches(input.store, input.setStore, trimmed, input.setSessionTodo)
+}
+
+function handleSessionDeleted(input: {
+  store: Store<State>
+  setStore: SetStoreFunction<State>
+  info: Session
+  setSessionTodo?: (sessionID: string, todos: Todo[] | undefined) => void
+}) {
+  const result = Binary.search(input.store.session, input.info.id, (s) => s.id)
+  if (result.found) {
+    input.setStore(
+      "session",
+      produce((draft) => {
+        draft.splice(result.index, 1)
+      }),
+    )
+  }
+  cleanupSessionCaches(input.setStore, input.info.id, input.setSessionTodo)
+  if (input.info.parentID) return
+  input.setStore("sessionTotal", (value) => Math.max(0, value - 1))
+}
+
+function handleSessionDiff(input: {
+  setStore: SetStoreFunction<State>
+  sessionID: string
+  diff: SnapshotFileDiff[]
+}) {
+  input.setStore("session_diff", input.sessionID, reconcile(list(input.diff), { key: "file" }))
+}
+
+function handleTodoUpdated(input: {
+  setStore: SetStoreFunction<State>
+  sessionID: string
+  todos: Todo[]
+  setSessionTodo?: (sessionID: string, todos: Todo[] | undefined) => void
+}) {
+  input.setStore("todo", input.sessionID, reconcile(input.todos, { key: "id" }))
+  input.setSessionTodo?.(input.sessionID, input.todos)
+}
+
+function handleSessionStatus(input: {
+  setStore: SetStoreFunction<State>
+  sessionID: string
+  status: SessionStatus
+}) {
+  input.setStore("session_status", input.sessionID, reconcile(input.status))
+}
+
+function handleMessageUpdated(input: {
+  store: Store<State>
+  setStore: SetStoreFunction<State>
+  info: Message
+}) {
+  const messages = input.store.message[input.info.sessionID]
+  if (!messages) {
+    input.setStore("message", input.info.sessionID, [input.info])
+    return
+  }
+  const result = Binary.search(messages, input.info.id, (m) => m.id)
+  if (result.found) {
+    input.setStore("message", input.info.sessionID, result.index, reconcile(input.info))
+    return
+  }
+  input.setStore(
+    "message",
+    input.info.sessionID,
+    produce((draft) => {
+      draft.splice(result.index, 0, input.info)
+    }),
+  )
+}
+
+function handleMessageRemoved(input: {
+  store: Store<State>
+  setStore: SetStoreFunction<State>
+  sessionID: string
+  messageID: string
+}) {
+  input.setStore(
+    produce((draft) => {
+      const messages = draft.message[input.sessionID]
+      if (messages) {
+        const result = Binary.search(messages, input.messageID, (m) => m.id)
+        if (result.found) messages.splice(result.index, 1)
+      }
+      delete draft.part[input.messageID]
+    }),
+  )
+}
+
+function handleMessagePartUpdated(input: {
+  store: Store<State>
+  setStore: SetStoreFunction<State>
+  part: Part
+}) {
+  if (SKIP_PARTS.has(input.part.type)) return
+  const parts = input.store.part[input.part.messageID]
+  if (!parts) {
+    input.setStore("part", input.part.messageID, [input.part])
+    return
+  }
+  const result = Binary.search(parts, input.part.id, (p) => p.id)
+  if (result.found) {
+    input.setStore("part", input.part.messageID, result.index, reconcile(input.part))
+    return
+  }
+  input.setStore(
+    "part",
+    input.part.messageID,
+    produce((draft) => {
+      draft.splice(result.index, 0, input.part)
+    }),
+  )
+}
+
+function handleMessagePartRemoved(input: {
+  store: Store<State>
+  setStore: SetStoreFunction<State>
+  messageID: string
+  partID: string
+}) {
+  const parts = input.store.part[input.messageID]
+  if (!parts) return
+  const result = Binary.search(parts, input.partID, (p) => p.id)
+  if (!result.found) return
+  input.setStore(
+    produce((draft: any) => {
+      const list = draft.part[input.messageID]
+      if (!list) return
+      const next = Binary.search(list as Part[], input.partID, (p) => p.id)
+      if (!next.found) return
+      list.splice(next.index, 1)
+      if (list.length === 0) delete draft.part[input.messageID]
+    }),
+  )
+}
+
+function handleMessagePartDelta(input: {
+  store: Store<State>
+  setStore: SetStoreFunction<State>
+  messageID: string
+  partID: string
+  field: string
+  delta: string
+}) {
+  const parts = input.store.part[input.messageID]
+  if (!parts) return
+  const result = Binary.search(parts, input.partID, (p) => p.id)
+  if (!result.found) return
+  input.setStore(
+    "part",
+    input.messageID,
+    produce((draft) => {
+      const part = draft[result.index]
+      const field = input.field as keyof typeof part
+      const existing = part[field] as string | undefined
+      ;(part[field] as string) = (existing ?? "") + input.delta
+    }),
+  )
+}
+
+function handleVcsBranchUpdated(input: {
+  store: Store<State>
+  setStore: SetStoreFunction<State>
+  branch?: string
+  vcsCache?: VcsCache
+}) {
+  if (input.store.vcs?.branch === input.branch) return
+  const next = { ...input.store.vcs, branch: input.branch }
+  input.setStore("vcs", next)
+  if (input.vcsCache) input.vcsCache.setStore("value", next)
+}
+
+function handlePermissionAsked(input: {
+  store: Store<State>
+  setStore: SetStoreFunction<State>
+  permission: PermissionRequest
+}) {
+  const permissions = input.store.permission[input.permission.sessionID]
+  if (!permissions) {
+    input.setStore("permission", input.permission.sessionID, [input.permission])
+    return
+  }
+  const result = Binary.search(permissions, input.permission.id, (p) => p.id)
+  if (result.found) {
+    input.setStore("permission", input.permission.sessionID, result.index, reconcile(input.permission))
+    return
+  }
+  input.setStore(
+    "permission",
+    input.permission.sessionID,
+    produce((draft) => {
+      draft.splice(result.index, 0, input.permission)
+    }),
+  )
+}
+
+function handlePermissionReplied(input: {
+  store: Store<State>
+  setStore: SetStoreFunction<State>
+  sessionID: string
+  requestID: string
+}) {
+  const permissions = input.store.permission[input.sessionID]
+  if (!permissions) return
+  const result = Binary.search(permissions, input.requestID, (p) => p.id)
+  if (!result.found) return
+  input.setStore(
+    "permission",
+    input.sessionID,
+    produce((draft) => {
+      draft.splice(result.index, 1)
+    }),
+  )
+}
+
+function handleQuestionAsked(input: {
+  store: Store<State>
+  setStore: SetStoreFunction<State>
+  question: QuestionRequest
+}) {
+  const questions = input.store.question[input.question.sessionID]
+  if (!questions) {
+    input.setStore("question", input.question.sessionID, [input.question])
+    return
+  }
+  const result = Binary.search(questions, input.question.id, (q) => q.id)
+  if (result.found) {
+    input.setStore("question", input.question.sessionID, result.index, reconcile(input.question))
+    return
+  }
+  input.setStore(
+    "question",
+    input.question.sessionID,
+    produce((draft) => {
+      draft.splice(result.index, 0, input.question)
+    }),
+  )
+}
+
+function handleQuestionRepliedRejected(input: {
+  store: Store<State>
+  setStore: SetStoreFunction<State>
+  sessionID: string
+  requestID: string
+}) {
+  const questions = input.store.question[input.sessionID]
+  if (!questions) return
+  const result = Binary.search(questions, input.requestID, (q) => q.id)
+  if (!result.found) return
+  input.setStore(
+    "question",
+    input.sessionID,
+    produce((draft) => {
+      draft.splice(result.index, 1)
+    }),
+  )
+}
+
 export function applyDirectoryEvent(input: {
   event: { type: string; properties?: unknown }
   store: Store<State>
@@ -107,253 +419,153 @@ export function applyDirectoryEvent(input: {
       return
     }
     case "session.created": {
-      const info = (event.properties as { info: Session }).info
-      const result = Binary.search(input.store.session, info.id, (s) => s.id)
-      if (result.found) {
-        input.setStore("session", result.index, reconcile(info))
-        break
-      }
-      const next = input.store.session.slice()
-      next.splice(result.index, 0, info)
-      const trimmed = trimSessions(next, { limit: input.store.limit, permission: input.store.permission })
-      input.setStore("session", reconcile(trimmed, { key: "id" }))
-      cleanupDroppedSessionCaches(input.store, input.setStore, trimmed, input.setSessionTodo)
-      if (!info.parentID) input.setStore("sessionTotal", (value) => value + 1)
+      handleSessionCreated({
+        store: input.store,
+        setStore: input.setStore,
+        info: (event.properties as { info: Session }).info,
+        setSessionTodo: input.setSessionTodo,
+      })
       break
     }
     case "session.updated": {
-      const info = (event.properties as { info: Session }).info
-      const result = Binary.search(input.store.session, info.id, (s) => s.id)
-      if (info.time.archived) {
-        if (result.found) {
-          input.setStore(
-            "session",
-            produce((draft) => {
-              draft.splice(result.index, 1)
-            }),
-          )
-        }
-        cleanupSessionCaches(input.setStore, info.id, input.setSessionTodo)
-        if (info.parentID) break
-        input.setStore("sessionTotal", (value) => Math.max(0, value - 1))
-        break
-      }
-      if (result.found) {
-        input.setStore("session", result.index, reconcile(info))
-        break
-      }
-      const next = input.store.session.slice()
-      next.splice(result.index, 0, info)
-      const trimmed = trimSessions(next, { limit: input.store.limit, permission: input.store.permission })
-      input.setStore("session", reconcile(trimmed, { key: "id" }))
-      cleanupDroppedSessionCaches(input.store, input.setStore, trimmed, input.setSessionTodo)
+      handleSessionUpdated({
+        store: input.store,
+        setStore: input.setStore,
+        info: (event.properties as { info: Session }).info,
+        setSessionTodo: input.setSessionTodo,
+      })
       break
     }
     case "session.deleted": {
-      const info = (event.properties as { info: Session }).info
-      const result = Binary.search(input.store.session, info.id, (s) => s.id)
-      if (result.found) {
-        input.setStore(
-          "session",
-          produce((draft) => {
-            draft.splice(result.index, 1)
-          }),
-        )
-      }
-      cleanupSessionCaches(input.setStore, info.id, input.setSessionTodo)
-      if (info.parentID) break
-      input.setStore("sessionTotal", (value) => Math.max(0, value - 1))
+      handleSessionDeleted({
+        store: input.store,
+        setStore: input.setStore,
+        info: (event.properties as { info: Session }).info,
+        setSessionTodo: input.setSessionTodo,
+      })
       break
     }
     case "session.diff": {
       const props = event.properties as { sessionID: string; diff: SnapshotFileDiff[] }
-      input.setStore("session_diff", props.sessionID, reconcile(list(props.diff), { key: "file" }))
+      handleSessionDiff({
+        setStore: input.setStore,
+        sessionID: props.sessionID,
+        diff: props.diff,
+      })
       break
     }
     case "todo.updated": {
       const props = event.properties as { sessionID: string; todos: Todo[] }
-      input.setStore("todo", props.sessionID, reconcile(props.todos, { key: "id" }))
-      input.setSessionTodo?.(props.sessionID, props.todos)
+      handleTodoUpdated({
+        setStore: input.setStore,
+        sessionID: props.sessionID,
+        todos: props.todos,
+        setSessionTodo: input.setSessionTodo,
+      })
       break
     }
     case "session.status": {
       const props = event.properties as { sessionID: string; status: SessionStatus }
-      input.setStore("session_status", props.sessionID, reconcile(props.status))
+      handleSessionStatus({
+        setStore: input.setStore,
+        sessionID: props.sessionID,
+        status: props.status,
+      })
       break
     }
     case "message.updated": {
-      const info = clean((event.properties as { info: Message }).info)
-      const messages = input.store.message[info.sessionID]
-      if (!messages) {
-        input.setStore("message", info.sessionID, [info])
-        break
-      }
-      const result = Binary.search(messages, info.id, (m) => m.id)
-      if (result.found) {
-        input.setStore("message", info.sessionID, result.index, reconcile(info))
-        break
-      }
-      input.setStore(
-        "message",
-        info.sessionID,
-        produce((draft) => {
-          draft.splice(result.index, 0, info)
-        }),
-      )
+      handleMessageUpdated({
+        store: input.store,
+        setStore: input.setStore,
+        info: clean((event.properties as { info: Message }).info),
+      })
       break
     }
     case "message.removed": {
       const props = event.properties as { sessionID: string; messageID: string }
-      input.setStore(
-        produce((draft) => {
-          const messages = draft.message[props.sessionID]
-          if (messages) {
-            const result = Binary.search(messages, props.messageID, (m) => m.id)
-            if (result.found) messages.splice(result.index, 1)
-          }
-          delete draft.part[props.messageID]
-        }),
-      )
+      handleMessageRemoved({
+        store: input.store,
+        setStore: input.setStore,
+        sessionID: props.sessionID,
+        messageID: props.messageID,
+      })
       break
     }
     case "message.part.updated": {
-      const part = (event.properties as { part: Part }).part
-      if (SKIP_PARTS.has(part.type)) break
-      const parts = input.store.part[part.messageID]
-      if (!parts) {
-        input.setStore("part", part.messageID, [part])
-        break
-      }
-      const result = Binary.search(parts, part.id, (p) => p.id)
-      if (result.found) {
-        input.setStore("part", part.messageID, result.index, reconcile(part))
-        break
-      }
-      input.setStore(
-        "part",
-        part.messageID,
-        produce((draft) => {
-          draft.splice(result.index, 0, part)
-        }),
-      )
+      handleMessagePartUpdated({
+        store: input.store,
+        setStore: input.setStore,
+        part: (event.properties as { part: Part }).part,
+      })
       break
     }
     case "message.part.removed": {
       const props = event.properties as { messageID: string; partID: string }
-      const parts = input.store.part[props.messageID]
-      if (!parts) break
-      const result = Binary.search(parts, props.partID, (p) => p.id)
-      if (result.found) {
-        input.setStore(
-          produce((draft) => {
-            const list = draft.part[props.messageID]
-            if (!list) return
-            const next = Binary.search(list, props.partID, (p) => p.id)
-            if (!next.found) return
-            list.splice(next.index, 1)
-            if (list.length === 0) delete draft.part[props.messageID]
-          }),
-        )
-      }
+      handleMessagePartRemoved({
+        store: input.store,
+        setStore: input.setStore,
+        messageID: props.messageID,
+        partID: props.partID,
+      })
       break
     }
     case "message.part.delta": {
       const props = event.properties as { messageID: string; partID: string; field: string; delta: string }
-      const parts = input.store.part[props.messageID]
-      if (!parts) break
-      const result = Binary.search(parts, props.partID, (p) => p.id)
-      if (!result.found) break
-      input.setStore(
-        "part",
-        props.messageID,
-        produce((draft) => {
-          const part = draft[result.index]
-          const field = props.field as keyof typeof part
-          const existing = part[field] as string | undefined
-          ;(part[field] as string) = (existing ?? "") + props.delta
-        }),
-      )
+      handleMessagePartDelta({
+        store: input.store,
+        setStore: input.setStore,
+        messageID: props.messageID,
+        partID: props.partID,
+        field: props.field,
+        delta: props.delta,
+      })
       break
     }
     case "vcs.branch.updated": {
       const props = event.properties as { branch?: string }
-      if (input.store.vcs?.branch === props.branch) break
-      const next = { ...input.store.vcs, branch: props.branch }
-      input.setStore("vcs", next)
-      if (input.vcsCache) input.vcsCache.setStore("value", next)
+      handleVcsBranchUpdated({
+        store: input.store,
+        setStore: input.setStore,
+        branch: props.branch,
+        vcsCache: input.vcsCache,
+      })
       break
     }
     case "permission.asked": {
-      const permission = event.properties as PermissionRequest
-      const permissions = input.store.permission[permission.sessionID]
-      if (!permissions) {
-        input.setStore("permission", permission.sessionID, [permission])
-        break
-      }
-      const result = Binary.search(permissions, permission.id, (p) => p.id)
-      if (result.found) {
-        input.setStore("permission", permission.sessionID, result.index, reconcile(permission))
-        break
-      }
-      input.setStore(
-        "permission",
-        permission.sessionID,
-        produce((draft) => {
-          draft.splice(result.index, 0, permission)
-        }),
-      )
+      handlePermissionAsked({
+        store: input.store,
+        setStore: input.setStore,
+        permission: event.properties as PermissionRequest,
+      })
       break
     }
     case "permission.replied": {
       const props = event.properties as { sessionID: string; requestID: string }
-      const permissions = input.store.permission[props.sessionID]
-      if (!permissions) break
-      const result = Binary.search(permissions, props.requestID, (p) => p.id)
-      if (!result.found) break
-      input.setStore(
-        "permission",
-        props.sessionID,
-        produce((draft) => {
-          draft.splice(result.index, 1)
-        }),
-      )
+      handlePermissionReplied({
+        store: input.store,
+        setStore: input.setStore,
+        sessionID: props.sessionID,
+        requestID: props.requestID,
+      })
       break
     }
     case "question.asked": {
-      const question = event.properties as QuestionRequest
-      const questions = input.store.question[question.sessionID]
-      if (!questions) {
-        input.setStore("question", question.sessionID, [question])
-        break
-      }
-      const result = Binary.search(questions, question.id, (q) => q.id)
-      if (result.found) {
-        input.setStore("question", question.sessionID, result.index, reconcile(question))
-        break
-      }
-      input.setStore(
-        "question",
-        question.sessionID,
-        produce((draft) => {
-          draft.splice(result.index, 0, question)
-        }),
-      )
+      handleQuestionAsked({
+        store: input.store,
+        setStore: input.setStore,
+        question: event.properties as QuestionRequest,
+      })
       break
     }
     case "question.replied":
     case "question.rejected": {
       const props = event.properties as { sessionID: string; requestID: string }
-      const questions = input.store.question[props.sessionID]
-      if (!questions) break
-      const result = Binary.search(questions, props.requestID, (q) => q.id)
-      if (!result.found) break
-      input.setStore(
-        "question",
-        props.sessionID,
-        produce((draft) => {
-          draft.splice(result.index, 1)
-        }),
-      )
+      handleQuestionRepliedRejected({
+        store: input.store,
+        setStore: input.setStore,
+        sessionID: props.sessionID,
+        requestID: props.requestID,
+      })
       break
     }
     case "lsp.updated": {

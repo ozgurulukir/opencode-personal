@@ -48,7 +48,8 @@ import {
   type PromptHistoryStoredEntry,
   promptLength,
 } from "./prompt-input/history"
-import { createPromptSubmit, type FollowupDraft } from "./prompt-input/submit"
+import { createPromptSubmit } from "./prompt-input/submit"
+import { type FollowupDraft } from "./prompt-input/sendFollowupDraft"
 import { PromptPopover, type AtOption, type SlashCommand } from "./prompt-input/slash-popover"
 import { PromptContextItems } from "./prompt-input/context-items"
 import { PromptImageAttachments } from "./prompt-input/image-attachments"
