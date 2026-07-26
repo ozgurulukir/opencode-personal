@@ -20,6 +20,7 @@ const storedSessions: Record<string, Array<{ id: string; title?: string }>> = {}
 const promoted: Array<{ directory: string; sessionID: string }> = []
 const sentShell: string[] = []
 const syncedDirectories: string[] = []
+const todoSetCalls: Array<{ sessionID: string; value: unknown }> = []
 
 let params: { id?: string } = {}
 let selected = "/repo/worktree-a"
@@ -164,6 +165,11 @@ beforeAll(async () => {
 
   mock.module("@/context/global-sync", () => ({
     useGlobalSync: () => ({
+      todo: {
+        set: (sessionID: string, value: unknown) => {
+          todoSetCalls.push({ sessionID, value })
+        },
+      },
       child: (directory: string) => {
         syncedDirectories.push(directory)
         storedSessions[directory] ??= []
@@ -211,6 +217,7 @@ beforeEach(() => {
   params = {}
   sentShell.length = 0
   syncedDirectories.length = 0
+  todoSetCalls.length = 0
   selected = "/repo/worktree-a"
   variant = undefined
   for (const key of Object.keys(storedSessions)) delete storedSessions[key]
@@ -341,5 +348,64 @@ describe("prompt submit worktree selection", () => {
 
     expect(storedSessions["/repo/worktree-a"]).toEqual([{ id: "session-1", title: "New session 1" }])
     expect(optimisticSeeded).toEqual([true])
+  })
+})
+
+describe("prompt submit abort", () => {
+  test("returns early when there is no session id", async () => {
+    params = {}
+    const submit = createPromptSubmit({
+      info: () => undefined,
+      imageAttachments: () => [],
+      commentCount: () => 0,
+      autoAccept: () => false,
+      mode: () => "normal",
+      working: () => false,
+      editor: () => undefined,
+      queueScroll: () => undefined,
+      promptLength: (value) => value.reduce((sum, part) => sum + ("content" in part ? part.content.length : 0), 0),
+      addToHistory: () => undefined,
+      resetHistoryNavigation: () => undefined,
+      setMode: () => undefined,
+      setPopover: () => undefined,
+      newSessionWorktree: () => undefined,
+      onNewSessionWorktreeReset: () => undefined,
+      onQueue: () => undefined,
+      onAbort: () => undefined,
+      onSubmit: () => undefined,
+    })
+
+    const result = await submit.abort()
+    expect(result).toBeUndefined()
+    expect(todoSetCalls).toEqual([])
+  })
+
+  test("clears todo and calls session abort when session exists", async () => {
+    params = { id: "session-1" }
+    const submit = createPromptSubmit({
+      info: () => ({ id: "session-1" }),
+      imageAttachments: () => [],
+      commentCount: () => 0,
+      autoAccept: () => false,
+      mode: () => "normal",
+      working: () => false,
+      editor: () => undefined,
+      queueScroll: () => undefined,
+      promptLength: (value) => value.reduce((sum, part) => sum + ("content" in part ? part.content.length : 0), 0),
+      addToHistory: () => undefined,
+      resetHistoryNavigation: () => undefined,
+      setMode: () => undefined,
+      setPopover: () => undefined,
+      newSessionWorktree: () => undefined,
+      onNewSessionWorktreeReset: () => undefined,
+      onQueue: () => undefined,
+      onAbort: () => undefined,
+      onSubmit: () => undefined,
+    })
+
+    const result = await submit.abort()
+
+    expect(todoSetCalls).toEqual([{ sessionID: "session-1", value: [] }])
+    expect(syncedDirectories).toContain("/repo/main")
   })
 })

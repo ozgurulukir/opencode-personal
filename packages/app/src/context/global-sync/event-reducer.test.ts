@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import type { Message, Part, PermissionRequest, Project, QuestionRequest, Session } from "@opencode-ai/sdk/v2/client"
+import type { Message, Part, PermissionRequest, Project, QuestionRequest, Session, SnapshotFileDiff, Todo } from "@opencode-ai/sdk/v2/client"
 import { createStore } from "solid-js/store"
 import type { State } from "./types"
 import { applyDirectoryEvent, applyGlobalEvent, cleanupDroppedSessionCaches } from "./event-reducer"
@@ -129,6 +129,38 @@ describe("applyGlobalEvent", () => {
     })
 
     expect(refreshCount).toBe(1)
+  })
+
+  test("upserts existing project on project.updated", () => {
+    const project = [{ id: "a", name: "old" }] as Project[]
+    const setCalls: unknown[] = []
+    applyGlobalEvent({
+      event: { type: "project.updated", properties: { id: "a", name: "new" } },
+      project,
+      refresh() {},
+      setGlobalProject(next) {
+        setCalls.push(typeof next === "function" ? next(project) : next)
+      },
+    })
+
+    expect(project[0].name).toBe("new")
+    expect(setCalls).toHaveLength(1)
+  })
+
+  test("inserts missing project on project.updated", () => {
+    const project = [{ id: "a" }] as Project[]
+    const setCalls: unknown[] = []
+    applyGlobalEvent({
+      event: { type: "project.updated", properties: { id: "b" } },
+      project,
+      refresh() {},
+      setGlobalProject(next) {
+        setCalls.push(typeof next === "function" ? next(project) : next)
+      },
+    })
+
+    expect(project.map((x) => x.id)).toEqual(["a", "b"])
+    expect(setCalls).toHaveLength(1)
   })
 })
 
@@ -515,6 +547,176 @@ describe("applyDirectoryEvent", () => {
 
     expect(store.vcs).toEqual({ branch: "feature/test", default_branch: "main" })
     expect(cacheStore.value).toEqual({ branch: "feature/test", default_branch: "main" })
+  })
+
+  test("reconciles session.diff by file key", () => {
+    const sessionID = "ses_1"
+    const diffA = { file: "a.ts", status: "modified" as const, additions: 1, deletions: 0, patch: "p" } as SnapshotFileDiff
+    const diffB = { file: "b.ts", status: "added" as const, additions: 0, deletions: 1, patch: "p" } as SnapshotFileDiff
+    const [store, setStore] = createStore(
+      baseState({
+        session_diff: { [sessionID]: [diffA] },
+      }),
+    )
+
+    applyDirectoryEvent({
+      event: { type: "session.diff", properties: { sessionID, diff: [diffB] } },
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+
+    expect(store.session_diff[sessionID]?.map((x) => x.file)).toEqual(["b.ts"])
+  })
+
+  test("replaces todo list and calls setSessionTodo on todo.updated", () => {
+    const sessionID = "ses_1"
+    const todos: (string | undefined)[] = []
+    const [store, setStore] = createStore(
+      baseState({
+        todo: { [sessionID]: [{ content: "old", status: "open", priority: "0" } as Todo] },
+      }),
+    )
+
+    applyDirectoryEvent({
+      event: { type: "todo.updated", properties: { sessionID, todos: [{ content: "new", status: "open", priority: "0" } as Todo] } },
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+      setSessionTodo(sessionID_, next) {
+        todos.push(sessionID_)
+        todos.push(next?.[0]?.content)
+      },
+    })
+
+    expect(store.todo[sessionID]?.map((x) => x.content)).toEqual(["new"])
+    expect(todos).toEqual([sessionID, "new"])
+  })
+
+  test("reconciles session.status", () => {
+    const sessionID = "ses_1"
+    const [store, setStore] = createStore(
+      baseState({
+        session_status: { [sessionID]: { type: "idle" } },
+      }),
+    )
+
+    applyDirectoryEvent({
+      event: { type: "session.status", properties: { sessionID, status: { type: "busy" } } },
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+
+    expect(store.session_status[sessionID]).toEqual({ type: "busy" })
+  })
+
+  test("appends deltas to existing message.part fields", () => {
+    const sessionID = "ses_1"
+    const messageID = "msg_1"
+    const partID = "prt_1"
+    const [store, setStore] = createStore(
+      baseState({
+        part: {
+          [messageID]: [
+            { id: partID, sessionID, messageID, type: "text", text: "hello" } as Part,
+          ],
+        },
+      }),
+    )
+
+    applyDirectoryEvent({
+      event: { type: "message.part.delta", properties: { messageID, partID, field: "text", delta: " world" } },
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+
+    expect((store.part[messageID]?.[0] as { text?: string } | undefined)?.text).toBe("hello world")
+  })
+
+  test("ignores message.part.delta when part is missing", () => {
+    const [store, setStore] = createStore(baseState())
+
+    applyDirectoryEvent({
+      event: { type: "message.part.delta", properties: { messageID: "msg_missing", partID: "prt_missing", field: "text", delta: "x" } },
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+
+    expect(store.part).toEqual({})
+  })
+
+  test("reconciles existing session on session.created without incrementing total", () => {
+    const existing = rootSession({ id: "ses_1" })
+    const updated = { ...existing, time: { ...existing.time, updated: 2 } } as Session
+    const [store, setStore] = createStore(
+      baseState({
+        session: [existing],
+        sessionTotal: 1,
+      }),
+    )
+
+    applyDirectoryEvent({
+      event: { type: "session.created", properties: { info: updated } },
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+
+    expect(store.session).toHaveLength(1)
+    expect(store.session[0].time.updated).toBe(2)
+    expect(store.sessionTotal).toBe(1)
+  })
+
+  test("reconciles existing session on session.updated without archiving", () => {
+    const existing = rootSession({ id: "ses_1" })
+    const updated = { ...existing, time: { ...existing.time, updated: 2 } } as Session
+    const [store, setStore] = createStore(
+      baseState({
+        session: [existing],
+      }),
+    )
+
+    applyDirectoryEvent({
+      event: { type: "session.updated", properties: { info: updated } },
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+
+    expect(store.session).toHaveLength(1)
+    expect(store.session[0].time.updated).toBe(2)
+  })
+
+  test("skips permission.replied when permission list is missing", () => {
+    const [store, setStore] = createStore(baseState())
+
+    applyDirectoryEvent({
+      event: { type: "permission.replied", properties: { sessionID: "ses_1", requestID: "perm_1" } },
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+
+    expect(store.permission).toEqual({})
   })
 
   test("routes disposal and lsp events to side-effect handlers", () => {

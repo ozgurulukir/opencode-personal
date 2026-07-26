@@ -1,4 +1,4 @@
-import type { Message, Session } from "@opencode-ai/sdk/v2/client"
+import type { Session } from "@opencode-ai/sdk/v2/client"
 import { showToast } from "@opencode-ai/ui/toast"
 import { base64Encode } from "@opencode-ai/core/util/encode"
 import { Binary } from "@opencode-ai/core/util/binary"
@@ -18,6 +18,9 @@ import { Worktree as WorktreeState } from "@/utils/worktree"
 import { buildRequestParts } from "./build-request-parts"
 import { setCursorPosition } from "./editor-dom"
 import { formatServerError } from "@/utils/server-errors"
+import { sendFollowupDraft, type FollowupDraft } from "./sendFollowupDraft"
+import { detectCommand } from "./detectCommand"
+import { optimisticRemove } from "./useOptimisticSend"
 
 type PendingPrompt = {
   abort: AbortController
@@ -25,150 +28,6 @@ type PendingPrompt = {
 }
 
 const pending = new Map<string, PendingPrompt>()
-
-export type FollowupDraft = {
-  sessionID: string
-  sessionDirectory: string
-  prompt: Prompt
-  context: (ContextItem & { key: string })[]
-  agent: string
-  model: { providerID: string; modelID: string }
-  variant?: string
-}
-
-type FollowupSendInput = {
-  client: ReturnType<typeof useSDK>["client"]
-  globalSync: ReturnType<typeof useGlobalSync>
-  sync: ReturnType<typeof useSync>
-  draft: FollowupDraft
-  messageID?: string
-  optimisticBusy?: boolean
-  before?: () => Promise<boolean> | boolean
-}
-
-const draftText = (prompt: Prompt) => prompt.map((part) => ("content" in part ? part.content : "")).join("")
-
-const draftImages = (prompt: Prompt) => prompt.filter((part): part is ImageAttachmentPart => part.type === "image")
-
-export async function sendFollowupDraft(input: FollowupSendInput) {
-  const text = draftText(input.draft.prompt)
-  const images = draftImages(input.draft.prompt)
-  const [, setStore] = input.globalSync.child(input.draft.sessionDirectory)
-
-  const setBusy = () => {
-    if (!input.optimisticBusy) return
-    setStore("session_status", input.draft.sessionID, { type: "busy" })
-  }
-
-  const setIdle = () => {
-    if (!input.optimisticBusy) return
-    setStore("session_status", input.draft.sessionID, { type: "idle" })
-  }
-
-  const wait = async () => {
-    const ok = await input.before?.()
-    if (ok === false) return false
-    return true
-  }
-
-  const [head, ...tail] = text.split(" ")
-  const cmd = head?.startsWith("/") ? head.slice(1) : undefined
-  if (cmd && input.sync.data.command.find((item) => item.name === cmd)) {
-    setBusy()
-    try {
-      if (!(await wait())) {
-        setIdle()
-        return false
-      }
-
-      await input.client.session.command({
-        sessionID: input.draft.sessionID,
-        command: cmd,
-        arguments: tail.join(" "),
-        agent: input.draft.agent,
-        model: `${input.draft.model.providerID}/${input.draft.model.modelID}`,
-        variant: input.draft.variant,
-        parts: images.map((attachment) => ({
-          id: Identifier.ascending("part"),
-          type: "file" as const,
-          mime: attachment.mime,
-          url: attachment.dataUrl,
-          filename: attachment.filename,
-        })),
-      })
-      return true
-    } catch (err) {
-      setIdle()
-      throw err
-    }
-  }
-
-  const messageID = input.messageID ?? Identifier.ascending("message")
-  const { requestParts, optimisticParts } = buildRequestParts({
-    prompt: input.draft.prompt,
-    context: input.draft.context,
-    images,
-    text,
-    sessionID: input.draft.sessionID,
-    messageID,
-    sessionDirectory: input.draft.sessionDirectory,
-  })
-
-  const message: Message = {
-    id: messageID,
-    sessionID: input.draft.sessionID,
-    role: "user",
-    time: { created: Date.now() },
-    agent: input.draft.agent,
-    model: { ...input.draft.model, variant: input.draft.variant },
-  }
-
-  const add = () =>
-    input.sync.session.optimistic.add({
-      directory: input.draft.sessionDirectory,
-      sessionID: input.draft.sessionID,
-      message,
-      parts: optimisticParts,
-    })
-
-  const remove = () =>
-    input.sync.session.optimistic.remove({
-      directory: input.draft.sessionDirectory,
-      sessionID: input.draft.sessionID,
-      messageID,
-    })
-
-  batch(() => {
-    setBusy()
-    add()
-  })
-
-  try {
-    if (!(await wait())) {
-      batch(() => {
-        setIdle()
-        remove()
-      })
-      return false
-    }
-
-    await input.client.session.promptAsync({
-      sessionID: input.draft.sessionID,
-      agent: input.draft.agent,
-      model: input.draft.model,
-      messageID,
-      parts: requestParts,
-      variant: input.draft.variant,
-    })
-    return true
-  } catch (err) {
-    batch(() => {
-      setIdle()
-      remove()
-    })
-    throw err
-  }
-}
 
 type PromptSubmitInput = {
   info: Accessor<{ id: string } | undefined>
@@ -452,49 +311,37 @@ export function createPromptSubmit(input: PromptSubmitInput) {
       return
     }
 
-    if (text.startsWith("/")) {
-      const [cmdName, ...args] = text.split(" ")
-      const commandName = cmdName.slice(1)
-      const customCommand = sync.data.command.find((c) => c.name === commandName)
-      if (customCommand) {
-        clearInput()
-        client.session
-          .command({
-            sessionID: session.id,
-            command: commandName,
-            arguments: args.join(" "),
-            agent,
-            model: `${model.providerID}/${model.modelID}`,
-            variant,
-            parts: images.map((attachment) => ({
-              id: Identifier.ascending("part"),
-              type: "file" as const,
-              mime: attachment.mime,
-              url: attachment.dataUrl,
-              filename: attachment.filename,
-            })),
+    const customCommand = detectCommand(text, sync.data.command)
+    if (customCommand) {
+      clearInput()
+      client.session
+        .command({
+          sessionID: session.id,
+          command: customCommand.name,
+          arguments: customCommand.arguments,
+          agent,
+          model: `${model.providerID}/${model.modelID}`,
+          variant,
+          parts: images.map((attachment) => ({
+            id: Identifier.ascending("part"),
+            type: "file" as const,
+            mime: attachment.mime,
+            url: attachment.dataUrl,
+            filename: attachment.filename,
+          })),
+        })
+        .catch((err) => {
+          showToast({
+            title: language.t("prompt.toast.commandSendFailed.title"),
+            description: formatServerError(err, language.t, language.t("common.requestFailed")),
           })
-          .catch((err) => {
-            showToast({
-              title: language.t("prompt.toast.commandSendFailed.title"),
-              description: formatServerError(err, language.t, language.t("common.requestFailed")),
-            })
-            restoreInput()
-          })
-        return
-      }
+          restoreInput()
+        })
+      return
     }
 
     const commentItems = context.filter((item) => item.type === "file" && !!item.comment?.trim())
     const messageID = Identifier.ascending("message")
-
-    const removeOptimisticMessage = () => {
-      sync.session.optimistic.remove({
-        directory: sessionDirectory,
-        sessionID: session.id,
-        messageID,
-      })
-    }
 
     removeCommentItems(commentItems)
     clearInput()
@@ -512,7 +359,7 @@ export function createPromptSubmit(input: PromptSubmitInput) {
         if (sessionDirectory === projectDirectory) {
           sync.set("session_status", session.id, { type: "idle" })
         }
-        removeOptimisticMessage()
+        optimisticRemove(sync, sessionDirectory, session.id, messageID)
         restoreCommentItems(commentItems)
         restoreInput()
       }
@@ -571,7 +418,7 @@ export function createPromptSubmit(input: PromptSubmitInput) {
         title: language.t("prompt.toast.promptSendFailed.title"),
         description: errorMessage(err),
       })
-      removeOptimisticMessage()
+      optimisticRemove(sync, sessionDirectory, session.id, messageID)
       restoreCommentItems(commentItems)
       restoreInput()
     })
