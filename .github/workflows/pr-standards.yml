@@ -100,7 +100,6 @@ jobs:
             - \`refactor:\` or \`refactor(scope):\` code refactoring
             - \`test:\` or \`test(scope):\` adding or updating tests
 
-            Where \`scope\` is the package name (e.g., \`app\`, \`desktop\`, \`opencode\`).
 
             See [CONTRIBUTING.md](../blob/main/CONTRIBUTING.md#pr-titles) for details.`);
               return;
