@@ -23,6 +23,7 @@
     "ai": "catalog:",
     "astro": "5.18.2",
     "diff": "catalog:",
+    "isomorphic-dompurify": "3.19.0",
     "js-base64": "3.8.1",
     "lang-map": "0.4.0",
     "luxon": "catalog:",
