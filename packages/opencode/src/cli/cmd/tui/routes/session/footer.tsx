@@ -10,8 +10,25 @@ export function Footer() {
   const { theme } = useTheme()
   const sync = useSync()
   const route = useRoute()
-  const mcp = createMemo(() => Object.values(sync.data.mcp).filter((x) => x.status === "connected").length)
-  const mcpError = createMemo(() => Object.values(sync.data.mcp).some((x) => x.status === "failed"))
+
+  // ⚡ Bolt Optimization: Replace Object.values().filter().length with a single loop to reduce GC pressure
+  const mcpStats = createMemo(() => {
+    let connected = 0
+    let hasError = false
+    const mcpData = sync.data.mcp
+    for (const key in mcpData) {
+      if (Object.prototype.hasOwnProperty.call(mcpData, key)) {
+        const item = mcpData[key]
+        if (item.status === "connected") connected++
+        else if (item.status === "failed") hasError = true
+      }
+    }
+    return { connected, hasError }
+  })
+
+  const mcp = () => mcpStats().connected
+  const mcpError = () => mcpStats().hasError
+
   const lsp = createMemo(() => Object.keys(sync.data.lsp))
   const permissions = createMemo(() => {
     if (route.data.type !== "session") return []
