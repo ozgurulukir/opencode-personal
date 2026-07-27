@@ -56,3 +56,6 @@
 ## 2026-07-23 - Optimizing chained array methods replacing map/flatMap/sort
 **Learning:** Chaining multiple array methods like `.flatMap(roots).sort()[0]` traverses arrays multiple times, constructs intermediate arrays, and performs an O(N log N) sort just to find a single extreme value (e.g. latest session).
 **Action:** Replace these chains with a single O(N) `for` loop traversal that keeps track of the max/min value to eliminate intermediate array allocations and sorting overhead.
+## 2026-07-27 - Consolidating multiple reduce calls
+**Learning:** Using multiple `.reduce()` calls on the same array to calculate different metrics (e.g. counting specific message roles) forces multiple O(N) passes over the array and introduces function call overhead from the callback functions.
+**Action:** Consolidate multiple `.reduce()` calls into a single `for` loop to compute all metrics in one pass, reducing GC pressure and time complexity.
