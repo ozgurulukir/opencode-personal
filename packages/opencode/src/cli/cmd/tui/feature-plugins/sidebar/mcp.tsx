@@ -8,14 +8,25 @@ function View(props: { api: TuiPluginApi }) {
   const [open, setOpen] = createSignal(true)
   const theme = () => props.api.theme.current
   const list = createMemo(() => props.api.state.mcp())
-  const on = createMemo(() => list().filter((item) => item.status === "connected").length)
-  const bad = createMemo(
-    () =>
-      list().filter(
-        (item) =>
-          item.status === "failed" || item.status === "needs_auth" || item.status === "needs_client_registration",
-      ).length,
-  )
+
+  // ⚡ Bolt Optimization: Replace multiple .filter().length with a single loop to reduce GC pressure
+  const stats = createMemo(() => {
+    let connected = 0
+    let failed = 0
+    const mcpList = list()
+    for (let i = 0; i < mcpList.length; i++) {
+      const status = mcpList[i].status
+      if (status === "connected") {
+        connected++
+      } else if (status === "failed" || status === "needs_auth" || status === "needs_client_registration") {
+        failed++
+      }
+    }
+    return { connected, failed }
+  })
+
+  const on = () => stats().connected
+  const bad = () => stats().failed
 
   const dot = (status: string) => {
     if (status === "connected") return theme().success

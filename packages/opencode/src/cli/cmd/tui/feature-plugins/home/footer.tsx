@@ -23,7 +23,18 @@ function Mcp(props: { api: TuiPluginApi }) {
   const list = createMemo(() => props.api.state.mcp())
   const has = createMemo(() => list().length > 0)
   const err = createMemo(() => list().some((item) => item.status === "failed"))
-  const count = createMemo(() => list().filter((item) => item.status === "connected").length)
+
+  // ⚡ Bolt Optimization: Replace .filter().length with a single loop to reduce GC pressure
+  const count = createMemo(() => {
+    let connected = 0
+    const mcpList = list()
+    for (let i = 0; i < mcpList.length; i++) {
+      if (mcpList[i].status === "connected") {
+        connected++
+      }
+    }
+    return connected
+  })
 
   return (
     <Show when={has()}>
