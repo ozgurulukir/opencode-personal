@@ -43,3 +43,18 @@ WebUI is UX-ready
 
 **Lessons Learned:**
 - WebUI is already highly polished and accessible. Suggest future user testing to find real friction points.
+## 2025-03-24 - WebUI Polish Audit: Focus Management in Dialogs
+
+**Major Findings:**
+- The custom focus trap logic in `packages/ui/src/components/dialog.tsx` relies on querying the `[autofocus]` DOM attribute (`target?.querySelector("[autofocus]")`).
+- The `TextField` component did not explicitly accept an `autofocus` prop, causing it to fall into the `...others` spread which was applied to the outer wrapper (`Kobalte.Input` or `Kobalte.TextArea` inner components didn't receive it properly to let the Dialog trap mechanism target the actual input).
+- This resulted in modals (e.g. "Connect Provider", "Edit Project") not auto-focusing on the first relevant input as intended by developers adding `autofocus` to `<TextField>`.
+
+**Patterns to Repeat:**
+- Explicitly separating functional native DOM properties (like `autofocus`, `name`, `disabled`) via `splitProps` in wrapper components to guarantee they get forwarded down to the lowest-level inner HTML element (like `<input>`) where they are actually respected by native browser events and generic queries.
+
+**Patterns to Avoid:**
+- Implicitly relying on generic prop spreading (`...others`) to attach important accessibility/focus attributes on complex components, as the attribute may end up on a non-interactive wrapper div.
+
+**Lessons Learned:**
+- SolidJS `splitProps` operates strictly. If an attribute isn't explicitly intercepted and forwarded, it goes to the wrapper. For focus management targeting the `[autofocus]` attribute to work with Kobalte dialogs, we need to ensure interactive inputs actually get the attribute.
