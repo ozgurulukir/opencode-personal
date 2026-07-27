@@ -178,7 +178,18 @@ export function toolEntryBody(commit: StreamCommit, raw: string): RunEntryBody |
     }
   }
 
-  return { type: "text", content: toolScroll(commit.phase, ctx) }
+  // Tool scroll helpers (e.g. scrollTodoStart, scrollQuestionStart,
+  // scrollWriteStart) return "" to suppress the start-phase placeholder. A
+  // placeholder row was rendered here anyway, leaking an empty/spurious
+  // commit during streaming that displaced the final content -- causing the
+  // visible truncation users saw. Skip the entry entirely when there is no
+  // content to render.
+  const content = toolScroll(commit.phase, ctx)
+  if (!content) {
+    return undefined
+  }
+
+  return { type: "text", content }
 }
 
 export function toolFiletype(input?: string): string | undefined {

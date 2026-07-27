@@ -163,3 +163,7 @@ const failingAccountLayer = Layer.mock(Account.Service, {
 ```
 
 This is much shorter than stubbing every method with `Effect.void` / `Effect.succeed(...)` placeholders, and it keeps the test focused on the behaviour under test.
+
+## Testing the scrollback streaming surface
+
+`test/cli/run/scrollback.surface.test.ts` is the canonical pattern for testing `RunScrollbackStream`. It uses `createTestRenderer` + `MockTreeSitterClient` from `@opentui/core/testing` (real `MarkdownRenderable`/`CodeRenderable`, not mocked), then extracts committed snapshots via `Reflect.get(renderer, "externalOutputQueue").claim()` and renders them with `snapshot.getRealCharBytes(true)`. Reuse the `setup()`, `claim()`, `render()`, `renderRows()` helpers in that file rather than building a new harness. Call `scrollback.destroy()` in a `finally` block and `renderer.destroy()` in `afterEach` (via the `active[]` array).

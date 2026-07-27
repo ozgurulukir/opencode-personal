@@ -839,6 +839,34 @@ test("renders structured write finals once as code blocks", async () => {
   }
 })
 
+test("flushes incomplete code fence content on complete even when the final block is unstable", async () => {
+  const out = await setup()
+
+  try {
+    // Stream an incomplete code fence (no closing ```), then finalize.
+    // Regression: when MarkdownRenderable's final _blockStates entry is still
+    // unstable after settle(), commitMarkdownBlocks returned false and
+    // finishActive destroyed the surface -- content was lost from scrollback
+    // but persisted in DB (visible after restart).
+    await out.scrollback.append(
+      assistant('# Heading\n\n```js\nconst x = 1\nconst y = 2\n'),
+    )
+    await out.scrollback.complete()
+
+    const commits = claim(out.renderer)
+    try {
+      const output = render(commits)
+      expect(output).toContain("Heading")
+      expect(output).toContain("const x = 1")
+      expect(output).toContain("const y = 2")
+    } finally {
+      destroy(commits)
+    }
+  } finally {
+    out.scrollback.destroy()
+  }
+})
+
 test("renders promoted task markdown without a leading blank row", async () => {
   const out = await setup()
 

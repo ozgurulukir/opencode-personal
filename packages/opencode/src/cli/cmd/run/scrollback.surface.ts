@@ -268,6 +268,23 @@ export class RunScrollbackStream {
       return true
     }
 
+    // Last-resort flush: when the stream is done but the final markdown block
+    // is still unstable (incomplete fence, trailing whitespace-only block, or
+    // a `_blockStates` entry that settle() did not populate), commitMarkdownBlocks
+    // returns false and finishActive() would destroy the surface -- losing the
+    // accumulated content from scrollback even though it was persisted to the
+    // DB (hence "text appears after restart but is missing during streaming").
+    // Force-commit the full surface height so the trailing content reaches
+    // scrollback before the surface is torn down.
+    if (done && active.surface.height > active.committedRows) {
+      this.flushPendingSpacer(active)
+      active.surface.commitRows(0, active.surface.height, { trailingNewline })
+      active.committedBlocks = renderable._blockStates.length
+      active.committedRows = active.surface.height
+      active.rendered = true
+      return true
+    }
+
     return false
   }
 
