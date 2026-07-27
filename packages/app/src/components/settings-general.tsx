@@ -6,6 +6,7 @@ import { Select } from "@opencode-ai/ui/select"
 import { Switch } from "@opencode-ai/ui/switch"
 import { TextField } from "@opencode-ai/ui/text-field"
 import { Tooltip } from "@opencode-ai/ui/tooltip"
+import { Spinner } from "@opencode-ai/ui/spinner"
 import { useTheme, type ColorScheme } from "@opencode-ai/ui/theme/context"
 import { showToast } from "@opencode-ai/ui/toast"
 import { useParams } from "@solidjs/router"
@@ -720,9 +721,14 @@ export const SettingsGeneral: Component = () => {
           description={language.t("settings.updates.row.check.description")}
         >
           <Button size="small" variant="secondary" disabled={store.checking || !platform.checkUpdate} onClick={check}>
-            {store.checking
-              ? language.t("settings.updates.action.checking")
-              : language.t("settings.updates.action.checkNow")}
+            {store.checking ? (
+              <div class="flex items-center gap-2">
+                <Spinner class="size-4" />
+                <span>{language.t("settings.updates.action.checking")}</span>
+              </div>
+            ) : (
+              language.t("settings.updates.action.checkNow")
+            )}
           </Button>
         </SettingsRow>
       </SettingsList>
