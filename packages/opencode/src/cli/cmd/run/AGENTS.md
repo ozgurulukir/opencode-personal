@@ -145,3 +145,15 @@ Before any refactoring, 146 characterization tests were written:
 - `footer.characterization.test.ts` — history, autocomplete, submit flows
 
 **Key insight:** Characterization tests lock behavior BEFORE extraction, eliminating regression risk and enabling confident refactoring.
+
+## `tool.rules.ts` is the SSOT for tool scroll content
+
+The `TOOL_RULES` registry's `scroll.<phase>` helpers are the single source of truth for what each tool renders at each phase. Returning `""` means "suppress the entry entirely" (todo, question, write, task, apply_patch, invalid, batch, plan_exit); returning content means "render this inline header" (glob→`✱ Glob "..."`, grep, read, bash, webfetch, lsp, skill, list, websearch). `toolEntryBody` MUST map a `""` scroll result to `undefined` — returning `{ type: "text", content: "" }` leaks a spurious empty commit into scrollback that displaces final content during streaming.
+
+## "Text truncated during stream, correct after restart" symptom
+
+This symptom means the DB path has full content but the TUI streaming path lost it. The DB path (`flushPart` in `session-data/utils.ts` → projector) always captures the full text via `text.slice(sent)`. The TUI path (`toolEntryBody` → `RunScrollbackStream.append`) can lose content in two places: (a) `toolEntryBody` returning spurious empty/placeholder entries (see SSOT rule above), (b) `flushActive`'s markdown path where `commitMarkdownBlocks` returns false on a final unstable block and `finishActive` then destroys the surface before the content is committed. Check both when this symptom appears.
+
+## `MarkdownRenderable` settle/commit quirks (`@opentui/core`)
+
+`MarkdownRenderable._blockStates` / `_stableBlockCount` / `settle()` are external `@opentui/core` APIs (not indexed by codebase-memory-mcp). `settle()` resolving does NOT guarantee all `_blockStates` entries are populated — `commitMarkdownBlocks` can return false on the final block (incomplete code fence, whitespace-only trailing block). `flushActive` has a force-commit fallback (`done && surface.height > committedRows`) to prevent content loss before `finishActive` destroys the surface.
