@@ -160,8 +160,14 @@ export function SessionContextTab() {
 
   const counts = createMemo(() => {
     const all = messages()
-    const user = all.reduce((count, x) => count + (x.role === "user" ? 1 : 0), 0)
-    const assistant = all.reduce((count, x) => count + (x.role === "assistant" ? 1 : 0), 0)
+    // ⚡ Bolt Optimization: Replace multiple .reduce() calls with a single loop to reduce GC pressure and O(N) traversals
+    let user = 0
+    let assistant = 0
+    for (let i = 0; i < all.length; i++) {
+      const role = all[i].role
+      if (role === "user") user++
+      else if (role === "assistant") assistant++
+    }
     return {
       all: all.length,
       user,
