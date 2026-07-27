@@ -49,13 +49,24 @@ function isProviderModelNotFoundErrorLike(error: unknown): error is ProviderMode
 export function parseReadableConfigInvalidError(errorInput: ConfigInvalidError, translator?: Translator) {
   const file = errorInput.data.path && errorInput.data.path !== "config" ? errorInput.data.path : "config"
   const detail = errorInput.data.message?.trim() ?? ""
-  const issues = (errorInput.data.issues ?? [])
-    .map((issue) => {
+
+  // ⚡ Bolt Optimization: Replace .map().filter(Boolean) with direct loop to avoid intermediate array allocations
+  const issues: string[] = []
+  const rawIssues = errorInput.data.issues ?? []
+  for (let i = 0; i < rawIssues.length; i++) {
+    const issue = rawIssues[i]
+    if (issue) {
       const msg = issue.message.trim()
-      if (!issue.path.length) return msg
-      return `${issue.path.join(".")}: ${msg}`
-    })
-    .filter(Boolean)
+      if (msg) {
+        if (!issue.path.length) {
+          issues.push(msg)
+        } else {
+          issues.push(`${issue.path.join(".")}: ${msg}`)
+        }
+      }
+    }
+  }
+
   const msg = issues.length ? issues.join("\n") : detail
   if (!msg) return tr(translator, "error.chain.configInvalid", `Config file at ${file} is invalid`, { path: file })
   return tr(translator, "error.chain.configInvalidWithMessage", `Config file at ${file} is invalid: ${msg}`, {
@@ -67,7 +78,18 @@ export function parseReadableConfigInvalidError(errorInput: ConfigInvalidError, 
 function parseReadableProviderModelNotFoundError(errorInput: ProviderModelNotFoundError, translator?: Translator) {
   const p = errorInput.data.providerID.trim()
   const m = errorInput.data.modelID.trim()
-  const list = (errorInput.data.suggestions ?? []).map((v) => v.trim()).filter(Boolean)
+
+  // ⚡ Bolt Optimization: Replace .map().filter(Boolean) with direct loop to avoid intermediate array allocations
+  const list: string[] = []
+  const suggestionsList = errorInput.data.suggestions ?? []
+  for (let i = 0; i < suggestionsList.length; i++) {
+    const val = suggestionsList[i]
+    if (val) {
+      const trimmed = val.trim()
+      if (trimmed) list.push(trimmed)
+    }
+  }
+
   const body = tr(translator, "error.chain.modelNotFound", `Model not found: ${p}/${m}`, { provider: p, model: m })
   const tail = tr(translator, "error.chain.checkConfig", "Check your config (opencode.json) provider/model names")
   if (list.length) {
