@@ -89,6 +89,13 @@ export const layer: Layer.Layer<
 
     type CacheEntry = { mtime: number; content: string }
     const fileCache = new Map<string, CacheEntry>()
+    const FILE_CACHE_MAX = 100
+
+    const evictLRU = () => {
+      if (fileCache.size <= FILE_CACHE_MAX) return
+      const oldest = fileCache.keys().next().value
+      if (oldest !== undefined) fileCache.delete(oldest)
+    }
 
     const statMtime = Effect.fnUntraced(function* (filepath: string) {
       const info = yield* fs.stat(filepath).pipe(Effect.catch(() => Effect.succeed(undefined)))
@@ -102,10 +109,17 @@ export const layer: Layer.Layer<
         return yield* read(filepath)
       }
       const cached = fileCache.get(filepath)
-      if (cached && cached.mtime >= mtime) return cached.content
+      if (cached && cached.mtime >= mtime) {
+        // Move to end (most recently used) by re-inserting
+        fileCache.delete(filepath)
+        fileCache.set(filepath, cached)
+        return cached.content
+      }
       const content = yield* read(filepath)
-      if (content) fileCache.set(filepath, { mtime, content })
-      else fileCache.delete(filepath)
+      if (content) {
+        fileCache.set(filepath, { mtime, content })
+        evictLRU()
+      } else fileCache.delete(filepath)
       return content
     })
 
