@@ -53,14 +53,14 @@ const zvec = lazy((): ZVecModule | undefined => {
   }
 })
 
-const EMBEDDING_DIM = 384
-
 class ZvecIndex {
   private collection: ZVecCollection | null = null
   private readonly path: string
+  private readonly dimension: number
 
-  constructor(path: string) {
+  constructor(path: string, dimension = 384) {
     this.path = path
+    this.dimension = dimension
   }
 
   private open(): ZVecCollection {
@@ -72,7 +72,7 @@ class ZvecIndex {
       vectors: {
         name: "embedding",
         dataType: mod.ZVecDataType.VECTOR_FP32,
-        dimension: EMBEDDING_DIM,
+        dimension: this.dimension,
         indexParams: {
           indexType: mod.ZVecIndexType.HNSW,
           metricType: mod.ZVecMetricType.COSINE,
@@ -90,7 +90,13 @@ class ZvecIndex {
       this.collection = mod.ZVecCreateAndOpen(this.path, schema) as ZVecCollection
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
-      if (msg.toLowerCase().includes("already exist") || msg.toLowerCase().includes("alreadyexist")) {
+      const lower = msg.toLowerCase()
+      if (
+        lower.includes("already exist") ||
+        lower.includes("alreadyexist") ||
+        lower.includes("path validate failed") ||
+        lower.includes("] exists")
+      ) {
         this.collection = mod.ZVecOpen(this.path) as ZVecCollection
       } else {
         throw e
@@ -99,19 +105,20 @@ class ZvecIndex {
     return this.collection
   }
 
-  index(chunks: Array<{ id: string; path: string; content: string; embedding: number[] }>) {
+  index(chunks: Array<{ id: string; path: string; content: string; embedding: number[]; mtime: number }>) {
     return Effect.try({
       try: () => {
-        if (!zvec()) return
+        const mod = zvec()
+        if (!mod) throw new Error("zvec binding unavailable")
         const col = this.open()
         const mapped = chunks.map((c) => ({
           id: docId(c.id),
           vectors: { embedding: c.embedding },
-          fields: { path: c.path, content: c.content, mtime: Date.now() },
+          fields: { path: c.path, content: c.content, mtime: c.mtime },
         }))
         const BATCH_SIZE = 1000
         for (let i = 0; i < mapped.length; i += BATCH_SIZE) {
-          col.insertSync(mapped.slice(i, i + BATCH_SIZE))
+          col.upsertSync(mapped.slice(i, i + BATCH_SIZE))
         }
       },
       catch: (e) => new Error(`Zvec index failed: ${e instanceof Error ? e.message : String(e)}`),
@@ -122,7 +129,7 @@ class ZvecIndex {
     return Effect.try({
       try: () => {
         const mod = zvec()
-        if (!mod) return [] as SearchResult[]
+        if (!mod) throw new Error("zvec binding unavailable")
         const col = this.open()
         const results = col.querySync({
           fieldName: "embedding",
@@ -145,7 +152,9 @@ class ZvecIndex {
   delete(ids: string[]) {
     return Effect.try({
       try: () => {
-        if (!zvec() || ids.length === 0) return
+        const mod = zvec()
+        if (!mod) throw new Error("zvec binding unavailable")
+        if (ids.length === 0) return
         const col = this.open()
         col.deleteSync(ids.map(docId))
       },
@@ -159,16 +168,16 @@ class ZvecIndex {
         if (this.collection) {
           try {
             this.collection.destroySync()
-          } catch {
-            // ignore
+          } catch (e) {
+            log.warn("zvec reset: destroySync failed", { error: e instanceof Error ? e.message : String(e) })
           }
           this.collection = null
         }
         const fs = require("node:fs")
         try {
           fs.rmSync(this.path, { recursive: true, force: true })
-        } catch {
-          // ignore
+        } catch (e) {
+          log.warn("zvec reset: rmSync failed", { path: this.path, error: e instanceof Error ? e.message : String(e) })
         }
       },
       catch: (e) => new Error(`Zvec reset failed: ${e instanceof Error ? e.message : String(e)}`),
@@ -205,7 +214,7 @@ export const layer = Layer.effect(
     })
 
     return {
-      index: (chunks: Array<{ id: string; path: string; content: string; embedding: number[] }>) =>
+      index: (chunks: Array<{ id: string; path: string; content: string; embedding: number[]; mtime: number }>) =>
         Effect.gen(function* () {
           const index = yield* getIndex()
           return yield* index.index(chunks)

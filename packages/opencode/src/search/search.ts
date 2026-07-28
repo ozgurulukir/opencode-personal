@@ -9,7 +9,7 @@ export interface SearchResult {
 
 export interface SearchServiceInterface {
   readonly index: (
-    chunks: Array<{ id: string; path: string; content: string; embedding: number[] }>,
+    chunks: Array<{ id: string; path: string; content: string; embedding: number[]; mtime: number }>,
   ) => Effect.Effect<void, Error>
   readonly search: (query: string, embedding: number[], topK?: number) => Effect.Effect<SearchResult[], Error>
   readonly reset: Effect.Effect<void, Error>

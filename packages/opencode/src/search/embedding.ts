@@ -113,7 +113,7 @@ export class WordPieceTokenizer {
   }
 }
 
-function meanPool(logits: Float32Array, mask: number[], dim: number): number[] {
+export function meanPool(logits: Float32Array, mask: number[], dim: number): number[] {
   const pooled = new Float32Array(dim)
   const tokens = mask.length
   let count = 0
@@ -122,7 +122,8 @@ function meanPool(logits: Float32Array, mask: number[], dim: number): number[] {
     count++
     for (let j = 0; j < dim; j++) pooled[j] += logits[i * dim + j]
   }
-  for (let j = 0; j < dim; j++) pooled[j] /= count
+  const safeCount = count || 1
+  for (let j = 0; j < dim; j++) pooled[j] /= safeCount
   let norm = 0
   for (let j = 0; j < dim; j++) norm += pooled[j] * pooled[j]
   norm = Math.sqrt(norm) || 1
@@ -216,6 +217,7 @@ export const layer = Layer.effect(
   Effect.gen(function* () {
     const config = yield* Config.Service
     let backend: EmbeddingServiceInterface | null = null
+    let dimension = 384
 
     const embed = (texts: string[]): Effect.Effect<number[][], Error> =>
       Effect.gen(function* () {
@@ -226,7 +228,7 @@ export const layer = Layer.effect(
             | undefined
           const provider = (embeddingCfg?.provider as string) ?? "local"
           const modelId = (embeddingCfg?.model as string) ?? HF_REPO
-          const dimension = (embeddingCfg?.dimension as number) ?? 384
+          dimension = (embeddingCfg?.dimension as number) ?? 384
           const apiKey =
             provider === "openai" ? ((embeddingCfg?.openaiApiKey as string) ?? process.env.OPENAI_API_KEY ?? "") : ""
           backend =
@@ -237,7 +239,7 @@ export const layer = Layer.effect(
         return yield* backend.embed(texts)
       })
 
-    return { embed, dimension: 384 }
+    return { embed, get dimension() { return dimension } }
   }),
 )
 

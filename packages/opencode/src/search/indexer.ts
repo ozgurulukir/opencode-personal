@@ -3,6 +3,7 @@ import { AppFileSystem } from "@opencode-ai/core/filesystem"
 import { SearchService } from "./search"
 import { EmbeddingService } from "./embedding"
 import { InstanceState } from "@/effect/instance-state"
+import { FileIgnore } from "@/file/ignore"
 import * as NFS from "node:fs/promises"
 
 export const CHUNK_LINES = 100
@@ -18,16 +19,17 @@ export interface Chunk {
   readonly id: string
   readonly path: string
   readonly content: string
+  readonly mtime: number
 }
 
-export function chunkFile(file: string, content: string): Chunk[] {
+export function chunkFile(file: string, content: string, mtime: number): Chunk[] {
   const cleanContent = stripAnsi(content)
   const lines = cleanContent.split("\n")
   const chunks: Chunk[] = []
   if (lines.length <= CHUNK_LINES) {
     const trimmed = cleanContent.trim()
     if (trimmed.length >= CHUNK_MIN_CHARS) {
-      chunks.push({ id: `${file}:0`, path: file, content: trimmed })
+      chunks.push({ id: `${file}:0`, path: file, content: trimmed, mtime })
     }
     return chunks
   }
@@ -35,7 +37,7 @@ export function chunkFile(file: string, content: string): Chunk[] {
     const slice = lines.slice(i, i + CHUNK_LINES).join("\n")
     const trimmed = slice.trim()
     if (trimmed.length >= CHUNK_MIN_CHARS) {
-      chunks.push({ id: `${file}:${i}`, path: file, content: trimmed })
+      chunks.push({ id: `${file}:${i}`, path: file, content: trimmed, mtime })
     }
   }
   return chunks
@@ -78,12 +80,7 @@ export const IndexWorkspace = Effect.gen(function* () {
 
     for (const file of files) {
       const normalized = file.replace(/\\/g, "/")
-      if (
-        normalized.includes("node_modules") ||
-        normalized.includes("/dist/") ||
-        normalized.includes("/.git/") ||
-        normalized.includes("/build/")
-      ) {
+      if (FileIgnore.match(normalized)) {
         continue
       }
       globbedPaths.add(file)
@@ -123,7 +120,7 @@ export const IndexWorkspace = Effect.gen(function* () {
       try {
         const content = yield* fs.readFileString(fileInfo.path).pipe(Effect.catch(() => Effect.succeed("")))
         if (!content) continue
-        const fileChunks = chunkFile(fileInfo.path, content)
+        const fileChunks = chunkFile(fileInfo.path, content, fileInfo.mtime)
         if (fileChunks.length > 0) {
           newChunks.push(...fileChunks)
           manifest.files[fileInfo.path] = {
