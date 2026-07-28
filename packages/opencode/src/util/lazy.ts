@@ -5,7 +5,7 @@ export function lazy<T>(fn: () => T) {
   const result = (): T => {
     if (loaded) return value as T
     value = fn()
-    loaded = true
+    if (value !== undefined) loaded = true
     return value as T
   }
 

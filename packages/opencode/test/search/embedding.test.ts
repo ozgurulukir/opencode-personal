@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { Effect, Layer } from "effect"
-import { EmbeddingService, type EmbeddingServiceInterface, WordPieceTokenizer } from "../../src/search/embedding"
+import { EmbeddingService, type EmbeddingServiceInterface, WordPieceTokenizer, meanPool } from "../../src/search/embedding"
 
 describe("EmbeddingService DI", () => {
   test("resolves from layer and satisfies interface contract", async () => {
@@ -50,5 +50,22 @@ describe("WordPieceTokenizer", () => {
     const result = tokenizer.encode("unknownword")
     // [UNK] = 1
     expect(result.input_ids).toEqual([2, 1, 3])
+  })
+})
+
+describe("meanPool", () => {
+  test("returns zero vector when all attention mask values are zero", () => {
+    const logits = new Float32Array([1, 2, 3, 4, 5, 6])
+    const mask = [0, 0, 0]
+    const result = meanPool(logits, mask, 2)
+    expect(result).toEqual([0, 0])
+  })
+
+  test("L2-normalizes the mean-pooled vector", () => {
+    const logits = new Float32Array([2, 4, 6, 8])
+    const mask = [1, 1]
+    const result = meanPool(logits, mask, 2)
+    const norm = Math.sqrt(result[0] ** 2 + result[1] ** 2)
+    expect(norm).toBeCloseTo(1)
   })
 })

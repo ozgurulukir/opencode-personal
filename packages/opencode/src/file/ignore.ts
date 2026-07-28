@@ -29,6 +29,7 @@ const FOLDERS = new Set([
   "mypy_cache",
   ".history",
   ".gradle",
+  ".opencode",
 ])
 
 const FILES = [
@@ -43,8 +44,6 @@ const FILES = [
 
   // Logs & temp
   "**/logs/**",
-  "**/tmp/**",
-  "**/temp/**",
   "**/*.log",
 
   // Coverage/test outputs

@@ -47,4 +47,28 @@ describe("util.lazy", () => {
     expect(lazyNull()).toBe(null)
     expect(lazyUndefined()).toBe(undefined)
   })
+
+  test("should retry when fn returns undefined", () => {
+    let callCount = 0
+    const getValue = () => {
+      callCount++
+      if (callCount < 3) return undefined
+      return "resolved"
+    }
+
+    const lazyValue = lazy(getValue)
+
+    expect(lazyValue()).toBe(undefined)
+    expect(callCount).toBe(1)
+
+    expect(lazyValue()).toBe(undefined)
+    expect(callCount).toBe(2)
+
+    expect(lazyValue()).toBe("resolved")
+    expect(callCount).toBe(3)
+
+    // Once resolved, should cache the value
+    expect(lazyValue()).toBe("resolved")
+    expect(callCount).toBe(3)
+  })
 })

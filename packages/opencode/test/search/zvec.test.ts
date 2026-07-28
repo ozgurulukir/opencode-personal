@@ -94,8 +94,8 @@ describe("search.zvec", () => {
         const fs = yield* AppFileSystem.Service
 
         const chunks = [
-          { id: "doc1", path: "a.ts", content: "some code content here", embedding: Array(384).fill(0.1) },
-          { id: "doc2", path: "b.ts", content: "other code content here", embedding: Array(384).fill(0.9) },
+          { id: "doc1", path: "a.ts", content: "some code content here", embedding: Array(384).fill(0.1), mtime: Date.now() },
+          { id: "doc2", path: "b.ts", content: "other code content here", embedding: Array(384).fill(0.9), mtime: Date.now() },
         ]
 
         yield* search.index(chunks)
@@ -145,6 +145,7 @@ describe("search.zvec", () => {
           path: `file_${i}.ts`,
           content: `content_${i}`,
           embedding: Array(384).fill(0.1),
+          mtime: Date.now(),
         }))
 
         // This should not throw any "Too many docs" error
@@ -154,6 +155,72 @@ describe("search.zvec", () => {
         const results = yield* search.search("query", Array(384).fill(0.1), 1)
         expect(results.length).toBe(1)
         expect(results[0].id).toBeDefined()
+      }).pipe(
+        Effect.provide(defaultLayer),
+        Effect.provide(AppFileSystem.defaultLayer),
+        provideInstance(dir),
+        Effect.runPromise,
+      )
+    } finally {
+      await fsNode.rm(dir, { recursive: true, force: true }).catch(() => {});
+    }
+  })
+
+  test("ZvecIndex.open falls back to ZVecOpen when index directory already exists", async () => {
+    const {
+      ZVecCollectionSchema,
+      ZVecDataType,
+      ZVecIndexType,
+      ZVecMetricType,
+      ZVecInitialize,
+      ZVecLogLevel,
+      ZVecCreateAndOpen,
+      ZVecOpen,
+    } = await import("@zvec/zvec")
+    const { defaultLayer } = await import("../../src/search/zvec")
+    const { provideInstance } = await import("../fixture/fixture")
+    const { AppFileSystem } = await import("@opencode-ai/core/filesystem")
+    const fsNode = await import("node:fs/promises")
+    const os = await import("node:os")
+    const path = await import("path")
+
+    const dir = await fsNode.mkdtemp(path.join(os.tmpdir(), "opencode-zvec-fallback-test-"))
+
+    try {
+      ZVecInitialize({ logLevel: ZVecLogLevel.ERROR })
+      const indexPath = path.join(dir, ".opencode", "zvec_index")
+      const schema = new ZVecCollectionSchema({
+        name: "workspace_search",
+        vectors: {
+          name: "embedding",
+          dataType: ZVecDataType.VECTOR_FP32,
+          dimension: 384,
+          indexParams: {
+            indexType: ZVecIndexType.HNSW,
+            metricType: ZVecMetricType.COSINE,
+            m: 24,
+            efConstruction: 100,
+          },
+        },
+        fields: [
+          { name: "path", dataType: ZVecDataType.STRING },
+          { name: "content", dataType: ZVecDataType.STRING },
+        ],
+      })
+
+      // Pre-populate the index directory using the native API, then close it
+      const col = ZVecCreateAndOpen(indexPath, schema)
+      col.insertSync([
+        { id: "a", vectors: { embedding: Array(384).fill(0.1) }, fields: { path: "a.ts", content: "hello world" } },
+      ])
+      col.closeSync()
+
+      // SearchService should fall back to ZVecOpen (not crash with "path validate failed")
+      await Effect.gen(function* () {
+        const search = yield* SearchService
+        const results = yield* search.search("hello", Array(384).fill(0.1), 1)
+        expect(results.length).toBe(1)
+        expect(results[0].path).toBe("a.ts")
       }).pipe(
         Effect.provide(defaultLayer),
         Effect.provide(AppFileSystem.defaultLayer),
