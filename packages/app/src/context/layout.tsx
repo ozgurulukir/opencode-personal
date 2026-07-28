@@ -367,8 +367,8 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
         flush()
       }
 
-      makeEventListener(window, "pagehide", flush)
-      makeEventListener(document, "visibilitychange", handleVisibility)
+      onCleanup(makeEventListener(window, "pagehide", flush))
+      onCleanup(makeEventListener(document, "visibilitychange", handleVisibility))
 
       onCleanup(() => {
         scroll.dispose()

@@ -379,7 +379,7 @@ export const { use: useCommand, provider: CommandProvider } = createSimpleContex
     }
 
     onMount(() => {
-      makeEventListener(document, "keydown", handleKeyDown)
+      onCleanup(makeEventListener(document, "keydown", handleKeyDown))
     })
 
     function register(cb: () => CommandOption[]): void

@@ -214,12 +214,12 @@ export const { use: useGlobalSDK, provider: GlobalSDKProvider } = createSimpleCo
     }
 
     onMount(() => {
-      makeEventListener(document, "visibilitychange", () => {
+      onCleanup(makeEventListener(document, "visibilitychange", () => {
         if (document.visibilityState !== "visible") return
         if (!started) return
         if (Date.now() - lastEventAt < HEARTBEAT_TIMEOUT_MS) return
         attempt?.abort()
-      })
+      }))
     })
 
     onCleanup(() => {
