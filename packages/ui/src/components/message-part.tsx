@@ -14,7 +14,7 @@ import {
 } from "solid-js"
 import { createStore } from "solid-js/store"
 import stripAnsi from "strip-ansi"
-import { contextToolSummary, findLastTextPart } from "./message-part-utils"
+import { contextToolSummary, findLastTextPart, parseUserMessageParts } from "./message-part-utils"
 import { Dynamic } from "solid-js/web"
 import {
   AgentPart,
@@ -628,15 +628,13 @@ export function AssistantParts(props: {
   const emptyParts: PartType[] = []
   const emptyTools: ToolPart[] = []
   const msgs = createMemo(() => index(props.messages))
-  const part = createMemo(
-    () => {
-      const map = new Map<string, Map<string, PartType>>()
-      for (const message of props.messages) {
-        map.set(message.id, index(list(data.store.part?.[message.id], emptyParts)))
-      }
-      return map
+  const part = createMemo(() => {
+    const map = new Map<string, Map<string, PartType>>()
+    for (const message of props.messages) {
+      map.set(message.id, index(list(data.store.part?.[message.id], emptyParts)))
     }
-  )
+    return map
+  })
 
   const grouped = createMemo(
     () => {
@@ -795,7 +793,6 @@ function contextToolTrigger(part: ToolPart, i18n: ReturnType<typeof useI18n>) {
     }
   }
 }
-
 
 function ExaOutput(props: { output?: string }) {
   const links = createMemo(() => urls(props.output))
@@ -1044,13 +1041,13 @@ export function UserMessageDisplay(props: { message: UserMessage; parts: PartTyp
 
   const text = createMemo(() => textPart()?.text || "")
 
-  const files = createMemo(() => (props.parts?.filter((p) => p.type === "file") as FilePart[]) ?? [])
+  // ⚡ Bolt Optimization: Replace multiple .filter() calls with a single loop to reduce GC pressure and O(N) traversals
+  const parsedParts = createMemo(() => parseUserMessageParts(props.parts))
 
-  const attachments = createMemo(() => files().filter(attached))
-
-  const inlineFiles = createMemo(() => files().filter(inline))
-
-  const agents = createMemo(() => (props.parts?.filter((p) => p.type === "agent") as AgentPart[]) ?? [])
+  const files = () => parsedParts().files
+  const attachments = () => parsedParts().attachments
+  const inlineFiles = () => parsedParts().inlineFiles
+  const agents = () => parsedParts().agents
 
   const model = createMemo(() => {
     const providerID = props.message.model?.providerID
