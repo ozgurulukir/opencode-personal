@@ -1,6 +1,7 @@
 import path from "path"
 import { pathToFileURL } from "url"
 import z from "zod"
+import { createHash } from "node:crypto"
 import { Effect, Layer, Context, Schema } from "effect"
 import { zod } from "@opencode-ai/core/effect-zod"
 import { withStatics } from "@opencode-ai/core/schema"
@@ -15,8 +16,11 @@ import { AppFileSystem } from "@opencode-ai/core/filesystem"
 import { Config } from "@/config/config"
 import { ConfigMarkdown } from "@/config/markdown"
 import { Glob } from "@opencode-ai/core/util/glob"
+import { Hash } from "@opencode-ai/core/util/hash"
 import * as Log from "@opencode-ai/core/util/log"
 import { Discovery } from "./discovery"
+import { EmbeddingService, defaultLayer as embeddingDefaultLayer } from "@/search/embedding"
+import { ZvecIndex } from "@/search/zvec"
 import CUSTOMIZE_OPENCODE_SKILL_BODY from "./prompt/customize-opencode.md" with { type: "text" }
 
 const log = Log.create({ service: "skill" })
@@ -64,6 +68,13 @@ export const NameMismatchError = NamedError.create(
 type State = {
   skills: Record<string, Info>
   dirs: Set<string>
+  loadedSkills: Set<string>
+  manifest: SkillManifest
+}
+
+type SkillManifest = {
+  version: number
+  skills: Record<string, { contentHash: string }>
 }
 
 type DiscoveryState = {
@@ -76,11 +87,21 @@ type ScanState = {
   dirs: Set<string>
 }
 
+function skillContentHash(skill: Info): string {
+  return createHash("sha1").update(`${skill.name}\n${skill.description ?? ""}\n${skill.content}`).digest("hex")
+}
+
 export interface Interface {
   readonly get: (name: string) => Effect.Effect<Info | undefined>
   readonly all: () => Effect.Effect<Info[]>
   readonly dirs: () => Effect.Effect<string[]>
   readonly available: (agent?: Agent.Info) => Effect.Effect<Info[]>
+  readonly markLoaded: (name: string) => Effect.Effect<void>
+  readonly matchBySemantics: (
+    userMessage: string,
+    agent: Agent.Info,
+    opts: { count: number; threshold: number },
+  ) => Effect.Effect<Info[]>
 }
 
 const add = Effect.fnUntraced(function* (state: State, match: string, bus: Bus.Interface) {
@@ -245,14 +266,47 @@ export const layer = Layer.effect(
     const bus = yield* Bus.Service
     const fsys = yield* AppFileSystem.Service
     const global = yield* Global.Service
+    const embedder = yield* EmbeddingService
     const discovered = yield* InstanceState.make(
       Effect.fn("Skill.discovery")(function* (ctx) {
         return yield* discoverSkills(config, discovery, fsys, global, ctx.directory, ctx.worktree)
       }),
     )
+
+    const zvecIndex = yield* InstanceState.make(
+      Effect.fn("Skill.zvecIndex")(function* () {
+        const directory = yield* InstanceState.directory
+        const dirHash = Hash.fast(directory)
+        const indexPath = path.join(Global.Path.cache, "zvec", "skills", dirHash)
+        yield* fsys.ensureDir(path.join(Global.Path.cache, "zvec", "skills")).pipe(Effect.catch(() => Effect.void))
+        return new ZvecIndex(indexPath)
+      }),
+    )
+
     const state = yield* InstanceState.make(
       Effect.fn("Skill.state")(function* () {
-        const s: State = { skills: {}, dirs: new Set() }
+        const directory = yield* InstanceState.directory
+        const dirHash = Hash.fast(directory)
+        const manifestPath = path.join(Global.Path.cache, "zvec", "skills", `${dirHash}_manifest.json`)
+
+        const s: State = {
+          skills: {},
+          dirs: new Set(),
+          loadedSkills: new Set(),
+          manifest: { version: 1, skills: {} },
+        }
+
+        // Load persisted manifest
+        const manifestExists = yield* fsys.existsSafe(manifestPath)
+        if (manifestExists) {
+          const raw = yield* fsys.readJson(manifestPath).pipe(
+            Effect.catch(() => Effect.succeed(undefined)),
+          )
+          if (raw && typeof raw === "object" && (raw as any).version === 1 && (raw as any).skills) {
+            s.manifest = raw as any
+          }
+        }
+
         // Register the built-in skill BEFORE disk discovery so a user-disk
         // skill with the same name can override it.
         if (Flag.OPENCODE_EXPERIMENTAL_CUSTOMIZE_SKILL) {
@@ -264,6 +318,63 @@ export const layer = Layer.effect(
           }
         }
         yield* loadSkills(s, yield* InstanceState.get(discovered), bus)
+
+        // Incremental indexing: find changed/new skills, embed, upsert to zvec
+        const zi = yield* InstanceState.get(zvecIndex)
+        const toIndex: Array<{ id: string; path: string; content: string; embedding: number[]; mtime: number }> = []
+        const toDelete: string[] = []
+        const currentNames = new Set(Object.keys(s.skills))
+
+        for (const name of currentNames) {
+          const sk = s.skills[name]
+          const ch = skillContentHash(sk)
+          const existing = s.manifest.skills[name]
+          if (!existing || existing.contentHash !== ch) {
+            toIndex.push({
+              id: `skill:${name}`,
+              path: sk.location,
+              content: `${sk.name}\n${sk.description ?? ""}\n${sk.content}`,
+              embedding: [],
+              mtime: Date.now(),
+            })
+          }
+        }
+
+        // Find deleted skills
+        for (const cachedName of Object.keys(s.manifest.skills)) {
+          if (!currentNames.has(cachedName)) {
+            toDelete.push(`skill:${cachedName}`)
+          }
+        }
+
+        // Delete removed skills from zvec
+        if (toDelete.length > 0) {
+          yield* zi.delete(toDelete).pipe(Effect.catch(() => Effect.void))
+        }
+
+        // Embed and index new/changed skills
+        if (toIndex.length > 0) {
+          const contents = toIndex.map((c) => c.content)
+          const vectors = yield* embedder.embed(contents).pipe(Effect.orDie)
+          const enriched = toIndex.map((c, i) => ({ ...c, embedding: vectors[i] }))
+          yield* zi.index(enriched).pipe(Effect.catch(() => Effect.void))
+
+          // Update manifest
+          for (const c of toIndex) {
+            const name = c.id.slice("skill:".length)
+            s.manifest.skills[name] = { contentHash: skillContentHash(s.skills[name]) }
+          }
+        }
+
+        // Remove deleted from manifest
+        for (const id of toDelete) {
+          const name = id.slice("skill:".length)
+          delete s.manifest.skills[name]
+        }
+
+        // Persist manifest
+        yield* fsys.writeJson(manifestPath, s.manifest).pipe(Effect.catch(() => Effect.void))
+
         return s
       }),
     )
@@ -289,7 +400,40 @@ export const layer = Layer.effect(
       return list.filter((skill) => Permission.evaluate("skill", skill.name, agent.permission).action !== "deny")
     })
 
-    return Service.of({ get, all, dirs, available })
+    const markLoaded = Effect.fn("Skill.markLoaded")(function* (name: string) {
+      const s = yield* InstanceState.get(state)
+      s.loadedSkills.add(name)
+    })
+
+    const matchBySemantics = Effect.fn("Skill.matchBySemantics")(function* (
+      userMessage: string,
+      agent: Agent.Info,
+      opts: { count: number; threshold: number },
+    ) {
+      const s = yield* InstanceState.get(state)
+      const zi = yield* InstanceState.get(zvecIndex)
+
+      const [queryVec] = yield* embedder.embed([userMessage]).pipe(Effect.orDie)
+      const results = yield* zi.search(userMessage, queryVec, opts.count * 2).pipe(
+        Effect.catch(() => Effect.succeed([] as Array<{ id: string; score: number; path: string; content: string }>)),
+      )
+
+      // Filter by loadedSkills, permission, and threshold
+      const matched: Info[] = []
+      for (const r of results) {
+        const name = r.id.startsWith("skill:") ? r.id.slice("skill:".length) : ""
+        if (!name || !s.skills[name]) continue
+        if (s.loadedSkills.has(name)) continue
+        if (r.score < opts.threshold) continue
+        if (Permission.evaluate("skill", name, agent.permission).action === "deny") continue
+        matched.push(s.skills[name])
+        if (matched.length >= opts.count) break
+      }
+
+      return matched
+    })
+
+    return Service.of({ get, all, dirs, available, markLoaded, matchBySemantics })
   }),
 )
 
@@ -299,6 +443,7 @@ export const defaultLayer = layer.pipe(
   Layer.provide(Bus.layer),
   Layer.provide(AppFileSystem.defaultLayer),
   Layer.provide(Global.layer),
+  Layer.provide(embeddingDefaultLayer),
 )
 
 export function fmt(list: Info[], opts: { verbose: boolean }) {

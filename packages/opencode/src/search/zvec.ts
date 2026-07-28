@@ -56,7 +56,7 @@ const zvec = lazy((): ZVecModule | undefined => {
   }
 })
 
-class ZvecIndex {
+export class ZvecIndex {
   private collection: ZVecCollection | null = null
   private readonly path: string
   private readonly dimension: number

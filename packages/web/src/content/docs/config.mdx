@@ -713,6 +713,35 @@ You can configure MCP servers you want to use through the `mcp` option.
 
 ---
 
+### Skills
+
+Configure skill discovery and auto-matching through the `skills` option.
+
+```json title="opencode.json"
+{
+  "$schema": "https://opencode.ai/config.json",
+  "skills": {
+    "paths": ["./team-skills"],
+    "urls": ["https://example.com/.well-known/skills/"],
+    "autoMatch": true,
+    "autoMatchCount": 3,
+    "autoMatchThreshold": 0.25
+  }
+}
+```
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `paths` | `string[]` | `[]` | Additional directories to scan for `SKILL.md` files |
+| `urls` | `string[]` | `[]` | Remote URLs to fetch skill definitions from |
+| `autoMatch` | `boolean` | `false` | Enable semantic search to automatically inject matching skills into context |
+| `autoMatchCount` | `number` | `3` | Number of top-matching skills to inject when `autoMatch` is enabled |
+| `autoMatchThreshold` | `number` | `0.25` | Minimum cosine similarity score (0–1) for auto-match. Skills below this threshold are not injected |
+
+[Learn more about skills](/docs/skills).
+
+---
+
 ### Plugins
 
 [Plugins](/docs/plugins) extend OpenCode with custom tools, hooks, and integrations.

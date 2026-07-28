@@ -28,7 +28,7 @@ System prompt uses a **shared core + provider delta** structure:
 **XML section markers** (consistent semantics, do not mix):
 
 - `<environment>` — runtime context (working dir, platform, date)
-- `<skills>` — available skills catalog (verbose in system prompt, brief in skill tool description)
+- `<skills>` — available skills catalog (verbose in system prompt, brief in skill tool description). When `skills.autoMatch` is enabled, only the top-matching skills are shown instead of the full catalog.
 - `<instructions source="...">` — persistent project rules (AGENTS.md, CLAUDE.md)
 - `<system-reminder>` — transient status notifications (plan mode, build switch, max steps)
 
@@ -239,6 +239,7 @@ See `specs/effect/migration.md` for the compact pattern reference and examples.
 - Use `Effect.forkScoped` inside the closure for background stream consumers — the fiber is interrupted when the instance is disposed.
 - To make a service's `init()` non-blocking, fork `InstanceState.get(state)` at the `init()` call site (e.g. `Effect.forkIn(scope)`), not by forking work inside the `InstanceState.make` closure. Forking inside the closure leaves state incomplete for other methods that read it.
 - `src/project/bootstrap.ts` already wraps every service `init()` in `Effect.forkDetach`, so `init()` is fire-and-forget in production. Keep `init()` methods synchronous internally; the caller controls concurrency.
+- **Split error-prone resources into separate InstanceState.** If a single `InstanceState<State, Error, ...>` holds a resource whose methods return `Effect<A, Error>` (e.g., `ZvecIndex`), the `Error` type pollutes all methods that read from that state. Fix: put the error-prone resource in its own `InstanceState` and compose them. See `skill/index.ts` for the pattern — `ZvecIndex` lives in its own `InstanceState`, separate from the skill metadata state.
 
 ## Effect v4 beta API
 

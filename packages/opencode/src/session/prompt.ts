@@ -1668,8 +1668,18 @@ const resolveTools = Effect.fn("SessionPrompt.resolveTools")(function* (input: {
 
             yield* plugin.trigger("experimental.chat.messages.transform", {}, { messages: msgs })
 
+            const cfg = yield* config.get()
+            const userText = lastUserMsg?.parts.filter((p) => p.type === "text").map((p) => p.text).join(" ")
+            const autoMatchOpts = cfg.skills?.autoMatch
+              ? {
+                  autoMatch: true,
+                  count: cfg.skills.autoMatchCount ?? 3,
+                  threshold: cfg.skills.autoMatchThreshold ?? 0.25,
+                }
+              : undefined
+
             const [skills, env, instructions, modelMsgs] = yield* Effect.all([
-              sys.skills(agent),
+              sys.skills(agent, userText, autoMatchOpts),
               sys.environment(model),
               instruction.system().pipe(Effect.orDie),
               MessageV2.toModelMessagesEffect(msgs, model),

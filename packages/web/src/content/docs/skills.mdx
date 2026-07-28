@@ -122,6 +122,26 @@ skill({ name: "git-release" })
 
 ---
 
+## Auto-match skills
+
+When `skills.autoMatch` is enabled in `opencode.json`, OpenCode uses semantic search to find relevant skills automatically — without the agent needing to call the `skill` tool.
+
+On each request, the user's message is compared against all skill descriptions using cosine similarity. The top matching skills (up to `autoMatchCount`) are injected into the system prompt as `<skills>` XML, provided their similarity score exceeds `autoMatchThreshold`.
+
+```json
+{
+  "skills": {
+    "autoMatch": true,
+    "autoMatchCount": 3,
+    "autoMatchThreshold": 0.25
+  }
+}
+```
+
+Skills already loaded via the `skill` tool are excluded from auto-match to avoid duplication.
+
+---
+
 ## Configure permissions
 
 Control which skills agents can access using pattern-based permissions in `opencode.json`:

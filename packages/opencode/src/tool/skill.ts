@@ -36,6 +36,8 @@ export const SkillTool = Tool.define(
             metadata: {},
           })
 
+          yield* skill.markLoaded(params.name)
+
           const dir = path.dirname(info.location)
           const base = pathToFileURL(dir).href
           const limit = 10
