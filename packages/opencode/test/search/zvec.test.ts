@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test"
+import { describe, expect, mock, test } from "bun:test"
 import { Effect, Layer } from "effect"
 import { SearchService, type SearchServiceInterface } from "../../src/search/search"
 import {
@@ -10,6 +10,17 @@ import {
   ZVecInitialize,
   ZVecLogLevel,
 } from "@zvec/zvec"
+
+// Module-level variable for mock.module factory (hoisted by Bun, must be at module scope)
+let _testCacheDir = ""
+
+mock.module("@opencode-ai/core/global", () => {
+  const actual = require("@opencode-ai/core/global")
+  return {
+    ...actual,
+    Path: { ...actual.Path, get cache() { return _testCacheDir } },
+  }
+})
 
 describe("search.zvec", () => {
   test("@zvec/zvec loads and basic CRUD works", () => {
@@ -177,7 +188,7 @@ describe("search.zvec", () => {
       ZVecCreateAndOpen,
       ZVecOpen,
     } = await import("@zvec/zvec")
-    const { defaultLayer } = await import("../../src/search/zvec")
+    const { Hash } = await import("@opencode-ai/core/util/hash")
     const { provideInstance } = await import("../fixture/fixture")
     const { AppFileSystem } = await import("@opencode-ai/core/filesystem")
     const fsNode = await import("node:fs/promises")
@@ -185,10 +196,15 @@ describe("search.zvec", () => {
     const path = await import("path")
 
     const dir = await fsNode.mkdtemp(path.join(os.tmpdir(), "opencode-zvec-fallback-test-"))
+    const cacheDir = await fsNode.mkdtemp(path.join(os.tmpdir(), "opencode-zvec-cache-"))
+    _testCacheDir = cacheDir
 
     try {
+      const { defaultLayer } = await import("../../src/search/zvec")
+
       ZVecInitialize({ logLevel: ZVecLogLevel.ERROR })
-      const indexPath = path.join(dir, ".opencode", "zvec_index")
+      const dirHash = Hash.fast(dir)
+      const indexPath = path.join(cacheDir, "zvec", dirHash)
       const schema = new ZVecCollectionSchema({
         name: "workspace_search",
         vectors: {
@@ -209,6 +225,7 @@ describe("search.zvec", () => {
       })
 
       // Pre-populate the index directory using the native API, then close it
+      await fsNode.mkdir(path.join(cacheDir, "zvec"), { recursive: true })
       const col = ZVecCreateAndOpen(indexPath, schema)
       col.insertSync([
         { id: "a", vectors: { embedding: Array(384).fill(0.1) }, fields: { path: "a.ts", content: "hello world" } },
@@ -228,7 +245,9 @@ describe("search.zvec", () => {
         Effect.runPromise,
       )
     } finally {
+      mock.restore()
       await fsNode.rm(dir, { recursive: true, force: true }).catch(() => {});
+      await fsNode.rm(cacheDir, { recursive: true, force: true }).catch(() => {});
     }
   })
 })

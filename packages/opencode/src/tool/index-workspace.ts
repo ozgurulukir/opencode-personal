@@ -1,8 +1,11 @@
 import { Effect, Schema } from "effect"
+import path from "path"
 import * as Tool from "./tool"
 import { SearchService } from "@/search/search"
 import { EmbeddingService } from "@/search/embedding"
 import { AppFileSystem } from "@opencode-ai/core/filesystem"
+import { Path as GlobalPath } from "@opencode-ai/core/global"
+import { Hash } from "@opencode-ai/core/util/hash"
 import { InstanceState } from "@/effect/instance-state"
 import { IndexWorkspace } from "@/search/indexer"
 import DESCRIPTION from "./index-workspace.txt"
@@ -27,7 +30,8 @@ export const IndexWorkspaceTool = Tool.define(
       execute: (params: { force: boolean }) =>
         Effect.gen(function* () {
           const directory = yield* InstanceState.directory
-          const manifestPath = `${directory}/.opencode/zvec_index_manifest.json`
+          const dirHash = Hash.fast(directory)
+          const manifestPath = path.join(GlobalPath.cache, "zvec", `${dirHash}_manifest.json`)
 
           if (params.force) {
             yield* search.reset

@@ -1,6 +1,9 @@
 import { Effect, Layer } from "effect"
 import { createHash } from "node:crypto"
+import path from "path"
 import { AppFileSystem } from "@opencode-ai/core/filesystem"
+import { Global } from "@opencode-ai/core/global"
+import { Hash } from "@opencode-ai/core/util/hash"
 import * as Log from "@opencode-ai/core/util/log"
 import { SearchService, type SearchResult, type SearchServiceInterface } from "./search"
 import { InstanceState } from "@/effect/instance-state"
@@ -200,11 +203,12 @@ export const layer = Layer.effect(
     const state = yield* InstanceState.make(
       Effect.fn("SearchService.state")(function* () {
         const directory = yield* InstanceState.directory
-        const indexPath = `${directory}/.opencode/zvec_index`
-        // Ensure the parent (.opencode) exists, but NOT the index dir itself —
+        const dirHash = Hash.fast(directory)
+        const indexPath = path.join(Global.Path.cache, "zvec", dirHash)
+        // Ensure the parent cache dir exists, but NOT the index dir itself —
         // ZVecCreateAndOpen must create it fresh (it rejects an already-existing path,
         // and the open() fallback uses ZVecOpen only for re-opening an existing DB).
-        yield* fs.ensureDir(`${directory}/.opencode`).pipe(Effect.catch(() => Effect.void))
+        yield* fs.ensureDir(path.join(Global.Path.cache, "zvec")).pipe(Effect.catch(() => Effect.void))
         return new ZvecIndex(indexPath)
       }),
     )
