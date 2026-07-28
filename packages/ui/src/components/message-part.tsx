@@ -14,7 +14,7 @@ import {
 } from "solid-js"
 import { createStore } from "solid-js/store"
 import stripAnsi from "strip-ansi"
-import { contextToolSummary, findLastTextPart } from "./message-part-utils"
+import { contextToolSummary, findLastTextPart, parseUserMessageParts } from "./message-part-utils"
 import { Dynamic } from "solid-js/web"
 import {
   AgentPart,
@@ -1042,26 +1042,7 @@ export function UserMessageDisplay(props: { message: UserMessage; parts: PartTyp
   const text = createMemo(() => textPart()?.text || "")
 
   // ⚡ Bolt Optimization: Replace multiple .filter() calls with a single loop to reduce GC pressure and O(N) traversals
-  const parsedParts = createMemo(() => {
-    const files: FilePart[] = []
-    const attachments: FilePart[] = []
-    const inlineFiles: FilePart[] = []
-    const agents: AgentPart[] = []
-    const rawParts = props.parts ?? []
-
-    for (let i = 0; i < rawParts.length; i++) {
-      const p = rawParts[i]
-      if (p.type === "file") {
-        const filePart = p as FilePart
-        files.push(filePart)
-        if (attached(filePart)) attachments.push(filePart)
-        if (inline(filePart)) inlineFiles.push(filePart)
-      } else if (p.type === "agent") {
-        agents.push(p as AgentPart)
-      }
-    }
-    return { files, attachments, inlineFiles, agents }
-  })
+  const parsedParts = createMemo(() => parseUserMessageParts(props.parts))
 
   const files = () => parsedParts().files
   const attachments = () => parsedParts().attachments
