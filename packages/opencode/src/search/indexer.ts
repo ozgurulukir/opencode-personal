@@ -1,5 +1,8 @@
 import { Effect } from "effect"
+import path from "path"
 import { AppFileSystem } from "@opencode-ai/core/filesystem"
+import { Path as GlobalPath } from "@opencode-ai/core/global"
+import { Hash } from "@opencode-ai/core/util/hash"
 import { SearchService } from "./search"
 import { EmbeddingService } from "./embedding"
 import { InstanceState } from "@/effect/instance-state"
@@ -56,8 +59,9 @@ export const IndexWorkspace = Effect.gen(function* () {
       dot: false,
     })
 
-    yield* fs.ensureDir(`${directory}/.opencode`).pipe(Effect.catch(() => Effect.void))
-    const manifestPath = `${directory}/.opencode/zvec_index_manifest.json`
+    const dirHash = Hash.fast(directory)
+    yield* fs.ensureDir(path.join(GlobalPath.cache, "zvec")).pipe(Effect.catch(() => Effect.void))
+    const manifestPath = path.join(GlobalPath.cache, "zvec", `${dirHash}_manifest.json`)
     const manifestExists = yield* fs.existsSafe(manifestPath)
     let manifest: { version: number; files: Record<string, { mtime: number; chunkIds: string[] }> } = {
       version: 1,
