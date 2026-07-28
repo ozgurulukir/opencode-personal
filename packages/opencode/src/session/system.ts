@@ -49,7 +49,11 @@ function matchDelta(model: Provider.Model): string {
 
 export interface Interface {
   readonly environment: (model: Provider.Model) => Effect.Effect<string[]>
-  readonly skills: (agent: Agent.Info) => Effect.Effect<string | undefined>
+  readonly skills: (
+    agent: Agent.Info,
+    userMessage?: string,
+    autoMatchOpts?: { autoMatch: boolean; count: number; threshold: number },
+  ) => Effect.Effect<string | undefined>
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/SystemPrompt") {}
@@ -76,17 +80,35 @@ export const layer = Layer.effect(
         ]
       }),
 
-      skills: Effect.fn("SystemPrompt.skills")(function* (agent: Agent.Info) {
+      skills: Effect.fn("SystemPrompt.skills")(function* (
+        agent: Agent.Info,
+        userMessage?: string,
+        autoMatchOpts?: { autoMatch: boolean; count: number; threshold: number },
+      ) {
         if (Permission.disabled(["skill"], agent.permission).has("skill")) return
 
-        const list = yield* skill.available(agent)
+        // Auto-match mode: use semantic search to find relevant skills
+        if (userMessage && autoMatchOpts?.autoMatch) {
+          const matched = yield* skill.matchBySemantics(userMessage, agent, {
+            count: autoMatchOpts.count,
+            threshold: autoMatchOpts.threshold,
+          })
+          if (matched.length === 0) return
+          return [
+            "<skills>",
+            "Skills provide specialized instructions and workflows for specific tasks.",
+            "Use the skill tool to load a skill when a task matches its description.",
+            Skill.fmt(matched, { verbose: true }),
+            "</skills>",
+          ].join("\n")
+        }
 
+        // Fallback: list all available skills
+        const list = yield* skill.available(agent)
         return [
           "<skills>",
           "Skills provide specialized instructions and workflows for specific tasks.",
           "Use the skill tool to load a skill when a task matches its description.",
-          // the agents seem to ingest the information about skills a bit better if we present a more verbose
-          // version of them here and a less verbose version in tool description, rather than vice versa.
           Skill.fmt(list, { verbose: true }),
           "</skills>",
         ].join("\n")
