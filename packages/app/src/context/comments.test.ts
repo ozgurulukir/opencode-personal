@@ -1,8 +1,10 @@
-import { beforeAll, describe, expect, mock, test } from "bun:test"
+import { afterAll, beforeAll, describe, expect, mock, test } from "bun:test"
 import { createRoot } from "solid-js"
 import type { LineComment } from "./comments"
 
 let createCommentSessionForTest: typeof import("./comments").createCommentSessionForTest
+
+afterAll(() => mock.restore())
 
 beforeAll(async () => {
   mock.module("@solidjs/router", () => ({

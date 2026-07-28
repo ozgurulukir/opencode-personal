@@ -1,8 +1,10 @@
-import { beforeAll, describe, expect, mock, test } from "bun:test"
+import { afterAll, beforeAll, describe, expect, mock, test } from "bun:test"
 
 let shouldListRoot: typeof import("./file-tree").shouldListRoot
 let shouldListExpanded: typeof import("./file-tree").shouldListExpanded
 let dirsToExpand: typeof import("./file-tree").dirsToExpand
+
+afterAll(() => mock.restore())
 let normalizePath: typeof import("./file-tree").normalizePath
 let buildFilter: typeof import("./file-tree").buildFilter
 

@@ -1,8 +1,10 @@
-import { beforeAll, describe, expect, mock, test } from "bun:test"
+import { afterAll, beforeAll, describe, expect, mock, test } from "bun:test"
 import type { Message, Part } from "@opencode-ai/sdk/v2"
 
 let sendFollowupDraftFn: typeof import("./sendFollowupDraft").sendFollowupDraft
 let detectCommandFn: typeof import("./detectCommand").detectCommand
+
+afterAll(() => mock.restore())
 let optimisticAddFn: typeof import("./useOptimisticSend").optimisticAdd
 let optimisticRemoveFn: typeof import("./useOptimisticSend").optimisticRemove
 
