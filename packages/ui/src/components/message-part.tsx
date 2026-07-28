@@ -628,15 +628,13 @@ export function AssistantParts(props: {
   const emptyParts: PartType[] = []
   const emptyTools: ToolPart[] = []
   const msgs = createMemo(() => index(props.messages))
-  const part = createMemo(
-    () => {
-      const map = new Map<string, Map<string, PartType>>()
-      for (const message of props.messages) {
-        map.set(message.id, index(list(data.store.part?.[message.id], emptyParts)))
-      }
-      return map
+  const part = createMemo(() => {
+    const map = new Map<string, Map<string, PartType>>()
+    for (const message of props.messages) {
+      map.set(message.id, index(list(data.store.part?.[message.id], emptyParts)))
     }
-  )
+    return map
+  })
 
   const grouped = createMemo(
     () => {
@@ -795,7 +793,6 @@ function contextToolTrigger(part: ToolPart, i18n: ReturnType<typeof useI18n>) {
     }
   }
 }
-
 
 function ExaOutput(props: { output?: string }) {
   const links = createMemo(() => urls(props.output))
@@ -1044,13 +1041,32 @@ export function UserMessageDisplay(props: { message: UserMessage; parts: PartTyp
 
   const text = createMemo(() => textPart()?.text || "")
 
-  const files = createMemo(() => (props.parts?.filter((p) => p.type === "file") as FilePart[]) ?? [])
+  // ⚡ Bolt Optimization: Replace multiple .filter() calls with a single loop to reduce GC pressure and O(N) traversals
+  const parsedParts = createMemo(() => {
+    const files: FilePart[] = []
+    const attachments: FilePart[] = []
+    const inlineFiles: FilePart[] = []
+    const agents: AgentPart[] = []
+    const rawParts = props.parts ?? []
 
-  const attachments = createMemo(() => files().filter(attached))
+    for (let i = 0; i < rawParts.length; i++) {
+      const p = rawParts[i]
+      if (p.type === "file") {
+        const filePart = p as FilePart
+        files.push(filePart)
+        if (attached(filePart)) attachments.push(filePart)
+        if (inline(filePart)) inlineFiles.push(filePart)
+      } else if (p.type === "agent") {
+        agents.push(p as AgentPart)
+      }
+    }
+    return { files, attachments, inlineFiles, agents }
+  })
 
-  const inlineFiles = createMemo(() => files().filter(inline))
-
-  const agents = createMemo(() => (props.parts?.filter((p) => p.type === "agent") as AgentPart[]) ?? [])
+  const files = () => parsedParts().files
+  const attachments = () => parsedParts().attachments
+  const inlineFiles = () => parsedParts().inlineFiles
+  const agents = () => parsedParts().agents
 
   const model = createMemo(() => {
     const providerID = props.message.model?.providerID
