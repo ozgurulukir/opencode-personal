@@ -1,8 +1,10 @@
-import { beforeAll, beforeEach, describe, expect, mock, test } from "bun:test"
+import { afterAll, beforeAll, beforeEach, describe, expect, mock, test } from "bun:test"
 
 type PersistTestingType = typeof import("./persist").PersistTesting
 type PersistType = typeof import("./persist").Persist
 type RemovePersistedType = typeof import("./persist").removePersisted
+
+afterAll(() => mock.restore())
 
 class MemoryStorage implements Storage {
   private values = new Map<string, string>()

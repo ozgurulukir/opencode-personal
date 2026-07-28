@@ -1,7 +1,9 @@
-import { beforeAll, beforeEach, describe, expect, mock, test } from "bun:test"
+import { afterAll, beforeAll, beforeEach, describe, expect, mock, test } from "bun:test"
 import type { Prompt } from "@/context/prompt"
 
 let createPromptSubmit: typeof import("./submit").createPromptSubmit
+
+afterAll(() => mock.restore())
 
 const createdClients: string[] = []
 const createdSessions: string[] = []

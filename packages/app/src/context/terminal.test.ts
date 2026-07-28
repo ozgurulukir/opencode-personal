@@ -1,8 +1,10 @@
-import { beforeAll, describe, expect, mock, test } from "bun:test"
+import { afterAll, beforeAll, describe, expect, mock, test } from "bun:test"
 
 type ServerKey = Parameters<typeof import("./terminal").getTerminalServerScope>[1]
 
 let getWorkspaceTerminalCacheKey: (dir: string, scope?: string) => string
+
+afterAll(() => mock.restore())
 let getTerminalServerScope: typeof import("./terminal").getTerminalServerScope
 let getLegacyTerminalStorageKeys: (dir: string, legacySessionID?: string) => string[]
 let migrateTerminalState: (value: unknown) => unknown

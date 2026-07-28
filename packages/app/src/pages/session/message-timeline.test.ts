@@ -1,8 +1,10 @@
-import { describe, expect, test } from "bun:test"
+import { afterAll, describe, expect, mock, test } from "bun:test"
 import { createRoot } from "solid-js"
 import { createStore, type Store } from "solid-js/store"
 import type { Part, TextPart, UserMessage } from "@opencode-ai/sdk/v2"
 import { createTimelineStaging } from "./message-staging"
+
+afterAll(() => mock.restore())
 import { messageComments, taskDescription } from "./message-comments"
 import { pace } from "./message-staging"
 import { boundaryTarget, markBoundaryGesture } from "./message-gesture"
