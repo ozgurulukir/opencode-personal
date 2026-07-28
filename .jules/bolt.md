@@ -59,3 +59,7 @@
 ## 2026-07-27 - Consolidating multiple reduce calls in session-context-tab.tsx
 **Learning:** Using multiple `.reduce()` calls on the same array to calculate different metrics (e.g. counting specific message roles) forces multiple O(N) passes over the array and introduces function call overhead from the callback functions.
 **Action:** Consolidate multiple `.reduce()` calls into a single `for` loop to compute all metrics in one pass, reducing GC pressure and time complexity. (e.g. `packages/app/src/components/session/session-context-tab.tsx` in a hot `createMemo` path during streaming sessions, matching the existing `// ⚡ Bolt Optimization` patterns at lines 111 and 127).
+
+## 2026-07-28 - Consolidating multiple createMemo filters
+**Learning:** Using multiple consecutive `createMemo` hooks with chained array `.filter()` calls over the same array causes severe performance issues in SolidJS, especially during streaming where `props.parts` updates rapidly. This forces multiple O(N) traversals and GC collections per frame.
+**Action:** Replace multiple `.filter()` calls inside separate `createMemo`s with a single imperative loop inside one `createMemo` block, updating pre-allocated arrays, to do it all in a single pass.
