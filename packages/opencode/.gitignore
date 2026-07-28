@@ -9,3 +9,4 @@ script/build-*.ts
 temporary-*.md
 .artifacts
 src/search/wasm
+zvec
