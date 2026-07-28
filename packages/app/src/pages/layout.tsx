@@ -217,11 +217,11 @@ export default function Layout(props: ParentProps) {
       if (document.visibilityState !== "hidden") return
       reset()
     }
-    makeEventListener(window, "pointerup", stop)
-    makeEventListener(window, "pointercancel", stop)
-    makeEventListener(window, "blur", stop)
-    makeEventListener(window, "blur", blur)
-    makeEventListener(document, "visibilitychange", hide)
+    onCleanup(makeEventListener(window, "pointerup", stop))
+    onCleanup(makeEventListener(window, "pointercancel", stop))
+    onCleanup(makeEventListener(window, "blur", stop))
+    onCleanup(makeEventListener(window, "blur", blur))
+    onCleanup(makeEventListener(document, "visibilitychange", hide))
   })
 
   const sidebarHovering = createMemo(() => !layout.sidebar.opened() && state.hoverProject !== undefined)
@@ -1381,7 +1381,7 @@ export default function Layout(props: ParentProps) {
     }
 
     handleDeepLinks(drainPendingDeepLinks(window))
-    makeEventListener(window, deepLinkEvent, handler as EventListener)
+    onCleanup(makeEventListener(window, deepLinkEvent, handler as EventListener))
   })
 
   async function renameProject(project: LocalProject, next: string) {

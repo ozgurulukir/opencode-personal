@@ -1784,7 +1784,7 @@ export default function Page() {
   )
 
   onMount(() => {
-    makeEventListener(document, "keydown", handleKeyDown)
+    onCleanup(makeEventListener(document, "keydown", handleKeyDown))
   })
 
   onCleanup(() => {
