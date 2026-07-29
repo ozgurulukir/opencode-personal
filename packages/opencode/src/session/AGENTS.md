@@ -93,6 +93,30 @@ Normal tools merge `agent.permission + session.permission`. But subagent task's 
 
 `context-budget.ts:43` — the old default `min(20000, maxOutputTokens)` was too small for models with 32K+ output limits. The new default is `maxOutputTokens` (or user-configured `reserved`). This ensures compaction reserves enough headroom for the model's full output capacity.
 
+### `summary_max_tokens` config — summary budget is now configurable
+
+`compaction.ts:summaryBudget()` — the compaction summary length was previously unbounded (model decided). Now: `cc.summaryMaxTokens ?? min(maxOutputTokens, maxSummaryTokens)`. Config key `compaction.summary_max_tokens` overrides; default caps at `min(model output limit, 8000)`. The `buildPrompt` function appends `Target length: under N tokens.` to the template when a budget is set.
+
+### `autocontinue` only fires on auto compaction
+
+`compaction.ts:554` — the synthetic "Continue" message after compaction is gated by `input.auto`. Manual `/compact` does NOT inject a continue message. The config key `compaction.autocontinue` (default `true`) and the plugin hook `experimental.compaction.autocontinue` both control this — config must be `true` AND plugin must return `{ enabled: true }` for the continue message to appear.
+
+### Continue message includes pending todos
+
+`compaction.ts:585-602` — when `Todo.Service` is available (via `Effect.serviceOption`), the continue message appends a "Pending todos:" block with `[H]`/`[M]`/`[L]` badges. The service is optional — if not provided, the continue message omits the todo block silently. This is a non-breaking enhancement: existing consumers that don't provide `Todo.Service` continue to work.
+
+### `summaryBudget` uses model output limit, not a hardcoded ratio
+
+`compaction.ts:summaryBudget()` — unlike `preserveRecentBudget` which uses `usable * 0.25`, the summary budget is `cc.summaryMaxTokens ?? min(maxOutputTokens, maxSummaryTokens)`. No hardcoded ratio: the model's `maxOutputTokens` is the natural cap (the compaction agent can't output more than that anyway), and `maxSummaryTokens` (8000) is a practical ceiling.
+
+### `SUMMARY_TEMPLATE` — tool call shorthand and file roles
+
+`compaction.ts:44-78` — the template now guides the model to use `tool_name(key_arg)` shorthand (e.g., `read(src/auth.ts)`, `bash(npm test)`) and annotate file paths with roles (`read | written | created | deleted`). These patterns improve summary quality by preserving tool call history and file operation context that would otherwise be lost in natural-language rephrasing.
+
+### `buildPrompt` token budget hint
+
+`compaction.ts:buildPrompt()` — when `maxTokens` is provided, the function appends `Target length: under N tokens.` to the template. This gives the model a concrete output length target, preventing overly long or short summaries. The budget is calculated by `summaryBudget()` and passed from the call site at `compaction.ts:445`.
+
 ## Pre-existing flaky tests in this module
 
 - `session.system > skills output is sorted by name and stable across calls` — fails intermittently (Expected: >489, Received: 188)

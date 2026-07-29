@@ -489,7 +489,10 @@ opencode run "Hello world"
   "$schema": "https://opencode.ai/config.json",
   "compaction": {
     "auto": true,
-    "prune": true
+    "prune": true,
+    "tail_turns": 2,
+    "summary_max_tokens": 5000,
+    "prune_protected_tools": ["skill", "task"]
   }
 }
 ```
@@ -497,6 +500,9 @@ opencode run "Hello world"
 - `auto` - ضغط الجلسة تلقائيًا عند امتلاء السياق (الافتراضي: `true`).
 - `prune` - إزالة مخرجات الأدوات القديمة لتوفير الرموز (tokens) (الافتراضي: `true`).
 - `reserved` - مخزن مؤقت للرموز (tokens) من أجل الضغط. يترك نافذة كافية لتجنب الفيضان أثناء الضغط.
+- `tail_turns` - عدد أدوار المستخدم الأخيرة التي سيتم الاحتفاظ بها حرفيًا أثناء الضغط (الافتراضي: `2`).
+- `summary_max_tokens` - الحد الأقصى لعدد الرموز (tokens) لملخص الضغط. الافتراضي: `min(حد إخراج النموذج, 8000)`.
+- `prune_protected_tools` - أسماء الأدوات التي لا يتم تقليم مخرجاتها أبدًا (الافتراضي: `["skill"]`).
 
 ---
 

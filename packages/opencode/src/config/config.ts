@@ -301,6 +301,14 @@ export const Info = Schema.Struct({
         description:
           "Tool names whose output is never pruned during compaction (default: [\"skill\"])",
       }),
+      summary_max_tokens: Schema.optional(NonNegativeInt).annotate({
+        description:
+          "Maximum tokens for the compaction summary. Defaults to min(model output limit, 8000).",
+      }),
+      autocontinue: Schema.optional(Schema.Boolean).annotate({
+        description:
+          "After auto-compaction, inject a synthetic 'Continue' message so the model can proceed (default: true). Only applies to auto compaction, not manual /compact.",
+      }),
     }),
   ),
   experimental: Schema.optional(

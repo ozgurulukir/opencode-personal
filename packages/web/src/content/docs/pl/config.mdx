@@ -486,13 +486,19 @@ Możesz kontrolować zachowanie kompaktowania kontekstu za pomocą opcji `compac
   "$schema": "https://opencode.ai/config.json",
   "compaction": {
     "auto": true,
-    "prune": true
+    "prune": true,
+    "tail_turns": 2,
+    "summary_max_tokens": 5000,
+    "prune_protected_tools": ["skill", "task"]
   }
 }
 ```
 
 - `auto` - Automatycznie kompaktuj, gdy kontekst jest pełny (domyślnie: `true`).
 - `prune` - Usuń stare wyniki narzędzi, aby zaoszczędzić tokeny (domyślnie: `true`).
+- `tail_turns` - Liczba ostatnich tur użytkownika do zachowania dosłownie podczas kompakcji (domyślnie: `2`).
+- `summary_max_tokens` - Maksymalna liczba tokenów dla podsumowania kompakcji. Domyślnie: `min(limit wyjścia modelu, 8000)`.
+- `prune_protected_tools` - Nazwy narzędzi, których dane wyjściowe nigdy nie są przycinane (domyślnie: `["skill"]`).
 
 ---
 

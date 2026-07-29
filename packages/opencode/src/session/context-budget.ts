@@ -11,6 +11,7 @@ export const DEFAULTS = {
   defaultTailTurns: 2,
   minPreserveRecentTokens: 2_000,
   maxPreserveRecentTokens: 8_000,
+  maxSummaryTokens: 8_000,
 } as const
 
 export function compactionConfig(cfg: Config.Info) {
@@ -26,6 +27,9 @@ export function compactionConfig(cfg: Config.Info) {
     minPreserveRecentTokens: cfg.compaction?.min_preserve_recent_tokens ?? DEFAULTS.minPreserveRecentTokens,
     maxPreserveRecentTokens: cfg.compaction?.max_preserve_recent_tokens ?? DEFAULTS.maxPreserveRecentTokens,
     pruneProtectedTools: cfg.compaction?.prune_protected_tools ?? ["skill"],
+    summaryMaxTokens: cfg.compaction?.summary_max_tokens,
+    maxSummaryTokens: DEFAULTS.maxSummaryTokens,
+    autocontinue: cfg.compaction?.autocontinue !== false,
   }
 }
 

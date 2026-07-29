@@ -490,7 +490,10 @@ Možete kontrolirati ponašanje sažimanja konteksta putem opcije `compaction`.
   "compaction": {
     "auto": true,
     "prune": true,
-    "reserved": 10000
+    "tail_turns": 2,
+    "reserved": 10000,
+    "summary_max_tokens": 5000,
+    "prune_protected_tools": ["skill", "task"]
   }
 }
 ```
@@ -498,6 +501,9 @@ Možete kontrolirati ponašanje sažimanja konteksta putem opcije `compaction`.
 - `auto` - Automatski sažimanje sesije kada je kontekst pun (podrazumevano: `true`).
 - `prune` - Uklonite stare izlaze alata da sačuvate tokene (podrazumevano: `true`).
 - `reserved` - Token buffer za sažimanje. Ostavlja dovoljno prostora da se izbjegne prelijevanje tokom sažimanja
+- `tail_turns` - Broj nedavnih korisničkih rundi koje treba zadržati doslovno tokom sažimanja (podrazumevano: `2`).
+- `summary_max_tokens` - Maksimalni tokeni za sažetak kompresije. Podrazumevano: `min(granica izlaza modela, 8000)`.
+- `prune_protected_tools` - Nazivi alata čiji se izlaz nikada ne obrezuje (podrazumevano: `["skill"]`).
 
 ---
 

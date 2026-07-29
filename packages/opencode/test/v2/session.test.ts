@@ -6,6 +6,7 @@ import { CrossSpawnSpawner } from "@opencode-ai/core/cross-spawn-spawner"
 import { Session as SessionV1 } from "../../src/session/session"
 import { SessionPrompt } from "../../src/session/prompt"
 import { SessionCompaction } from "../../src/session/compaction"
+import { Todo } from "../../src/session/todo"
 import { SessionStatus } from "../../src/session/status"
 import { Bus } from "@/bus"
 import { SyncEvent } from "@/sync"
@@ -179,6 +180,7 @@ function makeTestLayer() {
     SessionStatus.defaultLayer,
     Bus.layer,
     SyncEvent.defaultLayer,
+    Todo.defaultLayer,
   )
   // Stubs depend on SyncEvent, so provide infra to them.
   const stubs = Layer.mergeAll(promptStub.layer, compactionStub.layer).pipe(Layer.provide(infra))

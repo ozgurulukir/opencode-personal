@@ -3,6 +3,7 @@ import { Bus } from "@/bus"
 import * as Session from "./session"
 import { SessionID, MessageID, PartID } from "./schema"
 import { Provider } from "@/provider/provider"
+import { ProviderTransform } from "@/provider/transform"
 import { MessageV2 } from "./message-v2"
 import { Token } from "@/util/token"
 import * as Log from "@opencode-ai/core/util/log"
@@ -12,11 +13,12 @@ import { Plugin } from "@/plugin"
 import { Config } from "@/config/config"
 import { NotFoundError } from "@/storage/storage"
 import { ModelID, ProviderID } from "@/provider/schema"
-import { Effect, Layer, Context, Schema } from "effect"
+import { Effect, Layer, Context, Schema, Option } from "effect"
 import * as DateTime from "effect/DateTime"
 import { InstanceState } from "@/effect/instance-state"
 import { isOverflow as overflow } from "./overflow"
 import * as ContextBudget from "./context-budget"
+import * as Todo from "./todo"
 import { makeRuntime } from "@/effect/run-service"
 import { serviceUse } from "@/effect/service-use"
 import { SyncEvent } from "@/sync"
@@ -43,20 +45,20 @@ const MAX_PRESERVE_RECENT_TOKENS = ContextBudget.DEFAULTS.maxPreserveRecentToken
 const SUMMARY_TEMPLATE = `Output exactly the Markdown structure shown inside <template> and keep the section order unchanged. Do not include the <template> tags in your response.
 <template>
 ## Goal
-- [single-sentence task summary]
+- [task summary — one bullet per goal if multiple]
 
 ## Constraints & Preferences
 - [user constraints, preferences, specs, or "(none)"]
 
 ## Progress
 ### Done
-- [completed work or "(none)"]
+- [completed work — cite tool calls as tool(key_arg), e.g. read(src/auth.ts), bash(npm test), or "(none)"]
 
 ### In Progress
 - [current work or "(none)"]
 
 ### Blocked
-- [blockers or "(none)"]
+- [blockers — include exact error strings when known, or "(none)"]
 
 ## Key Decisions
 - [decision and why, or "(none)"]
@@ -65,16 +67,20 @@ const SUMMARY_TEMPLATE = `Output exactly the Markdown structure shown inside <te
 - [ordered next actions or "(none)"]
 
 ## Critical Context
-- [important technical facts, errors, open questions, or "(none)"]
+- [important technical facts, open questions, unresolved errors, or "(none)"]
 
 ## Relevant Files
-- [file or directory path: why it matters, or "(none)"]
+- [path — role: read | written | created | deleted, or "(none)"]
 </template>
 
 Rules:
 - Keep every section, even when empty.
 - Use terse bullets, not prose paragraphs.
-- Preserve exact file paths, commands, error strings, and identifiers when known.
+- Preserve exact file paths, commands, error strings, and identifiers.
+- For tool calls, use tool_name(key_arg) shorthand (e.g., read(src/auth.ts), bash(npm test)).
+- In Relevant Files, annotate each path with its role: read, written, created, or deleted.
+- Condense older completed work; expand on recent decisions and unresolved items.
+- Keep the summary concise but complete.
 - Do not mention the summary process or that context was compacted.`
 type Turn = {
   start: number
@@ -121,7 +127,7 @@ function completedCompactions(messages: MessageV2.WithParts[]) {
   })
 }
 
-function buildPrompt(input: { previousSummary?: string; context: string[] }) {
+function buildPrompt(input: { previousSummary?: string; context: string[]; maxTokens?: number }) {
   const anchor = input.previousSummary
     ? [
         "Update the anchored summary below using the conversation history above.",
@@ -131,7 +137,8 @@ function buildPrompt(input: { previousSummary?: string; context: string[] }) {
         "</previous-summary>",
       ].join("\n")
     : "Create a new anchored summary from the conversation history above."
-  return [anchor, SUMMARY_TEMPLATE, ...input.context].join("\n\n")
+  const budget = input.maxTokens ? `\nTarget length: under ${input.maxTokens} tokens.` : ""
+  return [anchor, SUMMARY_TEMPLATE + budget, ...input.context].join("\n\n")
 }
 
 function preserveRecentBudget(input: { cfg: Config.Info; model: Provider.Model }) {
@@ -143,6 +150,10 @@ function preserveRecentBudget(input: { cfg: Config.Info; model: Provider.Model }
       Math.max(cc.minPreserveRecentTokens, Math.floor(ContextBudget.usableWith(input.cfg, input.model, cc) * 0.25)),
     )
   )
+}
+
+function summaryBudget(model: Provider.Model, cc: ReturnType<typeof ContextBudget.compactionConfig>) {
+  return cc.summaryMaxTokens ?? Math.min(ProviderTransform.maxOutputTokens(model), cc.maxSummaryTokens)
 }
 
 function turns(messages: MessageV2.WithParts[]) {
@@ -236,6 +247,7 @@ export const layer: Layer.Layer<
     const processors = yield* SessionProcessor.Service
     const provider = yield* Provider.Service
     const sync = yield* SyncEvent.Service
+    const todo = yield* Effect.serviceOption(Todo.Service)
 
     const isOverflow = Effect.fn("SessionCompaction.isOverflow")(function* (input: {
       tokens: MessageV2.Assistant["tokens"]
@@ -430,7 +442,13 @@ export const layer: Layer.Layer<
         { sessionID: input.sessionID },
         { context: [], prompt: undefined },
       )
-      const nextPrompt = compacting.prompt ?? buildPrompt({ previousSummary, context: compacting.context })
+      const cc = ContextBudget.compactionConfig(cfg)
+      const nextPrompt = compacting.prompt
+        ?? buildPrompt({
+            previousSummary,
+            context: compacting.context,
+            maxTokens: summaryBudget(model, cc),
+          })
       const msgs = structuredClone(selected.head)
       yield* plugin.trigger("experimental.chat.messages.transform", {}, { messages: msgs })
       const modelMessages = yield* MessageV2.toModelMessagesEffect(msgs, model, {
@@ -535,9 +553,10 @@ export const layer: Layer.Layer<
           if (replayParts.length > 0) yield* session.updateParts(replayParts)
         }
 
-        if (!replay) {
+        if (!replay && input.auto) {
           const info = yield* provider.getProvider(userMessage.model.providerID)
           if (
+            cc.autocontinue &&
             (yield* plugin.trigger(
               "experimental.compaction.autocontinue",
               {
@@ -563,11 +582,31 @@ export const layer: Layer.Layer<
               agent: userMessage.agent,
               model: userMessage.model,
             })
+            const todoBlock = yield* Option.match(todo, {
+              onNone: () => Effect.succeed(""),
+              onSome: (svc) =>
+                svc.get(input.sessionID).pipe(
+                  Effect.map((todos) => {
+                    const pending = todos.filter((t) => t.status !== "completed" && t.status !== "cancelled")
+                    if (pending.length === 0) return ""
+                    return (
+                      "\n\nPending todos:\n" +
+                      pending
+                        .map((t) => {
+                          const badge = t.priority === "high" ? "[H] " : t.priority === "low" ? "[L] " : "[M] "
+                          return `- ${badge}${t.content}`
+                        })
+                        .join("\n")
+                    )
+                  }),
+                ),
+            })
             const text =
               (input.overflow
                 ? "The previous request exceeded the provider's size limit due to large media attachments. The conversation was compacted and media files were removed from context. If the user was asking about attached images or files, explain that the attachments were too large to process and suggest they try again with smaller or fewer files.\n\n"
                 : "") +
-              "Continue if you have next steps, or stop and ask for clarification if you are unsure how to proceed."
+              "Continue if you have next steps, or stop and ask for clarification if you are unsure how to proceed." +
+              todoBlock
             yield* session.updatePart({
               id: PartID.ascending(),
               messageID: continueMsg.id,
