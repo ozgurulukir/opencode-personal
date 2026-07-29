@@ -77,8 +77,11 @@ export function used(tokens: MessageV2.Assistant["tokens"]) {
 }
 
 export function isOverflow(cfg: Config.Info, tokens: MessageV2.Assistant["tokens"], model: Provider.Model) {
-  if (!compactionConfig(cfg).auto) return false
-  if (model.limit.context === 0) return false
+  const cc = compactionConfig(cfg)
+  if (!cc.auto) return false
+  // When contextLimit is set, it replaces model.limit.context as the threshold base.
+  // Skip the model.limit.context === 0 guard — the user explicitly set a limit.
+  if (!cc.contextLimit && model.limit.context === 0) return false
 
   return used(tokens) >= usable(cfg, model)
 }

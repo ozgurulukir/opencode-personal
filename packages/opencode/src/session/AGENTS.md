@@ -123,6 +123,10 @@ Normal tools merge `agent.permission + session.permission`. But subagent task's 
 
 **Safety invariant**: `reserved` is clamped to at least `maxOutputTokens`. The default `reserved` is `compactionBuffer` (20K), but `Math.max(20K, maxOutputTokens)` ensures the model always has enough headroom for its full output. Without this, a model with 128K max output could hit the context limit mid-response with only 20K headroom. User-set `reserved` is also subject to this floor — it's a safety invariant, not a suggestion.
 
+**`isOverflow` guard**: `context-budget.ts:isOverflow()` skips the `model.limit.context === 0` early return when `contextLimit` is set. Without this fix, a model with unknown context limit (`limit.context === 0`) would never trigger auto-compaction even when the user explicitly set `context_limit`. The guard `if (!cc.contextLimit && model.limit.context === 0) return false` ensures the user's explicit limit is respected.
+
+**Auto-specific vs shared**: `auto`, `context_limit`, `reserved`, and `autocontinue` only affect auto-compaction (triggered by `isOverflow`). Manual `/compact` bypasses these entirely. `prune`, `tail_turns`, `summary_max_tokens`, `prune_protected_tools`, and all other fields affect both auto and manual compaction.
+
 ## Pre-existing flaky tests in this module
 
 - `session.system > skills output is sorted by name and stable across calls` — fails intermittently (Expected: >489, Received: 188)

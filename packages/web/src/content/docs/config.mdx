@@ -679,14 +679,19 @@ You can control context compaction behavior through the `compaction` option.
 }
 ```
 
+**Auto-specific** (only affect auto-compaction, not manual `/compact`):
+
 - `auto` - Automatically compact the session when context is full (default: `true`).
+- `context_limit` - Explicit context window for the compaction threshold. Overrides the model's context limit. For example, `200000` triggers compaction when used tokens reach 200000 minus the `reserved` buffer.
+- `reserved` - Token buffer for compaction. Leaves enough window to avoid overflow during compaction. When `context_limit` is set, defaults to 20000 but is clamped to at least the model's `maxOutputTokens` — this ensures the model always has enough headroom for its full output. For example, if `context_limit: 200000` and the model's `maxOutputTokens` is 8000, the effective `reserved` is 20000 and compaction triggers at 180000. If `maxOutputTokens` is 128000, the effective `reserved` is 128000 and compaction triggers at 72000.
+- `autocontinue` - After auto-compaction, inject a synthetic "Continue" message so the model can proceed (default: `true`). Only applies to auto compaction, not manual `/compact`.
+
+**Shared** (affect both auto and manual compaction):
+
 - `prune` - Remove old tool outputs to save tokens (default: `true`).
 - `tail_turns` - Number of recent user turns to keep verbatim during compaction (default: `2`).
-- `reserved` - Token buffer for compaction. Leaves enough window to avoid overflow during compaction.
 - `summary_max_tokens` - Maximum tokens for the compaction summary. Defaults to `min(model output limit, 8000)`.
-- `autocontinue` - After auto-compaction, inject a synthetic "Continue" message so the model can proceed (default: `true`). Only applies to auto compaction, not manual `/compact`.
 - `prune_protected_tools` - Tool names whose output is never pruned (default: `["skill"]`).
-- `context_limit` - Explicit context window for the compaction threshold. Overrides the model's context limit. For example, `200000` triggers compaction when used tokens reach 200000 minus the `reserved` buffer.
 
 ---
 
