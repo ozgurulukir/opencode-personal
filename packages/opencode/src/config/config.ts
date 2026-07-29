@@ -297,6 +297,10 @@ export const Info = Schema.Struct({
       max_preserve_recent_tokens: Schema.optional(NonNegativeInt).annotate({
         description: "Maximum tokens to preserve from recent turns when auto-calculating the budget (default: 8000)",
       }),
+      prune_protected_tools: Schema.optional(Schema.Array(Schema.String)).annotate({
+        description:
+          "Tool names whose output is never pruned during compaction (default: [\"skill\"])",
+      }),
     }),
   ),
   experimental: Schema.optional(
