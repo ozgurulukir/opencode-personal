@@ -63,6 +63,36 @@ Normal tools merge `agent.permission + session.permission`. But subagent task's 
 
 `session/instruction.ts:91` — the `fileCache` Map caches AGENTS.md/CLAUDE.md file contents by path. Entries are only evicted when a file is deleted or empty. For long-running sessions touching many project directories, this grows without bound. Add LRU eviction (100 entries) and re-insert on cache hit to maintain recency ordering. The cache is per-instance, not per-session, so it survives across session switches within the same project.
 
+## Compaction system
+
+### `isOverflow` headroom bug when `limit.input` is set
+
+`context-budget.ts:usableWith()` — when `model.limit.input` is set, the function previously used `limit.input - min(compactionBuffer, maxOutputTokens)`, which reserved only 20K headroom for output. For models with 32K+ output limits, compaction triggered too late. The fix: always subtract `maxOutputTokens` from `limit.input` (or `reserved` if user-configured). Regression tests at `compaction.test.ts:480-546` document the expected behavior. Related issues: #10634, #8089, #11086, #12621.
+
+### `filterCompacted` has unreachable dead code
+
+`message-v2.ts:651-652` — the condition `msg.info.role === "user" && completed.has(msg.info.id) && msg.parts.some(...)` is unreachable. Line 643 already handles the same condition with `continue`/`break` for all sub-cases. Remove it if found.
+
+### `filterCompacted` reordering comparisons appear inverted
+
+`message-v2.ts:676` — the condition `tailIndex < compactionIndex && summaryIndex > compactionIndex` in the reversed array appears inverted. The summary should have a lower index (newer) than the compaction marker (older) in the reversed array, and the tail should have a higher index (older). The reordering code at lines 676-682 may never execute as a result. The function still works because the reversed array (newest-first) is what the runLoop consumes.
+
+### `compaction_continue` metadata guard scope
+
+`prompt.ts:1595-1598` — the double-compaction guard checks ALL visible messages for `compaction_continue` metadata, not just recent ones. This prevents infinite compaction loops but also means a `compaction_continue` marker from an old compaction blocks future auto-compaction. The guard is safe because `filterCompacted` removes old compaction markers from the visible window.
+
+### `processCompaction` history computation is order-dependent
+
+`compaction.ts:400` — `history` excludes the current compaction marker only when it is the last message (`messages.at(-1)?.info.id === input.parentID`). After `filterCompacted` reorder, the marker may not be last, but this is safe because the current compaction hasn't produced a summary yet so `completedCompactions` won't match it. The dependency on message ordering is undocumented — do not change the condition without understanding this invariant.
+
+### `PRUNE_PROTECTED_TOOLS` is now configurable
+
+`compaction.ts:335` — was hardcoded to `["skill"]`, now reads from `cc.pruneProtectedTools` (config key `compaction.prune_protected_tools`, default `["skill"]`). Add tools like `"task"` to protect subagent results from pruning.
+
+### `reserved` default changed from `min(compactionBuffer, maxOutputTokens)` to `maxOutputTokens`
+
+`context-budget.ts:43` — the old default `min(20000, maxOutputTokens)` was too small for models with 32K+ output limits. The new default is `maxOutputTokens` (or user-configured `reserved`). This ensures compaction reserves enough headroom for the model's full output capacity.
+
 ## Pre-existing flaky tests in this module
 
 - `session.system > skills output is sorted by name and stable across calls` — fails intermittently (Expected: >489, Received: 188)

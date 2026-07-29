@@ -25,6 +25,7 @@ export function compactionConfig(cfg: Config.Info) {
     toolOutputMaxChars: cfg.compaction?.tool_output_max_chars ?? DEFAULTS.toolOutputMaxChars,
     minPreserveRecentTokens: cfg.compaction?.min_preserve_recent_tokens ?? DEFAULTS.minPreserveRecentTokens,
     maxPreserveRecentTokens: cfg.compaction?.max_preserve_recent_tokens ?? DEFAULTS.maxPreserveRecentTokens,
+    pruneProtectedTools: cfg.compaction?.prune_protected_tools ?? ["skill"],
   }
 }
 
@@ -40,7 +41,11 @@ function usableWith(
   const context = model.limit.context
   if (context === 0) return 0
 
-  const reserved = cc.reserved ?? Math.min(DEFAULTS.compactionBuffer, ProviderTransform.maxOutputTokens(model))
+  const reserved = cc.reserved ?? ProviderTransform.maxOutputTokens(model)
+  // When limit.input is set, subtract maxOutputTokens to reserve headroom for the
+  // next model response. Without this, compaction triggers too late — the model
+  // has no room to generate output on the next turn.
+  // See compaction.test.ts:480-546 for regression tests.
   return model.limit.input
     ? Math.max(0, model.limit.input - reserved)
     : Math.max(0, context - ProviderTransform.maxOutputTokens(model))

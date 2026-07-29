@@ -37,7 +37,6 @@ export const Event = {
 export const PRUNE_MINIMUM = ContextBudget.DEFAULTS.pruneMinimumTokens
 export const PRUNE_PROTECT = ContextBudget.DEFAULTS.pruneProtectTokens
 const TOOL_OUTPUT_MAX_CHARS = ContextBudget.DEFAULTS.toolOutputMaxChars
-const PRUNE_PROTECTED_TOOLS = ["skill"]
 const DEFAULT_TAIL_TURNS = ContextBudget.DEFAULTS.defaultTailTurns
 const MIN_PRESERVE_RECENT_TOKENS = ContextBudget.DEFAULTS.minPreserveRecentTokens
 const MAX_PRESERVE_RECENT_TOKENS = ContextBudget.DEFAULTS.maxPreserveRecentTokens
@@ -271,6 +270,8 @@ export const layer: Layer.Layer<
             messages: input.messages.slice(turn.start, turn.end),
             model: input.model,
           }),
+        // Sequential: token estimation is cheap (character counting) and
+        // concurrency would not improve latency for the typical 1-2 tail turns.
         { concurrency: 1 },
       )
 
@@ -320,19 +321,21 @@ export const layer: Layer.Layer<
       let total = 0
       let pruned = 0
       const toPrune: MessageV2.ToolPart[] = []
-      let turns = 0
+      let userTurns = 0
 
-      loop: for (let msgIndex = msgs.length - 1; msgIndex >= 0; msgIndex--) {
+      messages: for (let msgIndex = msgs.length - 1; msgIndex >= 0; msgIndex--) {
         const msg = msgs[msgIndex]
-        if (msg.info.role === "user") turns++
-        if (turns < cc.tailTurns) continue
-        if (msg.info.role === "assistant" && msg.info.summary) break loop
+        if (msg.info.role === "user") userTurns++
+        if (userTurns < cc.tailTurns) continue
+        if (msg.info.role === "assistant" && msg.info.summary) break messages
         for (let partIndex = msg.parts.length - 1; partIndex >= 0; partIndex--) {
           const part = msg.parts[partIndex]
           if (part.type !== "tool") continue
           if (part.state.status !== "completed") continue
-          if (PRUNE_PROTECTED_TOOLS.includes(part.tool)) continue
-          if (part.state.time.compacted) break loop
+          if (cc.pruneProtectedTools.includes(part.tool)) continue
+          // Stop at the first already-compacted part — everything older has
+          // already been considered for pruning in a previous pass.
+          if (part.state.time.compacted) break messages
           const estimate = Token.estimate(part.state.output)
           total += estimate
           if (total <= cc.pruneProtectTokens) continue
@@ -375,6 +378,9 @@ export const layer: Layer.Layer<
           }
         | undefined
       if (input.overflow) {
+        // Find the most recent non-compaction user turn before the compaction
+        // parent. That turn's content (with media stripped) will be replayed
+        // after compaction so the model can continue from where it left off.
         const idx = input.messages.findIndex((m) => m.info.id === input.parentID)
         for (let i = idx - 1; i >= 0; i--) {
           const msg = input.messages[i]
@@ -384,6 +390,8 @@ export const layer: Layer.Layer<
             break
           }
         }
+        // If slicing removed all non-compaction user content, there's nothing
+        // meaningful to replay — fall back to the full message set.
         const hasContent =
           replay && messages.some((m) => m.info.role === "user" && !m.parts.some((p) => p.type === "compaction"))
         if (!hasContent) {
@@ -397,6 +405,11 @@ export const layer: Layer.Layer<
         ? yield* provider.getModel(agent.model.providerID, agent.model.modelID)
         : yield* provider.getModel(userMessage.model.providerID, userMessage.model.modelID)
       const cfg = yield* config.get()
+      // Exclude the current compaction marker from history so completedCompactions
+      // doesn't count it as a prior compaction. The marker is the last message
+      // when no post-compaction messages exist yet; after filterCompacted reorder
+      // it may not be last, but that's safe because the current compaction hasn't
+      // produced a summary yet so it won't match completedCompactions' criteria.
       const history = compactionPart && messages.at(-1)?.info.id === input.parentID ? messages.slice(0, -1) : messages
       const prior = completedCompactions(history)
       const hidden = new Set(prior.flatMap((item) => [item.userIndex, item.assistantIndex]))
