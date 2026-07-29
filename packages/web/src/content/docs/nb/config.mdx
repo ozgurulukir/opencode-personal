@@ -501,13 +501,19 @@ Du kan styre kontekstkomprimering gjennom alternativet `compaction`.
 }
 ```
 
+**Auto-spesifikk** (påvirker kun auto-komprimering, ikke manuell `/compact`):
+
 - `auto` - Komprimer økten automatisk når konteksten er full (standard: `true`).
+- `context_limit` - Eksplisitt kontekstvindu for komprimeringsterskelen. Overstyrer modellens kontekstgrense. For eksempel utløser `200000` komprimering når brukte tokens når 200000 minus `reserved`-bufferen.
+- `reserved` - Tokenbuffer for komprimering. Efterlater nok vindu til å unngå overløp under komprimering. Når `context_limit` er satt, er standarden 20000, men settes til minst modellens `maxOutputTokens` — dette sikrer at modellen alltid har nok plass til full utdata. For eksempel med `context_limit: 200000` og `maxOutputTokens` på 8000, er effektiv `reserved` 20000 og komprimering utløses ved 180000. Hvis `maxOutputTokens` er 128000, er effektiv `reserved` 128000 og komprimering utløses ved 72000.
+- `autocontinue` - Etter auto-komprimering, sett inn en syntetisk "Fortsett"-melding slik at modellen kan fortsette (standard: `true`). Gjelder kun for auto-komprimering, ikke manuell `/compact`.
+
+**Delt** (påvirker både auto og manuell komprimering):
+
 - `prune` - Fjern gamle verktøyutdata for å spare tokens (standard: `true`).
-- `reserved` - Tokenbuffer for komprimering. Efterlater nok vindu til å unngå overløp under komprimering.
 - `tail_turns` - Antall nylige brukerturer å beholde ordrett under komprimering (standard: `2`).
 - `summary_max_tokens` - Maksimalt antall tokens for komprimeringssammendraget. Standard: `min(modellens utdatagrense, 8000)`.
 - `prune_protected_tools` - Verktøynavn hvis utdata aldri beskjæres (standard: `["skill"]`).
-- `context_limit` - Eksplisitt kontekstvindu for komprimeringsterskelen. Overstyrer modellens kontekstgrense. For eksempel utløser `200000` komprimering når brukte tokens når 200000 minus `reserved`-bufferen.
 
 ---
 

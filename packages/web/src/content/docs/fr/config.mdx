@@ -500,13 +500,19 @@ Vous pouvez contrôler le comportement de compactage du contexte via l'option `c
 }
 ```
 
+**Spécifique à l'auto-compactage** (affecte uniquement l'auto-compactage, pas le `/compact` manuel) :
+
 - `auto` - Compacte automatiquement la session lorsque le contexte est plein (par défaut : `true`).
+- `context_limit` - Fenêtre de contexte explicite pour le seuil de compactage. Remplace la limite de contexte du modèle. Par exemple, `200000` déclenche le compactage lorsque les jetons utilisés atteignent 200000 moins le tampon `reserved`.
+- `reserved` - Tampon de jetons pour le compactage. Laisse suffisamment de marge pour éviter le débordement lors du compactage. Lorsque `context_limit` est défini, la valeur par défaut est 20000 mais est limitée à au moins `maxOutputTokens` du modèle — cela garantit que le modèle a toujours assez de marge pour sa sortie complète. Par exemple, avec `context_limit: 200000` et `maxOutputTokens` de 8000, le `reserved` effectif est 20000 et le compactage se déclenche à 180000. Si `maxOutputTokens` est 128000, le `reserved` effectif est 128000 et le compactage se déclenche à 72000.
+- `autocontinue` - Après l'auto-compactage, injecte un message "Continuer" synthétique pour que le modèle puisse procéder (par défaut : `true`). S'applique uniquement à l'auto-compactage, pas au `/compact` manuel.
+
+**Partagé** (affecte à la fois l'auto-compactage et le compactage manuel) :
+
 - `prune` - Supprimez les anciennes sorties de l'outil pour économiser des tokens (par défaut : `true`).
-- `reserved` - Tampon de jetons pour le compactage. Laisse suffisamment de marge pour éviter le débordement lors du compactage.
 - `tail_turns` - Nombre de tours utilisateur récents à conserver textuellement lors du compactage (par défaut : `2`).
 - `summary_max_tokens` - Nombre maximum de tokens pour le résumé du compactage. Par défaut : `min(limite de sortie du modèle, 8000)`.
 - `prune_protected_tools` - Noms des outils dont la sortie n'est jamais élaguée (par défaut : `["skill"]`).
-- `context_limit` - Fenêtre de contexte explicite pour le seuil de compactage. Remplace la limite de contexte du modèle. Par exemple, `200000` déclenche le compactage lorsque les jetons utilisés atteignent 200000 moins le tampon `reserved`.
 
 ---
 

@@ -500,13 +500,19 @@ Você pode controlar o comportamento de compactação de contexto através da op
 }
 ```
 
+**Específico para compactação automática** (afeta apenas a compactação automática, não o `/compact` manual):
+
 - `auto` - Compacta automaticamente a sessão quando o contexto está cheio (padrão: `true`).
+- `context_limit` - Janela de contexto explícita para o limite de compactação. Substitui o limite de contexto do modelo. Por exemplo, `200000` aciona a compactação quando os tokens usados atingem 200000 menos o buffer `reserved`.
+- `reserved` - Buffer de tokens para compactação. Deixa janela suficiente para evitar estouro durante a compactação. Quando `context_limit` está definido, o padrão é 20000, mas é fixado em pelo menos `maxOutputTokens` do modelo — isso garante que o modelo sempre tenha espaço suficiente para sua saída completa. Por exemplo, com `context_limit: 200000` e `maxOutputTokens` de 8000, o `reserved` efetivo é 20000 e a compactação é acionada em 180000. Se `maxOutputTokens` for 128000, o `reserved` efetivo é 128000 e a compactação é acionada em 72000.
+- `autocontinue` - Após a compactação automática, injeta uma mensagem sintética "Continuar" para que o modelo possa prosseguir (padrão: `true`). Aplica-se apenas à compactação automática, não ao `/compact` manual.
+
+**Compartilhado** (afeta tanto a compactação automática quanto a manual):
+
 - `prune` - Remove saídas antigas de ferramentas para economizar tokens (padrão: `true`).
-- `reserved` - Buffer de tokens para compactação. Deixa janela suficiente para evitar estouro durante a compactação.
 - `tail_turns` - Número de turnos de usuário recentes para manter textualmente durante a compactação (padrão: `2`).
 - `summary_max_tokens` - Máximo de tokens para o resumo da compactação. Padrão: `min(limite de saída do modelo, 8000)`.
 - `prune_protected_tools` - Nomes de ferramentas cuja saída nunca é podada (padrão: `["skill"]`).
-- `context_limit` - Janela de contexto explícita para o limite de compactação. Substitui o limite de contexto do modelo. Por exemplo, `200000` aciona a compactação quando os tokens usados atingem 200000 menos o buffer `reserved`.
 
 ---
 

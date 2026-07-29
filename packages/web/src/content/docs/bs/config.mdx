@@ -499,13 +499,19 @@ Možete kontrolirati ponašanje sažimanja konteksta putem opcije `compaction`.
 }
 ```
 
+**Specifično za automatsku kompresiju** (utiče samo na auto-kompresiju, ne na ručno `/compact`):
+
 - `auto` - Automatski komprimiraj sesiju kada je kontekst pun (podrazumevano: `true`).
+- `context_limit` - Eksplicitni kontekstni prozor za prag kompresije. Nadjačava ograničenje konteksta modela. Na primer, `200000` pokreće kompresiju kada korišćeni tokeni dostignu 200000 minus `reserved` bafer.
+- `reserved` - Bafer tokena za kompresiju. Ostavlja dovoljno prostora da se izbegne prelivanje tokom kompresije. Kada je `context_limit` postavljen, podrazumevana vrednost je 20000, ali se fiksira na najmanje `maxOutputTokens` modela — ovo osigurava da model uvek ima dovoljno prostora za pun izlaz. Na primer, sa `context_limit: 200000` i `maxOutputTokens` od 8000, efektivni `reserved` je 20000 i kompresija se pokreće na 180000. Ako je `maxOutputTokens` 128000, efektivni `reserved` je 128000 i kompresija se pokreće na 72000.
+- `autocontinue` - Nakon auto-kompresije, ubacuje sintetičku poruku "Nastavi" kako bi model mogao da nastavi (podrazumevano: `true`). Odnosi se samo na auto-kompresiju, ne na ručno `/compact`.
+
+**Zajedničko** (utiče i na automatsku i na ručnu kompresiju):
+
 - `prune` - Ukloni stare izlaze alata da biste uštedeli tokene (podrazumevano: `true`).
-- `reserved` - Bafer tokena za kompresiju. Ostavlja dovoljno prostora da se izbegne prelivanje tokom kompresije.
 - `tail_turns` - Broj nedavnih korisničkih poteza koje treba zadržati doslovno tokom kompresije (podrazumevano: `2`).
 - `summary_max_tokens` - Maksimalni tokeni za sažetak kompresije. Podrazumevano: `min(granica izlaza modela, 8000)`.
 - `prune_protected_tools` - Nazivi alata čiji se izlaz nikada ne obrezuje (podrazumevano: `["skill"]`).
-- `context_limit` - Eksplicitni kontekstni prozor za prag kompresije. Nadjačava ograničenje konteksta modela. Na primer, `200000` pokreće kompresiju kada korišćeni tokeni dostignu 200000 minus `reserved` bafer.
 
 ---
 

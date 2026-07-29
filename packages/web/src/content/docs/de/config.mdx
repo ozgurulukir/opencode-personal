@@ -499,12 +499,19 @@ Sie können das Verhalten der Kontextkomprimierung über die Option `compaction`
 }
 ```
 
+**Auto-spezifisch** (betrifft nur die automatische Komprimierung, nicht manuelles `/compact`):
+
 - `auto` – Die Sitzung wird automatisch komprimieren, wenn der Kontext voll ist (Standard: `true`).
+- `context_limit` - Explizites Kontextfenster für die Komprimierungsschwelle. Überschreibt das Kontextlimit des Modells. Z. B. löst `200000` die Komprimierung aus, wenn die verwendeten Token 200000 abzüglich des `reserved`-Puffers erreichen.
+- `reserved` - Token-Puffer für die Komprimierung. Lässt genügend Spielraum, um einen Überlauf während der Komprimierung zu vermeiden. Wenn `context_limit` gesetzt ist, beträgt der Standardwert 20000, wird aber auf mindestens `maxOutputTokens` des Modells begrenzt – dies stellt sicher, dass das Modell immer genügend Headroom für seine vollständige Ausgabe hat. Z. B. bei `context_limit: 200000` und `maxOutputTokens` von 8000 beträgt das effektive `reserved` 20000 und die Komprimierung wird bei 180000 ausgelöst. Bei `maxOutputTokens` von 128000 beträgt das effektive `reserved` 128000 und die Komprimierung wird bei 72000 ausgelöst.
+- `autocontinue` – Nach der automatischen Komprimierung eine synthetische "Weiter"-Nachricht einfügen, damit das Modell fortfahren kann (Standard: `true`). Gilt nur für die automatische Komprimierung, nicht für manuelles `/compact`.
+
+**Gemeinsam** (betrifft sowohl automatische als auch manuelle Komprimierung):
+
 - `prune` – Alte Tool-Ausgaben entfernen, um Token zu sparen (Standard: `true`).
 - `tail_turns` - Anzahl der letzten Benutzerrunden, die während der Komprimierung wörtlich beibehalten werden (Standard: `2`).
 - `summary_max_tokens` - Maximale Token-Anzahl für die Komprimierungszusammenfassung. Standard: `min(Ausgabelimit des Modells, 8000)`.
 - `prune_protected_tools` - Namen von Tools, deren Ausgabe nie beschnitten wird (Standard: `["skill"]`).
-- `context_limit` - Explizites Kontextfenster für die Komprimierungsschwelle. Überschreibt das Kontextlimit des Modells. Z. B. löst `200000` die Komprimierung aus, wenn die verwendeten Token 200000 abzüglich des `reserved`-Puffers erreichen.
 
 ---
 

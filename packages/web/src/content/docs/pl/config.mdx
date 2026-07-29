@@ -495,13 +495,19 @@ Możesz kontrolować zachowanie kompaktowania kontekstu za pomocą opcji `compac
 }
 ```
 
+**Specyficzne dla automatycznej kompakcji** (wpływa tylko na auto-kompakcję, nie na ręczne `/compact`):
+
 - `auto` - Automatycznie kompresuj sesję, gdy kontekst jest pełny (domyślnie: `true`).
+- `context_limit` - Jawne okno kontekstu dla progu kompakcji. Zastępuje limit kontekstu modelu. Na przykład `200000` uruchamia kompakcję, gdy użyte tokeny osiągną 200000 minus bufor `reserved`.
+- `reserved` - Bufor tokenów dla kompakcji. Pozostawia wystarczająco dużo miejsca, aby uniknąć przepełnienia podczas kompakcji. Gdy ustawiono `context_limit`, domyślnie wynosi 20000, ale jest ustalany na co najmniej `maxOutputTokens` modelu — gwarantuje to, że model zawsze ma wystarczającą przestrzeń na pełne wyjście. Na przykład z `context_limit: 200000` i `maxOutputTokens` 8000, efektywny `reserved` wynosi 20000, a kompakcja uruchamia się przy 180000. Jeśli `maxOutputTokens` wynosi 128000, efektywny `reserved` wynosi 128000, a kompakcja uruchamia się przy 72000.
+- `autocontinue` - Po auto-kompakcji wstawia syntetyczną wiadomość "Kontynuuj", aby model mógł kontynuować (domyślnie: `true`). Dotyczy tylko auto-kompakcji, nie ręcznego `/compact`.
+
+**Wspólne** (wpływają zarówno na automatyczną, jak i ręczną kompakcję):
+
 - `prune` - Usuń stare wyniki narzędzi, aby zaoszczędzić tokeny (domyślnie: `true`).
-- `reserved` - Bufor tokenów dla kompakcji. Pozostawia wystarczająco dużo miejsca, aby uniknąć przepełnienia podczas kompakcji.
 - `tail_turns` - Liczba ostatnich tur użytkownika do zachowania dosłownie podczas kompakcji (domyślnie: `2`).
 - `summary_max_tokens` - Maksymalna liczba tokenów dla podsumowania kompakcji. Domyślnie: `min(limit wyjścia modelu, 8000)`.
 - `prune_protected_tools` - Nazwy narzędzi, których dane wyjściowe nigdy nie są przycinane (domyślnie: `["skill"]`).
-- `context_limit` - Jawne okno kontekstu dla progu kompakcji. Zastępuje limit kontekstu modelu. Na przykład `200000` uruchamia kompakcję, gdy użyte tokeny osiągną 200000 minus bufor `reserved`.
 
 ---
 

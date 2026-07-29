@@ -497,13 +497,19 @@ OpenCode 启动时会自动下载新版本。您可以使用 `autoupdate` 选项
 }
 ```
 
+**自动压缩专用**（仅影响自动压缩，不影响手动 `/compact`）：
+
 - `auto` - 当上下文已满时自动压缩会话（默认值：`true`）。
+- `context_limit` - 压缩阈值的显式上下文窗口。覆盖模型的上下文限制。例如，`200000` 会在使用的 Token 达到 200000 减去 `reserved` 缓冲区时触发压缩。
+- `reserved` - 压缩的 Token 缓冲区。留出足够的窗口以避免压缩期间溢出。当设置了 `context_limit` 时，默认值为 20000，但至少会被限制为模型的 `maxOutputTokens` — 这确保模型始终有足够的空间用于完整输出。例如，`context_limit: 200000` 且 `maxOutputTokens` 为 8000 时，有效 `reserved` 为 20000，压缩在 180000 触发。如果 `maxOutputTokens` 为 128000，有效 `reserved` 为 128000，压缩在 72000 触发。
+- `autocontinue` - 自动压缩后，注入一条合成的"继续"消息，以便模型可以继续（默认值：`true`）。仅适用于自动压缩，不适用于手动 `/compact`。
+
+**共享**（影响自动和手动压缩）：
+
 - `prune` - 删除旧工具输出以节省 Token（默认值：`true`）。
-- `reserved` - 压缩的 Token 缓冲区。留出足够的窗口以避免压缩期间溢出。
 - `tail_turns` - 压缩期间逐字保留的最近用户轮次数（默认值：`2`）。
 - `summary_max_tokens` - 压缩摘要的最大 Token 数。默认值：`min(模型输出限制, 8000)`。
 - `prune_protected_tools` - 输出永远不会被修剪的工具名称（默认值：`["skill"]`）。
-- `context_limit` - 压缩阈值的显式上下文窗口。覆盖模型的上下文限制。例如，`200000` 会在使用的 Token 达到 200000 减去 `reserved` 缓冲区时触发压缩。
 
 ---
 
