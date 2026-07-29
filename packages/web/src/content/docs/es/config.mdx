@@ -499,13 +499,19 @@ Puede controlar el comportamiento de compactación del contexto a través de la 
 }
 ```
 
+**Específico de compactación automática** (solo afecta la compactación automática, no `/compact` manual):
+
 - `auto` - Compacta automáticamente la sesión cuando el contexto está lleno (predeterminado: `true`).
+- `context_limit` - Ventana de contexto explícita para el umbral de compactación. Anula el límite de contexto del modelo. Por ejemplo, `200000` activa la compactación cuando los tokens usados alcanzan 200000 menos el búfer `reserved`.
+- `reserved` - Búfer de tokens para la compactación. Deja suficiente margen para evitar desbordamiento durante la compactación. Cuando se establece `context_limit`, el valor predeterminado es 20000 pero se fija al menos al `maxOutputTokens` del modelo — esto garantiza que el modelo siempre tenga suficiente margen para su salida completa. Por ejemplo, con `context_limit: 200000` y `maxOutputTokens` de 8000, el `reserved` efectivo es 20000 y la compactación se activa en 180000. Si `maxOutputTokens` es 128000, el `reserved` efectivo es 128000 y la compactación se activa en 72000.
+- `autocontinue` - Después de la compactación automática, inyecta un mensaje sintético "Continuar" para que el modelo pueda proceder (predeterminado: `true`). Solo se aplica a la compactación automática, no a `/compact` manual.
+
+**Compartido** (afecta tanto a la compactación automática como a la manual):
+
 - `prune` - Elimina las salidas de herramientas antiguas para ahorrar tokens (predeterminado: `true`).
-- `reserved` - Búfer de tokens para la compactación. Deja suficiente margen para evitar desbordamiento durante la compactación.
 - `tail_turns` - Número de turnos de usuario recientes para conservar textualmente durante la compactación (predeterminado: `2`).
 - `summary_max_tokens` - Máximo de tokens para el resumen de compactación. Predeterminado: `min(límite de salida del modelo, 8000)`.
 - `prune_protected_tools` - Nombres de herramientas cuya salida nunca se poda (predeterminado: `["skill"]`).
-- `context_limit` - Ventana de contexto explícita para el umbral de compactación. Anula el límite de contexto del modelo. Por ejemplo, `200000` activa la compactación cuando los tokens usados alcanzan 200000 menos el búfer `reserved`.
 
 ---
 

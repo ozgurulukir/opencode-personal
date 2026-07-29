@@ -499,13 +499,19 @@ Puoi controllare il comportamento di compattazione del contesto tramite l'opzion
 }
 ```
 
+**Specifico per la compattazione automatica** (influisce solo sull'auto-compattazione, non sul `/compact` manuale):
+
 - `auto` - Comprime automaticamente la sessione quando il contesto è pieno (predefinito: `true`).
+- `context_limit` - Finestra di contesto esplicita per la soglia di compattazione. Sostituisce il limite di contesto del modello. Ad esempio, `200000` attiva la compattazione quando i token utilizzati raggiungono 200000 meno il buffer `reserved`.
+- `reserved` - Buffer di token per la compattazione. Lascia finestra sufficiente per evitare overflow durante la compattazione. Quando `context_limit` è impostato, il valore predefinito è 20000 ma viene fissato ad almeno `maxOutputTokens` del modello — questo garantisce che il modello abbia sempre spazio sufficiente per il suo output completo. Ad esempio, con `context_limit: 200000` e `maxOutputTokens` di 8000, il `reserved` effettivo è 20000 e la compattazione si attiva a 180000. Se `maxOutputTokens` è 128000, il `reserved` effettivo è 128000 e la compattazione si attiva a 72000.
+- `autocontinue` - Dopo l'auto-compattazione, inietta un messaggio sintetico "Continua" per consentire al modello di procedere (predefinito: `true`). Si applica solo all'auto-compattazione, non al `/compact` manuale.
+
+**Condiviso** (influisce sia sulla compattazione automatica che manuale):
+
 - `prune` - Rimuove i vecchi output degli strumenti per risparmiare token (predefinito: `true`).
-- `reserved` - Buffer di token per la compattazione. Lascia finestra sufficiente per evitare overflow durante la compattazione.
 - `tail_turns` - Numero di turni utente recenti da mantenere testualmente durante la compattazione (predefinito: `2`).
 - `summary_max_tokens` - Token massimi per il riepilogo della compattazione. Predefinito: `min(limite di output del modello, 8000)`.
 - `prune_protected_tools` - Nomi degli strumenti il cui output non viene mai potato (predefinito: `["skill"]`).
-- `context_limit` - Finestra di contesto esplicita per la soglia di compattazione. Sostituisce il limite di contesto del modello. Ad esempio, `200000` attiva la compattazione quando i token utilizzati raggiungono 200000 meno il buffer `reserved`.
 
 ---
 

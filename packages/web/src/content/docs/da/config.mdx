@@ -501,13 +501,19 @@ Du kan styre kontekstkomprimeringsadfærd gennem indstillingen `compaction`.
 }
 ```
 
+**Auto-specifik** (påvirker kun auto-komprimering, ikke manuel `/compact`):
+
 - `auto` - Komprimer automatisk sessionen, når konteksten er fuld (standard: `true`).
+- `context_limit` - Eksplicit kontekstvindue til komprimeringstærsklen. Tilsidesætter modellens kontekstgrænse. F.eks. udløser `200000` komprimering, når brugte tokens når 200000 minus `reserved`-bufferen.
+- `reserved` - Tokenbuffer til komprimering. Efterlader tilstrækkeligt vindue til at undgå overløb under komprimering. Når `context_limit` er indstillet, er standarden 20000, men sættes til mindst modellens `maxOutputTokens` — dette sikrer, at modellen altid har nok plads til fuld output. F.eks. med `context_limit: 200000` og `maxOutputTokens` på 8000, er effektiv `reserved` 20000 og komprimering udløses ved 180000. Hvis `maxOutputTokens` er 128000, er effektiv `reserved` 128000 og komprimering udløses ved 72000.
+- `autocontinue` - Efter auto-komprimering, indsæt en syntetisk "Fortsæt"-besked, så modellen kan fortsætte (standard: `true`). Gælder kun for auto-komprimering, ikke manuel `/compact`.
+
+**Delt** (påvirker både auto og manuel komprimering):
+
 - `prune` - Fjern gamle værktøjsoutputs for at spare tokens (standard: `true`).
-- `reserved` - Tokenbuffer til komprimering. Efterlader tilstrækkeligt vindue til at undgå overløb under komprimering.
 - `tail_turns` - Antal seneste brugeromgange, der skal bevares ordret under komprimering (standard: `2`).
 - `summary_max_tokens` - Maksimale tokens for komprimeringsoversigten. Standard: `min(modelens outputgrænse, 8000)`.
 - `prune_protected_tools` - Værktøjsnavne, hvis output aldrig beskæres (standard: `["skill"]`).
-- `context_limit` - Eksplicit kontekstvindue til komprimeringstærsklen. Tilsidesætter modellens kontekstgrænse. F.eks. udløser `200000` komprimering, når brugte tokens når 200000 minus `reserved`-bufferen.
 
 ---
 
