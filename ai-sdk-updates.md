@@ -1,223 +1,395 @@
 # AI SDK Dependency Upgrade Report
 
-Generated from `package.json` and `packages/opencode/package.json`.
-**Scope:** minor/patch upgrades only — no major version changes.
-**Source of truth:** npm registry `ai-v6` dist-tag (same major version line).
+Generated: 2026-07-29  
+Scope: Minor and patch version upgrades only (no major version changes).
 
 ---
 
-## Summary Table
+## Summary
 
-| Package                       | Current | Latest      | Changelog                                                                                                                                                           |
-| ----------------------------- | ------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ai`                          | 6.0.168 | **6.0.208** | [vercel/ai CHANGELOG](https://github.com/vercel/ai/blob/main/packages/ai/CHANGELOG.md)                                                                              |
-| `@ai-sdk/provider`            | 3.0.8   | **3.0.10**  | [vercel/ai provider CHANGELOG](https://github.com/vercel/ai/blob/main/packages/provider/CHANGELOG.md)                                                               |
-| `@ai-sdk/provider-utils`      | 4.0.23  | **4.0.29**  | [vercel/ai provider-utils CHANGELOG](https://github.com/vercel/ai/blob/main/packages/provider-utils/CHANGELOG.md)                                                   |
-| `@ai-sdk/openai`              | 3.0.53  | **3.0.73**  | [vercel/ai openai CHANGELOG](https://github.com/vercel/ai/blob/main/packages/openai/CHANGELOG.md)                                                                   |
-| `@ai-sdk/anthropic`           | 3.0.71  | **3.0.89**  | [vercel/ai anthropic CHANGELOG](https://github.com/vercel/ai/blob/main/packages/anthropic/CHANGELOG.md)                                                             |
-| `@ai-sdk/google`              | 3.0.63  | **3.0.86**  | [vercel/ai google CHANGELOG](https://github.com/vercel/ai/blob/main/packages/google/CHANGELOG.md)                                                                   |
-| `@ai-sdk/google-vertex`       | 4.0.112 | **4.0.152** | [vercel/ai google-vertex CHANGELOG](https://github.com/vercel/ai/blob/main/packages/google-vertex/CHANGELOG.md)                                                     |
-| `@ai-sdk/azure`               | 3.0.49  | **3.0.80**  | [vercel/ai azure CHANGELOG](https://github.com/vercel/ai/blob/main/packages/azure/CHANGELOG.md)                                                                     |
-| `@ai-sdk/xai`                 | 3.0.82  | **3.0.100** | [vercel/ai xai CHANGELOG](https://github.com/vercel/ai/blob/main/packages/xai/CHANGELOG.md)                                                                         |
-| `@ai-sdk/gateway`             | 3.0.104 | **3.0.139** | [vercel/ai gateway CHANGELOG](https://github.com/vercel/ai/blob/main/packages/gateway/CHANGELOG.md)                                                                 |
-| `@ai-sdk/groq`                | 3.0.31  | **3.0.45**  | [vercel/ai groq CHANGELOG](https://github.com/vercel/ai/blob/main/packages/groq/CHANGELOG.md)                                                                       |
-| `@ai-sdk/mistral`             | 3.0.27  | **3.0.43**  | [vercel/ai mistral CHANGELOG](https://github.com/vercel/ai/blob/main/packages/mistral/CHANGELOG.md)                                                                 |
-| `@ai-sdk/cerebras`            | 2.0.41  | **2.0.60**  | [vercel/ai cerebras CHANGELOG](https://github.com/vercel/ai/blob/main/packages/cerebras/CHANGELOG.md)                                                               |
-| `@ai-sdk/cohere`              | 3.0.27  | **3.0.42**  | [vercel/ai cohere CHANGELOG](https://github.com/vercel/ai/blob/main/packages/cohere/CHANGELOG.md)                                                                   |
-| `@ai-sdk/togetherai`          | 2.0.41  | **2.0.59**  | [vercel/ai togetherai CHANGELOG](https://github.com/vercel/ai/blob/main/packages/togetherai/CHANGELOG.md)                                                           |
-| `@ai-sdk/perplexity`          | 3.0.26  | **3.0.39**  | [vercel/ai perplexity CHANGELOG](https://github.com/vercel/ai/blob/main/packages/perplexity/CHANGELOG.md)                                                           |
-| `@ai-sdk/deepinfra`           | 2.0.41  | **2.0.58**  | [vercel/ai deepinfra CHANGELOG](https://github.com/vercel/ai/blob/main/packages/deepinfra/CHANGELOG.md)                                                             |
-| `@ai-sdk/alibaba`             | 1.0.17  | **1.0.32**  | [vercel/ai alibaba CHANGELOG](https://github.com/vercel/ai/blob/main/packages/alibaba/CHANGELOG.md)                                                                 |
-| `@ai-sdk/vercel`              | 2.0.39  | **2.0.56**  | [vercel/ai vercel CHANGELOG](https://github.com/vercel/ai/blob/main/packages/vercel/CHANGELOG.md)                                                                   |
-| `@ai-sdk/openai-compatible`   | 2.0.41  | **2.0.54**  | [vercel/ai openai-compatible CHANGELOG](https://github.com/vercel/ai/blob/main/packages/openai-compatible/CHANGELOG.md)                                             |
-| `@openrouter/ai-sdk-provider` | 2.8.1   | **2.10.0**  | [CHANGELOG.md](https://github.com/OpenRouterTeam/ai-sdk-provider/blob/master/CHANGELOG.md) / [Releases](https://github.com/OpenRouterTeam/ai-sdk-provider/releases) |
-| `ai-gateway-provider`         | 3.1.2   | **3.1.3**   | [cloudflare/ai CHANGELOG](https://github.com/cloudflare/ai/blob/main/packages/ai-gateway-provider/CHANGELOG.md)                                                     |
-| `gitlab-ai-provider`          | 6.6.0   | **6.9.3**   | [CHANGELOG.md](https://gitlab.com/vglafirov/gitlab-ai-provider/-/blob/main/CHANGELOG.md)                                                                            |
-| `venice-ai-sdk-provider`      | 2.0.1   | **2.1.1**   | [Commit history](https://github.com/dpuyosa/venice-ai-sdk-provider/commits/v6)                                                                                      |
-| `@modelcontextprotocol/sdk`   | 1.27.1  | **1.29.0**  | [typescript-sdk releases](https://github.com/modelcontextprotocol/typescript-sdk/releases)                                                                          |
-
-> **Note on `ai` package:** npm's `latest` dist-tag now points to 7.0.4. Version 6.0.208 is the latest in the 6.x line. Use `ai@6` or `ai@^6.0.0` to stay on 6.x.
+| Package | Current | Latest Minor/Patch | Status |
+|---------|---------|-------------------|--------|
+| `ai` | 6.0.224 | **6.0.238** | ✅ 14 patch releases |
+| `@ai-sdk/openai` | 3.0.84 | **3.0.90** | ✅ 6 patch releases |
+| `@ai-sdk/anthropic` | 3.0.96 | **3.0.103** | ✅ 7 patch releases |
+| `@ai-sdk/google` | 3.0.91 | **3.0.103** | ✅ 12 patch releases |
+| `@ai-sdk/google-vertex` | 4.0.159 | **4.0.174** | ✅ 15 patch releases |
+| `@ai-sdk/amazon-bedrock` | 4.0.133 | **4.0.144** | ✅ 11 patch releases |
+| `@ai-sdk/azure` | 3.0.88 | **3.0.95** | ✅ 7 patch releases |
+| `@ai-sdk/xai` | 3.0.106 | **3.0.113** | ✅ 7 patch releases |
+| `@ai-sdk/mistral` | 3.0.48 | **3.0.53** | ✅ 5 patch releases |
+| `@ai-sdk/openai-compatible` | 2.0.59 | **2.0.63** | ✅ 4 patch releases |
+| `@ai-sdk/togetherai` | 2.0.64 | **2.0.69** | ✅ 5 patch releases |
+| `@ai-sdk/gateway` | 3.0.148 | **3.0.160** | ✅ 12 patch releases |
+| `@ai-sdk/provider-utils` | 4.0.38 | **4.0.41** | ✅ 3 patch releases |
+| `@ai-sdk/cerebras` | 2.0.65 | **2.0.69** | ⚠️ Dependency bumps only |
+| `@ai-sdk/cohere` | 3.0.47 | **3.0.50** | ⚠️ Dependency bumps only |
+| `@ai-sdk/deepinfra` | 2.0.63 | **2.0.67** | ⚠️ Dependency bumps only |
+| `@ai-sdk/perplexity` | 3.0.45 | **3.0.48** | ⚠️ Dependency bumps only |
+| `@ai-sdk/vercel` | 2.0.61 | **2.0.65** | ⚠️ Dependency bumps only |
+| `@ai-sdk/alibaba` | 1.0.37 | **1.0.41** | ⚠️ Dependency bumps only |
+| `gitlab-ai-provider` | 6.10.1 | **6.12.1** | ✅ 2 minor + 1 patch |
+| `@openrouter/ai-sdk-provider` | 2.10.0 | **2.10.0** | ⛔ Already latest (3.0.0 is major) |
+| `@ai-sdk/provider` | 3.0.14 | **3.0.14** | ⛔ Already latest (4.0.4 is major) |
+| `ai-gateway-provider` | 3.2.0 | **3.2.0** | ⛔ Already latest (4.0.0 is major) |
+| `venice-ai-sdk-provider` | 2.1.1 | **2.1.1** | ⛔ Already latest |
 
 ---
 
-## Notable Changes by Package
+## Detailed Findings
 
-### `ai` — 6.0.168 → 6.0.208 (+40 patch versions)
+### `ai` — 6.0.224 → 6.0.238
 
-- 🔒 **Security — SSRF guard hardened** (`375fdd7`): `downloadBlob`/`download` now validate after redirects (manual redirect follow + re-validation per hop), strip trailing dots on hostnames, decode IPv6-embedded private addresses; fail-closed on opaque redirects in browsers.
-- 🔒 **Security — tool approval replay hardened** (`bae5e2b`): `generateText`/`streamText` re-validate HMAC signature, tool-call input schema, and approval policy before executing replayed approvals; prevents forged assistant messages from executing arbitrary tools.
-- 🔒 **Security — prototype pollution guard** (`3295831`): stream part IDs hardened against `__proto__`/`constructor` pollution.
-- 🔒 **Security — SSRF redirect bypass** (`531251e`): `validateDownloadUrl` now blocks redirect targets before following.
-- 🐛 **Fix — error redaction in UI streams** (`f18b08f`): `toUIMessageStream`/`createUIMessageStream` default `onError` now returns `'An error occurred.'` instead of serializing raw server exceptions.
-- 🐛 **Fix — `stepMs` timeout now works in `streamText`** (`eeefc3f`): step timer survives until stream finishes.
-- ✨ **Feat — experimental Realtime API** (`ce769dd`): `openai.experimental_realtime()`, `google.experimental_realtime()`, `xai.experimental_realtime()` for voice conversations.
-- ✨ **Feat — `generateAudio` first-class** (`0416e3e`).
-- ✨ **Feat — automatic tool approval** (`fc92055`).
+**Changelog:** https://github.com/vercel/ai/blob/release-v6.0/packages/ai/CHANGELOG.md
 
-### `@ai-sdk/provider` — 3.0.8 → 3.0.10
-
-- `3.0.10`: Dependency alignment release (bumped `@ai-sdk/provider-utils`); no user-facing changes.
-
-### `@ai-sdk/provider-utils` — 4.0.23 → 4.0.29 (+6 patch versions)
-
-- 🔒 **Security — SSRF fix** (`ad4cfc2`, v4.0.19): `downloadBlob`/`download` now reject private/internal IPs, localhost, and non-HTTP protocols _before_ fetching.
-- 🐛 **Fix — unicode escape bypass in `secureJsonParse`** (`824b295`, v4.0.18).
-- 🐛 **Fix — Bedrock filename extension stripping** (`08336f1`, v4.0.17).
-- ✨ **Feat — 2 GiB download size limit** (`4024a3a`, v4.0.15): `download()`/`downloadBlob()` enforce default `maxBytes`.
-- ✨ **Feat — `spawnCommand` for detached sandbox execution** (`6c93e36`).
-
-### `@ai-sdk/openai` — 3.0.53 → 3.0.73 (+20 patch versions)
-
-- ✨ **Feat — GPT-5.4 / GPT-5.4-mini / GPT-5.4-nano model support** (`7afaece`).
-- ✨ **Feat — GPT-5.5 chat model IDs** (`d6c79e3`).
-- ✨ **Feat — `gpt-5.3-codex` model** (`0c9395b`).
-- ✨ **Feat — tool_search tool, native skills, hosted shell, web search `queries` forwarding** (multiple versions).
-- 🔒 **Security — streaming tool call finalization** (`45b3d76`): tool call args no longer finalized on parsable partial JSON.
-- 🐛 **Fix — `image-url` tool result content in Responses API** (`61bcdb5`).
-- 🐛 **Fix — reasoning items skipped when using `previousResponseId`** (`17b5597`).
-
-### `@ai-sdk/anthropic` — 3.0.71 → 3.0.89 (+18 patch versions)
-
-- ✨ **Feat — `advisor` tool** (`8018480`, v3.0.81).
-- ✨ **Feat — `web_fetch_20260209` and `web_search_20260209` tool variants** (`56c67d5`).
-- ✨ **Feat — eager input streaming for fine-grained tool streaming** (`3fb4e70`).
-- ✨ **Feat — `claude-opus-4-8` support** (`e02f041`).
-- ✨ **Feat — `claude-fable-5` and `fallbacks` API parameter** (`6b4d325`).
-- ✨ **Feat — `code_execution` tool** (`2164cdf`).
-- ✨ **Feat — Claude Sonnet 4.6, Opus 4.6 fast mode** (v3.0.45, v3.0.39).
-- 🐛 **Fix — encrypted code execution results in multi-turn with web_fetch/web_search** (`7531e72`).
-- 🐛 **Fix — compaction_delta streaming null content** (`b094c07`).
-
-### `@ai-sdk/google` — 3.0.63 → 3.0.86 (+23 patches)
-
-- ⭐ **3.0.80 — Critical bug fix:** auto-injects `skip_thought_signature_validator` for Gemini 3 tool-call replays. Without this, Gemini 3 returns HTTP 400 _"Function call is missing a thought_signature"_ when messages are serialized/persisted (e.g. DB-backed `useChat` routes).
-- **3.0.75** — Updated Interactions API implementation for upstream breaking changes (May 26 cutover).
-- **3.0.70** — Fixed lack of image consistency when using Interactions API in stateless mode.
-
-### `@ai-sdk/google-vertex` — 4.0.112 → 4.0.152 (+40 patches)
-
-- **4.0.140** — Added support for `claude-opus-4-8` via updated `@ai-sdk/anthropic@3.0.81`.
-- **4.0.152** — Dependency bump to `provider-utils@4.0.33`, `anthropic@3.0.89`, `google@3.0.86`, `openai-compatible@2.0.54`.
-
-### `@ai-sdk/azure` — 3.0.49 → 3.0.80 (+31 patches)
-
-- Range is primarily dependency-only bumps (`@ai-sdk/openai`, `@ai-sdk/provider-utils`).
-- **3.0.80** — Updated to `provider-utils@4.0.33`, `deepseek@2.0.42`, `openai@3.0.77`.
-
-### `@ai-sdk/xai` — 3.0.82 → 3.0.100 (+18 patches)
-
-- ⭐ **3.0.85** — Fixed `additionalProperties` flag emission; **added support for non-image file parts** (PDF, text, CSV) in the Responses API via `input_file` + `file_url` — previously threw `UnsupportedFunctionalityError` for non-image documents.
-- **3.0.100** — Dependency bump to `provider-utils@4.0.33`, `openai-compatible@2.0.54`.
-
-### `@ai-sdk/gateway` — 3.0.104 → 3.0.139 (+35 patches)
-
-- ⭐ **3.0.120** — Added `serviceTier: 'flex' | 'priority'` to `GatewayProviderOptions`.
-- **3.0.139** — Dependency bump to `provider-utils@4.0.33`.
-
-### `@ai-sdk/groq` — 3.0.31 → 3.0.45
-
-- **3.0.45**: Dependency bump (`@ai-sdk/provider@3.0.12`, `@ai-sdk/provider-utils@4.0.33`).
-- Last provider-specific changes in 3.0.25 range: `strict` mode tools fix, `strictJsonSchema` support, `reasoning-end` event fix in streaming.
-
-### `@ai-sdk/mistral` — 3.0.27 → 3.0.43
-
-- **3.0.43**: Dependency bump (`provider-utils@4.0.33`).
-- Last provider-specific change: `3.0.4` — updated `reference_ids` type to union of `number` and `string`.
-
-### `@ai-sdk/cerebras` — 2.0.41 → 2.0.60
-
-- **2.0.60**: Dependency bump.
-- Last provider-specific change: `2.0.34` — removed deprecated model IDs (`llama-3.3-70b`, `qwen-3-32b`).
-
-### `@ai-sdk/cohere` — 3.0.27 → 3.0.42
-
-- **3.0.42**: Dependency bump.
-- Last provider-specific change: `3.0.16` — added `outputDimension` option for Cohere embedding models (256/512/1024/1536).
-
-### `@ai-sdk/togetherai` — 2.0.41 → 2.0.59
-
-- **2.0.59**: Dependency bump (`provider-utils@4.0.33`, `openai-compatible@2.0.54`).
-- Last provider-specific change: `2.0.34` — use `TOGETHER_API_KEY` as default env var (`TOGETHER_AI_API_KEY` still supported but deprecated).
-
-### `@ai-sdk/perplexity` — 3.0.26 → 3.0.39
-
-- **3.0.39**: Dependency bump.
-- **3.0.0**: `Provider-V3`, `LanguageModelV3`, extended token usage, raw finish reason, PDF support, reasoning tokens.
-
-### `@ai-sdk/deepinfra` — 2.0.41 → 2.0.58
-
-- **2.0.58**: Dependency bump.
-- **2.0.29/2.0.30**: Fixed token usage calculation for Gemini/Gemma models.
-- **2.0.33**: Added `supportsStructuredOutputs` to provider settings.
-
-### `@ai-sdk/alibaba` — 1.0.17 → 1.0.32
-
-- **1.0.32**: Dependency bump.
-- ⭐ **Security fix (transitive from openai-compatible 2.0.33)**: streaming tool call arguments no longer execute on parsable-but-incomplete JSON — critical if using tool calls.
-
-### `@ai-sdk/vercel` — 2.0.39 → 2.0.56
-
-- **2.0.56**: Dependency bump.
-- Mostly dependency-alignment; no provider-specific behavioral changes in the 2.x patch range.
-
-### `@ai-sdk/openai-compatible` — 2.0.41 → 2.0.54
-
-- ⭐ **2.0.33** — Fixed base64 string decoding (`fix(openai-compat): decode base64 string data`).
-- ⭐ **2.0.20** — Fixed `reasoning_content` inclusion in multi-turn tool call messages.
-- **2.0.16** — Accept non-OpenAI provider options.
-- **2.0.15** — Consistent camelCase `openaiCompatible` key for providerOptions (kebab-case deprecated).
-- **2.0.5** — Changed response schemas from `z.object` to `z.looseObject` for non-standard API compatibility.
-
-### `@openrouter/ai-sdk-provider` — 2.8.1 → 2.10.0
-
-- **2.9.0** — Added `structuredOutputs.strict` opt-out; fixed image URL regex to accept query strings/fragments; fixed duplicate `tool-call` events on trailing-whitespace deltas.
-- **2.9.1** — Fixed sending `null` content for tool-only assistant messages.
-
-### `ai-gateway-provider` — 3.1.2 → 3.1.3
-
-- **3.1.3** — Updated dependencies; replaced `tsup` with `tsdown` as build tool.
-
-### `gitlab-ai-provider` — 6.6.0 → 6.9.3
-
-- **6.7.0** — Added GPT-5.5 model mapping.
-- **6.7.1** — Fixed Anthropic cache token counting (now includes cache tokens in input total).
-- **6.8.0** — Added Claude Opus 4.8 model mapping.
-- **6.9.0** — Added Claude Fable 5 model mapping.
-- **6.9.3** — Fixed concurrent auth failures caused by token races.
-
-### `venice-ai-sdk-provider` — 2.0.1 → 2.1.1
-
-- **2.0.2** — Added reasoning-enabled field and expanded effort values.
-- **2.1.0** — Added metadata extractor and prediction tokens; added reasoning summary, cache retention, and parallel tools support; migrated from Prettier to Biome.
-- **2.1.1** — Fixed default `veniceParameters` via schema parse.
-
-### `@modelcontextprotocol/sdk` — 1.27.1 → 1.29.0
-
-- **v1.28.0** — Uses `scopes_supported` from resource metadata by default; defaults to `client_secret_basic`; fixed SSE reconnection timeout cleanup; relaxed loopback port rules per RFC 8252.
-- **v1.29.0** — Disallowed null (infinite) requested TTL; added missing `size` field to `ResourceSchema`; added typings exports; fixed `windowsHide` on Windows.
+**Key changes (14 patch releases):**
+- Fixed chat `onFinish` handling when overlapping requests clear the active response before a resume stream finishes
+- Fixed `onInputStart` not being called before `onInputAvailable` during non-streaming tool calls
+- Fixed tools excluded by `activeTools` still being parsed/executed
+- Fixed provider options being lost when combining consecutive tool messages
+- Fixed MP4 audio detection during transcription by reading the ftyp box correctly
+- Fixed tool parts being overwritten when tool call IDs repeat across steps
+- Fixed unbounded media-type sniffing decode for ID3-prefixed input, preventing O(N) memory blowups
+- Fixed synthesizing client tool errors for invalid provider-executed tool calls
+- Fixed validated Node.js downloads reaching private/internal services via DNS rebinding by pinning resolved addresses
+- Allowed validating assistant UI messages with empty parts so persisted errored responses remain loadable
+- Prevented pending tool executions from enqueueing results after a model stream error closes the result stream
+- Allowed UI message chunks to include fields added by newer server versions
+- Propagated abort reasons when generation is cancelled during tool execution
+- Returned response piping promises so callers can catch stream read/write errors
+- Added support for overriding model call settings for individual `prepareStep` invocations
+- Preserved provider metadata from empty text deltas in `streamText`
 
 ---
 
-## Cross-Package Dependency Shifts
+### `@ai-sdk/openai` — 3.0.84 → 3.0.90
 
-All `@ai-sdk/*` providers share internal dependencies that have also moved:
+**Changelog:** https://github.com/vercel/ai/blob/main/packages/openai/CHANGELOG.md
 
-| Shared Dep                  | Current | Latest | Notes                             |
-| --------------------------- | ------- | ------ | --------------------------------- |
-| `@ai-sdk/provider`          | 3.0.8   | 3.0.10 | Minimal user-facing changes       |
-| `@ai-sdk/provider-utils`    | 4.0.23  | 4.0.29 | SSRF fix, download limits         |
-| `@ai-sdk/openai-compatible` | 2.0.41  | 2.0.54 | Base64 fix, reasoning_content fix |
-
-> **Recommendation:** Upgrade all `@ai-sdk/*` packages **together** to avoid version conflicts, since they share `@ai-sdk/provider` and `@ai-sdk/provider-utils` as peer/transitive dependencies.
+**Key changes (6 patch releases):**
+- Updated `@ai-sdk/provider-utils` to `4.0.39` → `4.0.41`
+- Preserved stored tool search output item IDs from provider metadata
+- Applied reasoning, service tier, and image defaults to recognizable future OpenAI model family versions
+- Added blocked domain filters to the OpenAI and Azure Responses API web search tools
 
 ---
 
-## Critical Fixes to Prioritize
+### `@ai-sdk/anthropic` — 3.0.96 → 3.0.103
 
-| Package                     | Fix                                  | Impact                                             |
-| --------------------------- | ------------------------------------ | -------------------------------------------------- |
-| `@ai-sdk/provider-utils`    | SSRF guard (v4.0.19)                 | Security — blocks private/internal IP fetches      |
-| `@ai-sdk/google`            | Gemini 3 thought_signature (v3.0.80) | Bug — prevents HTTP 400 on persisted chat messages |
-| `@ai-sdk/openai-compatible` | Base64 string decoding (v2.0.33)     | Bug — fixes broken binary data handling            |
-| `@ai-sdk/openai`            | Streaming tool call finalization     | Security — prevents partial JSON execution         |
-| `ai`                        | Tool approval replay hardening       | Security — prevents forged tool execution          |
+**Changelog:** https://github.com/vercel/ai/releases
+
+**Key changes (7 patch releases):**
+- Updated `@ai-sdk/provider-utils` to `4.0.39` → `4.0.41`
+- Preserved web search citations when replaying assistant messages
+- Sanitized unsupported JSON Schema constraints in native Anthropic structured output
+- Warned when parallel tool use is requested with JSON tool structured output
+- Warned when an unknown model uses the default 4096 max output token limit
+- Used current-generation capability defaults for unrecognized Claude model IDs, while retaining conservative defaults for legacy Claude and non-Claude models
+- **New:** Support fallbacks `'default'` mode for safety classifier refusals (adds `server-side-fallback-2026-07-01` beta)
+- **New:** Support mid-conversation tool changes via `toolChanges` system message provider option (adds `mid-conversation-tool-changes-2026-07-01` beta)
+- **New:** Added `claude-opus-5` model ID with frontier-tier capabilities (128k output tokens, structured output, adaptive thinking, xhigh effort, sampling parameter rejection)
+- Reported thinking tokens as reasoning token usage
+
+---
+
+### `@ai-sdk/google` — 3.0.91 → 3.0.103
+
+**Changelog:** https://github.com/vercel/ai/releases
+
+**Key changes (12 patch releases):**
+- Updated `@ai-sdk/provider-utils` to `4.0.39` → `4.0.41`
+- `google.interactions` agent requests now support additional tools, including `file_search`
+- Forwarded Vertex-only `imageConfig` options (`personGeneration`, `prominentPeople`, `imageOutputOptions`)
+- Associated multiple code execution results with their corresponding tool call
+- Surfaced Gemini `responseId` as `response-metadata` in streams and `response.id` in generate responses
+- **New models:** `gemini-3.6-flash` and `gemini-3.5-flash-lite`
+- Avoided missing thought-signature warnings and skip-validator injection for valid unsigned Gemini 3 parallel function calls in the same model response
+- Default unknown Gemini model IDs to the newest supported capabilities
+- Omitted unsupported function call IDs
+- Forwarded `topK` through Google Interactions requests; warned when unsupported frequency or presence penalties are provided
+
+---
+
+### `@ai-sdk/google-vertex` — 4.0.159 → 4.0.174
+
+**Changelog:** https://github.com/vercel/ai/releases/tag/%40ai-sdk%2Fgoogle-vertex%404.0.174
+
+**Key changes (15 patch releases):**
+- Support video (not just image) reference inputs in `inputReferences` for reference-to-video generation
+- Added `gemini-3.6-flash` and `gemini-3.5-flash-lite` models
+- Default unknown Gemini model IDs to the newest supported capabilities
+- Allow `google.interactions` agent requests to include supported tools, including `file_search`
+- Anthropic: support fallbacks `default` mode; support mid-conversation tool changes; added `claude-opus-5` model id
+- Fixed Google tool result conversion to send file data as inline data instead of JSON text on the legacy tool-result path
+- Forwarded Vertex-only `imageConfig` options (`personGeneration`, `prominentPeople`, `imageOutputOptions`)
+- Associated multiple code execution results with their tool call
+- Surfaced Gemini `responseId` as `response-metadata` (stream) and `response.id` (generate)
+- Avoided missing thought-signature warnings and skip-validator injection for valid unsigned Gemini 3 parallel function calls
+- Omitted unsupported function call IDs
+- Preserved web search citations when replaying assistant messages
+- Warned when parallel tool use is requested with JSON tool structured output
+- Used current-generation capability defaults for unrecognized Claude model IDs
+- Reported thinking tokens as reasoning token usage
+- Preserved structured error data from chat completion SSE streams
+- Called `onInputStart` before `onInputAvailable` during non-streaming tool calls
+- Prevented validated downloads on Node.js from reaching private/internal services through DNS aliases or DNS rebinding
+
+---
+
+### `@ai-sdk/amazon-bedrock` — 4.0.133 → 4.0.144
+
+**Changelog:** https://github.com/vercel/ai/blob/main/packages/amazon-bedrock/CHANGELOG.md
+
+**Key changes (11 patch releases):**
+- Translated `eager_input_streaming` into the fine-grained-tool-streaming beta for Anthropic models
+- Avoided unreliable synthetic response tools when structured output is combined with tools on Bedrock Claude Opus 4.7 and 4.8
+- **New:** Returned Bedrock Converse request bodies from language model generation and streaming calls
+- Supported application inference profile ARNs
+- Sanitized unsupported JSON Schema constraints in native Anthropic structured output; encoded slashes in ARN model IDs for Converse requests
+- **New:** Passed through `s3://` image URLs to Amazon Bedrock Converse as S3 image sources instead of downloading them
+- Sanitized invalid characters in replayed tool call names before sending conversation history
+- Used current-generation capability defaults for unrecognized Claude model IDs while retaining conservative defaults for legacy Claude and non-Claude models
+- Omitted tool `strict` and `output_config.format` for Claude models that Bedrock rejects
+- Updated dependencies (`@ai-sdk/anthropic`, `@ai-sdk/openai`, `@ai-sdk/provider-utils`)
+
+---
+
+### `@ai-sdk/azure` — 3.0.88 → 3.0.95
+
+**Changelog:** https://github.com/vercel/ai/blob/main/packages/azure/CHANGELOG.md
+
+**Key changes (7 patch releases):**
+- Updated `@ai-sdk/provider-utils` to `4.0.39` → `4.0.41`
+- Updated `@ai-sdk/openai` to `3.0.85` → `3.0.90`
+- Updated `@ai-sdk/deepseek` to `2.0.48` → `2.0.51`
+- **New:** Added blocked domain filters to the OpenAI and Azure Responses API web search tools
+- **Bug fix:** Azure DeepSeek structured output no longer returns JSON in reasoning with empty text
+
+---
+
+### `@ai-sdk/xai` — 3.0.106 → 3.0.113
+
+**Changelog:** https://github.com/vercel/ai/blob/@ai-sdk/xai@3.0.113/packages/xai/CHANGELOG.md
+
+**Key changes (7 patch releases):**
+- **New:** Support end-user identifiers for video generation and editing
+- **Bug fix:** Handle empty HTTP 202 responses while polling videos
+- **Bug fix:** Preserve images in Responses API tool results
+- **Behavior change:** Warn when xAI Responses models ignore unsupported sampling settings
+- Updated dependencies (`@ai-sdk/provider-utils`, `@ai-sdk/openai-compatible`)
+
+---
+
+### `@ai-sdk/mistral` — 3.0.48 → 3.0.53
+
+**Changelog:** https://github.com/vercel/ai/releases/tag/%40ai-sdk%2Fmistral%403.0.53
+
+**Key changes (5 patch releases):**
+- Updated `@ai-sdk/provider-utils` to `4.0.39` → `4.0.41`
+- **New:** Non-streaming Voxtral text-to-speech generation with saved voice IDs and one-off reference audio
+- **Bug fix:** Preserve reasoning in multi-turn conversations
+
+---
+
+### `@ai-sdk/openai-compatible` — 2.0.59 → 2.0.63
+
+**Changelog:** https://github.com/vercel/ai/blob/main/packages/openai-compatible/CHANGELOG.md
+
+**Key changes (4 patch releases):**
+- **Bug fix:** OpenAI-compatible chat SSE errors now preserve structured error fields instead of discarding them and exposing only the message string
+  - Changed `chunk.value.error.message` → `chunk.value.error` in `openai-compatible-chat-language-model.ts`
+  - Updated test to verify structured error objects (e.g., `{ code, message }`) are passed through correctly
+- Updated `@ai-sdk/provider-utils` to `4.0.41`
+
+---
+
+### `@ai-sdk/togetherai` — 2.0.64 → 2.0.69
+
+**Changelog:** https://github.com/vercel/ai/blob/main/packages/togetherai/CHANGELOG.md
+
+**Key changes (5 patch releases):**
+- **New:** Enabled `includeUsage` for TogetherAI so streaming responses report token usage
+- Updated dependencies (`@ai-sdk/provider-utils` and `@ai-sdk/openai-compatible` patch bumps)
+
+---
+
+### `@ai-sdk/gateway` — 3.0.148 → 3.0.160
+
+**Changelog:** https://github.com/vercel/ai/blob/main/packages/gateway/CHANGELOG.md
+
+**Key changes (12 patch releases):**
+- No detailed per-version changelog entries are published for `3.0.149`–`3.0.160` in the package's own `CHANGELOG.md`.
+- The gateway package's documented changelog ends at `3.0.66`.
+- Versions `3.0.67` through `3.0.160` appear to be automated dependency-sync releases in the `vercel/ai` monorepo.
+- Note: version `3.0.113` is missing from the npm release history (skipped/yanked).
+
+---
+
+### `@ai-sdk/provider-utils` — 4.0.38 → 4.0.41
+
+**Changelog:** https://github.com/vercel/ai/releases/tag/%40ai-sdk/provider-utils%404.0.41
+
+**Key changes (3 patch releases):**
+- **4.0.39:** Accept callable Standard Schema validators that do not provide JSON Schema conversion
+- **4.0.40:** Fix tool input lifecycle ordering — `onInputStart` now fires before `onInputAvailable` for non-streaming tool calls
+- **4.0.41:** Security fix — prevent DNS alias / DNS rebinding SSRF in validated downloads by validating and pinning resolved addresses before opening a socket
+
+---
+
+### `@ai-sdk/cerebras` — 2.0.65 → 2.0.69
+
+**Changelog:** https://github.com/vercel/ai/releases/tag/%40ai-sdk%2Fcerebras%402.0.69
+
+**Key changes (4 patch releases):**
+- All four releases are automated dependency-bump patches in the Vercel AI SDK monorepo.
+- No code changes were made to the `@ai-sdk/cerebras` package itself between 2.0.65 and 2.0.69.
+- Updated `@ai-sdk/provider-utils` to `4.0.39` → `4.0.41`
+- Updated `@ai-sdk/openai-compatible` to `2.0.60` → `2.0.63`
+
+---
+
+### `@ai-sdk/cohere` — 3.0.47 → 3.0.50
+
+**Changelog:** https://github.com/vercel/ai/blob/main/packages/cohere/CHANGELOG.md
+
+**Key changes (3 patch releases):**
+- All three releases are dependency-bump releases only.
+- No new features, bug fixes, or breaking changes were introduced in the Cohere provider itself.
+- Updated `@ai-sdk/provider-utils` from `4.0.38` → `4.0.41`
+
+---
+
+### `@ai-sdk/deepinfra` — 2.0.63 → 2.0.67
+
+**Changelog:** https://github.com/vercel/ai/blob/main/packages/deepinfra/CHANGELOG.md
+
+**Key changes (4 patch releases):**
+- All four releases are patch-level dependency bumps only.
+- No deepinfra-specific code changes, bug fixes, or new features were introduced.
+- Updated `@ai-sdk/provider-utils` to `4.0.39` → `4.0.41`
+- Updated `@ai-sdk/openai-compatible` to `2.0.60` → `2.0.63`
+
+---
+
+### `@ai-sdk/perplexity` — 3.0.45 → 3.0.48
+
+**Changelog:** https://github.com/vercel/ai/releases?q=perplexity
+
+**Key changes (3 patch releases):**
+- All three releases are dependency-only bumps (`@ai-sdk/provider-utils`).
+- No new features or bug fixes were introduced in the `@ai-sdk/perplexity` package itself.
+- Updated `@ai-sdk/provider-utils` from `4.0.38` → `4.0.41`
+- The most recent functional fix in this line was **3.0.45** itself: *"Fix Perplexity prompt conversion for file parts with unsupported media types and top-level PDF media types."*
+
+---
+
+### `@ai-sdk/vercel` — 2.0.61 → 2.0.65
+
+**Changelog:** https://github.com/vercel/ai/releases/tag/%40ai-sdk/vercel%402.0.65
+
+**Key changes (4 patch releases):**
+- All four releases are dependency-only bumps.
+- `@ai-sdk/vercel` itself had no direct code changes.
+- Updated `@ai-sdk/provider-utils` to `4.0.39` → `4.0.41`
+- Updated `@ai-sdk/openai-compatible` to `2.0.60` → `2.0.63`
+- Notable transitive fixes:
+  - `provider-utils` 4.0.39: Fix Effect Standard Schema classes failing as message metadata validators
+  - `openai-compatible` 2.0.61: Fix chat SSE errors losing structured error fields
+  - `provider-utils` 4.0.40: Fix tool input lifecycle ordering
+  - `provider-utils` 4.0.41: Security fix — prevent DNS alias / DNS rebinding SSRF
+
+---
+
+### `@ai-sdk/alibaba` — 1.0.37 → 1.0.41
+
+**Changelog:** https://github.com/vercel/ai/blob/main/packages/alibaba/CHANGELOG.md
+
+**Key changes (4 patch releases):**
+- All four releases are dependency-only updates.
+- No Alibaba-specific code changes or new features.
+- Updated `@ai-sdk/provider-utils` to `4.0.39` → `4.0.41`
+- Updated `@ai-sdk/openai-compatible` to `2.0.60` → `2.0.63`
+- Notable changes already in 1.0.35–1.0.36 (before current version):
+  - Added `wan2.7` text-to-video and reference-to-video model support
+  - Security fix: prevent streaming tool calls from finalizing on parsable partial JSON
+
+---
+
+### `@ai-sdk/provider` — 3.0.14
+
+**Changelog:** https://github.com/vercel/ai/blob/main/packages/provider/CHANGELOG.md
+
+**Status:** Already on latest minor/patch version. No 3.x upgrades available. Next version is `4.0.4` (major).
+
+---
+
+### `@openrouter/ai-sdk-provider` — 2.10.0
+
+**Changelog:** https://github.com/OpenRouterTeam/ai-sdk-provider/blob/main/CHANGELOG.md
+
+**Status:** Already on latest minor/patch version (`2.10.0`). Next version is `3.0.0` (major).
+
+**Note on 3.0.0 (major, excluded):**
+- Switch to dedicated images API for image generation
+- Support for Vercel AI SDK v7
+- Various bug fixes from `2.9.0`/`2.9.1`
+
+---
+
+### `ai-gateway-provider` — 3.2.0
+
+**Changelog:** https://github.com/cloudflare/ai/blob/main/packages/ai-gateway-provider/CHANGELOG.md
+
+**Status:** Already on latest minor/patch version (`3.2.0`). Next version is `4.0.0` (major).
+
+---
+
+### `venice-ai-sdk-provider` — 2.1.1
+
+**Changelog:** https://www.npmjs.com/package/venice-ai-sdk-provider
+
+**Status:** Already on latest minor/patch version (`2.1.1`). No newer `2.x` releases published.
+
+---
+
+### `gitlab-ai-provider` — 6.10.1 → 6.12.1
+
+**Changelog:** https://gitlab.com/vglafirov/gitlab-ai-provider/-/blob/main/CHANGELOG.md
+
+**Key changes (2 minor + 1 patch releases):**
+- **6.11.0:** Added GPT-5.6 model mappings (`duo-chat-gpt-5-6-sol`, `-terra`, `-luna`)
+- **6.11.1:** Routed GPT-5.6 models through the Responses API; docs sync for the model mappings table
+- **6.12.0:** Added Claude Opus 5 model mappings
+- **6.12.1:** Performance: placed Anthropic cache breakpoints on the final two messages
+
+---
+
+## Recommendations
+
+### High-value upgrades (new features or significant bug fixes)
+
+1. **`@ai-sdk/anthropic`** — `claude-opus-5` model support, mid-conversation tool changes, fallbacks mode
+2. **`@ai-sdk/google` / `@ai-sdk/google-vertex`** — `gemini-3.6-flash` and `gemini-3.5-flash-lite` models, improved tool-call reliability
+3. **`@ai-sdk/amazon-bedrock`** — S3 image URL pass-through, Converse request body exposure, inference profile ARN support
+4. **`@ai-sdk/mistral`** — Voxtral text-to-speech generation, reasoning preservation in multi-turn
+5. **`gitlab-ai-provider`** — GPT-5.6 and Claude Opus 5 model mappings
+6. **`ai`** — Multiple tool execution and streaming fixes, DNS rebinding security fix
+
+### Safe but low-value upgrades (dependency bumps only)
+
+These packages had no provider-specific code changes in the patch releases — only transitive dependency updates:
+
+- `@ai-sdk/cerebras`
+- `@ai-sdk/cohere`
+- `@ai-sdk/deepinfra`
+- `@ai-sdk/perplexity`
+- `@ai-sdk/vercel`
+- `@ai-sdk/alibaba`
+- `@ai-sdk/gateway` (mostly automated dependency-sync releases)
+
+### Already up-to-date
+
+- `@openrouter/ai-sdk-provider` (2.10.0)
+- `@ai-sdk/provider` (3.0.14)
+- `ai-gateway-provider` (3.2.0)
+- `venice-ai-sdk-provider` (2.1.1)
