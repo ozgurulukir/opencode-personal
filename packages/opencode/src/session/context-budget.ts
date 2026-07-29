@@ -44,9 +44,17 @@ function usableWith(
   cc: ReturnType<typeof compactionConfig>,
 ) {
   // When contextLimit is set, use it as the explicit context window.
-  // Otherwise fall back to model.limit.input (if set) or model.limit.context.
+  // reserved defaults to compactionBuffer (20K) but is clamped to at least
+  // maxOutputTokens so the model always has headroom for its full output.
+  // User can override with explicit reserved, but the maxOutputTokens floor
+  // is a safety invariant — without it, a model with 128K max output could
+  // hit the context limit mid-response with only 20K headroom.
   if (cc.contextLimit) {
-    return Math.max(0, cc.contextLimit - (cc.reserved ?? ProviderTransform.maxOutputTokens(model)))
+    const reserved = Math.max(
+      cc.reserved ?? DEFAULTS.compactionBuffer,
+      ProviderTransform.maxOutputTokens(model),
+    )
+    return Math.max(0, cc.contextLimit - reserved)
   }
 
   const context = model.limit.context
