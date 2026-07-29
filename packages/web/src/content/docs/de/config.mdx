@@ -493,7 +493,8 @@ Sie können das Verhalten der Kontextkomprimierung über die Option `compaction`
     "prune": true,
     "tail_turns": 2,
     "summary_max_tokens": 5000,
-    "prune_protected_tools": ["skill", "task"]
+    "prune_protected_tools": ["skill", "task"],
+    "context_limit": 200000
   }
 }
 ```
@@ -503,6 +504,7 @@ Sie können das Verhalten der Kontextkomprimierung über die Option `compaction`
 - `tail_turns` - Anzahl der letzten Benutzerrunden, die während der Komprimierung wörtlich beibehalten werden (Standard: `2`).
 - `summary_max_tokens` - Maximale Token-Anzahl für die Komprimierungszusammenfassung. Standard: `min(Ausgabelimit des Modells, 8000)`.
 - `prune_protected_tools` - Namen von Tools, deren Ausgabe nie beschnitten wird (Standard: `["skill"]`).
+- `context_limit` - Explizites Kontextfenster für die Komprimierungsschwelle. Überschreibt das Kontextlimit des Modells. Z. B. löst `200000` die Komprimierung aus, wenn die verwendeten Token 200000 abzüglich des `reserved`-Puffers erreichen.
 
 ---
 

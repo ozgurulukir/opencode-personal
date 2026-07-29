@@ -495,7 +495,8 @@ Bağlam sıkıştırma davranışını `compaction` seçeneği aracılığıyla 
     "tail_turns": 2,
     "reserved": 10000,
     "summary_max_tokens": 5000,
-    "prune_protected_tools": ["skill", "task"]
+    "prune_protected_tools": ["skill", "task"],
+    "context_limit": 200000
   }
 }
 ```
@@ -506,6 +507,7 @@ Bağlam sıkıştırma davranışını `compaction` seçeneği aracılığıyla 
 - `tail_turns` - Sıkıştırma sırasında aynen korunacak son kullanıcı tur sayısı (varsayılan: `2`).
 - `summary_max_tokens` - Sıkıştırma özeti için maksimum token. Varsayılan: `min(model çıktı limiti, 8000)`.
 - `prune_protected_tools` - Çıktısı asla budanmayacak araç adları (varsayılan: `["skill"]`).
+- `context_limit` - Sıkıştırma eşiği için açık bağlam penceresi. Modelin bağlam limitini geçersiz kılar. Örneğin `200000`, kullanılan tokenlar `reserved` tamponu çıkarıldıktan sonra 200000'e ulaştığında sıkıştırmayı tetikler.
 
 ---
 

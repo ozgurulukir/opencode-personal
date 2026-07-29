@@ -30,6 +30,7 @@ export function compactionConfig(cfg: Config.Info) {
     summaryMaxTokens: cfg.compaction?.summary_max_tokens,
     maxSummaryTokens: DEFAULTS.maxSummaryTokens,
     autocontinue: cfg.compaction?.autocontinue !== false,
+    contextLimit: cfg.compaction?.context_limit,
   }
 }
 
@@ -42,6 +43,12 @@ function usableWith(
   model: Provider.Model,
   cc: ReturnType<typeof compactionConfig>,
 ) {
+  // When contextLimit is set, use it as the explicit context window.
+  // Otherwise fall back to model.limit.input (if set) or model.limit.context.
+  if (cc.contextLimit) {
+    return Math.max(0, cc.contextLimit - (cc.reserved ?? ProviderTransform.maxOutputTokens(model)))
+  }
+
   const context = model.limit.context
   if (context === 0) return 0
 
