@@ -6,7 +6,9 @@
 
 ## About
 
-Bun workspace monorepo: `packages/*`, `packages/console/*`, `packages/sdk/js`, `packages/slack`. Catalog versioning via `catalog:` in bun.lock; workspace deps via `workspace:*`; patched deps in root `package.json`.
+Bun workspace monorepo: `packages/*`, `packages/sdk/js`. Catalog versioning via `catalog:` in bun.lock; workspace deps via `workspace:*`; patched deps in root `package.json`.
+
+- Deleted packages (not imported by core targets `opencode`, `app`, `web`): `slack`, `enterprise`, `llm`, `function`, `http-recorder`, `console/*`, `extensions/zed`, `sdks/vscode`. The `github/` directory has a `workspace:*` reference to `@opencode-ai/sdk` but is NOT in the workspace config — it's a standalone GitHub Action.
 
 ## Setup
 
@@ -16,7 +18,7 @@ Bun workspace monorepo: `packages/*`, `packages/console/*`, `packages/sdk/js`, `
 
 ## Development
 
-- `bun run dev` / `dev:web` / `dev:console` / `dev:desktop` / `dev:storybook`
+- `bun run dev` / `dev:web` / `dev:desktop` / `dev:storybook`
 - `bun run lint` (oxlint)
 - `bun run typecheck` (turbo typecheck)
 - Regenerate JS SDK: `./packages/sdk/js/script/build.ts`
@@ -187,7 +189,7 @@ const table = sqliteTable("session", {
 
 - **Characterization tests are mandatory before any file split or refactoring (Rule 3).** Write tests that lock existing behavior BEFORE extraction. Precedents: `cli/cmd/run/tool.ts` split into 6 modules after 26 display-function tests; `provider/transform.ts` `normalizeMessages` (277 lines) decomposed into 7 per-provider modules after 9 characterization + 225 `ProviderTransform.message` tests; 146 characterization tests for `run.ts`, `session-data.ts`, `footer.prompt.tsx` before the 6-phase refactor. See `packages/opencode/src/provider/AGENTS.md` for the orchestrator pattern and early-return constraints.
 - **Storybook expansion is optional post-refactoring.** Add stories only if: (1) 3+ visual states, (2) designer/PM review needed, or (3) edge cases need documentation. Skip for internal components (header, thinking) covered by parent stories. See `packages/ui/AGENTS.md`.
-- Type HTTP boundaries with zod before eliminating `as any` casts. Provider files (openai.ts, anthropic.ts, openai-compatible.ts) had 213+ instances, resolved in d82e6af by removing redundant casts (`body: any` accesses). Remaining casts limited to library internals (effect-zod: 3, slack: 1, plugin: 1, desktop: 1) and test assertions.
+- Type HTTP boundaries with zod before eliminating `as any` casts. Provider files (openai.ts, anthropic.ts, openai-compatible.ts) had 213+ instances, resolved in d82e6af by removing redundant casts (`body: any` accesses). Remaining casts limited to library internals (effect-zod: 3, plugin: 1, desktop: 1) and test assertions.
 - Split large icon component files (>300 lines) by Heroicons prefix category (arrows, coding, communication, data, file, general, layout, media, social). See `packages/web/src/components/icons/`.
 - Before splitting a god function, extract small single-responsibility modules first (cost, billing, auth, model validation). `packages/console/app/src/routes/zen/util/handler.ts`: 1132 → 468 → 154 lines via two phases. Phase 1 (9 modules): cost.ts, billing.ts, usage.ts, auth.ts, provider-selector.ts, model.ts, reload.ts, validation.ts, http.ts. Phase 2 (6 modules): request.ts, setup.ts, retry.ts, response.ts, error-mapping.ts, plus HandlerDeps injection. Now a thin orchestrator: `parseRequest → setupRequest → executeRetriableRequest → handleResponse → mapErrorToResponse`.
 - Drizzle ORM type mismatches (e.g., `UserTable.userID`, `WorkspaceTable.workspaceID`) often need runtime `any` casts during extraction. Accept as necessary boundary violations, not debt to resolve immediately.
@@ -199,11 +201,9 @@ const table = sqliteTable("session", {
 
 ## Known Issues
 
-- `packages/console/app/src/routes/zen/util/handler.ts` is now a 154-line thin orchestrator (was 1132), decomposed into 15 modules in `zen/util/` with HandlerDeps injection. 93 tests across 14 files. See Rules for the extraction phase breakdown.
-- `packages/console/app/src/routes/zen/util/billing.ts`, `reload.ts`, `usage.ts` require SST cloud resources at module load (`@opencode-ai/console-core/lite.js`). Tests mock these 3 modules via `mock.module()` with `afterAll(() => mock.restore())` cleanup. See `packages/console/app/src/routes/zen/util/AGENTS.md`.
 - Root `test` script always fails: `echo 'do not run tests from root' && exit 1`
 - `packages/opencode/src/session/prompt.ts:1480` — `runLoop` is a ~230-line Effect-based infinite loop; future extraction target
-- Remaining `as any` casts (6 total) in library internals: `packages/core/src/effect-zod.ts` (3, Effect Schema annotations), `packages/slack/src/index.ts` (1, Slack message shape), `packages/opencode/src/plugin/index.ts` (1, `(hook as any).config?.(cfg)`), `packages/desktop/src/main/index.ts` (1, Electron HTTP proxy), plus test files accessing Effect internals.
+- Remaining `as any` casts (5 total) in library internals: `packages/core/src/effect-zod.ts` (3, Effect Schema annotations), `packages/opencode/src/plugin/index.ts` (1, `(hook as any).config?.(cfg)`), `packages/desktop/src/main/index.ts` (1, Electron HTTP proxy), plus test files accessing Effect internals.
 - `useFilteredList` (`packages/ui/src/hooks/use-filtered-list.tsx`) must use `createResource` (not `createMemo`) for grouped data when `items` can be async. Commit `016a457` replaced `createResource` with `createMemo` + `asyncItems` resource + `Object.assign` to mock the `Resource` shape — silently broke reactivity: API calls succeeded (200 OK) but `List`-based dialogs (`dialog-select-directory`, `dialog-select-model`) rendered empty. Reverted; the `keys` memo optimization (`6541fdf`) is safe and preserved.
 - TypeScript conditional types in parameter positions can cause the compiler to skip parameters (both `tsc` and `tsgo`). Example: `[Extract<T, ...>["properties"]] extends [never] ? ...` caused `id: string` to be skipped in `@openauthjs/openauth`'s `OnSuccessResponder.subject()`.
 - Permission evaluation: `evaluate(permission, pattern, ...rulesets)` flattens then uses `findLast` — last match wins. A bug previously passed `(approved, ruleset)` in wrong order, making config always override DB-persisted "always allow". Fixed by checking deny from config first, then allow from approved, then allow from config. Pre-existing `ScopedCache` state leakage between `withDir` tests masks this — `disposeAllInstances()` invalidates async, so "always" replies leak. 2 flaky tests remain.
@@ -228,7 +228,7 @@ const table = sqliteTable("session", {
 - Message continuation: `wrapMessageContinuation` (`packages/opencode/src/session/message-continuation.ts`) — pure function mutating message parts in-place; operate on a message-array copy before calling
 - Provider usage: `packages/opencode/src/provider/usage/` — types.ts (interfaces), claude.ts (Anthropic OAuth fetcher), zai.ts (ZAI API key fetcher), registry.ts (auth.json reader + dispatcher). `/usage` TUI dialog: `cli/cmd/tui/component/dialog-usage.tsx`
 - Double compaction fix: overflow guard checks `compaction_continue` metadata to prevent `Event.Compacted` double-fire (`session/prompt.ts:1564`)
-- Security: use `constantTimeEqual()` (wraps `node:crypto` `timingSafeEqual`) for secret comparisons, not `!==`. Pattern in `packages/function/src/api.ts` and `packages/enterprise/src/core/share.ts` — both define a local `constantTimeEqual(a, b)` handling length mismatch before `timingSafeEqual`.
+- Security: use `constantTimeEqual()` (wraps `node:crypto` `timingSafeEqual`) for secret comparisons, not `!==`. Pattern: define a local `constantTimeEqual(a, b)` handling length mismatch before `timingSafeEqual`.
 - Provider system prompt: `ProviderTransform.systemPromptDelivery(providerID, authInfo)` (`packages/opencode/src/provider/transform.ts`) returns `{ type: "instructions" }` for OpenAI OAuth (no `system` role support — passed via `instructions` field). Used in `session/llm.ts:108` and `agent/agent.ts:456`.
 - WSL path resolution: `wslPath()` (`packages/desktop/src/main/apps.ts`) resolves `$HOME` separately (no user input) then passes the path as an `execFileSync` array argument to prevent shell injection. Never interpolate user-controlled paths into `sh -lc` strings.
 - Fiber error handling in FiberMap: use `Effect.tapError` (observe + propagate) not `Effect.catch` (swallow) for sync loop errors — the error propagates, the fiber fails, FiberMap auto-removes it. See `packages/opencode/src/control-plane/workspace.ts:512`.
