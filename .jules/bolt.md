@@ -63,3 +63,6 @@
 ## 2026-07-28 - Consolidating multiple createMemo filters
 **Learning:** Using multiple consecutive `createMemo` hooks with chained array `.filter()` calls over the same array causes severe performance issues in SolidJS, especially during streaming where `props.parts` updates rapidly. This forces multiple O(N) traversals and GC collections per frame.
 **Action:** Replace multiple `.filter()` calls inside separate `createMemo`s with a single imperative loop inside one `createMemo` block, updating pre-allocated arrays, to do it all in a single pass.
+## 2026-07-29 - O(N log N) Sorting Elimination in Zed Editor & Project Matching
+**Learning:** Using `.sort()[0]` to find extreme values (such as the highest scored editor row or the shortest project icon path) incurs unnecessary O(N log N) overhead and mutates the array in-place, which can be particularly expensive when run frequently or on large arrays.
+**Action:** Replace `matches.sort(...)[0]` and chained `.map().filter().sort()[0]` with single O(N) `for` loops that track the optimal value in one pass, eliminating the sorting overhead and intermediate array allocations.
