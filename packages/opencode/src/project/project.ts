@@ -369,7 +369,17 @@ export const layer: Layer.Layer<
           include: "file",
         })
         .pipe(Effect.orDie)
-      const shortest = matches.sort((a, b) => a.length - b.length)[0]
+
+      // ⚡ Bolt Optimization: Replace O(N log N) .sort()[0] with a single O(N) pass
+      // to avoid intermediate array allocations and sorting overhead.
+      let shortest: string | undefined
+      for (let i = 0; i < matches.length; i++) {
+        const match = matches[i]
+        if (match && (!shortest || match.length < shortest.length)) {
+          shortest = match
+        }
+      }
+
       if (!shortest) return
 
       const buffer = yield* fs.readFile(shortest).pipe(Effect.orDie)
