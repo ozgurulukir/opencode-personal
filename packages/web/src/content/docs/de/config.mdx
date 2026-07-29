@@ -490,13 +490,19 @@ Sie können das Verhalten der Kontextkomprimierung über die Option `compaction`
   "$schema": "https://opencode.ai/config.json",
   "compaction": {
     "auto": true,
-    "prune": true
+    "prune": true,
+    "tail_turns": 2,
+    "summary_max_tokens": 5000,
+    "prune_protected_tools": ["skill", "task"]
   }
 }
 ```
 
 - `auto` – Die Sitzung wird automatisch komprimieren, wenn der Kontext voll ist (Standard: `true`).
 - `prune` – Alte Tool-Ausgaben entfernen, um Token zu sparen (Standard: `true`).
+- `tail_turns` - Anzahl der letzten Benutzerrunden, die während der Komprimierung wörtlich beibehalten werden (Standard: `2`).
+- `summary_max_tokens` - Maximale Token-Anzahl für die Komprimierungszusammenfassung. Standard: `min(Ausgabelimit des Modells, 8000)`.
+- `prune_protected_tools` - Namen von Tools, deren Ausgabe nie beschnitten wird (Standard: `["skill"]`).
 
 ---
 

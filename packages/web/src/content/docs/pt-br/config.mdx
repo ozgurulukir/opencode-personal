@@ -491,7 +491,10 @@ Você pode controlar o comportamento de compactação de contexto através da op
   "compaction": {
     "auto": true,
     "prune": true,
-    "reserved": 10000
+    "tail_turns": 2,
+    "reserved": 10000,
+    "summary_max_tokens": 5000,
+    "prune_protected_tools": ["skill", "task"]
   }
 }
 ```
@@ -499,6 +502,9 @@ Você pode controlar o comportamento de compactação de contexto através da op
 - `auto` - Compactar automaticamente a sessão quando o contexto estiver cheio (padrão: `true`).
 - `prune` - Remover saídas antigas de ferramentas para economizar tokens (padrão: `true`).
 - `reserved` - Buffer de tokens para compactação. Deixa janela suficiente para evitar estouro durante a compactação
+- `tail_turns` - Número de turnos de usuário recentes para manter literalmente durante a compactação (padrão: `2`).
+- `summary_max_tokens` - Máximo de tokens para o resumo da compactação. Padrão: `min(limite de saída do modelo, 8000)`.
+- `prune_protected_tools` - Nomes de ferramentas cuja saída nunca é podada (padrão: `["skill"]`).
 
 ---
 

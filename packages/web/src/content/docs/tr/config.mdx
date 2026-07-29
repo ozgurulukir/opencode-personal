@@ -492,7 +492,10 @@ Bağlam sıkıştırma davranışını `compaction` seçeneği aracılığıyla 
   "compaction": {
     "auto": true,
     "prune": true,
-    "reserved": 10000
+    "tail_turns": 2,
+    "reserved": 10000,
+    "summary_max_tokens": 5000,
+    "prune_protected_tools": ["skill", "task"]
   }
 }
 ```
@@ -500,6 +503,9 @@ Bağlam sıkıştırma davranışını `compaction` seçeneği aracılığıyla 
 - `auto` - Bağlam dolduğunda oturumu otomatik olarak sıkıştırır (varsayılan: `true`).
 - `prune` - Belirteçleri kaydetmek için eski araç çıktılarını kaldırın (varsayılan: `true`).
 - `reserved` - Sıkıştırma için belirteç tamponu. Sıkıştırma sırasında taşmayı önlemek için yeterli pencere bırakır.
+- `tail_turns` - Sıkıştırma sırasında aynen korunacak son kullanıcı tur sayısı (varsayılan: `2`).
+- `summary_max_tokens` - Sıkıştırma özeti için maksimum token. Varsayılan: `min(model çıktı limiti, 8000)`.
+- `prune_protected_tools` - Çıktısı asla budanmayacak araç adları (varsayılan: `["skill"]`).
 
 ---
 

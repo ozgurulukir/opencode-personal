@@ -492,7 +492,10 @@ Du kan styre kontekstkomprimering gjennom alternativet `compaction`.
   "compaction": {
     "auto": true,
     "prune": true,
-    "reserved": 10000
+    "tail_turns": 2,
+    "reserved": 10000,
+    "summary_max_tokens": 5000,
+    "prune_protected_tools": ["skill", "task"]
   }
 }
 ```
@@ -500,6 +503,9 @@ Du kan styre kontekstkomprimering gjennom alternativet `compaction`.
 - `auto` - Komprimer økten automatisk når konteksten er full (standard: `true`).
 - `prune` - Fjern gamle verktøyutdata for å spare tokens (standard: `true`).
 - `reserved` - Token-buffer for komprimering. Etterlater nok vindu til å unngå overflyt under komprimering
+- `tail_turns` - Antall nylige brukerturer som skal beholdes ordrett under komprimering (standard: `2`).
+- `summary_max_tokens` - Maksimalt antall tokens for komprimeringssammendraget. Standard: `min(modellens utdatagrense, 8000)`.
+- `prune_protected_tools` - Verktøynavn hvis utdata aldri beskjæres (standard: `["skill"]`).
 
 ---
 

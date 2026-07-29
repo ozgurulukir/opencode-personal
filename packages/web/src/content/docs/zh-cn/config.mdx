@@ -488,7 +488,10 @@ OpenCode 启动时会自动下载新版本。您可以使用 `autoupdate` 选项
   "compaction": {
     "auto": true,
     "prune": true,
-    "reserved": 10000
+    "tail_turns": 2,
+    "reserved": 10000,
+    "summary_max_tokens": 5000,
+    "prune_protected_tools": ["skill", "task"]
   }
 }
 ```
@@ -496,6 +499,9 @@ OpenCode 启动时会自动下载新版本。您可以使用 `autoupdate` 选项
 - `auto` - 当上下文已满时自动压缩会话（默认值：`true`）。
 - `prune` - 删除旧的工具输出以节省 Token（默认值：`true`）。
 - `reserved` - 压缩时的 Token 缓冲区。保留足够的窗口以避免压缩过程中溢出。
+- `tail_turns` - 压缩期间要逐字保留的最近用户回合数（默认值：`2`）。
+- `summary_max_tokens` - 压缩摘要的最大 Token 数。默认值：`min(模型输出限制, 8000)`。
+- `prune_protected_tools` - 输出永远不会被修剪的工具名称（默认值：`["skill"]`）。
 
 ---
 
