@@ -309,6 +309,10 @@ export const Info = Schema.Struct({
         description:
           "After auto-compaction, inject a synthetic 'Continue' message so the model can proceed (default: true). Only applies to auto compaction, not manual /compact.",
       }),
+      context_limit: Schema.optional(NonNegativeInt).annotate({
+        description:
+          "Explicit context window for compaction threshold. Overrides the model's context limit. E.g. 200000 triggers compaction when used tokens reach 200000 minus reserved buffer.",
+      }),
     }),
   ),
   experimental: Schema.optional(

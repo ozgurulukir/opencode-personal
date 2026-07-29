@@ -673,7 +673,8 @@ You can control context compaction behavior through the `compaction` option.
     "tail_turns": 2,
     "reserved": 10000,
     "summary_max_tokens": 5000,
-    "prune_protected_tools": ["skill", "task"]
+    "prune_protected_tools": ["skill", "task"],
+    "context_limit": 200000
   }
 }
 ```
@@ -685,6 +686,7 @@ You can control context compaction behavior through the `compaction` option.
 - `summary_max_tokens` - Maximum tokens for the compaction summary. Defaults to `min(model output limit, 8000)`.
 - `autocontinue` - After auto-compaction, inject a synthetic "Continue" message so the model can proceed (default: `true`). Only applies to auto compaction, not manual `/compact`.
 - `prune_protected_tools` - Tool names whose output is never pruned (default: `["skill"]`).
+- `context_limit` - Explicit context window for the compaction threshold. Overrides the model's context limit. For example, `200000` triggers compaction when used tokens reach 200000 minus the `reserved` buffer.
 
 ---
 

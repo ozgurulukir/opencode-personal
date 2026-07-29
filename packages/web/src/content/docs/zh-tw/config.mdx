@@ -495,17 +495,19 @@ OpenCode 啟動時會自動下載新版本。您可以使用 `autoupdate` 選項
     "tail_turns": 2,
     "reserved": 10000,
     "summary_max_tokens": 5000,
-    "prune_protected_tools": ["skill", "task"]
+    "prune_protected_tools": ["skill", "task"],
+    "context_limit": 200000
   }
 }
 ```
 
-- `auto` - 當上下文已滿時自動壓縮工作階段（預設值：`true`）。
-- `prune` - 刪除舊的工具輸出以節省 Token（預設值：`true`）。
-- `reserved` - 壓縮時的 Token 緩衝區。保留足夠的窗口以避免壓縮過程中溢出。
-- `tail_turns` - 壓縮期間要逐字保留的最近使用者回合數（預設值：`2`）。
+- `auto` - 當上下文已滿時自動壓縮會話（預設值：`true`）。
+- `prune` - 刪除舊工具輸出以節省 Token（預設值：`true`）。
+- `reserved` - 壓縮的 Token 緩衝區。留出足夠的視窗以避免壓縮期間溢位。
+- `tail_turns` - 壓縮期間逐字保留的最近使用者輪次數（預設值：`2`）。
 - `summary_max_tokens` - 壓縮摘要的最大 Token 數。預設值：`min(模型輸出限制, 8000)`。
 - `prune_protected_tools` - 輸出永遠不會被修剪的工具名稱（預設值：`["skill"]`）。
+- `context_limit` - 壓縮閾值的顯式上下文視窗。覆蓋模型的上下文限制。例如，`200000` 會在使用 Token 達到 200000 減去 `reserved` 緩衝區時觸發壓縮。
 
 ---
 

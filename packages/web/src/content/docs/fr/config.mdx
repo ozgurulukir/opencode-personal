@@ -494,7 +494,8 @@ Vous pouvez contrôler le comportement de compactage du contexte via l'option `c
     "tail_turns": 2,
     "reserved": 10000,
     "summary_max_tokens": 5000,
-    "prune_protected_tools": ["skill", "task"]
+    "prune_protected_tools": ["skill", "task"],
+    "context_limit": 200000
   }
 }
 ```
@@ -505,6 +506,7 @@ Vous pouvez contrôler le comportement de compactage du contexte via l'option `c
 - `tail_turns` - Nombre de tours utilisateur récents à conserver textuellement lors du compactage (par défaut : `2`).
 - `summary_max_tokens` - Nombre maximum de tokens pour le résumé du compactage. Par défaut : `min(limite de sortie du modèle, 8000)`.
 - `prune_protected_tools` - Noms des outils dont la sortie n'est jamais élaguée (par défaut : `["skill"]`).
+- `context_limit` - Fenêtre de contexte explicite pour le seuil de compactage. Remplace la limite de contexte du modèle. Par exemple, `200000` déclenche le compactage lorsque les jetons utilisés atteignent 200000 moins le tampon `reserved`.
 
 ---
 

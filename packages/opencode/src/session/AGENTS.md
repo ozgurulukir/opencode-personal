@@ -117,6 +117,10 @@ Normal tools merge `agent.permission + session.permission`. But subagent task's 
 
 `compaction.ts:buildPrompt()` — when `maxTokens` is provided, the function appends `Target length: under N tokens.` to the template. This gives the model a concrete output length target, preventing overly long or short summaries. The budget is calculated by `summaryBudget()` and passed from the call site at `compaction.ts:445`.
 
+### `context_limit` config — explicit context window overrides model limit
+
+`context-budget.ts:usableWith()` — when `cc.contextLimit` is set, it replaces both `model.limit.context` and `model.limit.input` as the base for the compaction threshold. The formula becomes `contextLimit - reserved` (instead of `model.limit.input - reserved` or `model.limit.context - maxOutputTokens`). This lets users set a hard compaction trigger point independent of the model's advertised limits — e.g. `context_limit: 200000` triggers compaction when used tokens reach 200K minus the reserved buffer, regardless of whether the model claims 320K or 1M context.
+
 ## Pre-existing flaky tests in this module
 
 - `session.system > skills output is sorted by name and stable across calls` — fails intermittently (Expected: >489, Received: 188)

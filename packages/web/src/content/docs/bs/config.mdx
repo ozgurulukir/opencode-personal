@@ -493,17 +493,19 @@ Možete kontrolirati ponašanje sažimanja konteksta putem opcije `compaction`.
     "tail_turns": 2,
     "reserved": 10000,
     "summary_max_tokens": 5000,
-    "prune_protected_tools": ["skill", "task"]
+    "prune_protected_tools": ["skill", "task"],
+    "context_limit": 200000
   }
 }
 ```
 
-- `auto` - Automatski sažimanje sesije kada je kontekst pun (podrazumevano: `true`).
-- `prune` - Uklonite stare izlaze alata da sačuvate tokene (podrazumevano: `true`).
-- `reserved` - Token buffer za sažimanje. Ostavlja dovoljno prostora da se izbjegne prelijevanje tokom sažimanja
-- `tail_turns` - Broj nedavnih korisničkih rundi koje treba zadržati doslovno tokom sažimanja (podrazumevano: `2`).
+- `auto` - Automatski komprimiraj sesiju kada je kontekst pun (podrazumevano: `true`).
+- `prune` - Ukloni stare izlaze alata da biste uštedeli tokene (podrazumevano: `true`).
+- `reserved` - Bafer tokena za kompresiju. Ostavlja dovoljno prostora da se izbegne prelivanje tokom kompresije.
+- `tail_turns` - Broj nedavnih korisničkih poteza koje treba zadržati doslovno tokom kompresije (podrazumevano: `2`).
 - `summary_max_tokens` - Maksimalni tokeni za sažetak kompresije. Podrazumevano: `min(granica izlaza modela, 8000)`.
 - `prune_protected_tools` - Nazivi alata čiji se izlaz nikada ne obrezuje (podrazumevano: `["skill"]`).
+- `context_limit` - Eksplicitni kontekstni prozor za prag kompresije. Nadjačava ograničenje konteksta modela. Na primer, `200000` pokreće kompresiju kada korišćeni tokeni dostignu 200000 minus `reserved` bafer.
 
 ---
 

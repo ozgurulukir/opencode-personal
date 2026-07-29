@@ -493,16 +493,19 @@ Puede controlar el comportamiento de compactación del contexto a través de la 
     "prune": true,
     "tail_turns": 2,
     "summary_max_tokens": 5000,
-    "prune_protected_tools": ["skill", "task"]
+    "prune_protected_tools": ["skill", "task"],
+    "context_limit": 200000
   }
 }
 ```
 
-- `auto`: compacta automáticamente la sesión cuando el contexto está lleno (predeterminado: `true`).
-- `prune`: elimina las salidas de herramientas antiguas para guardar tokens (predeterminado: `true`).
+- `auto` - Compacta automáticamente la sesión cuando el contexto está lleno (predeterminado: `true`).
+- `prune` - Elimina las salidas de herramientas antiguas para ahorrar tokens (predeterminado: `true`).
+- `reserved` - Búfer de tokens para la compactación. Deja suficiente margen para evitar desbordamiento durante la compactación.
 - `tail_turns` - Número de turnos de usuario recientes para conservar textualmente durante la compactación (predeterminado: `2`).
 - `summary_max_tokens` - Máximo de tokens para el resumen de compactación. Predeterminado: `min(límite de salida del modelo, 8000)`.
 - `prune_protected_tools` - Nombres de herramientas cuya salida nunca se poda (predeterminado: `["skill"]`).
+- `context_limit` - Ventana de contexto explícita para el umbral de compactación. Anula el límite de contexto del modelo. Por ejemplo, `200000` activa la compactación cuando los tokens usados alcanzan 200000 menos el búfer `reserved`.
 
 ---
 
