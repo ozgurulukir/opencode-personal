@@ -121,6 +121,8 @@ Normal tools merge `agent.permission + session.permission`. But subagent task's 
 
 `context-budget.ts:usableWith()` — when `cc.contextLimit` is set, it replaces both `model.limit.context` and `model.limit.input` as the base for the compaction threshold. The formula becomes `contextLimit - reserved` (instead of `model.limit.input - reserved` or `model.limit.context - maxOutputTokens`). This lets users set a hard compaction trigger point independent of the model's advertised limits — e.g. `context_limit: 200000` triggers compaction when used tokens reach 200K minus the reserved buffer, regardless of whether the model claims 320K or 1M context.
 
+**Safety invariant**: `reserved` is clamped to at least `maxOutputTokens`. The default `reserved` is `compactionBuffer` (20K), but `Math.max(20K, maxOutputTokens)` ensures the model always has enough headroom for its full output. Without this, a model with 128K max output could hit the context limit mid-response with only 20K headroom. User-set `reserved` is also subject to this floor — it's a safety invariant, not a suggestion.
+
 ## Pre-existing flaky tests in this module
 
 - `session.system > skills output is sorted by name and stable across calls` — fails intermittently (Expected: >489, Received: 188)
