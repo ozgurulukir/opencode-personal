@@ -370,8 +370,6 @@ export const layer: Layer.Layer<
         })
         .pipe(Effect.orDie)
 
-      // ⚡ Bolt Optimization: Replace O(N log N) .sort()[0] with a single O(N) pass
-      // to avoid intermediate array allocations and sorting overhead.
       let shortest: string | undefined
       for (let i = 0; i < matches.length; i++) {
         const match = matches[i]
