@@ -622,9 +622,9 @@ it.live("ask - adds request to pending list", () =>
       const fiber = yield* ask({
         sessionID: SessionID.make("session_test"),
         permission: "bash",
-        patterns: ["ls"],
+        patterns: ["unique-pattern-pending-list"],
         metadata: { cmd: "ls" },
-        always: ["ls"],
+        always: ["unique-pattern-pending-list"],
         tool: {
           messageID: MessageID.make("msg_test"),
           callID: "call_test",
@@ -637,9 +637,9 @@ it.live("ask - adds request to pending list", () =>
       expect(items[0]).toMatchObject({
         sessionID: SessionID.make("session_test"),
         permission: "bash",
-        patterns: ["ls"],
+        patterns: ["unique-pattern-pending-list"],
         metadata: { cmd: "ls" },
-        always: ["ls"],
+        always: ["unique-pattern-pending-list"],
         tool: {
           messageID: MessageID.make("msg_test"),
           callID: "call_test",
@@ -665,9 +665,9 @@ it.live("ask - publishes asked event", () =>
         const fiber = yield* ask({
           sessionID: SessionID.make("session_test"),
           permission: "bash",
-          patterns: ["ls"],
+          patterns: ["unique-pattern-asked-event"],
           metadata: { cmd: "ls" },
-          always: ["ls"],
+          always: ["unique-pattern-asked-event"],
           tool: {
             messageID: MessageID.make("msg_test"),
             callID: "call_test",
@@ -680,7 +680,7 @@ it.live("ask - publishes asked event", () =>
         expect(seen).toMatchObject({
           sessionID: SessionID.make("session_test"),
           permission: "bash",
-          patterns: ["ls"],
+          patterns: ["unique-pattern-asked-event"],
         })
 
         yield* rejectAll()
@@ -775,9 +775,9 @@ it.live("reply - always persists approval and resolves", () =>
         id: PermissionID.make("per_test3"),
         sessionID: SessionID.make("session_test"),
         permission: "bash",
-        patterns: ["ls"],
+        patterns: ["unique-pattern-persist"],
         metadata: {},
-        always: ["ls"],
+        always: ["unique-pattern-persist"],
         ruleset: [],
       }).pipe(Effect.forkScoped)
 
@@ -788,7 +788,7 @@ it.live("reply - always persists approval and resolves", () =>
       const result = yield* ask({
         sessionID: SessionID.make("session_test2"),
         permission: "bash",
-        patterns: ["ls"],
+        patterns: ["unique-pattern-persist"],
         metadata: {},
         always: [],
         ruleset: [],
@@ -873,7 +873,7 @@ it.live("reply - reject cancels all pending for same session", () =>
         id: PermissionID.make("per_test4a"),
         sessionID: SessionID.make("session_same"),
         permission: "bash",
-        patterns: ["ls"],
+        patterns: ["unique-pattern-reject-a"],
         metadata: {},
         always: [],
         ruleset: [],
@@ -883,7 +883,7 @@ it.live("reply - reject cancels all pending for same session", () =>
         id: PermissionID.make("per_test4b"),
         sessionID: SessionID.make("session_same"),
         permission: "edit",
-        patterns: ["foo.ts"],
+        patterns: ["unique-pattern-reject-b"],
         metadata: {},
         always: [],
         ruleset: [],
@@ -908,9 +908,9 @@ it.live("reply - always resolves matching pending requests in same session", () 
         id: PermissionID.make("per_test5a"),
         sessionID: SessionID.make("session_same"),
         permission: "bash",
-        patterns: ["ls"],
+        patterns: ["unique-pattern-same-session"],
         metadata: {},
-        always: ["ls"],
+        always: ["unique-pattern-same-session"],
         ruleset: [],
       }).pipe(Effect.forkScoped)
 
@@ -918,7 +918,7 @@ it.live("reply - always resolves matching pending requests in same session", () 
         id: PermissionID.make("per_test5b"),
         sessionID: SessionID.make("session_same"),
         permission: "bash",
-        patterns: ["ls"],
+        patterns: ["unique-pattern-same-session"],
         metadata: {},
         always: [],
         ruleset: [],
@@ -941,9 +941,9 @@ it.live("reply - always keeps other session pending", () =>
         id: PermissionID.make("per_test6a"),
         sessionID: SessionID.make("session_a"),
         permission: "bash",
-        patterns: ["ls"],
+        patterns: ["unique-pattern-a"],
         metadata: {},
-        always: ["ls"],
+        always: ["unique-pattern-a"],
         ruleset: [],
       }).pipe(Effect.forkScoped)
 
@@ -951,7 +951,7 @@ it.live("reply - always keeps other session pending", () =>
         id: PermissionID.make("per_test6b"),
         sessionID: SessionID.make("session_b"),
         permission: "bash",
-        patterns: ["ls"],
+        patterns: ["unique-pattern-b"],
         metadata: {},
         always: [],
         ruleset: [],
@@ -989,7 +989,7 @@ it.live("reply - publishes replied event", () =>
         id: PermissionID.make("per_test7"),
         sessionID: SessionID.make("session_test"),
         permission: "bash",
-        patterns: ["ls"],
+        patterns: ["unique-pattern-pub"],
         metadata: {},
         always: [],
         ruleset: [],
