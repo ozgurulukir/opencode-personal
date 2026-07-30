@@ -47,8 +47,12 @@ beforeAll(async () => {
     terminalWebSocketURL: (opts: unknown) => "ws://test",
   }))
   mock.module("@/context/command", () => ({
+    upsertCommandRegistration: () => [],
+    formatKeybind: () => "",
+    useCommand: () => ({}),
+    CommandProvider: (props: any) => props.children,
+    parseKeybind: () => [],
     matchKeybind: () => true,
-    parseKeybind: () => ({}),
   }))
   mock.module("@/context/language", () => ({
     useLanguage: () => ({
@@ -72,7 +76,14 @@ beforeAll(async () => {
     }),
   }))
   mock.module("@/context/server", () => ({
+    resolveServerList: () => [],
+    ServerConnection: { key: () => "" },
+    ServerProvider: (props: any) => props.children,
+    normalizeServerUrl: () => "",
+    serverName: () => "",
+
     useServer: () => ({ current: { http: { username: "user", password: "pwd" }, type: "http", authToken: false } }),
+
   }))
   mock.module("@/context/settings", () => ({
     useSettings: () => ({
@@ -96,9 +107,14 @@ beforeAll(async () => {
   }))
   mock.module("@opencode-ai/ui/toast", () => ({ showToast: () => {} }))
   mock.module("@/utils/runtime-adapters", () => ({
+    hasSetOption: () => false,
+    isDisposable: () => false,
+    getSpeechRecognitionCtor: () => undefined,
+
     disposeIfDisposable: (x: unknown) => {},
     getHoveredLinkText: () => "http://test",
     setOptionIfSupported: () => {},
+
   }))
 
   const mod = await import("./terminal")
