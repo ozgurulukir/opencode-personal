@@ -9,14 +9,7 @@ let optimisticAddFn: typeof import("./useOptimisticSend").optimisticAdd
 let optimisticRemoveFn: typeof import("./useOptimisticSend").optimisticRemove
 
 beforeAll(async () => {
-  mock.module("./build-request-parts", () => ({
-    buildRequestParts: () => ({
-      requestParts: [],
-      optimisticParts: [],
-    }),
-  }))
-
-  const sendFollowupDraftMod = await import("./sendFollowupDraft")
+    const sendFollowupDraftMod = await import("./sendFollowupDraft")
   sendFollowupDraftFn = sendFollowupDraftMod.sendFollowupDraft
 
   const detectCommandMod = await import("./detectCommand")
