@@ -367,7 +367,6 @@ export const toModelMessagesEffect = Effect.fnUntraced(function* (
 
             // For providers that don't support media in tool results, extract media files
             // (images, PDFs) to be sent as a separate user message
-            // ⚡ Bolt Optimization: Replace multiple .filter() calls with a single loop to reduce GC pressure and O(N) traversals
             const extractedMedia: typeof attachments = []
             const finalAttachments: typeof attachments = []
             for (let i = 0; i < attachments.length; i++) {
@@ -701,8 +700,14 @@ function handleOutputLengthError(e: unknown): NonNullable<Assistant["error"]> {
   return e as NonNullable<Assistant["error"]>
 }
 
-function handleLoadAPIKeyError(e: LoadAPIKeyError, providerID: ProviderID): NonNullable<Assistant["error"]> {
-  return new AuthError({ providerID, message: e.message }, { cause: e }).toObject()
+function handleLoadAPIKeyError(
+  e: LoadAPIKeyError,
+  providerID: ProviderID,
+): NonNullable<Assistant["error"]> {
+  return new AuthError(
+    { providerID, message: e.message },
+    { cause: e },
+  ).toObject()
 }
 
 function handleECONNRESET(e: SystemError): NonNullable<Assistant["error"]> {
@@ -720,7 +725,10 @@ function handleECONNRESET(e: SystemError): NonNullable<Assistant["error"]> {
   ).toObject()
 }
 
-function handleZlibError(e: FetchDecompressionError, aborted?: boolean): NonNullable<Assistant["error"]> {
+function handleZlibError(
+  e: FetchDecompressionError,
+  aborted?: boolean,
+): NonNullable<Assistant["error"]> {
   if (aborted) {
     return new AbortedError({ message: e.message }, { cause: e }).toObject()
   }
@@ -737,7 +745,10 @@ function handleZlibError(e: FetchDecompressionError, aborted?: boolean): NonNull
   ).toObject()
 }
 
-function handleAPICallError(e: APICallError, providerID: ProviderID): NonNullable<Assistant["error"]> {
+function handleAPICallError(
+  e: APICallError,
+  providerID: ProviderID,
+): NonNullable<Assistant["error"]> {
   const parsed = ProviderError.parseAPICallError({
     providerID,
     error: e,
