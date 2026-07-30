@@ -367,12 +367,19 @@ export const toModelMessagesEffect = Effect.fnUntraced(function* (
 
             // For providers that don't support media in tool results, extract media files
             // (images, PDFs) to be sent as a separate user message
-            const mediaAttachments = attachments.filter((a) => isMedia(a.mime))
-            const extractedMedia = mediaAttachments.filter((a) => !supportsMediaInToolResult(a))
+            const extractedMedia: typeof attachments = []
+            const finalAttachments: typeof attachments = []
+            for (let i = 0; i < attachments.length; i++) {
+              const a = attachments[i]
+              if (isMedia(a.mime) && !supportsMediaInToolResult(a)) {
+                extractedMedia.push(a)
+              } else {
+                finalAttachments.push(a)
+              }
+            }
             if (extractedMedia.length > 0) {
               media.push(...extractedMedia)
             }
-            const finalAttachments = attachments.filter((a) => !isMedia(a.mime) || supportsMediaInToolResult(a))
 
             const output =
               finalAttachments.length > 0
