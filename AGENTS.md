@@ -1,5 +1,5 @@
-- Default branch is `main` (the `dev` note is stale from upstream).
-- Local `main` ref may not exist; use `dev` or `origin/dev` for diffs.
+- **Origin:** `ozgurulukir/opencode-personal` — default branch is `main`.
+- This repo is a fork of `anomalyco/opencode`.
 - ALWAYS USE PARALLEL TOOLS WHEN APPLICABLE.
 - Prefer automation: execute requested actions without confirmation unless blocked by missing info or safety/irreversibility.
 - `.jules/bolt.md` is the canonical performance/Bolt learning log. Read it BEFORE any perf refactor — it documents "when to optimize" patterns AND the "do not micro-optimize typical UI components" guardrail.
