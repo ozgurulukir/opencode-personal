@@ -55,6 +55,7 @@
     "@solid-primitives/resize-observer": "2.2.0",
     "@solidjs/meta": "catalog:",
     "@solidjs/router": "catalog:",
+    "@opencode-ai/diff-wasm": "workspace:*",
     "diff": "catalog:",
     "dompurify": "3.4.12",
     "fuzzysort": "catalog:",

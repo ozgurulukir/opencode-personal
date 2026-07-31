@@ -1,6 +1,6 @@
 import * as Log from "@opencode-ai/core/util/log"
 import { pathToFileURL } from "url"
-import { applyPatch } from "diff"
+import { applyPatch } from "@opencode-ai/diff-wasm"
 import type { AgentSideConnection, Role } from "@agentclientprotocol/sdk"
 import type { SessionMessageResponse, ToolPart } from "@opencode-ai/sdk/v2"
 import { handleToolPartUpdate } from "./tool-dispatch"

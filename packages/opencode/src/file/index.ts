@@ -5,7 +5,7 @@ import { AppFileSystem } from "@opencode-ai/core/filesystem"
 import { Git } from "@/git"
 import { Effect, Layer, Context, Schema, Scope } from "effect"
 import * as Stream from "effect/Stream"
-import { formatPatch, structuredPatch } from "diff"
+import { formatPatch, structuredPatch } from "@opencode-ai/diff-wasm"
 import fuzzysort from "fuzzysort"
 import ignore from "ignore"
 import path from "path"
@@ -47,8 +47,8 @@ const Hunk = Schema.Struct({
 })
 
 const Patch = Schema.Struct({
-  oldFileName: Schema.String,
-  newFileName: Schema.String,
+  oldFileName: Schema.optional(Schema.String),
+  newFileName: Schema.optional(Schema.String),
   oldHeader: Schema.optional(Schema.String),
   newHeader: Schema.optional(Schema.String),
   hunks: Schema.Array(Hunk),
