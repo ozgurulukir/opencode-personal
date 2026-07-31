@@ -170,6 +170,7 @@ const table = sqliteTable("session", {
 - Package test directories follow `packages/<name>/test/` or `packages/<name>/test/<subpath>/`
 - Exception: `packages/ui` co-locates tests in `src/components/` alongside source. See `packages/ui/AGENTS.md`.
 - `mock.module()` in bun:test persists across test files — always use `afterAll(() => mock.restore())` to prevent leakage.
+- Test failures may be order-dependent. Some tests pass in isolation but fail in the full suite due to shared state or global mock leakage. Always run the full test suite after changes.
 
 ## Type Checking
 
@@ -179,9 +180,9 @@ const table = sqliteTable("session", {
 ## Technologies
 
 - zod 4.1.8 (catalog) + @hono/zod-validator 0.4.2 — use for HTTP boundary typing to eliminate `as any` casts
-- Bun 1.3.13 with workspace support, catalog versions, and patches
+- Bun 1.3.14 with workspace support, catalog versions, and patches
 - Drizzle ORM (beta) with snake_case field convention
-- Effect 4.0.0-beta.59
+- Effect 4.0.0-beta.65
 - SolidJS + Astro/Starlight (web), OpenTUI (TUI)
 - Turbo for monorepo orchestration
 
@@ -209,8 +210,10 @@ const table = sqliteTable("session", {
 - Permission evaluation: `evaluate(permission, pattern, ...rulesets)` flattens then uses `findLast` — last match wins. A bug previously passed `(approved, ruleset)` in wrong order, making config always override DB-persisted "always allow". Fixed by checking deny from config first, then allow from approved, then allow from config. Pre-existing `ScopedCache` state leakage between `withDir` tests masks this — `disposeAllInstances()` invalidates async, so "always" replies leak. 2 flaky tests remain.
 - Subagent permission wiring: normal tools merge `agent.permission + session.permission`, but subagent task's own ask merges `taskAgent.permission + PARENT session.permission` (not subagent session). See `prompt.ts:727-734`.
 - Effect Schema cross-file identity: Moving `Schema.Struct` definitions to separate files breaks type identity under `verbatimModuleSyntax`. Schema.Struct types are not stable across module boundaries. Keep schema definitions in the module where they're consumed.
-- `session.system > skills output is sorted by name and stable across calls` — fails intermittently (Expected: >489, Received: 188)
+- `session.system > skills output is sorted by name and stable across calls` — fails intermittently (Expected: >489, Received: 188). Root cause: commit `f3045ece6` changed `Skill.fmt()` to not sort and changed output format for descriptionless skills.
 - `usage.characterization.test.ts:76` — `getUsage` returns `tokens.cache.write: 0` when `inputTokenDetails.cacheWriteTokens: 0` and `metadata.anthropic.cacheCreationInputTokens: 75`. The `??` operator does not fall through for `0` (only `null`/`undefined`); use `||` if the intention is to fall through for all falsy values.
+- `ModelsDev Service > get() returns {} when disk empty and fetch disabled` fails even in isolation with massive output mismatch. `models-snapshot.js` (3.3MB) at `packages/opencode/src/provider/models-snapshot.js` may be related.
+- Order-dependent test failures are widespread: many tests pass in isolation but fail in the full suite, indicating shared state or global mock leakage beyond the documented `mock.module()` issue. Project/worktree/vcs tests are affected.
 
 ## Notes
 

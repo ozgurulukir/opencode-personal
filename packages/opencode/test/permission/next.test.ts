@@ -889,6 +889,7 @@ it.live("reply - reject cancels all pending for same session", () =>
         ruleset: [],
       }).pipe(Effect.forkScoped)
 
+      yield* Effect.yieldNow
       yield* waitForPending(2)
       yield* reply({ requestID: PermissionID.make("per_test4a"), reply: "reject" })
 
