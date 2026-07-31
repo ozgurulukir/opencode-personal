@@ -7,16 +7,21 @@ export function DiffChanges(props: {
 }) {
   const variant = () => props.variant ?? "default"
 
-  const additions = createMemo(() =>
-    Array.isArray(props.changes)
-      ? props.changes.reduce((acc, diff) => acc + (diff.additions ?? 0), 0)
-      : props.changes.additions,
-  )
-  const deletions = createMemo(() =>
-    Array.isArray(props.changes)
-      ? props.changes.reduce((acc, diff) => acc + (diff.deletions ?? 0), 0)
-      : props.changes.deletions,
-  )
+  const stats = createMemo(() => {
+    if (Array.isArray(props.changes)) {
+      // ⚡ Bolt Optimization: Replace multiple .reduce() calls with a single loop to reduce O(N) traversals
+      let additions = 0
+      let deletions = 0
+      for (let i = 0; i < props.changes.length; i++) {
+        additions += props.changes[i].additions ?? 0
+        deletions += props.changes[i].deletions ?? 0
+      }
+      return { additions, deletions }
+    }
+    return { additions: props.changes.additions, deletions: props.changes.deletions }
+  })
+  const additions = createMemo(() => stats().additions)
+  const deletions = createMemo(() => stats().deletions)
   const total = createMemo(() => (additions() ?? 0) + (deletions() ?? 0))
 
   const blockCounts = createMemo(() => {
