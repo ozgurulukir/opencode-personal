@@ -141,11 +141,21 @@ test("flushInterrupted marks all in-flight parts as interrupted", () => {
 - Locking down behavior before extraction
 - Documenting edge cases that the public API doesn't expose
 
-**Not for:**
-- Testing implementation details that may change
-- Replacing integration tests for public APIs
+ **Not for:**
+ - Testing implementation details that may change
+ - Replacing integration tests for public APIs
 
-## Module shape
+ ## Testing
+
+ ### Order-dependent failures
+
+ Many tests pass in isolation but fail in the full suite due to shared state or global mock leakage. This is documented in the root [AGENTS.md](../AGENTS.md#testing). Always run the full test suite after changes.
+
+ ### Effect race conditions in tests
+
+ When testing Effect code that registers concurrent operations (e.g., multiple permission requests), `waitForPending(N)` may observe fewer than `N` registered requests because `Effect.forkScoped` does not guarantee immediate registration. Insert `yield* Effect.yieldNow` before the wait to allow pending effects to register. See `test/permission/next.test.ts` for the pattern.
+
+ ## Module shape
 
 Do not use `export namespace Foo { ... }` for module organization. It is not
 standard ESM, it prevents tree-shaking, and it breaks Node's native TypeScript
@@ -322,3 +332,6 @@ The V2 session service (`src/v2/session.ts`) is a **hybrid delegation bridge** t
 
 - `Plugin.defaultLayer` includes `Config.defaultLayer` (real filesystem config) and triggers `import("../server/server")` inside the layer init closure (`plugin/index.ts:123`). Tests using `Plugin.defaultLayer` directly (`trigger.test.ts`, `workspace-adapter.test.ts`) time out because the server import block is too heavy for test context. Fix: use `TestConfig.layer()` mock + `Plugin.layer` (not `defaultLayer`) in tests that need Plugin service — see `auth-override.test.ts` and `loader-shared.test.ts` for the working pattern.
 - Testing modules that read `Log.file()` (or any singleton with module-level state): do NOT mutate `Global.Path.log` + `Log.init({...})` per test. The module-level `logpath` and `createWriteStream` race across parallel tests and leave dangling stream handles pointing at cleaned-up tmp dirs. Use `mock.module("@opencode-ai/core/util/log", () => ({...Log, file: () => logFile}))` to override the specific function per test, paired with `mock.restore()` in `afterEach`. See `test/cli/cmd/tui/stderr-capture.test.ts` for the pattern.
+- `Skill.fmt()` sorting conflict: `skill.fmt` test expects stable input order without re-sorting (`test/skill/skill.test.ts`), but system prompt (`session/system.ts`) expects alphabetically sorted output. Reverting `toSorted()` removal preserves test behavior but creates inconsistency with system prompt expectations. Resolution pending: either update system prompt to not sort, or update test to expect sorted output.
+- `ModelsDev.Service.get()` check order: `OPENCODE_DISABLE_MODELS_FETCH` must be evaluated BEFORE `loadSnapshot` (`src/provider/models.ts`). The previous ordering loaded the snapshot first, causing unnecessary I/O and test failures when fetch was disabled.
+ - Permission `reply("reject")` cancellation test race condition: The test `reply - reject cancels all pending for same session` (`test/permission/next.test.ts`) fails with "timed out waiting for 2 pending permission request(s)" because `waitForPending(2)` runs before the second permission request registers. The cancellation logic itself works correctly. Fix: insert `yield* Effect.yieldNow` before `waitForPending(2)` to allow the second `ask` to register.
