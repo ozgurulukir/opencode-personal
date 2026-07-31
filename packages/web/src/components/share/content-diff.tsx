@@ -1,4 +1,4 @@
-import { parsePatch } from "diff"
+import { parsePatch } from "@opencode-ai/diff-wasm"
 import { createMemo, For } from "solid-js"
 import { ContentCode } from "./content-code"
 import styles from "./content-diff.module.css"

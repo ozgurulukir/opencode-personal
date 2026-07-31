@@ -1,5 +1,5 @@
 import { Effect, Layer, Context, Schema, Stream, Scope } from "effect"
-import { formatPatch, structuredPatch } from "diff"
+import { formatPatch, structuredPatch } from "@opencode-ai/diff-wasm"
 import { Bus } from "@/bus"
 import { BusEvent } from "@/bus/bus-event"
 import { InstanceState } from "@/effect/instance-state"

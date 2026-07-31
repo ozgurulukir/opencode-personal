@@ -1,4 +1,4 @@
-import { parsePatch } from "diff"
+import { parsePatch } from "@opencode-ai/diff-wasm"
 
 export function getRevertDiffFiles(diffText: string) {
   if (!diffText) return []

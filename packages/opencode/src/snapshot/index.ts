@@ -1,6 +1,6 @@
 import { Cause, Duration, Effect, Layer, Schedule, Schema, Semaphore, Context, Stream } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process"
-import { formatPatch, structuredPatch } from "diff"
+import { formatPatch, structuredPatch } from "@opencode-ai/diff-wasm"
 import path from "path"
 import z from "zod"
 import { CrossSpawnSpawner } from "@opencode-ai/core/cross-spawn-spawner"
