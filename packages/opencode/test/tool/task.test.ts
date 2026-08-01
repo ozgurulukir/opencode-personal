@@ -480,8 +480,7 @@ describe("tool.task", () => {
           ),
         )
 
-      // Phase 2 fix: resuming a session that is not a child of the current
-      // session is now rejected to prevent cross-session context leakage.
+      // Resuming a session that is not a child of the current session is rejected.
       expect(result.error).toContain("does not belong to this session")
     }),
   )
@@ -561,9 +560,8 @@ describe("tool.task", () => {
             ),
           )
 
-        // BUG: on current code, bypassAgentCheck skips the ask AND skips
-        // deny evaluation, so the subagent spawns successfully despite the
-        // deny rule. After the fix, this should fail with a permission error.
+        // bypassAgentCheck skips the interactive ask prompt but deny rules
+        // are still enforced via Permission.evaluate before the guard.
         expect(result.ok).toBe(false)
         expect(result.error).toContain("denied")
       }),

@@ -258,6 +258,10 @@ const table = sqliteTable("session", {
 - `web-tree-sitter` Emscripten module API (`node_modules/@opentui/core/node_modules/web-tree-sitter/tree-sitter.js`): `Module["wasmBinary"]` (line 2186) accepts `Uint8Array` of wasm bytes — bypasses file loading; `locateFile` (line 2092) resolves wasm path; `loadWebAssemblyModule` (line 2049) instantiates with imports; `instantiateAsync` (line 2335) handles `WebAssembly.instantiate`. `Parser.init({ wasmBinary })` may bypass WASI file loading issues (under investigation).
 - Debug logging in compiled ESM binary: `Bun.write({append:true})`, `require("fs")`, and `globalThis.require` all fail. Use `import { appendFileSync } from "fs"` at module level (top of file) — works in compiled ESM context.
 
+## Code review: stale "BUG" comments in tests
+
+Comments like `"BUG: on current code..."` or `"Phase 2 fix..."` in test files describe historical bugs that are already fixed. The test assertions verify the fix. When evaluating such reviews, check the implementation first — the bug is often already resolved and the comment is stale. Update the comment to describe the verified behavior, not the historical bug.
+
 ## TypeScript Navigation (typegraph-mcp)
 
 Where suitable, use the `ts_*` MCP tools instead of grep/glob for navigating TypeScript code. They resolve through barrel files, re-exports, and project references and return semantic results instead of string matches.
