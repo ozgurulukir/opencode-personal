@@ -75,10 +75,10 @@ This file covers TUI-specific patterns for `packages/opencode/src/cli/cmd/tui/`.
 
 They have the same name and same two-press pattern, but different substrates, different timer guards, and different second-press actions (`sdk.client.session.abort` vs `options.onInterrupt`). Do not attempt to unify them.
 
-## Spinner component vs native `<spinner>` element
+## Unified TUI Spinner component
 
-The `Spinner` component (`component/spinner.tsx`) wraps the native `<spinner>` element with an `animations_enabled` KV check and a `⋯` fallback. Callers that use the native `<spinner>` element directly (prompt, footer) must duplicate this KV check themselves with a different fallback format. Prefer the `Spinner` component over the native element to keep fallback behavior consistent.
+The `Spinner` component (`component/spinner.tsx`) wraps the native `<spinner>` element with an `animations_enabled` KV check and a `⋯` fallback. It supports variants (`"dots"`, `"knight-rider"`, `"blocks"`) with centralized configurations in `ui/spinner-config.ts`. All TUI callers (prompt, footer, dialogs) use `<Spinner>` rather than native `<spinner>` elements to ensure consistent fallback behavior and animation toggling.
 
-## `createFrames` ignores color parameters
+## `createFrames` layout vs color generation
 
-`createFrames()` from `ui/spinner.ts` accepts `color`/`colors` in `KnightRiderOptions` but only uses structural params (`width`, `style`, `holdStart`, `holdEnd`). Color params are silently ignored — they only affect `createColors()`. Cache frames at module scope since they are color-independent.
+`createFrames()` from `ui/spinner.ts` derives frame strings based on geometric layout params (`width`, `style`, `holdStart`, `holdEnd`, `trailSteps`). Color distribution across frames is handled separately by `createColors()`. Frame layout configs are generated via `ui/spinner-config.ts` factories.

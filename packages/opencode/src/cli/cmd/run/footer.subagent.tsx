@@ -1,9 +1,8 @@
 /** @jsxImportSource @opentui/solid */
 import type { ScrollBoxRenderable } from "@opentui/core"
 import { useKeyboard } from "@opentui/solid"
-import "opentui-spinner/solid"
+import { Spinner } from "../tui/component/spinner"
 import { createMemo, indexArray, mapArray } from "solid-js"
-import { SPINNER_FRAMES } from "../tui/component/spinner"
 import { RunEntryContent, separatorRows } from "./scrollback.writer"
 import type { FooterSubagentDetail, FooterSubagentTab, RunDiffStyle } from "./types"
 import type { RunFooterTheme, RunTheme } from "./theme"
@@ -66,7 +65,7 @@ export function RunFooterSubagentTabs(props: {
           <box flexDirection="row" gap={1} width="100%">
             {tab.status === "running" ? (
               <box flexShrink={0}>
-                <spinner frames={SPINNER_FRAMES} interval={80} color={statusColor(props.theme, tab.status)} />
+                <Spinner color={statusColor(props.theme, tab.status)} />
               </box>
             ) : (
               <text fg={statusColor(props.theme, tab.status)} wrapMode="none" truncate flexShrink={0}>
