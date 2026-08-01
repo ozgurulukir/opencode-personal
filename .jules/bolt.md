@@ -66,3 +66,7 @@
 ## 2026-07-29 - O(N log N) Sorting Elimination in Zed Editor & Project Matching
 **Learning:** Using `.sort()[0]` to find extreme values (such as the highest scored editor row or the shortest project icon path) incurs unnecessary O(N log N) overhead and mutates the array in-place, which can be particularly expensive when run frequently or on large arrays.
 **Action:** Replace `matches.sort(...)[0]` and chained `.map().filter().sort()[0]` with single O(N) `for` loops that track the optimal value in one pass, eliminating the sorting overhead and intermediate array allocations.
+
+## 2026-08-01 - Avoid duplicated derived checks in event handlers
+**Learning:** Calculating complex state (like validating if an input is 'blank' via array mapping, mapping, and joining) inside high-frequency event handlers like `onKeyDown` creates enormous GC pressure.
+**Action:** Always check if a `createMemo` already computes the necessary state. Reuse existing memos instead of redundantly defining the check within the event handler.
