@@ -283,13 +283,22 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
 
   const commentCount = createMemo(() => {
     if (store.mode === "shell") return 0
-    return prompt.context.items().filter((item) => !!item.comment?.trim()).length
+    // ⚡ Bolt Optimization: Replace .filter().length with a single loop to reduce GC pressure
+    let count = 0
+    const items = prompt.context.items()
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].comment?.trim()) count++
+    }
+    return count
   })
   const blank = createMemo(() => {
-    const text = prompt
-      .current()
-      .map((part) => ("content" in part ? part.content : ""))
-      .join("")
+    // ⚡ Bolt Optimization: Replace chained .map().join("") with a single loop to reduce GC pressure
+    let text = ""
+    const parts = prompt.current()
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i]
+      if ("content" in part) text += part.content
+    }
     return text.trim().length === 0 && imageAttachments().length === 0 && commentCount() === 0
   })
   const stopping = createMemo(() => working() && blank())
@@ -1239,16 +1248,8 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault()
       if (event.repeat) return
-      if (
-        working() &&
-        prompt
-          .current()
-          .map((part) => ("content" in part ? part.content : ""))
-          .join("")
-          .trim().length === 0 &&
-        imageAttachments().length === 0 &&
-        commentCount() === 0
-      ) {
+      // ⚡ Bolt Optimization: Reuse the existing `stopping()` memo instead of recomputing everything
+      if (stopping()) {
         return
       }
       void handleSubmit(event)
