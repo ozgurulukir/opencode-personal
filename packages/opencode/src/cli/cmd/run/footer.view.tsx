@@ -12,8 +12,7 @@
 /** @jsxImportSource @opentui/solid */
 import { useKeyboard, useTerminalDimensions } from "@opentui/solid"
 import { Match, Show, Switch, createEffect, createMemo, createSignal, onCleanup } from "solid-js"
-import "opentui-spinner/solid"
-import { createColors, createFrames } from "../tui/ui/spinner"
+import { Spinner } from "../tui/component/spinner"
 import { RunCommandMenuBody, RunModelSelectBody, RunVariantSelectBody } from "./footer.command"
 import { FOOTER_MENU_ROWS, RunFooterMenu } from "./footer.menu"
 import { RunFooterSubagentBody, RunFooterSubagentTabs } from "./footer.subagent"
@@ -40,8 +39,7 @@ import type {
 } from "./types"
 import { RUN_THEME_FALLBACK, type RunTheme } from "./theme"
 
-// Frames are color-independent — cache at module scope to avoid recomputation on every theme change
-const KNIGHT_RIDER_FRAMES = createFrames({ style: "blocks" })
+
 
 const EMPTY_BORDER = {
   topLeft: "",
@@ -158,17 +156,7 @@ export function RunFooterView(props: RunFooterViewProps) {
   const runTheme = createMemo(() => props.theme ?? RUN_THEME_FALLBACK)
   const theme = createMemo(() => runTheme().footer)
   const block = createMemo(() => runTheme().block)
-  const spin = createMemo(() => {
-    return {
-      frames: KNIGHT_RIDER_FRAMES,
-      color: createColors({
-        color: theme().highlight,
-        style: "blocks",
-        inactiveFactor: 0.6,
-        minAlpha: 0.3,
-      }),
-    }
-  })
+
   const permission = createMemo<Extract<FooterView, { type: "permission" }> | undefined>(() => {
     const view = active()
     return view.type === "permission" ? view : undefined
@@ -584,7 +572,7 @@ export function RunFooterView(props: RunFooterViewProps) {
 
                         <Show when={busy() && !exiting()}>
                           <box id="run-direct-footer-status-spinner" marginLeft={1} flexShrink={0}>
-                            <spinner color={spin().color} frames={spin().frames} interval={40} />
+                            <Spinner variant="blocks" color={theme().highlight} />
                           </box>
 
                           <text

@@ -244,7 +244,7 @@ const table = sqliteTable("session", {
 - V1/V2 subagent parity: `tool/task.ts` (V1 TaskTool) and `v2/session.ts` (V2 subagent) share `subagentSessionPermission()` and `subagentToolRestrictions()` from `agent/subagent-permissions.ts`. Any change to permission derivation or tool restrictions must go through these helpers. V2 `subagent()` requires `Agent.Service` + `Config.Service` in test layers.
 - V2 `subagent()` abort: `Effect.runPromise(cancelChild)` returns a floating promise — always attach `.catch()`. V1 uses `EffectBridge` which handles this structurally.
 - V2 `subagent()` parent agent lookup: when a configured parent isn't found, log a warning (matching V1) — silent failure weakens deny-rule inheritance. Use `Effect.catchCause` with `Cause.squash(cause)`.
-- Three distinct spinner systems coexist: TUI braille spinner (`component/spinner.tsx`), web/desktop SVG spinner (`packages/ui/src/components/spinner.tsx`), and Knight Rider scanner (`ui/spinner.ts`). They share no code and have different APIs. The TUI `Spinner` component wraps the native `<spinner>` element with an `animations_enabled` KV check; callers using the native element directly (prompt, footer) must duplicate this check.
+- Three distinct spinner systems coexist: TUI unified spinner (`component/spinner.tsx` via `ui/spinner-config.ts`), web/desktop SVG spinner (`packages/ui/src/components/spinner.tsx`), and `@clack/prompts` CLI spinner. They share no code and have different APIs. The TUI `Spinner` component wraps the native `<spinner>` element with an `animations_enabled` KV check and supports variants (`dots`, `knight-rider`, `blocks`). All TUI views use `<Spinner>` instead of native `<spinner>` directly.
 - Nullish coalescing `??` does not fall through for `0` or `""` (only `null`/`undefined`). Use `||` when the intention is to fall through for all falsy values. Discovered in `getUsage`: `inputTokenDetails.cacheWriteTokens: 0` returned `0` instead of falling back to `metadata.anthropic.cacheCreationInputTokens`.
 - codebase-memory-mcp graph does NOT index external packages (`@opentui/core`, `effect`, etc.) or dynamic-dispatch calls (interface methods like `surface.render()`, `surface.commitRows()`, `surface.destroy()`). When tracing bugs through external renderable/surface/service APIs, read the source + external `.d.ts` directly — the graph's CALLS edges only capture static callees within indexed files.
 - `@opentui/core` package structure: `index.js` (main entry), `index-hzcw4q21.js` (renderables incl. `MarkdownRenderable`), `index-qfwqv8y3.js` (core incl. `TreeSitterClient`, `FFIRenderLib`, `CodeRenderable`), `parser.worker.js` (tree-sitter worker). Markdown rendering chain: `MarkdownRenderable.updateBlocks()` → `parseMarkdownIncremental()` (uses `marked.lexer`) → `CodeRenderable` (`filetype: "markdown"`) → `startHighlight()` → `treeSitterClient.highlightOnce()` → on failure: `catch { textBuffer.setText(content) }` shows raw text.
@@ -257,3 +257,27 @@ const table = sqliteTable("session", {
 - Two `web-tree-sitter` versions coexist: root `0.26.11` (`web-tree-sitter.wasm`) and `@opentui/core` nested `0.25.10` (`tree-sitter.wasm`). `parser.worker.js` imports `tree-sitter.wasm` from nested `0.25.10`. The `wasmResolver` plugin in `build.ts` must resolve to `@opentui/core`'s nested `0.25.10` `tree-sitter.wasm` (not root `0.26.11`'s `web-tree-sitter.wasm` — wrong file).
 - `web-tree-sitter` Emscripten module API (`node_modules/@opentui/core/node_modules/web-tree-sitter/tree-sitter.js`): `Module["wasmBinary"]` (line 2186) accepts `Uint8Array` of wasm bytes — bypasses file loading; `locateFile` (line 2092) resolves wasm path; `loadWebAssemblyModule` (line 2049) instantiates with imports; `instantiateAsync` (line 2335) handles `WebAssembly.instantiate`. `Parser.init({ wasmBinary })` may bypass WASI file loading issues (under investigation).
 - Debug logging in compiled ESM binary: `Bun.write({append:true})`, `require("fs")`, and `globalThis.require` all fail. Use `import { appendFileSync } from "fs"` at module level (top of file) — works in compiled ESM context.
+
+## TypeScript Navigation (typegraph-mcp)
+
+Where suitable, use the `ts_*` MCP tools instead of grep/glob for navigating TypeScript code. They resolve through barrel files, re-exports, and project references and return semantic results instead of string matches.
+
+- Point queries: `ts_find_symbol`, `ts_definition`, `ts_references`, `ts_type_info`, `ts_navigate_to`, `ts_trace_chain`, `ts_blast_radius`, `ts_module_exports`
+- Graph queries: `ts_dependency_tree`, `ts_dependents`, `ts_import_cycles`, `ts_shortest_path`, `ts_subgraph`, `ts_module_boundary`
+
+Start with the navigation tools before reading entire files. Use direct file reads only after the MCP tools identify the exact symbols or lines that matter.
+
+For quick architectural insight, prefer composition modules and entrypoints over top-level barrel files. If `ts_module_exports` on an `index.ts` or other barrel looks empty or uninformative, pivot to the app entrypoint, router, handler, service composition root, or API module that wires real behavior together.
+
+Use `rg` or `grep` when semantic symbol navigation is not the right tool, especially for:
+
+- docs, config, SQL, migrations, JSON, env vars, route strings, and other non-TypeScript assets
+- broad text discovery when you do not yet know the symbol name
+- exact string matching across the repo
+- validating wording or finding repeated plan/document references
+
+Practical rule:
+
+- use `ts_*` first for TypeScript symbol definition, references, types, and dependency analysis
+- use `rg`/`grep` for text search and non-TypeScript exploration
+- combine both when a task spans TypeScript code and surrounding docs/config

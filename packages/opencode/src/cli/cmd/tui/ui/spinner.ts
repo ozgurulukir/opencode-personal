@@ -265,8 +265,10 @@ export interface KnightRiderOptions {
 }
 
 /**
- * Creates frame strings for a Knight Rider style scanner animation
- * @param options Configuration options for the Knight Rider effect
+ * Creates frame strings for a Knight Rider style scanner animation.
+ * Note: Frame layout depends on geometric properties (`style`, `width`, `holdStart`, `holdEnd`, `trailSteps`).
+ * Color distribution across frames is handled separately by `createColors()`.
+ * @param options Configuration options for the Knight Rider frame layout
  * @returns Array of frame strings
  */
 export function createFrames(options: KnightRiderOptions = {}): string[] {
@@ -274,32 +276,12 @@ export function createFrames(options: KnightRiderOptions = {}): string[] {
   const style = options.style ?? "diamonds"
   const holdStart = options.holdStart ?? 30
   const holdEnd = options.holdEnd ?? 9
-
-  const colors =
-    options.colors ??
-    (options.color
-      ? deriveTrailColors(options.color, options.trailSteps)
-      : [
-          RGBA.fromHex("#ff0000"), // Brightest Red (Center)
-          RGBA.fromHex("#ff5555"), // Glare/Bloom
-          RGBA.fromHex("#dd0000"), // Trail 1
-          RGBA.fromHex("#aa0000"), // Trail 2
-          RGBA.fromHex("#770000"), // Trail 3
-          RGBA.fromHex("#440000"), // Trail 4
-        ])
-
-  const defaultColor =
-    options.defaultColor ??
-    (options.color ? deriveInactiveColor(options.color, options.inactiveFactor) : RGBA.fromHex("#330000"))
+  const trailLength = options.colors?.length ?? options.trailSteps ?? 6
 
   const trailOptions = {
-    colors,
-    trailLength: colors.length,
-    defaultColor,
+    trailLength,
     direction: "bidirectional" as const,
     holdFrames: { start: holdStart, end: holdEnd },
-    enableFading: options.enableFading,
-    minAlpha: options.minAlpha,
   }
 
   // Bidirectional cycle: Forward (width) + Hold End + Backward (width-1) + Hold Start
@@ -312,7 +294,7 @@ export function createFrames(options: KnightRiderOptions = {}): string[] {
 
       if (style === "diamonds") {
         const shapes = ["⬥", "◆", "⬩", "⬪"]
-        if (index >= 0 && index < trailOptions.colors.length) {
+        if (index >= 0 && index < trailLength) {
           return shapes[Math.min(index, shapes.length - 1)]
         }
         return "·"
@@ -320,7 +302,7 @@ export function createFrames(options: KnightRiderOptions = {}): string[] {
 
       // Default to blocks
       // It's active if we have a valid color index that is within our colors array
-      const isActive = index >= 0 && index < trailOptions.colors.length
+      const isActive = index >= 0 && index < trailLength
       return isActive ? "■" : "⬝"
     }).join("")
   })
