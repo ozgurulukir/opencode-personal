@@ -1,3 +1,21 @@
+import { mock } from "bun:test"
+mock.module("onnxruntime-web", () => {
+  class InferenceSession {
+    inputNames = ["input_ids", "attention_mask", "token_type_ids"]
+    outputNames = ["output"]
+    async run() {
+      return { output: { data: new Float32Array(384).fill(0) } }
+    }
+    static create() {
+      return Promise.resolve(new InferenceSession())
+    }
+  }
+  return {
+    InferenceSession,
+    Tensor: class { constructor() {} },
+    env: { wasm: {} }
+  }
+})
 import { describe, expect, test } from "bun:test"
 import { Effect, Layer } from "effect"
 import { Skill } from "../../src/skill"
