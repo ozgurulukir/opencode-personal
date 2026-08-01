@@ -399,11 +399,11 @@ function legacyErrorResponse(description: string, name: "BadRequestError" | "Not
 
 /**
  * Fix component schemas that are self-referencing `$ref`s — an Effect OpenAPI
- * generation bug where annotated union arms that share AST nodes with other
- * endpoints produce `{"$ref":"#/components/schemas/X"}` as the definition of X.
+ * deduplicator bug where shared AST nodes produce `{"$ref":"#/components/schemas/X"}`
+ * as the definition of X itself.
  *
- * Resolves by finding the actual schema from a parent union's `anyOf`/`oneOf`
- * that references the broken component, then inlining that schema.
+ * Workaround: regenerate the spec without the transform (which triggers the
+ * deduplicator) and copy the correct schemas over the broken ones.
  */
 function fixSelfReferencingComponents(spec: OpenApiSpec) {
   const schemas = spec.components?.schemas
@@ -413,26 +413,6 @@ function fixSelfReferencingComponents(spec: OpenApiSpec) {
     if (schema.$ref === `#/components/schemas/${name}`) selfRefs.add(name)
   }
   if (selfRefs.size === 0) return
-  // Find a parent union component whose anyOf/oneOf contains a $ref to the
-  // broken component — that parent was generated correctly and holds the inline
-  // schema we need.
-  for (const [, schema] of Object.entries(schemas)) {
-    for (const member of schema.anyOf ?? schema.oneOf ?? []) {
-      const ref = member.$ref?.replace("#/components/schemas/", "")
-      if (!ref || !selfRefs.has(ref)) continue
-      // This member's $ref points to a self-referencing component. The member
-      // itself is just {$ref:...}, so the actual schema must be resolved from
-      // the union. Since the union component was generated before the
-      // deduplicator broke things, the inline version lives elsewhere. Generate
-      // a fresh spec without the transform to get the correct schema.
-      // Simpler approach: look through all paths for an endpoint that uses this
-      // schema as a payload (it would have been expanded by the ref-expansion
-      // logic above if we ran after that, but we run before). Instead, just
-      // delete the broken component — if it's referenced via $ref elsewhere,
-      // the ref expansion in the request body loop will inline it anyway.
-    }
-  }
-  // Simplest fix: generate the raw spec (without transform) to get correct schemas
   const raw: OpenApiSpec = OpenApi.fromApi(OpenCodeHttpApi)
   const rawSchemas = raw.components?.schemas
   if (!rawSchemas) return

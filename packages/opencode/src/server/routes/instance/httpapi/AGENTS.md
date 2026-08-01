@@ -68,6 +68,10 @@ Stable services (like `SessionPrompt.Service`) are yielded once at handler-group
 
 The `session.get()` handler (`handlers/session.ts:74-76`) calls `session.get(ctx.params.sessionID)` — the `directory` parameter in SDK calls is for HTTP instance routing, not session lookup. The ACP agent's `sdk.session.get({ sessionID })` works without `directory` because the agent connects to a specific server instance directly.
 
+## OpenAPI self-referencing component workaround
+
+Effect's multi-document JSON Schema deduplicator can produce `{"$ref":"#/components/schemas/X"}` as the definition of X itself when shared AST nodes appear in annotated union arms. Workaround in `public.ts:fixSelfReferencingComponents`: regenerate the spec without the transform (`OpenApi.fromApi(OpenCodeHttpApi)`) and copy the correct schemas over the broken ones. The raw spec hasn't gone through the transform that triggers the dedup bug.
+
 ## Two SSE endpoints with different event shapes
 
 `/global/event` (`handlers/global.ts`) subscribes to `GlobalBus` (Node EventEmitter) and delivers events wrapped in `{ payload: { type, properties } }` — SyncEvents arrive inside a `sync` envelope. `/event` (`event.ts`) subscribes to the per-instance `Bus` (Effect PubSub) and delivers unwrapped `{ id, type, properties }` events directly. The global endpoint is for cross-instance consumers (ACP agent, CLI run command); the instance endpoint is for per-project consumers (TUI, web UI).

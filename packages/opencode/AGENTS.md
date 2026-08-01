@@ -251,6 +251,11 @@ See `specs/effect/migration.md` for the compact pattern reference and examples.
 - `src/project/bootstrap.ts` already wraps every service `init()` in `Effect.forkDetach`, so `init()` is fire-and-forget in production. Keep `init()` methods synchronous internally; the caller controls concurrency.
 - **Split error-prone resources into separate InstanceState.** If a single `InstanceState<State, Error, ...>` holds a resource whose methods return `Effect<A, Error>` (e.g., `ZvecIndex`), the `Error` type pollutes all methods that read from that state. Fix: put the error-prone resource in its own `InstanceState` and compose them. See `skill/index.ts` for the pattern — `ZvecIndex` lives in its own `InstanceState`, separate from the skill metadata state.
 
+## Formatter plugin
+
+- `enabled()` is memoized at the caller (`getCommand` in `format/index.ts` caches per formatter name in `commands[]`). Individual formatters run at most once per instance; internal caching is dead code.
+- `Filesystem.findUp` accepts `string | string[]`. The array overload returns ALL matches across all directories in traversal order. Batching is NOT semantically equivalent to looping per name when the loop only inspects `found[0]` (closest match per name) — batching iterates every match. Only batch when the loop logic is identical for all targets.
+
 ## Effect v4 beta API
 
 - `Effect.fork` and `Effect.forkDaemon` do not exist. Use `Effect.forkIn(scope)` to fork a fiber into a specific scope.

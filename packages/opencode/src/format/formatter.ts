@@ -151,17 +151,14 @@ export const biome: Info = {
     ".gql",
   ],
   async enabled(context) {
-    const configs = ["biome.json", "biome.jsonc"]
-    for (const config of configs) {
-      const found = await Filesystem.findUp(config, context.directory, context.worktree)
-      if (found.length > 0) {
-        // Prefer the repo's own biome binary (matches pinned version); fall back
-        // to the opencode global cache only if not installed locally.
-        const localBin = path.join(path.dirname(found[0]), "node_modules", ".bin", "biome")
-        if (await Filesystem.exists(localBin)) return [localBin, "format", "--write", "$FILE"]
-        const bin = await Npm.which("@biomejs/biome")
-        if (bin) return [bin, "format", "--write", "$FILE"]
-      }
+    const found = await Filesystem.findUp(["biome.json", "biome.jsonc"], context.directory, context.worktree)
+    if (found.length > 0) {
+      // Prefer the repo's own biome binary (matches pinned version); fall back
+      // to the opencode global cache only if not installed locally.
+      const localBin = path.join(path.dirname(found[0]), "node_modules", ".bin", "biome")
+      if (await Filesystem.exists(localBin)) return [localBin, "format", "--write", "$FILE"]
+      const bin = await Npm.which("@biomejs/biome")
+      if (bin) return [bin, "format", "--write", "$FILE"]
     }
     return false
   },
