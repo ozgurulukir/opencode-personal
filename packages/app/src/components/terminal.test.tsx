@@ -6,54 +6,6 @@ let getTerminalColors: typeof import("./terminal").getTerminalColors
 let debugTerminal: typeof import("./terminal").debugTerminal
 
 beforeAll(async () => {
-  mock.module("ghostty-web", () => ({
-    Ghostty: { load: () => Promise.resolve({}) },
-    Terminal: class {
-      options = { cursorBlink: false }
-      rows = 24
-      cols = 80
-      textarea = document.createElement("textarea")
-      getSelection() { return null }
-      paste() {}
-      focus() {}
-      attachCustomKeyEventHandler() { return () => true }
-      loadAddon() {}
-      open() {}
-      onResize() { return () => {} }
-      onData() { return () => {} }
-      onKey() { return () => {} }
-      dispose() {}
-      getViewportY() { return 0 }
-      scrollToLine() {}
-      write() {}
-    },
-    FitAddon: class {
-      fit() {}
-      observeResize() {}
-    },
-  }))
-  mock.module("@/addons/serialize", () => ({
-    SerializeAddon: class {
-      serialize() { return "buffer" }
-    },
-  }))
-  mock.module("@/utils/terminal-writer", () => ({
-    terminalWriter: (fn: (data: string, done: () => void) => void) => ({
-      push: (data: string) => fn(data, () => {}),
-      flush: (cb: () => void) => cb(),
-    }),
-  }))
-  mock.module("@/utils/terminal-websocket-url", () => ({
-    terminalWebSocketURL: (opts: unknown) => "ws://test",
-  }))
-  mock.module("@/context/command", () => ({
-    upsertCommandRegistration: () => [],
-    formatKeybind: () => "",
-    useCommand: () => ({}),
-    CommandProvider: (props: any) => props.children,
-    parseKeybind: () => [],
-    matchKeybind: () => true,
-  }))
   mock.module("@/context/language", () => ({
     useLanguage: () => ({
       t: (key: string, opts?: unknown) => (opts ? `${key}:${JSON.stringify(opts)}` : key),
@@ -74,16 +26,6 @@ beforeAll(async () => {
         },
       },
     }),
-  }))
-  mock.module("@/context/server", () => ({
-    resolveServerList: () => [],
-    ServerConnection: { key: () => "" },
-    ServerProvider: (props: any) => props.children,
-    normalizeServerUrl: () => "",
-    serverName: () => "",
-
-    useServer: () => ({ current: { http: { username: "user", password: "pwd" }, type: "http", authToken: false } }),
-
   }))
   mock.module("@/context/settings", () => ({
     useSettings: () => ({
@@ -106,16 +48,6 @@ beforeAll(async () => {
     withAlpha: (color: string, _alpha: number) => color,
   }))
   mock.module("@opencode-ai/ui/toast", () => ({ showToast: () => {} }))
-  mock.module("@/utils/runtime-adapters", () => ({
-    hasSetOption: () => false,
-    isDisposable: () => false,
-    getSpeechRecognitionCtor: () => undefined,
-
-    disposeIfDisposable: (x: unknown) => {},
-    getHoveredLinkText: () => "http://test",
-    setOptionIfSupported: () => {},
-
-  }))
 
   const mod = await import("./terminal")
   useTerminalUiBindings = mod.useTerminalUiBindings
