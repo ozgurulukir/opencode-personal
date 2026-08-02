@@ -334,13 +334,33 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
   }
   props.ref?.(ref)
 
-  const visibleActions = createMemo(() =>
-    actions()
-      .map((item) => ({ ...item, label: actionLabels().get(item.command) ?? "" }))
-      .filter((item) => !item.disabled && item.label),
-  )
-  const left = createMemo(() => visibleActions().filter((item) => item.side !== "right"))
-  const right = createMemo(() => visibleActions().filter((item) => item.side === "right"))
+  // ⚡ Bolt Optimization: Replace multiple .filter() and .map() with a single loop to reduce GC pressure and O(N) traversals
+  const processedActions = createMemo(() => {
+    const rawActions = actions()
+    const labels = actionLabels()
+    const visible: Array<NonNullable<ReturnType<typeof actions>[number]> & { label: string }> = []
+    const leftArr: typeof visible = []
+    const rightArr: typeof visible = []
+
+    for (let i = 0; i < rawActions.length; i++) {
+      const item = rawActions[i]
+      const label = labels.get(item.command) ?? ""
+      if (!item.disabled && label) {
+        const processed = { ...item, label }
+        visible.push(processed)
+        if (item.side === "right") {
+          rightArr.push(processed)
+        } else {
+          leftArr.push(processed)
+        }
+      }
+    }
+    return { visible, left: leftArr, right: rightArr }
+  })
+
+  const visibleActions = () => processedActions().visible
+  const left = () => processedActions().left
+  const right = () => processedActions().right
 
   return (
     <box gap={1} paddingBottom={1}>
