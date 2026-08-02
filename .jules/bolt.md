@@ -70,3 +70,7 @@
 ## 2026-08-01 - Avoid duplicated derived checks in event handlers
 **Learning:** Calculating complex state (like validating if an input is 'blank' via array mapping, mapping, and joining) inside high-frequency event handlers like `onKeyDown` creates enormous GC pressure.
 **Action:** Always check if a `createMemo` already computes the necessary state. Reuse existing memos instead of redundantly defining the check within the event handler.
+
+## 2026-08-01 - Consolidating multiple createMemo nodes over the same array
+**Learning:** Using multiple `createMemo` hooks that filter or map the same base array (e.g., `visibleActions`, `left`, `right`) forces multiple reactive nodes and redundant O(N) traversals per update.
+**Action:** In SolidJS, combine these into a single `createMemo` that uses one imperative loop to build all required arrays, returning them in an object. This reduces the reactive graph size and eliminates redundant intermediate array allocations.
