@@ -73,9 +73,21 @@ Normal tools merge `agent.permission + session.permission`. But subagent task's 
 
 `message-v2.ts:651-652` — the condition `msg.info.role === "user" && completed.has(msg.info.id) && msg.parts.some(...)` is unreachable. Line 643 already handles the same condition with `continue`/`break` for all sub-cases. Remove it if found.
 
-### `filterCompacted` reordering comparisons appear inverted
+### `filterCompacted` reorders messages — array position is not chronological
 
-`message-v2.ts:676` — the condition `tailIndex < compactionIndex && summaryIndex > compactionIndex` in the reversed array appears inverted. The summary should have a lower index (newer) than the compaction marker (older) in the reversed array, and the tail should have a higher index (older). The reordering code at lines 676-682 may never execute as a result. The function still works because the reversed array (newest-first) is what the runLoop consumes.
+`message-v2.ts:filterCompacted()` returns messages in model-consumption order: `[compaction-user, summary, ...retained tail..., continue-user]`. This is NOT chronological. Any code that assumes `msgs.length - 1` is the newest message will pick the wrong turn. Use `MessageV2.latest(msgs)` instead, which derives the latest user/assistant/finished by max `MessageID` (monotonic via `MessageID.ascending`).
+
+### Double auto-compaction trigger after `filterCompacted` reorder
+
+Before `latest()` was added, `prompt.ts:runLoop` picked `lastFinished` by array position. After `filterCompacted` reorder, the pre-compaction overflow assistant could appear after the summary in the array, bypassing the `summary !== true` overflow guard and firing a second `compaction.create()` immediately. The `latest()` fix ensures `lastFinished` is the chronologically-latest finished assistant, not the array-latest.
+
+### `Info` union type requires narrowing before accessing assistant-only fields
+
+`MessageV2.latest()` returns `Info` (union of `User | Assistant`). Downstream code in `prompt.ts` accesses assistant-only properties (`.model`, `.tools`, `.format`, `.system`). Narrow with `msg.info.role === "assistant"` or cast to `MessageV2.Assistant` after filtering.
+
+### `SubtaskPart` must be imported for type guards in `message-v2.ts`
+
+When filtering parts with `p is CompactionPart | SubtaskPart`, both types must be imported from `message.schema`. Missing `SubtaskPart` causes `TS2304: Cannot find name 'SubtaskPart'` at the type guard site.
 
 ### `compaction_continue` metadata guard scope
 
