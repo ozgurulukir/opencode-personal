@@ -4,6 +4,18 @@
 
 `lsp/client.ts` maintains `pushDiagnostics`, `pullDiagnostics`, `published`, `files`, `diagnosticRegistrations`, and `registrationListeners` — all Maps/Sets keyed by file path. Every unique file touched by the LSP server adds an entry. The `shutdown()` method must clear these explicitly; `connection.dispose()` does NOT clean them up. Without this, a long-lived LSP client leaks diagnostic data for every file opened during its lifetime.
 
+## `textDocument/didClose` is client→server only — `onNotification` never fires
+
+`connection.onNotification("textDocument/didClose", ...)` is dead code: `didClose` is a client→server notification, not a server→client notification. The handler is never triggered. To clean up diagnostic state when a file is closed, call `notify.close({ path })` from the client side (which sends `didClose` to the server AND clears local maps).
+
+## `touchFile` only opens, never closes — LRU cleanup lives in `notify.open`
+
+`lsp.touchFile` calls `client.notify.open()` but never calls `notify.close()`. Over a long session this unbounds the diagnostic maps. The fix is an LRU guard inside `notify.open`: when `Object.keys(files).length >= MAX_OPEN_FILES` and the file isn't already open, close the oldest entry before opening the new one. This bounds memory growth without requiring callers to track close events.
+
+## `typescript-language-server` memory cap via `maxTsServerMemory`
+
+`typescript-language-server` reads `maxTsServerMemory` from LSP `initializationOptions` and passes it as `--max-old-space-size=<MB>` to the spawned `tsserver.js` process (`cli.mjs:18730`). opencode's builtin Typescript server sets this in `lsp/server.ts:119` — override with `OPENCODE_TSSERVER_MAX_MEMORY` env var. Without it, tsserver runs with Node's default (~4 GB on 64-bit), which can cause swap thrashing on large monorepos.
+
 ## `broken` Set permanently blacklists server+root combinations
 
 `lsp/lsp.ts:208` — once an LSP server fails to spawn for a given root, `root + server.id` is added to `s.broken` and never retried for the instance lifetime. This is intentional (avoid repeated spawn failures), but the Set must be cleared on instance finalizer or stale failures prevent future LSP features from working after a transient error resolves.

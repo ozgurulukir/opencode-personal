@@ -47,3 +47,7 @@ repeating inline JSON parse logic.
 ## `systemPromptDelivery` — OpenAI OAuth uses `instructions`, not `system`
 
 `ProviderTransform.systemPromptDelivery(providerID, authInfo)` returns `{ type: "instructions" }` for OpenAI OAuth (which doesn't support `system` role messages). The system prompt is passed via `providerOptions.instructions` instead. All other providers use `{ type: "messages" }`.
+
+## `models-snapshot.js` is eagerly transformed — use lazy `getDatabaseProvider`
+
+`provider.ts:1031` previously did `const database = mapValues(modelsDev, fromModelsDevProvider)`, transforming all 5949 models (178 providers) into full `Model` objects at init time. The fix is a `databaseCache` + `getDatabaseProvider(providerID)` wrapper that calls `fromModelsDevProvider` only on first access. This cuts provider init memory by ~50-100 MB. Call sites (`mergeProvider`, env loop, plugin hooks, `custom()`) must use `getDatabaseProvider` instead of direct `database[providerID]` access.

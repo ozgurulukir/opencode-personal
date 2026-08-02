@@ -480,4 +480,44 @@ describe("LSPClient interop", () => {
       },
     })
   })
+
+  test("notify.close cleans up diagnostics and document state", async () => {
+    const handle = spawnFakeServer() as any
+    await using tmp = await tmpdir()
+    const file = path.join(tmp.path, "client.ts")
+    await Bun.write(file, "const x = 1\n")
+
+    await WithInstance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        const client = await LSPClient.create({
+          serverID: "fake",
+          server: handle as unknown as LSPServer.Handle,
+          root: tmp.path,
+          directory: tmp.path,
+        })
+
+        const version = await client.notify.open({ path: file })
+        await client.connection.sendNotification("test/publish-diagnostics", {
+          uri: pathToFileURL(file).href,
+          version,
+          diagnostics: [
+            {
+              range: { start: { line: 0, character: 0 }, end: { line: 0, character: 5 } },
+              message: "push diagnostic",
+              severity: 1,
+            },
+          ],
+        })
+
+        await client.waitForDiagnostics({ path: file, version, mode: "document" })
+        expect(client.diagnostics.get(file)).toHaveLength(1)
+
+        await client.notify.close({ path: file })
+        expect(client.diagnostics.get(file)).toBeUndefined()
+
+        await client.shutdown()
+      },
+    })
+  })
 })

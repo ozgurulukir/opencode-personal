@@ -3,15 +3,9 @@ import fs from "fs"
 import os from "os"
 import path from "path"
 import { Config } from "@/config/config"
-// Pure-WASM ONNX Runtime. Native .so-free, so it loads inside compiled binaries
-// (the .node/.so dlopen problem that breaks onnxruntime-node is avoided).
-import * as ort from "onnxruntime-web"
-// Embed the WASM glue (.mjs factory + .wasm binary) as file assets copied locally
-// (see src/search/wasm/). Bun resolves these to the real path in dev and embeds them
-// in the bunfs of --compile binaries — same code, both modes. The .node/.so dlopen
-// problem that breaks onnxruntime-node is avoided: this is pure WASM.
-import ortWasmMjs from "./wasm/ort-wasm-simd-threaded.mjs" with { type: "file" }
-import ortWasmBin from "./wasm/ort-wasm-simd-threaded.wasm" with { type: "file" }
+// Pure-WASM ONNX Runtime. Native .so-free, so it loads inside compiled binaries.
+// Type-only import so module load does not pull in onnxruntime-web eagerly.
+import type * as ort from "onnxruntime-web"
 
 export interface EmbeddingServiceInterface {
   readonly embed: (texts: string[]) => Effect.Effect<number[][], Error>
@@ -133,6 +127,7 @@ export function meanPool(logits: Float32Array, mask: number[], dim: number): num
 }
 
 function createLocalProvider(_modelId: string, dimension: number): EmbeddingServiceInterface {
+  let ortModule: typeof ort | null = null
   let session: ort.InferenceSession | null = null
   let tokenizer: WordPieceTokenizer | null = null
   // Memoised init so concurrent first embed() calls share a single load.
@@ -141,17 +136,21 @@ function createLocalProvider(_modelId: string, dimension: number): EmbeddingServ
   const ensureReady = () => {
     if (initPromise) return initPromise
     initPromise = (async () => {
+      ortModule = await import("onnxruntime-web")
+      const ortWasmMjs = (await import("./wasm/ort-wasm-simd-threaded.mjs", { with: { type: "file" } })).default
+      const ortWasmBin = (await import("./wasm/ort-wasm-simd-threaded.wasm", { with: { type: "file" } })).default
+
       const dir = modelCacheDir()
       const modelPath = path.join(dir, "model.onnx")
       const vocabPath = path.join(dir, "vocab.txt")
       await ensureDownloaded("onnx/model_quantized.onnx", modelPath)
       await ensureDownloaded("vocab.txt", vocabPath)
       tokenizer = new WordPieceTokenizer(fs.readFileSync(vocabPath, "utf8").split("\n"))
-      const env = ort.env as unknown as { wasm: Record<string, unknown> }
+      const env = ortModule.env as unknown as { wasm: Record<string, unknown> }
       env.wasm = env.wasm ?? {}
       env.wasm.numThreads = 1
       env.wasm.wasmPaths = { mjs: ortWasmMjs, wasm: ortWasmBin }
-      session = await ort.InferenceSession.create(modelPath, { executionProviders: ["wasm"] })
+      session = await ortModule.InferenceSession.create(modelPath, { executionProviders: ["wasm"] })
     })()
     return initPromise
   }
@@ -166,10 +165,10 @@ function createLocalProvider(_modelId: string, dimension: number): EmbeddingServ
           const i64 = (a: number[]) => new BigInt64Array(a.map(BigInt))
           const names = session!.inputNames
           const feeds: Record<string, ort.Tensor> = {}
-          feeds[names[0]] = new ort.Tensor("int64", i64(input_ids), [1, input_ids.length])
-          feeds[names[1]] = new ort.Tensor("int64", i64(attention_mask), [1, attention_mask.length])
+          feeds[names[0]] = new ortModule!.Tensor("int64", i64(input_ids), [1, input_ids.length])
+          feeds[names[1]] = new ortModule!.Tensor("int64", i64(attention_mask), [1, attention_mask.length])
           if (names.length > 2) {
-            feeds[names[2]] = new ort.Tensor("int64", new BigInt64Array(input_ids.length), [1, input_ids.length])
+            feeds[names[2]] = new ortModule!.Tensor("int64", new BigInt64Array(input_ids.length), [1, input_ids.length])
           }
           const out = await session!.run(feeds)
           const logits = out[session!.outputNames[0]].data as Float32Array

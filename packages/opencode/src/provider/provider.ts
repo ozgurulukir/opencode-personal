@@ -1028,7 +1028,14 @@ const layer: Layer.Layer<
         const bridge = yield* EffectBridge.make()
         const cfg = yield* config.get()
         const modelsDev = yield* modelsDevSvc.get()
-        const database = mapValues(modelsDev, fromModelsDevProvider)
+        const databaseCache: Record<string, Info> = {}
+        function getDatabaseProvider(providerID: string): Info | undefined {
+          if (databaseCache[providerID]) return databaseCache[providerID]
+          const raw = modelsDev[providerID]
+          if (!raw) return undefined
+          databaseCache[providerID] = fromModelsDevProvider(raw)
+          return databaseCache[providerID]
+        }
 
         const providers: Record<ProviderID, Info> = {} as Record<ProviderID, Info>
         const languages = new Map<string, LanguageModelV3>()
@@ -1058,7 +1065,7 @@ const layer: Layer.Layer<
             providers[providerID] = mergeDeep(existing, provider)
             return
           }
-          const match = database[providerID]
+          const match = getDatabaseProvider(providerID)
           if (!match) return
           // @ts-expect-error
           providers[providerID] = mergeDeep(match, provider)
@@ -1086,7 +1093,7 @@ const layer: Layer.Layer<
           const providerID = ProviderID.make(p.id)
           if (disabled.has(providerID)) continue
 
-          const provider = database[providerID]
+          const provider = getDatabaseProvider(providerID)
           if (!provider) continue
           const pluginAuth = yield* auth.get(providerID).pipe(Effect.orDie)
 
@@ -1107,14 +1114,14 @@ const layer: Layer.Layer<
 
         // extend database from config
         for (const [providerID, provider] of configProviders) {
-          const existing = database[providerID]
+          const existing = getDatabaseProvider(providerID)
           const parsed: Info = {
             id: ProviderID.make(providerID),
             name: provider.name ?? existing?.name ?? providerID,
             env: provider.env ?? existing?.env ?? [],
             options: mergeDeep(existing?.options ?? {}, provider.options ?? {}),
             source: "config",
-            models: existing?.models ?? {},
+            models: existing?.models ? { ...existing.models } : {},
           }
 
           for (const [modelID, model] of Object.entries(provider.models ?? {})) {
@@ -1196,19 +1203,22 @@ const layer: Layer.Layer<
             )
             parsed.models[modelID] = parsedModel
           }
-          database[providerID] = parsed
+          databaseCache[providerID] = parsed
         }
 
         // load env
         const envs = yield* env.all()
-        for (const [id, provider] of Object.entries(database)) {
+        const knownIDs = new Set([...Object.keys(modelsDev), ...Object.keys(databaseCache)])
+        for (const id of knownIDs) {
           const providerID = ProviderID.make(id)
           if (disabled.has(providerID)) continue
-          const apiKey = provider.env.find((item) => envs[item])
+          const dbEntry = databaseCache[id]
+          const envList = dbEntry ? dbEntry.env : (modelsDev[id]?.env ?? [])
+          const apiKey = envList.find((item) => envs[item])
           if (!apiKey) continue
           mergeProvider(providerID, {
             source: "env",
-            key: provider.env.length === 1 ? envs[apiKey] : undefined,
+            key: envList.length === 1 ? envs[apiKey] : undefined,
           })
         }
 
@@ -1238,7 +1248,7 @@ const layer: Layer.Layer<
           const options = yield* Effect.promise(() =>
             plugin.auth!.loader!(
               () => bridge.promise(auth.get(providerID).pipe(Effect.orDie)) as any,
-              toPublicInfo(database[plugin.auth!.provider]),
+              toPublicInfo(getDatabaseProvider(plugin.auth!.provider)!),
             ),
           )
           const opts = options ?? {}
@@ -1249,7 +1259,7 @@ const layer: Layer.Layer<
         for (const [id, fn] of Object.entries(custom(dep))) {
           const providerID = ProviderID.make(id)
           if (disabled.has(providerID)) continue
-          const data = database[providerID]
+          const data = getDatabaseProvider(providerID)
           if (!data) {
             log.error("Provider does not exist in model list " + providerID)
             continue
