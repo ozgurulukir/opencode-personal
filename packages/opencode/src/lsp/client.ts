@@ -590,6 +590,21 @@ export async function create(input: { serverID: string; server: LSPServer.Handle
         const extension = path.extname(request.path)
         const languageId = LANGUAGE_EXTENSIONS[extension] ?? "plaintext"
 
+        // LRU: close oldest open document when exceeding the limit to bound
+        // diagnostic-map memory growth in long-lived sessions.
+        const MAX_OPEN_FILES = 50
+        const openPaths = Object.keys(files)
+        if (openPaths.length >= MAX_OPEN_FILES && !files[request.path]) {
+          const oldest = openPaths[0]
+          pushDiagnostics.delete(oldest)
+          pullDiagnostics.delete(oldest)
+          published.delete(oldest)
+          delete files[oldest]
+          await connection.sendNotification("textDocument/didClose", {
+            textDocument: { uri: pathToFileURL(oldest).href },
+          })
+        }
+
         const document = files[request.path]
         if (document !== undefined) {
           // Do not wipe diagnostics on didChange. Some servers (e.g. clangd) only
@@ -646,6 +661,7 @@ export async function create(input: { serverID: string; server: LSPServer.Handle
         logger.info("textDocument/didOpen", request)
         pushDiagnostics.delete(request.path)
         pullDiagnostics.delete(request.path)
+        published.delete(request.path)
         await connection.sendNotification("textDocument/didOpen", {
           textDocument: {
             uri: pathToFileURL(request.path).href,
@@ -656,6 +672,21 @@ export async function create(input: { serverID: string; server: LSPServer.Handle
         })
         files[request.path] = { version: 0, text }
         return 0
+      },
+      async close(request: { path: string }) {
+        const normalizedPath = Filesystem.normalizePath(
+          path.isAbsolute(request.path) ? request.path : path.resolve(input.directory, request.path),
+        )
+        pushDiagnostics.delete(normalizedPath)
+        pullDiagnostics.delete(normalizedPath)
+        published.delete(normalizedPath)
+        delete files[normalizedPath]
+        logger.info("textDocument/didClose", { path: normalizedPath })
+        await connection.sendNotification("textDocument/didClose", {
+          textDocument: {
+            uri: pathToFileURL(normalizedPath).href,
+          },
+        })
       },
     },
     get diagnostics() {
