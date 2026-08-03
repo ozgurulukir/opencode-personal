@@ -115,7 +115,8 @@ type RuntimeState = {
 }
 
 const log = Log.create({ service: "tui.plugin" })
-const DISPOSE_TIMEOUT_MS = 5000
+// exported for testing
+export const DISPOSE_TIMEOUT_MS = 5000
 const KV_KEY = "plugin_enabled"
 const EMPTY_TUI: TuiPluginModule = {
   tui: async () => {},
@@ -404,14 +405,18 @@ function createPluginScope(load: PluginLoad, id: string) {
     ctrl.abort()
     const queue = [...list].reverse()
     list = []
-    const until = Date.now() + DISPOSE_TIMEOUT_MS
+
+    // Evaluate timeout dynamically so tests can override it at runtime
+    const timeoutMs = process.env.TEST_PLUGIN_TIMEOUT ? parseInt(process.env.TEST_PLUGIN_TIMEOUT, 10) : DISPOSE_TIMEOUT_MS
+    const until = Date.now() + timeoutMs
+
     for (const item of queue) {
       const left = until - Date.now()
       if (left <= 0) {
         fail("timed out cleaning up tui plugin", {
           path: load.spec,
           id,
-          timeout: DISPOSE_TIMEOUT_MS,
+          timeout: timeoutMs,
         })
         break
       }
@@ -422,7 +427,7 @@ function createPluginScope(load: PluginLoad, id: string) {
         fail("timed out cleaning up tui plugin", {
           path: load.spec,
           id,
-          timeout: DISPOSE_TIMEOUT_MS,
+          timeout: timeoutMs,
         })
         break
       }

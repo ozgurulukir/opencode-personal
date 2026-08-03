@@ -182,6 +182,9 @@ export default {
 test(
   "times out hanging plugin cleanup on dispose",
   async () => {
+    const originalTimeout = process.env.TEST_PLUGIN_TIMEOUT
+    process.env.TEST_PLUGIN_TIMEOUT = "500" // Set small timeout for testing
+
     await using tmp = await tmpdir({
       init: async (dir) => {
         const file = path.join(dir, "timeout-plugin.ts")
@@ -208,7 +211,7 @@ test(
       await TuiPluginRuntime.init({ api: createTuiPluginApi(), config })
 
       const done = await new Promise<string>((resolve) => {
-        const timer = setTimeout(() => resolve("timeout"), 7000)
+        const timer = setTimeout(() => resolve("timeout"), 4000)
         void TuiPluginRuntime.dispose().then(() => {
           clearTimeout(timer)
           resolve("done")
@@ -218,6 +221,11 @@ test(
     } finally {
       await TuiPluginRuntime.dispose()
       restore()
+      if (originalTimeout === undefined) {
+        delete process.env.TEST_PLUGIN_TIMEOUT
+      } else {
+        process.env.TEST_PLUGIN_TIMEOUT = originalTimeout
+      }
     }
   },
   { timeout: 15000 },
