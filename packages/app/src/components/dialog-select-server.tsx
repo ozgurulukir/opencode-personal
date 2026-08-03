@@ -652,6 +652,7 @@ export function DialogSelectServer() {
                           icon="dot-grid"
                           variant="ghost"
                           class="shrink-0 size-8 hover:bg-surface-base-hover data-[expanded]:bg-surface-base-active"
+                          aria-label={input.language.t("common.moreOptions")}
                           onClick={(e: MouseEvent) => e.stopPropagation()}
                           onPointerDown={(e: PointerEvent) => e.stopPropagation()}
                         />
