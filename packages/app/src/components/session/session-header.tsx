@@ -360,7 +360,6 @@ export function SessionHeader() {
                             as={IconButton}
                             icon="chevron-down"
                             variant="ghost"
-                            aria-label={language.t("common.moreOptions")}
                             disabled={opening()}
                             class="rounded-none h-full w-[20px] p-0 border-none shadow-none data-[expanded]:bg-surface-raised-base-active disabled:!cursor-default"
                             classList={{
