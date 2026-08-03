@@ -672,6 +672,7 @@ export function MessageTimeline(props: {
                               as={IconButton}
                               icon="dot-grid"
                               variant="ghost"
+                              aria-label={language.t("common.moreOptions")}
                               class="size-6 rounded-md data-[expanded]:bg-surface-base-active"
                               classList={{
                                 "bg-surface-base-active": share.open || title.pendingShare,

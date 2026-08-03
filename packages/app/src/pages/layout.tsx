@@ -2136,6 +2136,7 @@ export default function Layout(props: ParentProps) {
                       as={IconButton}
                       icon="dot-grid"
                       variant="ghost"
+                      aria-label={language.t("common.moreOptions")}
                       data-action="project-menu"
                       data-project={slug()}
                       class="shrink-0 size-6 rounded-md transition-opacity data-[expanded]:bg-surface-base-active"

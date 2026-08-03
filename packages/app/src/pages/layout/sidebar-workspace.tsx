@@ -173,6 +173,7 @@ const WorkspaceActions = (props: {
           as={IconButton}
           icon="dot-grid"
           variant="ghost"
+          aria-label={props.language.t("common.moreOptions")}
           class="size-6 rounded-md"
           data-action="workspace-menu"
           data-workspace={base64Encode(props.directory)}
