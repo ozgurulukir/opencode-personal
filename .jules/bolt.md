@@ -74,6 +74,6 @@
 ## 2026-08-01 - Consolidating multiple createMemo nodes over the same array
 **Learning:** Using multiple `createMemo` hooks that filter or map the same base array (e.g., `visibleActions`, `left`, `right`) forces multiple reactive nodes and redundant O(N) traversals per update.
 **Action:** In SolidJS, combine these into a single `createMemo` that uses one imperative loop to build all required arrays, returning them in an object. This reduces the reactive graph size and eliminates redundant intermediate array allocations.
-## 2024-06-25 - Consolidating createMemo Traversals
+## 2026-08-03 - Consolidating createMemo Traversals
 **Learning:** In SolidJS, computing related aggregates (like additions and deletions from a list of diffs) using separate `createMemo` blocks with chained array methods (e.g. `.reduce()`) causes redundant O(N) traversals and adds graph overhead.
 **Action:** Consolidate related array traversals into a single `createMemo` that iterates the array once (using a manual `for` loop) to compute and return all necessary aggregates in a single object. Then use lightweight derived accessors (e.g., `const additions = () => totals().additions`) to consume them, which avoids extra array iterations and reduces GC pressure.
