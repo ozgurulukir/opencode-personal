@@ -186,9 +186,11 @@ describe("HttpApi Server.listen", () => {
       ws.send("ping-listen\n")
       expect(await message).toContain("ping-listen")
 
+      ws.close(1000)
+      await withTimeout(closed, 5_000, "timed out waiting for websocket close")
+
       await stop(listener, "timed out waiting for listener.stop(true)")
       stopped = true
-      await withTimeout(closed, 5_000, "timed out waiting for websocket close")
       expect(ws.readyState).toBe(WebSocket.CLOSED)
 
       const restarted = await startListener()
@@ -196,10 +198,12 @@ describe("HttpApi Server.listen", () => {
         const nextInfo = await createCat(restarted, tmp.path)
         const nextTicket = await connectTicket(restarted, nextInfo.id, tmp.path)
         const nextWs = await openSocket(socketURL(restarted, nextInfo.id, tmp.path, nextTicket.ticket))
+        const nextClosed = new Promise<void>((resolve) => nextWs.addEventListener("close", () => resolve(), { once: true }))
         const nextMessage = waitForMessage(nextWs, (message) => message.includes("ping-restarted"))
         nextWs.send("ping-restarted\n")
         expect(await nextMessage).toContain("ping-restarted")
         nextWs.close(1000)
+        await withTimeout(nextClosed, 5_000, "timed out waiting for restarted websocket close")
       } finally {
         await stop(restarted, "timed out waiting for restarted listener.stop(true)")
       }
@@ -221,8 +225,10 @@ describe("HttpApi Server.listen", () => {
 
       const reusable = await connectTicket(listener, info.id, tmp.path)
       const ws = await openSocket(socketURL(listener, info.id, tmp.path, reusable.ticket))
+      const wsClosed = new Promise<void>((resolve) => ws.addEventListener("close", () => resolve(), { once: true }))
       await expectSocketRejected(socketURL(listener, info.id, tmp.path, reusable.ticket))
       ws.close(1000)
+      await withTimeout(wsClosed, 5_000, "timed out waiting for reusable websocket close")
 
       const other = await createCat(listener, tmp.path)
       const scoped = await connectTicket(listener, info.id, tmp.path)
@@ -274,7 +280,9 @@ describe("HttpApi Server.listen", () => {
 
       // Same directory on the WS upgrade → consume succeeds.
       const ws = await openSocket(socketURL(listener, info.id, tmp.path, mint.ticket))
+      const wsClosed = new Promise<void>((resolve) => ws.addEventListener("close", () => resolve(), { once: true }))
       ws.close(1000)
+      await withTimeout(wsClosed, 5_000, "timed out waiting for mint websocket close")
     } finally {
       await stop(listener, "timed out cleaning up directory-scope listener").catch(() => undefined)
     }
@@ -286,10 +294,12 @@ describe("HttpApi Server.listen", () => {
     try {
       const info = await createCat(listener, tmp.path)
       const ws = await openSocket(socketURL(listener, info.id, tmp.path))
+      const wsClosed = new Promise<void>((resolve) => ws.addEventListener("close", () => resolve(), { once: true }))
       const message = waitForMessage(ws, (message) => message.includes("ping-no-auth"))
       ws.send("ping-no-auth\n")
       expect(await message).toContain("ping-no-auth")
       ws.close(1000)
+      await withTimeout(wsClosed, 5_000, "timed out waiting for no-auth websocket close")
     } finally {
       await stop(listener, "timed out cleaning up no-auth listener").catch(() => undefined)
     }
