@@ -77,3 +77,7 @@
 ## 2026-08-03 - Consolidating createMemo Traversals
 **Learning:** In SolidJS, computing related aggregates (like additions and deletions from a list of diffs) using separate `createMemo` blocks with chained array methods (e.g. `.reduce()`) causes redundant O(N) traversals and adds graph overhead.
 **Action:** Consolidate related array traversals into a single `createMemo` that iterates the array once (using a manual `for` loop) to compute and return all necessary aggregates in a single object. Then use lightweight derived accessors (e.g., `const additions = () => totals().additions`) to consume them, which avoids extra array iterations and reduces GC pressure.
+
+## 2026-08-04 - Chained Array Operations in Utility Functions
+**Learning:** Using chained array methods (like `.filter().filter().reduce()`) in utility functions that are called frequently or process large arrays creates multiple intermediate arrays and forces multiple O(N) traversals, leading to unnecessary GC pressure.
+**Action:** Replace these chains with a single O(N) `for` loop that implements the filtering and reduction logic in a single pass without intermediate array allocations.
