@@ -338,6 +338,17 @@ export class OpenAICompatibleChatLanguageModel implements LanguageModelV3 {
       hasFinished: boolean
     }> = []
 
+    // Buffers tool-call deltas by `index` until `function.name` is known.
+    // Some OpenAI-compatible providers send the first delta without
+    // `function.name`.
+    const pendingToolCalls = new Map<
+      number,
+      {
+        id: string | null
+        bufferedArguments: string
+      }
+    >()
+
     let finishReason: {
       unified: ReturnType<typeof mapOpenAICompatibleFinishReason>
       raw: string | undefined
@@ -535,37 +546,90 @@ export class OpenAICompatibleChatLanguageModel implements LanguageModelV3 {
                 isActiveReasoning = false
               }
               for (const toolCallDelta of delta.tool_calls) {
-                const index = toolCallDelta.index
+                const index = toolCallDelta.index ?? toolCalls.length
 
                 if (toolCalls[index] == null) {
-                  if (toolCallDelta.id == null) {
-                    throw new InvalidResponseDataError({
-                      data: toolCallDelta,
-                      message: `Expected 'id' to be a string.`,
+                  if (toolCallDelta.index != null) {
+                    // Buffer deltas until `function.name` is known. Some
+                    // OpenAI-compatible providers send the first delta
+                    // without `function.name`.
+                    let pending = pendingToolCalls.get(index)
+                    if (pending == null) {
+                      pending = {
+                        id: toolCallDelta.id ?? null,
+                        bufferedArguments: "",
+                      }
+                      pendingToolCalls.set(index, pending)
+                    } else {
+                      if (pending.id == null && toolCallDelta.id != null) {
+                        pending.id = toolCallDelta.id
+                      }
+                    }
+
+                    const argumentsDelta = toolCallDelta.function?.arguments
+                    if (argumentsDelta != null) {
+                      pending.bufferedArguments += argumentsDelta
+                    }
+
+                    const name = toolCallDelta.function?.name
+                    if (name == null) {
+                      continue // wait for the delta that carries the name
+                    }
+
+                    pendingToolCalls.delete(index)
+
+                    if (pending.id == null) {
+                      throw new InvalidResponseDataError({
+                        data: toolCallDelta,
+                        message: `Expected 'id' to be a string.`,
+                      })
+                    }
+
+                    controller.enqueue({
+                      type: "tool-input-start",
+                      id: pending.id,
+                      toolName: name,
                     })
-                  }
 
-                  if (toolCallDelta.function?.name == null) {
-                    throw new InvalidResponseDataError({
-                      data: toolCallDelta,
-                      message: `Expected 'function.name' to be a string.`,
+                    toolCalls[index] = {
+                      id: pending.id,
+                      type: "function",
+                      function: {
+                        name,
+                        arguments: pending.bufferedArguments,
+                      },
+                      hasFinished: false,
+                    }
+                  } else {
+                    if (toolCallDelta.id == null) {
+                      throw new InvalidResponseDataError({
+                        data: toolCallDelta,
+                        message: `Expected 'id' to be a string.`,
+                      })
+                    }
+
+                    if (toolCallDelta.function?.name == null) {
+                      throw new InvalidResponseDataError({
+                        data: toolCallDelta,
+                        message: `Expected 'function.name' to be a string.`,
+                      })
+                    }
+
+                    controller.enqueue({
+                      type: "tool-input-start",
+                      id: toolCallDelta.id,
+                      toolName: toolCallDelta.function.name,
                     })
-                  }
 
-                  controller.enqueue({
-                    type: "tool-input-start",
-                    id: toolCallDelta.id,
-                    toolName: toolCallDelta.function.name,
-                  })
-
-                  toolCalls[index] = {
-                    id: toolCallDelta.id,
-                    type: "function",
-                    function: {
-                      name: toolCallDelta.function.name,
-                      arguments: toolCallDelta.function.arguments ?? "",
-                    },
-                    hasFinished: false,
+                    toolCalls[index] = {
+                      id: toolCallDelta.id,
+                      type: "function",
+                      function: {
+                        name: toolCallDelta.function.name,
+                        arguments: toolCallDelta.function.arguments ?? "",
+                      },
+                      hasFinished: false,
+                    }
                   }
 
                   const toolCall = toolCalls[index]
@@ -656,6 +720,19 @@ export class OpenAICompatibleChatLanguageModel implements LanguageModelV3 {
 
             if (isActiveText) {
               controller.enqueue({ type: "text-end", id: "txt-0" })
+            }
+
+            // Tool-call deltas that never received a `function.name` are
+            // invalid, preserving the original invalid-response semantics.
+            for (const [index, pending] of pendingToolCalls) {
+              throw new InvalidResponseDataError({
+                data: {
+                  index,
+                  id: pending.id,
+                  function: { arguments: pending.bufferedArguments },
+                },
+                message: `Expected 'function.name' to be a string.`,
+              })
             }
 
             // go through all tool calls and send the ones that are not finished
@@ -795,7 +872,7 @@ const createOpenAICompatibleChatChunkSchema = <ERROR_SCHEMA extends z.core.$ZodT
               tool_calls: z
                 .array(
                   z.object({
-                    index: z.number(),
+                    index: z.number().nullish(), //google does not send index
                     id: z.string().nullish(),
                     function: z.object({
                       name: z.string().nullish(),
