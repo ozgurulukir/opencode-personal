@@ -33,3 +33,7 @@ The fix in `ask()` splits evaluation: (1) deny from `ruleset` wins immediately (
 ## `reply("always")` persists to database
 
 When the user replies with `"always"`, the approved ruleset is persisted to `PermissionTable` (keyed by `project_id`). This means "always allow" decisions survive restarts. The ruleset is loaded from the database on service init via `InstanceState.make()`. The `PermissionTable` is an upsert — each project has at most one row containing the full approved ruleset.
+
+## Pre-existing flaky test: `reply - reject cancels all pending for same session`
+
+The test `reply - reject cancels all pending for same session` (`test/permission/next.test.ts`) fails intermittently in the full suite but passes in isolation. Not caused by recent changes.

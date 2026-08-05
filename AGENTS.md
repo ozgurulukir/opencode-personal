@@ -200,6 +200,15 @@ const table = sqliteTable("session", {
 - AGENTS.md is injected as a **user message** (not system prompt) per the Instruction Hierarchy pattern (Claude Code / Codex CLI), re-read from disk on every LLM API call inside `runLoop` (no caching — edits apply immediately). Injection point: `session/prompt.ts:1638-1644`.
 - System prompt assembly: `llm.ts:102-114` splits into cacheable prefix (`system[0]` = core + delta) and dynamic suffix (`system[1]` = environment + skills). Plugin transform hook + rejoin at `llm.ts:116-121` preserve the 2-part structure for prompt caching.
 - XML section markers are consistent: `<environment>`, `<skills>` (system prompt); `<instructions source="...">` (AGENTS.md/CLAUDE.md); `<system-reminder>` (transient status: plan mode, build switch, max steps). Don't mix tag semantics.
+- Skill frontmatter spec (agentskills.io): enforce stricter zod schema in `packages/opencode/src/skill/index.ts`. `description` is required; name/folder mismatch and duplicate names emit `skill.warning` instead of rejecting registration. Store `license`, `compatibility`, `metadata`, `allowedTools`, `warnings` on `Skill.Info`. Invalid skills are either registered with `warnings` (if they have partial valid structure) or dropped entirely (if completely invalid).
+- Wildcard ReDoS protection: `packages/opencode/src/util/wildcard.ts` caps `MAX_WILDCARDS = 10` with a non-throwing fallback to prevent regex backtracking attacks.
+- Skill name collision handling: duplicate non-builtin skill names emit `skill.warning` and are not registered. Built-in skills can be overridden by user disk skills. Emit `skill.loaded` / `skill.unloaded` bus events on registration/unregistration.
+- `skill.warning` bus event: emitted for non-critical skill frontmatter issues. Fields: `name`, `location`, `message`. Not shown as TUI toasts. Used for logging and `debug skill validate`.
+- `debug skill validate` CLI subcommand: validates all skills (including invalid ones) against the agentskills.io spec. Uses `Skill.allIncludingInvalid()` to see the full registry. Located at `packages/opencode/src/cli/cmd/debug/skill.ts`.
+- Permission `disabled()` override: `evaluate()` now checks both `pattern` and `permission` dimensions when overriding `disabled()`. Invariant comment in `permission/index.ts:reply()` documents shared mutable `approved` array.
+- Built-in skill tool truncation: framework-level `truncate.output()` in `Tool.define` already wraps built-in tool output. Explicit `Truncate.Service` / `Agent.Service` yield in `skill.ts` caused test timeouts and was reverted.
+- SDK regeneration: after adding new bus events (e.g., `skill.warning`), regenerate SDK via `cd packages/sdk/js && bun script/build.ts` to update generated `Event` union types. Until then, use `event.subscribe()` + `any` casts in TUI.
+- Plugin tool descriptions are sanitized via `sanitizeDescription()` in `packages/opencode/src/tool/registry.ts` to prevent malformed output.
 
 ## Known Issues
 
@@ -217,6 +226,9 @@ const table = sqliteTable("session", {
 - Order-dependent test failures are widespread: many tests pass in isolation but fail in the full suite, indicating shared state or global mock leakage beyond the documented `mock.module()` issue. Project/worktree/vcs tests are affected.
 - `Bun.build --compile` cannot resolve dynamic `import(..., { with: { type: "wasm" } })` — fails with `Cannot find module`. Plugin `onResolve` is NOT invoked for dynamic imports in compile mode (only static imports resolve at build time); `onLoad` on the containing file fails because Bun resolves the dynamic import BEFORE `onLoad` fires. `@opentui/core`'s `parser.worker.js:307` uses this pattern to load `web-tree-sitter/tree-sitter.wasm`, causing markdown rendering to fall back to raw text in the compiled binary (`CodeRenderable.startHighlight()` catch → `textBuffer.setText(content)`). Workaround: patch `parser.worker.js` content BEFORE `Bun.build()` (not via plugin `onLoad`), replacing the dynamic `type: "wasm"` import with a static `import ... with { type: "file" }` (works in compile mode, returns `/$bunfs/root/<hash>.wasm`).
 - `Bun.build --compile` worker context does NOT provide WASI imports. After resolving the wasm import (entry above), `web-tree-sitter@0.25.10`'s `tree-sitter.wasm` previously failed with `Aborted(LinkError: import function wasi_snapshot_preview1:clock_time_get must be callable)`. Fixed in `packages/opencode/script/build.ts` by monkey-patching `WebAssembly.instantiate` in `parser.worker.js` to inject a WASI shim (`wasi_snapshot_preview1` with `clock_time_get`, `fd_close`, `fd_seek`, `fd_write`, `proc_exit`, `environ_sizes_get`, `environ_get`).
+- Pre-existing flaky permission test: `reply - reject cancels all pending for same session` fails intermittently in the full suite but passes in isolation. Not caused by recent changes.
+- Skill tool truncation: explicit `Truncate.Service` / `Agent.Service` yield in `packages/opencode/src/tool/skill.ts` caused test timeouts. Framework-level `truncate.output()` in `Tool.define` already wraps built-in tool output; explicit yield was reverted.
+- Skill tests pass in isolation but may timeout after permission tests due to shared state/global mock leakage (pre-existing order-dependent failure documented above).
 
 ## Notes
 
@@ -258,6 +270,9 @@ const table = sqliteTable("session", {
 - `web-tree-sitter` Emscripten module API (`node_modules/@opentui/core/node_modules/web-tree-sitter/tree-sitter.js`): `Module["wasmBinary"]` (line 2186) accepts `Uint8Array` of wasm bytes — bypasses file loading; `locateFile` (line 2092) resolves wasm path; `loadWebAssemblyModule` (line 2049) instantiates with imports; `instantiateAsync` (line 2335) handles `WebAssembly.instantiate`. `Parser.init({ wasmBinary })` may bypass WASI file loading issues (under investigation).
  - Debug logging in compiled ESM binary: `Bun.write({append:true})`, `require("fs")`, and `globalThis.require` all fail. Use `import { appendFileSync } from "fs"` at module level (top of file) — works in compiled ESM context.
  - Upstream fixes may not be ported to this fork. Before debugging a bug that seems like it should already be fixed, search upstream (`anomalyco/opencode`) for the issue — the fix may exist in a commit that was never merged into this branch. Example: `94564f358` fixed double auto-compaction from `filterCompacted` reorder, but was missing from this fork's history.
+- `Agent.Service.get()` is a method on the service interface, not a separate Context tag. Yielding `Agent.Service` gives the service instance directly.
+- `effectCmd` expects CLI handlers to return `Effect<void, CliError, ...>`. Use `fail()` from `effect-cmd` for errors, not `Effect.fail(new Error(...))`.
+- `Skill.Info` requires `description` (enforced by zod) and optionally carries `warnings: string[]` for frontmatter issues. Test fixtures and manual `Info` construction must include `description` or typecheck fails. Use `Skill.allIncludingInvalid()` to see all skills including those with warnings.
 
 ## Code review: stale "BUG" comments in tests
 

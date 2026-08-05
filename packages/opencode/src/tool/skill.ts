@@ -29,6 +29,10 @@ export const SkillTool = Tool.define(
             throw new Error(`Skill "${params.name}" not found. Available skills: ${available || "none"}`)
           }
 
+          const warningHeader = info.warnings && info.warnings.length > 0
+            ? [`⚠️ Skill "${info.name}" has validation issues:`, ...info.warnings.map((w) => `  - ${w}`), ""]
+            : []
+
           yield* ctx.ask({
             permission: "skill",
             patterns: [params.name],
@@ -52,6 +56,7 @@ export const SkillTool = Tool.define(
           return {
             title: `Loaded skill: ${info.name}`,
             output: [
+              ...warningHeader,
               `<skill_content name="${info.name}">`,
               `# Skill: ${info.name}`,
               "",

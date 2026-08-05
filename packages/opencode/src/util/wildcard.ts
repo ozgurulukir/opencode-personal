@@ -1,8 +1,18 @@
 import { sortBy, pipe } from "remeda"
 
+const MAX_WILDCARDS = 10
+
 export function match(str: string, pattern: string) {
   if (str) str = str.replaceAll("\\", "/")
   if (pattern) pattern = pattern.replaceAll("\\", "/")
+
+  // Defense-in-depth: patterns with excessive wildcards are likely malformed.
+  // Return false (no match) rather than throwing — callers don't catch.
+  const wildcardCount = (pattern.match(/\*/g) ?? []).length
+  if (wildcardCount > MAX_WILDCARDS) {
+    return false
+  }
+
   let escaped = pattern
     .replace(/[.+^${}()|[\]\\]/g, "\\$&") // escape special regex chars
     .replace(/\*/g, ".*") // * becomes .*

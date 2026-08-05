@@ -181,7 +181,7 @@ Just some content without YAML frontmatter.
     ),
   )
 
-  it.live("discovers skills without descriptions", () =>
+  it.live("drops skills with missing description", () =>
     provideTmpdirInstance(
       (dir) =>
         Effect.gen(function* () {
@@ -201,14 +201,7 @@ Instructions here.
 
           const skill = yield* Skill.Service
           const list = yield* skill.all()
-          expect(list.length).toBe(1)
-          const item = list.find((x) => x.name === "manual-skill")
-          expect(item).toBeDefined()
-          expect(item!.description).toBeUndefined()
-          expect(Skill.fmt(list, { verbose: false })).not.toBe("No skills are currently available.")
-          expect(Skill.fmt(list, { verbose: false })).toContain("manual-skill")
-          expect(Skill.fmt(list, { verbose: true })).not.toBe("No skills are currently available.")
-          expect(Skill.fmt(list, { verbose: true })).toContain("manual-skill")
+          expect(list.length).toBe(0)
         }),
       { git: true },
     ),
@@ -489,6 +482,187 @@ description: Skill with too-long name.
     ),
   )
 
+  it.live("drops skills with uppercase name", () =>
+    provideTmpdirInstance(
+      (dir) =>
+        Effect.gen(function* () {
+          yield* Effect.promise(() =>
+            Bun.write(
+              path.join(dir, ".opencode", "skill", "pdf-processing", "SKILL.md"),
+              `---
+name: PDF-Processing
+description: Skill with uppercase name.
+---
+
+# Uppercase Name
+`,
+            ),
+          )
+
+          const skill = yield* Skill.Service
+          expect(yield* skill.all()).toEqual([])
+        }),
+      { git: true },
+    ),
+  )
+
+  it.live("drops skills with leading hyphen in name", () =>
+    provideTmpdirInstance(
+      (dir) =>
+        Effect.gen(function* () {
+          yield* Effect.promise(() =>
+            Bun.write(
+              path.join(dir, ".opencode", "skill", "pdf-processing", "SKILL.md"),
+              `---
+name: -pdf
+description: Skill with leading hyphen.
+---
+
+# Leading Hyphen
+`,
+            ),
+          )
+
+          const skill = yield* Skill.Service
+          expect(yield* skill.all()).toEqual([])
+        }),
+      { git: true },
+    ),
+  )
+
+  it.live("drops skills with consecutive hyphens in name", () =>
+    provideTmpdirInstance(
+      (dir) =>
+        Effect.gen(function* () {
+          yield* Effect.promise(() =>
+            Bun.write(
+              path.join(dir, ".opencode", "skill", "pdf-processing", "SKILL.md"),
+              `---
+name: pdf--processing
+description: Skill with consecutive hyphens.
+---
+
+# Consecutive Hyphens
+`,
+            ),
+          )
+
+          const skill = yield* Skill.Service
+          expect(yield* skill.all()).toEqual([])
+        }),
+      { git: true },
+    ),
+  )
+
+  it.live("drops skills with name not matching folder", () =>
+    provideTmpdirInstance(
+      (dir) =>
+        Effect.gen(function* () {
+          yield* Effect.promise(() =>
+            Bun.write(
+              path.join(dir, ".opencode", "skill", "pdf-processing", "SKILL.md"),
+              `---
+name: pdf
+description: Name mismatch with folder.
+---
+
+# Different Name
+`,
+            ),
+          )
+
+          const skill = yield* Skill.Service
+          expect(yield* skill.all()).toEqual([])
+        }),
+      { git: true },
+    ),
+  )
+
+  it.live("drops skills with empty description", () =>
+    provideTmpdirInstance(
+      (dir) =>
+        Effect.gen(function* () {
+          yield* Effect.promise(() =>
+            Bun.write(
+              path.join(dir, ".opencode", "skill", "no-description", "SKILL.md"),
+              `---
+name: no-description
+description: ""
+---
+
+# Empty Description
+`,
+            ),
+          )
+
+          const skill = yield* Skill.Service
+          expect(yield* skill.all()).toEqual([])
+        }),
+      { git: true },
+    ),
+  )
+
+  it.live("drops skills with description exceeding 1024 characters", () =>
+    provideTmpdirInstance(
+      (dir) =>
+        Effect.gen(function* () {
+          const longDesc = "a".repeat(1025)
+          yield* Effect.promise(() =>
+            Bun.write(
+              path.join(dir, ".opencode", "skill", "long-description", "SKILL.md"),
+              `---
+name: long-description
+description: ${longDesc}
+---
+
+# Long Description
+`,
+            ),
+          )
+
+          const skill = yield* Skill.Service
+          expect(yield* skill.all()).toEqual([])
+        }),
+      { git: true },
+    ),
+  )
+
+  it.live("accepts skill with all optional frontmatter fields", () =>
+    provideTmpdirInstance(
+      (dir) =>
+        Effect.gen(function* () {
+          yield* Effect.promise(() =>
+            Bun.write(
+              path.join(dir, ".opencode", "skill", "full-skill", "SKILL.md"),
+              `---
+name: full-skill
+description: A skill with all optional fields.
+license: MIT
+compatibility: opencode >= 1.0
+metadata:
+  author: test
+  version: "1.0"
+allowed-tools: Read Glob
+---
+
+# Full Skill
+`,
+            ),
+          )
+
+          const skill = yield* Skill.Service
+          const list = yield* skill.all()
+          expect(list.length).toBe(1)
+          expect(list[0].name).toBe("full-skill")
+          expect(list[0].license).toBe("MIT")
+          expect(list[0].compatibility).toBe("opencode >= 1.0")
+          expect(list[0].metadata).toEqual({ author: "test", version: "1.0" })
+          expect(list[0].allowedTools).toBe("Read Glob")
+        }),
+      { git: true },
+    ),
+  )
+
   it.live("accepts skill name at exactly 64 character limit", () =>
     provideTmpdirInstance(
       (dir) =>
@@ -516,7 +690,7 @@ description: Boundary name length.
     ),
   )
 
-  it.live("loads skill when name does not match folder name", () =>
+  it.live("drops skills with name not matching folder", () =>
     provideTmpdirInstance(
       (dir) =>
         Effect.gen(function* () {
@@ -535,8 +709,7 @@ description: Name mismatch with folder.
 
           const skill = yield* Skill.Service
           const list = yield* skill.all()
-          expect(list.length).toBe(1)
-          expect(list[0].name).toBe("different-name")
+          expect(list.length).toBe(0)
         }),
       { git: true },
     ),
@@ -544,7 +717,7 @@ description: Name mismatch with folder.
 })
 
 describe("skill.fmt", () => {
-  const mkSkill = (name: string, description?: string): Skill.Info => ({
+  const mkSkill = (name: string, description: string): Skill.Info => ({
     name,
     description,
     location: `/skills/${name}/SKILL.md`,
@@ -568,12 +741,6 @@ describe("skill.fmt", () => {
     expect(result).toContain("<available_skills>")
     expect(result).toContain("<name>alpha</name>")
     expect(result).toContain("<description>Alpha skill</description>")
-  })
-
-  test("shows skills without descriptions instead of hiding them", () => {
-    const result = Skill.fmt([mkSkill("nameless")], { verbose: false })
-    expect(result).not.toBe("No skills are currently available.")
-    expect(result).toContain("nameless")
   })
 
   test("preserves input order without re-sorting", () => {
