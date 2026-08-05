@@ -88,3 +88,13 @@ test("match handles case-insensitivity on Windows", () => {
     expect(Wildcard.match("/users/test/file", "/Users/test/*")).toBe(false)
   }
 })
+
+test("match returns false for patterns with excessive wildcards", () => {
+  const pattern = "*".repeat(11)
+  expect(Wildcard.match("anything", pattern)).toBe(false)
+})
+
+test("match returns true for patterns with exactly 10 wildcards", () => {
+  const pattern = "*".repeat(10)
+  expect(Wildcard.match("short", pattern)).toBe(true)
+})

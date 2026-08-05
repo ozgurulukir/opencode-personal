@@ -8,6 +8,7 @@ import { withStatics } from "@opencode-ai/core/schema"
 import { NamedError } from "@opencode-ai/core/util/error"
 import type { Agent } from "@/agent/agent"
 import { Bus } from "@/bus"
+import { BusEvent } from "@/bus/bus-event"
 import { InstanceState } from "@/effect/instance-state"
 import { Flag } from "@opencode-ai/core/flag/flag"
 import { Global } from "@opencode-ai/core/global"
@@ -30,6 +31,31 @@ const EXTERNAL_SKILL_PATTERN = "skills/**/SKILL.md"
 const OPENCODE_SKILL_PATTERN = "{skill,skills}/**/SKILL.md"
 const SKILL_PATTERN = "**/SKILL.md"
 
+export const Event = {
+  Loaded: BusEvent.define(
+    "skill.loaded",
+    Schema.Struct({
+      name: Schema.String,
+      location: Schema.String,
+    }),
+  ),
+  Unloaded: BusEvent.define(
+    "skill.unloaded",
+    Schema.Struct({
+      name: Schema.String,
+      location: Schema.String,
+    }),
+  ),
+  Warning: BusEvent.define(
+    "skill.warning",
+    Schema.Struct({
+      name: Schema.String,
+      location: Schema.String,
+      message: Schema.String,
+    }),
+  ),
+}
+
 // Built-in skill that ships with opencode. The model's intuition for what an
 // opencode.json should look like is often wrong, and opencode hard-fails on
 // invalid config, so users hit cryptic startup errors. Loading this skill
@@ -41,9 +67,14 @@ const CUSTOMIZE_OPENCODE_SKILL_DESCRIPTION =
 
 export const Info = Schema.Struct({
   name: Schema.String,
-  description: Schema.optional(Schema.String),
+  description: Schema.String,
   location: Schema.String,
   content: Schema.String,
+  license: Schema.optional(Schema.String),
+  compatibility: Schema.optional(Schema.String),
+  metadata: Schema.optional(Schema.Record(Schema.String, Schema.String)),
+  allowedTools: Schema.optional(Schema.String),
+  warnings: Schema.optional(Schema.Array(Schema.String)),
 }).pipe(withStatics((s) => ({ zod: zod(s) })))
 export type Info = Schema.Schema.Type<typeof Info>
 
@@ -88,12 +119,13 @@ type ScanState = {
 }
 
 function skillContentHash(skill: Info): string {
-  return createHash("sha1").update(`${skill.name}\n${skill.description ?? ""}\n${skill.content}`).digest("hex")
+  return createHash("sha1").update(`${skill.name}\n${skill.description}\n${skill.content}`).digest("hex")
 }
 
 export interface Interface {
   readonly get: (name: string) => Effect.Effect<Info | undefined>
   readonly all: () => Effect.Effect<Info[]>
+  readonly allIncludingInvalid: () => Effect.Effect<Info[]>
   readonly dirs: () => Effect.Effect<string[]>
   readonly available: (agent?: Agent.Info) => Effect.Effect<Info[]>
   readonly markLoaded: (name: string) => Effect.Effect<void>
@@ -124,37 +156,96 @@ const add = Effect.fnUntraced(function* (state: State, match: string, bus: Bus.I
 
   if (!md) return
 
-  const parsed = z.object({ name: z.string().min(1).max(64), description: z.string().optional() }).safeParse(md.data)
+  const folderName = path.basename(path.dirname(match))
+
+  const FRONTMATTER_SCHEMA = z.object({
+    name: z
+      .string()
+      .min(1, "name must not be empty")
+      .max(64, "name must be ≤64 characters"),
+    description: z
+      .string()
+      .max(1024, "description must be ≤1024 characters")
+      .optional(),
+    license: z.string().optional(),
+    compatibility: z
+      .string()
+      .max(500, "compatibility must be ≤500 characters")
+      .optional(),
+    metadata: z.record(z.string(), z.string()).optional(),
+    "allowed-tools": z.string().optional(),
+  })
+
+  const parsed = FRONTMATTER_SCHEMA.safeParse(md.data)
+  const warnings: string[] = []
+  const rawName =
+    typeof md.data?.name === "string" && md.data.name.length > 0 ? md.data.name : folderName
+
   if (!parsed.success) {
-    const message = parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")
-    const { Session } = yield* Effect.promise(() => import("@/session/session"))
-    yield* bus.publish(Session.Event.Error, {
-      error: new NamedError.Unknown({ message: `Skill ${match}: ${message}` }).toObject(),
+    const issues = parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")
+    const message = `Invalid frontmatter: ${issues}`
+    warnings.push(message)
+    yield* bus.publish(Event.Warning, {
+      name: rawName,
+      location: match,
+      message,
     })
-    log.error("skill schema invalid", { skill: match, issues: parsed.error.issues })
-    return
+    log.warn("skill schema invalid", { skill: match, issues: parsed.error.issues })
   }
 
-  const folderName = path.basename(path.dirname(match))
-  if (parsed.data.name !== folderName) {
+  if (parsed.success && (!parsed.data.description || parsed.data.description.trim() === "")) {
+    const message = "Missing or empty description"
+    warnings.push(message)
+    yield* bus.publish(Event.Warning, {
+      name: parsed.data.name,
+      location: match,
+      message,
+    })
+    log.warn("skill missing description", { skill: match })
+  }
+
+  if (parsed.success && parsed.data.name !== folderName) {
+    const message = `name "${parsed.data.name}" does not match folder "${folderName}"`
+    warnings.push(message)
+    yield* bus.publish(Event.Warning, {
+      name: parsed.data.name,
+      location: match,
+      message,
+    })
     log.warn("skill name does not match folder", { skill: match, expected: folderName, actual: parsed.data.name })
   }
 
-  if (state.skills[parsed.data.name]) {
-    log.warn("duplicate skill name", {
-      name: parsed.data.name,
-      existing: state.skills[parsed.data.name].location,
-      duplicate: match,
-    })
+  if (parsed.success && state.skills[parsed.data.name]) {
+    const existing = state.skills[parsed.data.name]
+    if (existing.location !== "<built-in>") {
+      log.warn("duplicate skill name", {
+        name: parsed.data.name,
+        existing: existing.location,
+        duplicate: match,
+      })
+    } else {
+      log.warn("skill overridden by user disk skill", {
+        name: parsed.data.name,
+        builtin: existing.location,
+        userSkill: match,
+      })
+    }
   }
 
   state.dirs.add(path.dirname(match))
-  state.skills[parsed.data.name] = {
-    name: parsed.data.name,
-    description: parsed.data.description,
+  const skillName = parsed.success ? parsed.data.name : rawName
+  state.skills[skillName] = {
+    name: skillName,
+    description: parsed.success ? (parsed.data.description ?? "") : "",
     location: match,
     content: md.content,
+    license: parsed.success ? parsed.data.license : undefined,
+    compatibility: parsed.success ? parsed.data.compatibility : undefined,
+    metadata: parsed.success ? parsed.data.metadata : undefined,
+    allowedTools: parsed.success ? parsed.data["allowed-tools"] : undefined,
+    warnings: warnings.length > 0 ? warnings : undefined,
   }
+  yield* bus.publish(Event.Loaded, { name: skillName, location: match })
 })
 
 const scan = Effect.fnUntraced(function* (
@@ -333,7 +424,7 @@ export const layer = Layer.effect(
             toIndex.push({
               id: `skill:${name}`,
               path: sk.location,
-              content: `${sk.name}\n${sk.description ?? ""}\n${sk.content}`,
+              content: `${sk.name}\n${sk.description}\n${sk.content}`,
               embedding: [],
               mtime: Date.now(),
             })
@@ -370,6 +461,7 @@ export const layer = Layer.effect(
         for (const id of toDelete) {
           const name = id.slice("skill:".length)
           delete s.manifest.skills[name]
+          yield* bus.publish(Event.Unloaded, { name, location: s.skills[name]?.location ?? "" })
         }
 
         // Persist manifest
@@ -386,6 +478,11 @@ export const layer = Layer.effect(
 
     const all = Effect.fn("Skill.all")(function* () {
       const s = yield* InstanceState.get(state)
+      return Object.values(s.skills).filter((skill) => !skill.warnings || skill.warnings.length === 0)
+    })
+
+    const allIncludingInvalid = Effect.fn("Skill.allIncludingInvalid")(function* () {
+      const s = yield* InstanceState.get(state)
       return Object.values(s.skills)
     })
 
@@ -395,7 +492,9 @@ export const layer = Layer.effect(
 
     const available = Effect.fn("Skill.available")(function* (agent?: Agent.Info) {
       const s = yield* InstanceState.get(state)
-      const list = Object.values(s.skills).toSorted((a, b) => a.name.localeCompare(b.name))
+      const list = Object.values(s.skills)
+        .filter((skill) => !skill.warnings || skill.warnings.length === 0)
+        .toSorted((a, b) => a.name.localeCompare(b.name))
       if (!agent) return list
       return list.filter((skill) => Permission.evaluate("skill", skill.name, agent.permission).action !== "deny")
     })
@@ -433,7 +532,7 @@ export const layer = Layer.effect(
       return matched
     })
 
-    return Service.of({ get, all, dirs, available, markLoaded, matchBySemantics })
+    return Service.of({ get, all, allIncludingInvalid, dirs, available, markLoaded, matchBySemantics })
   }),
 )
 
@@ -447,31 +546,13 @@ export const defaultLayer = layer.pipe(
 )
 
 export function fmt(list: Info[], opts: { verbose: boolean }) {
-  const described = list.filter((skill) => skill.description !== undefined)
-  if (described.length === 0) {
-    if (list.length === 0) return "No skills are currently available."
-    if (opts.verbose) {
-      return [
-        "<available_skills>",
-        ...list.flatMap((skill) => [
-          "  <skill>",
-          `    <name>${skill.name}</name>`,
-          "    <description>(no description provided)</description>",
-          `    <location>${pathToFileURL(skill.location).href}</location>`,
-          "  </skill>",
-        ]),
-        "</available_skills>",
-      ].join("\n")
-    }
-    return [
-      "## Available Skills",
-      ...list.map((skill) => `- **${skill.name}** (add a description to improve discoverability)`),
-    ].join("\n")
+  if (list.length === 0) {
+    return "No skills are currently available."
   }
   if (opts.verbose) {
     return [
       "<available_skills>",
-      ...described.flatMap((skill) => [
+      ...list.flatMap((skill) => [
         "  <skill>",
         `    <name>${skill.name}</name>`,
         `    <description>${skill.description}</description>`,
@@ -484,7 +565,7 @@ export function fmt(list: Info[], opts: { verbose: boolean }) {
 
   return [
     "## Available Skills",
-    ...described.map((skill) => `- **${skill.name}**: ${skill.description}`),
+    ...list.map((skill) => `- **${skill.name}**: ${skill.description}`),
   ].join("\n")
 }
 

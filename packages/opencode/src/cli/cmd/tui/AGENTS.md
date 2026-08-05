@@ -82,3 +82,7 @@ The `Spinner` component (`component/spinner.tsx`) wraps the native `<spinner>` e
 ## `createFrames` layout vs color generation
 
 `createFrames()` from `ui/spinner.ts` derives frame strings based on geometric layout params (`width`, `style`, `holdStart`, `holdEnd`, `trailSteps`). Color distribution across frames is handled separately by `createColors()`. Frame layout configs are generated via `ui/spinner-config.ts` factories.
+
+## Skill warnings
+
+`skill.warning` bus events are emitted for non-critical skill frontmatter issues. The event is not in the generated SDK `Event` union and is NOT shown as a TUI toast. Warnings are surfaced to the user via the `skill` tool output when an invalid skill is loaded.

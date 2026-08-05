@@ -46,3 +46,16 @@ The index signature preserves backward compatibility for any other tool reading 
 4. Continue with LSP diagnostics
 
 **Diff reuse**: existing diff variable is reused (no recalculation). `edit.ts` has two paths (create via `oldString === ""` and edit existing) — both call autoclose. Shell tool excluded (non-deterministic, diff unknown).
+
+## Built-in tool output truncation is handled by `Tool.define`
+
+`Tool.define` wraps built-in tool output with `truncate.output()` automatically. Do NOT yield `Truncate.Service` or `Agent.Service` explicitly in built-in tool implementations — it causes test timeouts without changing runtime behavior.
+
+## Skill tool shows validation warnings inline
+
+When the `skill` tool loads a skill that has `warnings` in its `Skill.Info`, the tool output prepends a warning block:
+```
+⚠️ Skill "name" has validation issues:
+  - <warning text>
+```
+This gives the LLM immediate feedback about frontmatter problems. The skill is still loaded and its content is returned after the warning block.

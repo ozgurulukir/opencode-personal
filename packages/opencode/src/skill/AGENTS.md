@@ -15,3 +15,24 @@ When `skills.autoMatch` is enabled in config, `matchBySemantics()` (`skill/index
 ## EmbeddingService must be captured at layer build time
 
 `matchBySemantics()` uses `EmbeddingService` inside `Effect.fn`, which would add `EmbeddingService` to the Effect's `R` type parameter. To keep the `Interface` methods' `R = never`, the embedder reference is captured at layer build time (`yield* EmbeddingService` in the layer init closure) and closed over by the `Effect.fn` body. This is the same pattern used by `SearchService` in `search/indexer.ts`.
+
+## Invalid skills are registered with `warnings` but hidden from the model
+
+Skills with frontmatter issues (invalid schema, missing description, name/folder mismatch) are still registered in `state.skills` with a `warnings: string[]` field, but `all()` and `available()` filter them out. This lets the `skill` tool load them on demand and surface warnings inline, while keeping the `<skills>` catalog in the system prompt clean.
+
+## `allIncludingInvalid()` exposes the full registry
+
+Debug/validation commands that need to see every skill on disk (including invalid ones) should call `Skill.allIncludingInvalid()`, not `Skill.all()`. The public `all()` intentionally hides invalid skills.
+
+## Skill tool prepends warnings to output
+
+When the model invokes the `skill` tool on a skill that has `warnings`, the tool output starts with:
+```
+⚠️ Skill "name" has validation issues:
+  - <warning text>
+```
+This gives the LLM immediate feedback about what's wrong, so it can fix the skill or stop using it.
+
+## `skill.warning` bus events are for logging, not TUI toasts
+
+`skill.warning` is emitted for non-critical frontmatter issues, but the TUI no longer shows a toast for it. The event is used by `debug skill validate` and internal logging. If you need to surface a skill problem to the user, do it in the `skill` tool output instead.

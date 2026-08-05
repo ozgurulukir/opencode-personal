@@ -57,14 +57,14 @@ describe("tool.skill", () => {
             Bun.write(
               path.join(skill, "SKILL.md"),
               `---
-name: tool-skill
-description: Skill for tool tests.
----
+ name: tool-skill
+ description: Skill for tool tests.
+ ---
 
-# Tool Skill
+ # Tool Skill
 
-Use this skill.
-`,
+ Use this skill.
+ `,
             ),
           )
           yield* Effect.promise(() => Bun.write(path.join(skill, "scripts", "demo.txt"), "demo"))
@@ -106,6 +106,56 @@ Use this skill.
           expect(result.output).toContain(`<skill_content name="tool-skill">`)
           expect(result.output).toContain(`Base directory for this skill: ${pathToFileURL(skill).href}`)
           expect(result.output).toContain(`<file>${file}</file>`)
+        }),
+      { git: true },
+    ),
+  )
+
+  it.live("execute shows warnings for invalid skill", () =>
+    provideTmpdirInstance(
+      (dir) =>
+        Effect.gen(function* () {
+          const skill = path.join(dir, ".opencode", "skill", "bad-skill")
+          yield* Effect.promise(() =>
+            Bun.write(
+              path.join(skill, "SKILL.md"),
+              `---
+name: bad-skill
+---
+
+# Bad Skill
+
+Missing description.
+`,
+            ),
+          )
+
+          const home = process.env.OPENCODE_TEST_HOME
+          process.env.OPENCODE_TEST_HOME = dir
+          yield* Effect.addFinalizer(() =>
+            Effect.sync(() => {
+              process.env.OPENCODE_TEST_HOME = home
+            }),
+          )
+
+          const registry = yield* ToolRegistry.Service
+          const agent = { name: "build", mode: "primary" as const, permission: [], options: {} }
+          const tool = (yield* registry.tools({
+            providerID: "opencode" as any,
+            modelID: "gpt-5" as any,
+            agent,
+          })).find((t) => t.id === SkillTool.id)
+          if (!tool) throw new Error("Skill tool not found")
+
+          const ctx: Tool.Context = {
+            ...baseCtx,
+            ask: () => Effect.void,
+          }
+
+          const result = yield* tool.execute({ name: "bad-skill" }, ctx)
+          expect(result.output).toContain(`⚠️ Skill "bad-skill" has validation issues:`)
+          expect(result.output).toContain("Missing or empty description")
+          expect(result.output).toContain(`<skill_content name="bad-skill">`)
         }),
       { git: true },
     ),

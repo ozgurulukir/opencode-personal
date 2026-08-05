@@ -561,6 +561,28 @@ test("disabled - specific allow overrides wildcard deny", () => {
   expect(result.has("read")).toBe(true)
 })
 
+test("disabled - specific pattern allow overrides wildcard deny", () => {
+  const result = Permission.disabled(
+    ["edit"],
+    [
+      { permission: "*", pattern: "*", action: "deny" },
+      { permission: "*", pattern: "*.md", action: "allow" },
+    ],
+  )
+  expect(result.has("edit")).toBe(false)
+})
+
+test("disabled - specific permission allow overrides wildcard deny", () => {
+  const result = Permission.disabled(
+    ["edit"],
+    [
+      { permission: "*", pattern: "*", action: "deny" },
+      { permission: "edit", pattern: "*", action: "allow" },
+    ],
+  )
+  expect(result.has("edit")).toBe(false)
+})
+
 // ask tests
 
 it.live("ask - resolves immediately when action is allow", () =>
@@ -931,6 +953,60 @@ it.live("reply - always resolves matching pending requests in same session", () 
       yield* Fiber.join(a)
       yield* Fiber.join(b)
       expect(yield* list()).toHaveLength(0)
+    }),
+  ),
+)
+
+it.live("reply - concurrent always replies for different patterns both persist", () =>
+  withDir({ git: true }, () =>
+    Effect.gen(function* () {
+      const a = yield* ask({
+        id: PermissionID.make("per_concurrent_a"),
+        sessionID: SessionID.make("session_concurrent"),
+        permission: "bash",
+        patterns: ["unique-pattern-concurrent-a"],
+        metadata: {},
+        always: ["unique-pattern-concurrent-a"],
+        ruleset: [],
+      }).pipe(Effect.forkScoped)
+
+      const b = yield* ask({
+        id: PermissionID.make("per_concurrent_b"),
+        sessionID: SessionID.make("session_concurrent"),
+        permission: "bash",
+        patterns: ["unique-pattern-concurrent-b"],
+        metadata: {},
+        always: ["unique-pattern-concurrent-b"],
+        ruleset: [],
+      }).pipe(Effect.forkScoped)
+
+      yield* waitForPending(2)
+      yield* reply({ requestID: PermissionID.make("per_concurrent_a"), reply: "always" })
+      yield* reply({ requestID: PermissionID.make("per_concurrent_b"), reply: "always" })
+
+      yield* Fiber.join(a)
+      yield* Fiber.join(b)
+
+      // Both patterns should be approved on subsequent calls
+      const resultA = yield* ask({
+        sessionID: SessionID.make("session_concurrent_verify"),
+        permission: "bash",
+        patterns: ["unique-pattern-concurrent-a"],
+        metadata: {},
+        always: [],
+        ruleset: [],
+      })
+      expect(resultA).toBeUndefined()
+
+      const resultB = yield* ask({
+        sessionID: SessionID.make("session_concurrent_verify2"),
+        permission: "bash",
+        patterns: ["unique-pattern-concurrent-b"],
+        metadata: {},
+        always: [],
+        ruleset: [],
+      })
+      expect(resultB).toBeUndefined()
     }),
   ),
 )

@@ -28,6 +28,7 @@ const skills: Skill.Info[] = [
   },
   {
     name: "manual-skill",
+    description: "Manual skill.",
     location: "/tmp/manual-skill/SKILL.md",
     content: "# manual-skill",
   },
@@ -48,6 +49,7 @@ const it = testEffect(
         Skill.Service.of({
           get: (name) => Effect.succeed(skills.find((skill) => skill.name === name)),
           all: () => Effect.succeed(skills),
+          allIncludingInvalid: () => Effect.succeed(skills),
           dirs: () => Effect.succeed([]),
           available: () => Effect.succeed(skills),
           markLoaded: () => Effect.void,

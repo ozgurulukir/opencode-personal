@@ -265,7 +265,12 @@ export const layer = Layer.effect(
 
       // Persist approved ruleset to database so "always allow" survives restarts
       // Use transaction for atomicity — the approved array construction and insert
-      // must be atomic to prevent race conditions between concurrent reply("always") calls.
+      // must be atomic to prevent race conditions between concurrent reply("always")
+      //
+      // IMPORTANT: `approved` is a shared mutable reference from InstanceState.
+      // We mutate in place (push) so concurrent reply("always") calls accumulate
+      // on the same array. Do NOT replace with spread assignment — that would
+      // break the local binding's link to state.approved and introduce a race.
       const ctx = yield* InstanceState.context
       Database.transaction((db) => {
         for (const pattern of existing.info.always) {
@@ -348,7 +353,7 @@ export function disabled(tools: string[], ruleset: Ruleset): Set<string> {
       (rule) => rule.pattern === "*" && rule.action === "deny",
     )
     const hasSpecificOverride = matchingRules.some(
-      (rule) => rule.permission !== "*" && rule.action !== "deny",
+      (rule) => rule.action !== "deny" && (rule.pattern !== "*" || rule.permission !== "*"),
     )
     if (hasCatchAllDeny && !hasSpecificOverride) result.add(tool)
   }

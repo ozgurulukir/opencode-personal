@@ -62,6 +62,13 @@ const searchAndEmbeddingLayer = Layer.merge(searchDefaultLayer, embeddingDefault
 
 const log = Log.create({ service: "tool.registry" })
 
+function sanitizeDescription(desc: string): string {
+  return desc
+    .replace(/<[^>]*>/g, "") // strip HTML/XML tags
+    .replace(/\[\[.*?\]\]/g, "") // strip wiki-style links
+    .trim()
+}
+
 export function webSearchEnabled(
   providerID: ProviderID,
   flags = { exa: Flag.OPENCODE_ENABLE_EXA, parallel: Flag.OPENCODE_ENABLE_PARALLEL },
@@ -160,7 +167,7 @@ export const layer: Layer.Layer<
           return {
             id,
             parameters,
-            description: def.description,
+            description: sanitizeDescription(def.description),
             execute: (args, toolCtx) =>
               Effect.gen(function* () {
                 const pluginCtx: PluginToolContext = {
