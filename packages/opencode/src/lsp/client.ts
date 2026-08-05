@@ -19,6 +19,11 @@ const DIAGNOSTICS_DOCUMENT_WAIT_TIMEOUT_MS = 5_000
 const DIAGNOSTICS_FULL_WAIT_TIMEOUT_MS = 10_000
 const DIAGNOSTICS_REQUEST_TIMEOUT_MS = 3_000
 
+// Bounds the diagnostic maps on the server-push path. notify.open's
+// MAX_OPEN_FILES guard only fires for files opened via didOpen; server-initiated
+// publishDiagnostics for files never opened bypass it, so we cap the maps here.
+const MAX_DIAGNOSTICS = 200
+
 const INITIALIZE_TIMEOUT_MS = 45_000
 
 // LSP spec constants
@@ -189,6 +194,28 @@ export async function create(input: { serverID: string; server: LSPServer.Handle
       at: Date.now(),
       version: typeof params.version === "number" ? params.version : undefined,
     })
+    // LRU: bound the diagnostic maps on the server-push path. notify.open's
+    // MAX_OPEN_FILES guard only fires for files opened via didOpen; server-initiated
+    // pushes for files never opened bypass it, so evict the oldest entries here.
+    if (pushDiagnostics.size >= MAX_DIAGNOSTICS) {
+      const sorted = [...pushDiagnostics.keys()].sort(
+        (a, b) => (published.get(a)?.at ?? 0) - (published.get(b)?.at ?? 0),
+      )
+      // Evict down to MAX_DIAGNOSTICS - 1 so the entry being added below keeps
+      // the map at exactly MAX_DIAGNOSTICS.
+      const toEvict = sorted.slice(0, sorted.length - (MAX_DIAGNOSTICS - 1))
+      for (const evictPath of toEvict) {
+        pushDiagnostics.delete(evictPath)
+        pullDiagnostics.delete(evictPath)
+        published.delete(evictPath)
+        if (files[evictPath]) {
+          delete files[evictPath]
+          void connection.sendNotification("textDocument/didClose", {
+            textDocument: { uri: pathToFileURL(evictPath).href },
+          })
+        }
+      }
+    }
     if (shouldSeedDiagnosticsOnFirstPush(input.serverID) && !pushDiagnostics.has(filePath)) {
       pushDiagnostics.set(filePath, params.diagnostics)
       return

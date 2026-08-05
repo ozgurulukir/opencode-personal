@@ -79,6 +79,7 @@ import {
   drainPendingDeepLinks,
 } from "./layout/deep-links"
 import { createInlineEditorController } from "./layout/inline-editor"
+import { createPrefetchQueues } from "./layout/prefetch-queue"
 import {
   LocalWorkspace,
   SortableWorkspace,
@@ -668,19 +669,12 @@ export default function Layout(props: ParentProps) {
     return result
   })
 
-  type PrefetchQueue = {
-    inflight: Set<string>
-    pending: string[]
-    pendingSet: Set<string>
-    running: number
-  }
-
   const prefetchChunk = 200
   const prefetchConcurrency = 2
   const prefetchPendingLimit = 10
   const span = 4
   const prefetchToken = { value: 0 }
-  const prefetchQueues = new Map<string, PrefetchQueue>()
+  const prefetchQueues = createPrefetchQueues()
 
   const PREFETCH_MAX_SESSIONS_PER_DIR = 10
   const prefetchedByDir = new Map<string, Set<string>>()
@@ -721,28 +715,10 @@ export default function Layout(props: ParentProps) {
   })
 
   createEffect(() => {
-    const visible = new Set(visibleSessionDirs())
-    for (const [directory, q] of prefetchQueues) {
-      if (visible.has(directory)) continue
-      q.pending.length = 0
-      q.pendingSet.clear()
-      if (q.running === 0) prefetchQueues.delete(directory)
-    }
+    prefetchQueues.cleanupInvisible(new Set(visibleSessionDirs()))
   })
 
-  const queueFor = (directory: string) => {
-    const existing = prefetchQueues.get(directory)
-    if (existing) return existing
-
-    const created: PrefetchQueue = {
-      inflight: new Set(),
-      pending: [],
-      pendingSet: new Set(),
-      running: 0,
-    }
-    prefetchQueues.set(directory, created)
-    return created
-  }
+  const queueFor = prefetchQueues.queueFor
 
   const mergeByID = <T extends { id: string }>(current: T[], incoming: T[]) => {
     if (current.length === 0) {
@@ -841,8 +817,13 @@ export default function Layout(props: ParentProps) {
     const token = prefetchToken.value
 
     void prefetchMessages(directory, sessionID, token).finally(() => {
-      q.running -= 1
-      q.inflight.delete(sessionID)
+      // Clean up empty queues for invisible directories. The reactive cleanup
+      // effect only runs when visibleSessionDirs() changes, so we must also
+      // clean up here when a prefetch completes and the directory is no longer
+      // visible. Skip re-pumping when the queue was deleted — pumpPrefetch's
+      // queueFor() would re-create an empty queue.
+      const done = prefetchQueues.completeInflight(directory, sessionID, new Set(visibleSessionDirs()))
+      if (done) return
       pumpPrefetch(directory)
     })
   }

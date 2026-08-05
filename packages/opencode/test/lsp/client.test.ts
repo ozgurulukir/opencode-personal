@@ -520,4 +520,193 @@ describe("LSPClient interop", () => {
       },
     })
   })
+
+  test("publishDiagnostics bounds diagnostic maps to MAX_DIAGNOSTICS on the server-push path", async () => {
+    const handle = spawnFakeServer() as any
+    await using tmp = await tmpdir()
+
+    await WithInstance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        const client = await LSPClient.create({
+          serverID: "fake",
+          server: handle as unknown as LSPServer.Handle,
+          root: tmp.path,
+          directory: tmp.path,
+        })
+
+        // Push diagnostics for 300 unique paths without ever calling notify.open.
+        // The MAX_OPEN_FILES guard in notify.open never fires here, so the
+        // MAX_DIAGNOSTICS eviction in the publishDiagnostics handler must bound
+        // the maps.
+        for (let i = 0; i < 300; i++) {
+          await client.connection.sendNotification("test/publish-diagnostics", {
+            uri: pathToFileURL(path.join(tmp.path, `file-${i}.ts`)).href,
+            diagnostics: [
+              {
+                range: { start: { line: 0, character: 0 }, end: { line: 0, character: 5 } },
+                message: `push ${i}`,
+                severity: 1,
+              },
+            ],
+          })
+        }
+
+        // Give the client a tick to process the notifications.
+        await new Promise((resolve) => setTimeout(resolve, 200))
+
+        expect(client.diagnostics.size).toBeLessThanOrEqual(200)
+        // The oldest entries are evicted first.
+        expect(client.diagnostics.get(path.join(tmp.path, "file-0.ts"))).toBeUndefined()
+        // The most recent entries survive.
+        expect(client.diagnostics.get(path.join(tmp.path, "file-299.ts"))?.[0]?.message).toBe("push 299")
+
+        await client.shutdown()
+      },
+    })
+  })
+
+  test("publishDiagnostics eviction sends didClose for files also in the open files record", async () => {
+    const handle = spawnFakeServer() as any
+    await using tmp = await tmpdir()
+    const file = path.join(tmp.path, "client.ts")
+    await Bun.write(file, "const x = 1\n")
+
+    await WithInstance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        const client = await LSPClient.create({
+          serverID: "fake",
+          server: handle as unknown as LSPServer.Handle,
+          root: tmp.path,
+          directory: tmp.path,
+        })
+
+        // Open a file so it lands in the `files` record.
+        await client.notify.open({ path: file })
+
+        // Push diagnostics for the opened file first so it becomes the oldest
+        // entry in pushDiagnostics (notify.open deletes it from the maps on open).
+        await client.connection.sendNotification("test/publish-diagnostics", {
+          uri: pathToFileURL(file).href,
+          diagnostics: [
+            {
+              range: { start: { line: 0, character: 0 }, end: { line: 0, character: 5 } },
+              message: "opened file",
+              severity: 1,
+            },
+          ],
+        })
+
+        // Push diagnostics for 300 more unique paths. The opened file is now the
+        // oldest entry, so eviction must send didClose and remove it from files.
+        for (let i = 0; i < 300; i++) {
+          await client.connection.sendNotification("test/publish-diagnostics", {
+            uri: pathToFileURL(path.join(tmp.path, `file-${i}.ts`)).href,
+            diagnostics: [
+              {
+                range: { start: { line: 0, character: 0 }, end: { line: 0, character: 5 } },
+                message: `push ${i}`,
+                severity: 1,
+              },
+            ],
+          })
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, 200))
+
+        // The opened file was evicted: didClose was sent and its diagnostics are gone.
+        const didCloseCount = await client.connection.sendRequest("test/get-did-close-count", {})
+        expect(didCloseCount).toBeGreaterThan(0)
+        expect(client.diagnostics.get(file)).toBeUndefined()
+
+        await client.shutdown()
+      },
+    })
+  })
+
+  test("notify.open LRU eviction cleans all four maps when files overflow", async () => {
+    const handle = spawnFakeServer() as any
+    await using tmp = await tmpdir()
+
+    await WithInstance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        const client = await LSPClient.create({
+          serverID: "fake",
+          server: handle as unknown as LSPServer.Handle,
+          root: tmp.path,
+          directory: tmp.path,
+        })
+
+        // Open the first file and push diagnostics for it so it is present in
+        // both the files record and the diagnostic maps.
+        const first = path.join(tmp.path, "open-0.ts")
+        await Bun.write(first, "const x = 1\n")
+        await client.notify.open({ path: first })
+        await client.connection.sendNotification("test/publish-diagnostics", {
+          uri: pathToFileURL(first).href,
+          diagnostics: [
+            {
+              range: { start: { line: 0, character: 0 }, end: { line: 0, character: 5 } },
+              message: "first file",
+              severity: 1,
+            },
+          ],
+        })
+
+        // Open 50 more files (MAX_OPEN_FILES = 50) so the LRU guard fires and
+        // evicts the oldest entry (open-0.ts).
+        for (let i = 1; i <= 50; i++) {
+          const file = path.join(tmp.path, `open-${i}.ts`)
+          await Bun.write(file, "const x = 1\n")
+          await client.notify.open({ path: file })
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, 100))
+
+        // The evicted file's diagnostics are gone from all maps.
+        expect(client.diagnostics.get(first)).toBeUndefined()
+
+        await client.shutdown()
+      },
+    })
+  })
+
+  test("shutdown clears all diagnostic maps", async () => {
+    const handle = spawnFakeServer() as any
+    await using tmp = await tmpdir()
+    const file = path.join(tmp.path, "client.ts")
+    await Bun.write(file, "const x = 1\n")
+
+    await WithInstance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        const client = await LSPClient.create({
+          serverID: "fake",
+          server: handle as unknown as LSPServer.Handle,
+          root: tmp.path,
+          directory: tmp.path,
+        })
+
+        await client.notify.open({ path: file })
+        await client.connection.sendNotification("test/publish-diagnostics", {
+          uri: pathToFileURL(file).href,
+          diagnostics: [
+            {
+              range: { start: { line: 0, character: 0 }, end: { line: 0, character: 5 } },
+              message: "push diagnostic",
+              severity: 1,
+            },
+          ],
+        })
+
+        await new Promise((resolve) => setTimeout(resolve, 100))
+        expect(client.diagnostics.get(file)).toBeDefined()
+
+        await client.shutdown()
+        expect(client.diagnostics.size).toBe(0)
+      },
+    })
+  })
 })
