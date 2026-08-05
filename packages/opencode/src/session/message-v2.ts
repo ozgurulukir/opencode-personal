@@ -1,7 +1,14 @@
 import { BusEvent } from "@/bus/bus-event"
 import { SessionID, MessageID, PartID } from "./schema"
 import { NamedError } from "@opencode-ai/core/util/error"
-import { APICallError, convertToModelMessages, LoadAPIKeyError, type ModelMessage, type UIMessage } from "ai"
+import {
+  APICallError,
+  convertToModelMessages,
+  InvalidResponseDataError,
+  LoadAPIKeyError,
+  type ModelMessage,
+  type UIMessage,
+} from "ai"
 import { SyncEvent } from "../sync"
 import { Database } from "@/storage/db"
 import { NotFoundError } from "@/storage/storage"
@@ -813,6 +820,21 @@ function handleGenericError(e: Error): NonNullable<Assistant["error"]> {
   return new NamedError.Unknown({ message: errorMessage(e) }, { cause: e }).toObject()
 }
 
+function handleInvalidResponseDataError(e: InvalidResponseDataError): NonNullable<Assistant["error"]> {
+  // The provider returned a stream with malformed tool-call data (e.g. a
+  // tool call whose `function.name` never arrived). This is a transient
+  // model/provder glitch, not a hard failure — retrying the request usually
+  // produces a well-formed response.
+  return new APIError(
+    {
+      message: e.message,
+      isRetryable: true,
+      responseBody: undefined,
+    },
+    { cause: e },
+  ).toObject()
+}
+
 function handleUnknownError(e: unknown): NonNullable<Assistant["error"]> {
   try {
     const parsed = ProviderError.parseStreamError(e)
@@ -849,6 +871,7 @@ export function fromError(
   if ((e as SystemError)?.code === "ECONNRESET") return handleECONNRESET(e as SystemError)
   if (e instanceof Error && (e as FetchDecompressionError).code === "ZlibError")
     return handleZlibError(e as FetchDecompressionError, ctx.aborted)
+  if (InvalidResponseDataError.isInstance(e)) return handleInvalidResponseDataError(e)
   if (APICallError.isInstance(e)) return handleAPICallError(e, ctx.providerID)
   if (e instanceof Error) return handleGenericError(e)
   return handleUnknownError(e)

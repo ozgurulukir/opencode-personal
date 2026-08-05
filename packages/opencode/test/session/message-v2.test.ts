@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { APICallError } from "ai"
+import { APICallError, InvalidResponseDataError } from "ai"
 import { MessageV2 } from "../../src/session/message-v2"
 import { ProviderTransform } from "@/provider/transform"
 import type { Provider } from "@/provider/provider"
@@ -1545,6 +1545,19 @@ describe("session.message-v2.fromError", () => {
     const result = MessageV2.fromError(zlibError, { providerID, aborted: true })
 
     expect(result.name).toBe("MessageAbortedError")
+  })
+
+  test("classifies InvalidResponseDataError as retryable APIError", () => {
+    const error = new InvalidResponseDataError({
+      data: { index: 0, id: "call_123", function: { arguments: '{"command": "ls"}' } },
+      message: "Expected 'function.name' to be a string.",
+    })
+
+    const result = MessageV2.fromError(error, { providerID })
+
+    expect(MessageV2.APIError.isInstance(result)).toBe(true)
+    expect((result as MessageV2.APIError).data.isRetryable).toBe(true)
+    expect((result as MessageV2.APIError).data.message).toInclude("function.name")
   })
 })
 
