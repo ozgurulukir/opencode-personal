@@ -39,14 +39,18 @@ function selectionFromFileUrl(url: string): Extract<Inline, { type: "file" }>["s
 }
 
 function textPartValue(parts: Part[]) {
-  const candidates = parts
-    .filter((part): part is TextPart => part.type === "text")
-    .filter((part) => !part.synthetic && !part.ignored)
-  return candidates.reduce((best: TextPart | undefined, part) => {
-    if (!best) return part
-    if (part.text.length > best.text.length) return part
-    return best
-  }, undefined)
+  // ⚡ Bolt Optimization: Replace chained .filter().filter().reduce() with a single loop to reduce GC pressure and O(N) traversals
+  let best: TextPart | undefined = undefined
+  for (let i = 0; i < parts.length; i++) {
+    const part = parts[i]
+    if (part.type !== "text") continue
+    const textPart = part as TextPart
+    if (textPart.synthetic || textPart.ignored) continue
+    if (!best || textPart.text.length > best.text.length) {
+      best = textPart
+    }
+  }
+  return best
 }
 
 /**
