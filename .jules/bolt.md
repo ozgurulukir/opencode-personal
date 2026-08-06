@@ -85,3 +85,6 @@
 ## 2026-08-04 - Optimizing findLastIndex with backward loops
 **Learning:** In fast-path state selectors (like adapters running on every state update), using `Array.prototype.findLastIndex()` on arrays allocates an intermediate callback closure and iterates N items per call. This creates garbage collection pressure and traversal overhead for simple property checks.
 **Action:** Replace `.findLastIndex()` (and similar methods like `.findLast()`) with an imperative backward `for` loop to avoid closure allocation and short-circuit early, improving worst-case traversal speed and eliminating GC pressure in high-frequency functions.
+## 2024-05-18 - SolidJS reactive graph GC pressure from intermediate arrays
+**Learning:** In SolidJS, high-frequency reactive blocks like `createMemo` (e.g. within `<Index>` components iterating over chat messages and attachments) that use chained array operations (`.map().filter()`) allocate temporary intermediate arrays on every re-evaluation, causing noticeable GC pressure and redundant O(N) traversals.
+**Action:** Replace chained `.map().filter()` or `.filter().map()` operations in hot paths with a single `for` loop that iterates once and populates a result array in-place, reducing memory allocations and improving main-thread responsiveness.
