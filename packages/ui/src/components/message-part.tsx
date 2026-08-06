@@ -672,9 +672,17 @@ export function AssistantParts(props: {
                   () => {
                     const entry = entryAccessor()
                     if (entry.type !== "context") return emptyTools
-                    return entry.refs
-                      .map((ref) => part().get(ref.messageID)?.get(ref.partID))
-                      .filter((part): part is ToolPart => !!part && isContextGroupTool(part))
+
+                    // ⚡ Bolt Optimization: Replace chained .map().filter() with a single loop to reduce GC pressure and O(N) traversals
+                    const result: ToolPart[] = []
+                    for (let i = 0; i < entry.refs.length; i++) {
+                      const ref = entry.refs[i]
+                      const p = part().get(ref.messageID)?.get(ref.partID)
+                      if (p && isContextGroupTool(p)) {
+                        result.push(p)
+                      }
+                    }
+                    return result
                   },
                   emptyTools,
                   { equals: same },
@@ -885,9 +893,17 @@ export function AssistantMessageDisplay(props: {
                   () => {
                     const entry = entryAccessor()
                     if (entry.type !== "context") return emptyTools
-                    return entry.refs
-                      .map((ref) => part().get(ref.partID))
-                      .filter((part): part is ToolPart => !!part && isContextGroupTool(part))
+
+                    // ⚡ Bolt Optimization: Replace chained .map().filter() with a single loop to reduce GC pressure and O(N) traversals
+                    const result: ToolPart[] = []
+                    for (let i = 0; i < entry.refs.length; i++) {
+                      const ref = entry.refs[i]
+                      const p = part().get(ref.partID)
+                      if (p && isContextGroupTool(p)) {
+                        result.push(p)
+                      }
+                    }
+                    return result
                   },
                   emptyTools,
                   { equals: same },
