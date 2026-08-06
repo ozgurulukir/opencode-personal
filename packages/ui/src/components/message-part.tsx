@@ -679,7 +679,7 @@ export function AssistantParts(props: {
                       const ref = entry.refs[i]
                       const p = part().get(ref.messageID)?.get(ref.partID)
                       if (p && isContextGroupTool(p)) {
-                        result.push(p as ToolPart)
+                        result.push(p)
                       }
                     }
                     return result
@@ -900,7 +900,7 @@ export function AssistantMessageDisplay(props: {
                       const ref = entry.refs[i]
                       const p = part().get(ref.partID)
                       if (p && isContextGroupTool(p)) {
-                        result.push(p as ToolPart)
+                        result.push(p)
                       }
                     }
                     return result
