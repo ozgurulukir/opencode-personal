@@ -238,6 +238,7 @@ See `specs/effect/migration.md` for the compact pattern reference and examples.
 - Use `Schema.TaggedErrorClass` for typed errors.
 - Use `Schema.Defect` instead of `unknown` for defect-like causes.
 - In `Effect.gen` / `Effect.fn`, prefer `yield* new MyError(...)` over `yield* Effect.fail(new MyError(...))` for direct early-failure branches.
+- `Option.getOrElse(() => defaultValue)` already returns a non-nullable value — the `?? defaultValue` fallback after it is dead code. This pattern was copy-pasted across `grep.ts` and `glob.ts`.
 
 ## Runtime vs InstanceState
 
@@ -266,6 +267,8 @@ See `specs/effect/migration.md` for the compact pattern reference and examples.
 - `Effect.runPromiseExit()` returns `Promise<Exit>`, NOT an Effect — do NOT use `.pipe()` on the result. For error handling, use `.catch()` on the Promise or wrap the Effect before running.
 - `Effect.orDie` converts `Effect.fail` to a defect (untracked). Tools wrapped with `.pipe(Effect.orDie)` (e.g., `TaskTool.execute`) turn typed errors into defects. Test error paths with `Effect.catchDefect`, not `Effect.flip` or `Effect.catchAll`.
 - `Effect.catchDefect` exists in Effect v4; `Effect.catchDie` does not. Use `Effect.catchDefect((defect) => ...)` to catch defects from `Effect.orDie` or `Effect.die`.
+- `Tool.define` wraps built-in tool output with `truncate.output()` automatically. Individual tools also wrap with `.pipe(Effect.orDie)` — this is redundant but consistent across the codebase. Do NOT yield `Truncate.Service` or `Agent.Service` explicitly in built-in tool implementations — it causes test timeouts without changing runtime behavior.
+- `Effect.catchIf` accepts a boolean predicate without requiring a type guard `is` annotation — TypeScript infers the narrowed type. The codebase uses duck-typing patterns like `(err) => "reason" in err && err.reason._tag === "NotFound"` without importing `PlatformError`. See `read.ts:176` and `grep.ts:58` for the pattern.
 
 ## LLM side-channels (predict, summaries, classification)
 
@@ -286,6 +289,7 @@ For any non-trajectory LLM call (e.g. ghost-text predict, auto-title suggestions
 
 - In effectified services, prefer yielding existing Effect services over dropping down to ad hoc platform APIs.
 - Prefer `FileSystem.FileSystem` instead of raw `fs/promises` for effectful file I/O.
+- `AppFileSystem.resolve` catches `ENOENT` from `realpathSync` and returns the normalized (but not symlink-resolved) path for non-existent inputs. This means non-existent paths can be "resolved" without error, which downstream code may treat as valid. See `grep.ts:52-66` for a bug that resulted from this behavior.
 - Prefer `ChildProcessSpawner.ChildProcessSpawner` with `ChildProcess.make(...)` instead of custom process wrappers.
 - Prefer `HttpClient.HttpClient` instead of raw `fetch`.
 - Prefer `Path.Path`, `Config`, `Clock`, and `DateTime` when those concerns are already inside Effect code.

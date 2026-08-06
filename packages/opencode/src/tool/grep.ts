@@ -1,6 +1,5 @@
 import path from "path"
-import { Schema } from "effect"
-import { Effect, Option } from "effect"
+import { Effect, Option, Schema } from "effect"
 import { InstanceState } from "@/effect/instance-state"
 import { AppFileSystem } from "@opencode-ai/core/filesystem"
 import { Ripgrep } from "../file/ripgrep"
@@ -10,6 +9,7 @@ import * as Tool from "./tool"
 import { Reference } from "@/reference/reference"
 
 const MAX_LINE_LENGTH = 2000
+const MATCH_LIMIT = 100
 
 export const Parameters = Schema.Struct({
   pattern: Schema.String.annotate({ description: "The regex pattern to search for in file contents" }),
@@ -33,13 +33,8 @@ export const GrepTool = Tool.define(
       parameters: Parameters,
       execute: (params: { pattern: string; path?: string; include?: string }, ctx: Tool.Context) =>
         Effect.gen(function* () {
-          const empty = {
-            title: params.pattern,
-            metadata: { matches: 0, truncated: false },
-            output: "No files found",
-          }
           if (!params.pattern) {
-            throw new Error("pattern is required")
+            return yield* Effect.fail(new Error("pattern is required"))
           }
 
           yield* ctx.ask({
@@ -60,12 +55,20 @@ export const GrepTool = Tool.define(
               : path.join(ins.directory, params.path ?? "."),
           )
           yield* reference.ensure(search)
-          const info = yield* fs.stat(search).pipe(Effect.catch(() => Effect.succeed(undefined)))
-          const cwd = info?.type === "Directory" ? search : path.dirname(search)
-          const file = info?.type === "Directory" ? undefined : [path.relative(cwd, search)]
+          const info = yield* fs.stat(search).pipe(
+            Effect.catchIf(
+              (err) => "reason" in err && err.reason._tag === "NotFound",
+              () => Effect.succeed(undefined),
+            ),
+          )
+          if (!info) {
+            return yield* Effect.fail(new Error(`Path does not exist: ${search}`))
+          }
+          const cwd = info.type === "Directory" ? search : path.dirname(search)
+          const file = info.type === "Directory" ? undefined : [path.relative(cwd, search)]
           yield* assertExternalDirectoryEffect(ctx, search, {
             bypass: yield* reference.contains(search),
-            kind: info?.type === "Directory" ? "directory" : "file",
+            kind: info.type === "Directory" ? "directory" : "file",
           })
 
           const result = yield* rg.search({
@@ -75,7 +78,9 @@ export const GrepTool = Tool.define(
             file,
             signal: ctx.abort,
           })
-          if (result.items.length === 0) return empty
+          if (result.items.length === 0) {
+            return { title: params.pattern, metadata: { matches: 0, truncated: false }, output: "No files found" }
+          }
 
           const rows = result.items.map((item) => ({
             path: AppFileSystem.resolve(
@@ -89,14 +94,14 @@ export const GrepTool = Tool.define(
               [...new Set(rows.map((row) => row.path))],
               Effect.fnUntraced(function* (file) {
                 const info = yield* fs.stat(file).pipe(Effect.catch(() => Effect.succeed(undefined)))
-                if (!info || info.type === "Directory") return undefined
-                return [
-                  file,
-                  info.mtime.pipe(
-                    Option.map((time) => time.getTime()),
-                    Option.getOrElse(() => 0),
-                  ) ?? 0,
-                ] as const
+                // Drop only if the path became a directory (file was replaced).
+                // If stat failed (transient error, file deleted mid-search), keep
+                // the match with mtime 0 so it sorts as oldest instead of being lost.
+                if (info?.type === "Directory") return undefined
+                const mtime = info
+                  ? info.mtime.pipe(Option.map((time) => time.getTime()), Option.getOrElse(() => 0))
+                  : 0
+                return [file, mtime] as const
               }),
               { concurrency: 16 },
             )).filter((entry): entry is readonly [string, number] => Boolean(entry)),
@@ -109,13 +114,14 @@ export const GrepTool = Tool.define(
 
           matches.sort((a, b) => b.mtime - a.mtime)
 
-          const limit = 100
-          const truncated = matches.length > limit
-          const final = truncated ? matches.slice(0, limit) : matches
-          if (final.length === 0) return empty
+          const truncated = matches.length > MATCH_LIMIT
+          const final = truncated ? matches.slice(0, MATCH_LIMIT) : matches
+          if (final.length === 0) {
+            return { title: params.pattern, metadata: { matches: 0, truncated: false }, output: "No files found" }
+          }
 
           const total = matches.length
-          const output = [`Found ${total} matches${truncated ? ` (showing first ${limit})` : ""}`]
+          const output = [`Found ${total} matches${truncated ? ` (showing first ${MATCH_LIMIT})` : ""}`]
 
           let current = ""
           for (const match of final) {
@@ -132,7 +138,7 @@ export const GrepTool = Tool.define(
           if (truncated) {
             output.push("")
             output.push(
-              `(Results truncated: showing ${limit} of ${total} matches (${total - limit} hidden). Consider using a more specific path or pattern.)`,
+              `(Results truncated: showing ${MATCH_LIMIT} of ${total} matches (${total - MATCH_LIMIT} hidden). Consider using a more specific path or pattern.)`,
             )
           }
 

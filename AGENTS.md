@@ -175,6 +175,7 @@ const table = sqliteTable("session", {
 
 - Always run `bun typecheck` from package directories (e.g., `packages/opencode`), never `tsc` directly.
 - `packages/web` requires `--skipLibCheck` due to pre-existing astro/starlight lib errors
+- **LSP diagnostics may show false positives for `@/` path aliases.** The language server often cannot resolve tsconfig path mappings, producing "Cannot find module" errors that `bun typecheck` (which uses `tsgo`) passes cleanly. Always trust `bun typecheck` over LSP diagnostics for `@/` imports.
 
 ## Technologies
 
