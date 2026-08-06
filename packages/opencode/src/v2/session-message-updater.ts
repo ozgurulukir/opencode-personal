@@ -18,11 +18,29 @@ export interface Adapter<Result> {
 }
 
 export function memory(state: MemoryState): Adapter<MemoryState> {
-  const activeAssistantIndex = () =>
-    state.messages.findLastIndex((message) => message.type === "assistant" && !message.time.completed)
-  const activeCompactionIndex = () => state.messages.findLastIndex((message) => message.type === "compaction")
-  const activeShellIndex = (callID: string) =>
-    state.messages.findLastIndex((message) => message.type === "shell" && message.callID === callID)
+  const activeAssistantIndex = () => {
+    // ⚡ Bolt Optimization: Using backward loop instead of .findLastIndex() to avoid GC pressure and O(N) traversal overhead
+    for (let i = state.messages.length - 1; i >= 0; i--) {
+      const message = state.messages[i]
+      if (message.type === "assistant" && !message.time.completed) return i
+    }
+    return -1
+  }
+  const activeCompactionIndex = () => {
+    // ⚡ Bolt Optimization: Using backward loop instead of .findLastIndex() to avoid GC pressure and O(N) traversal overhead
+    for (let i = state.messages.length - 1; i >= 0; i--) {
+      if (state.messages[i].type === "compaction") return i
+    }
+    return -1
+  }
+  const activeShellIndex = (callID: string) => {
+    // ⚡ Bolt Optimization: Using backward loop instead of .findLastIndex() to avoid GC pressure and O(N) traversal overhead
+    for (let i = state.messages.length - 1; i >= 0; i--) {
+      const message = state.messages[i]
+      if (message.type === "shell" && message.callID === callID) return i
+    }
+    return -1
+  }
 
   return {
     getCurrentAssistant() {
@@ -76,20 +94,42 @@ export function memory(state: MemoryState): Adapter<MemoryState> {
 export function update<Result>(adapter: Adapter<Result>, event: SessionEvent.Event): Result {
   const currentAssistant = adapter.getCurrentAssistant()
   type DraftAssistant = WritableDraft<SessionMessage.Assistant>
-  type DraftTool = WritableDraft<SessionMessage.AssistantTool>
-  type DraftText = WritableDraft<SessionMessage.AssistantText>
-  type DraftReasoning = WritableDraft<SessionMessage.AssistantReasoning>
 
-  const latestTool = (assistant: DraftAssistant | undefined, callID?: string) =>
-    assistant?.content.findLast(
-      (item): item is DraftTool => item.type === "tool" && (callID === undefined || item.id === callID),
-    )
+  const latestTool = (assistant: DraftAssistant | undefined, callID?: string) => {
+    if (!assistant?.content) return undefined
+    // ⚡ Bolt Optimization: Using backward loop instead of .findLast() to avoid GC pressure and O(N) traversal overhead
+    for (let i = assistant.content.length - 1; i >= 0; i--) {
+      const item = assistant.content[i]
+      if (item.type === "tool" && (callID === undefined || item.id === callID)) {
+        return item
+      }
+    }
+    return undefined
+  }
 
-  const latestText = (assistant: DraftAssistant | undefined) =>
-    assistant?.content.findLast((item): item is DraftText => item.type === "text")
+  const latestText = (assistant: DraftAssistant | undefined) => {
+    if (!assistant?.content) return undefined
+    // ⚡ Bolt Optimization: Using backward loop instead of .findLast() to avoid GC pressure and O(N) traversal overhead
+    for (let i = assistant.content.length - 1; i >= 0; i--) {
+      const item = assistant.content[i]
+      if (item.type === "text") {
+        return item
+      }
+    }
+    return undefined
+  }
 
-  const latestReasoning = (assistant: DraftAssistant | undefined, reasoningID: string) =>
-    assistant?.content.findLast((item): item is DraftReasoning => item.type === "reasoning" && item.id === reasoningID)
+  const latestReasoning = (assistant: DraftAssistant | undefined, reasoningID: string) => {
+    if (!assistant?.content) return undefined
+    // ⚡ Bolt Optimization: Using backward loop instead of .findLast() to avoid GC pressure and O(N) traversal overhead
+    for (let i = assistant.content.length - 1; i >= 0; i--) {
+      const item = assistant.content[i]
+      if (item.type === "reasoning" && item.id === reasoningID) {
+        return item
+      }
+    }
+    return undefined
+  }
 
   SessionEvent.All.match(event, {
     "session.next.agent.switched": (event) => {
