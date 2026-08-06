@@ -13,8 +13,12 @@ Supported operations:
 
 All operations require:
 - filePath: The file to operate on
+
+Position-based operations (goToDefinition, findReferences, hover, goToImplementation, prepareCallHierarchy, incomingCalls, outgoingCalls) also require:
 - line: The line number (1-based, as shown in editors)
 - character: The character offset (1-based, as shown in editors)
+
+documentSymbol requires only filePath (no line/character).
 
 workspaceSymbol also accepts:
 - query: A query string to filter symbols by. Empty string requests all symbols.
