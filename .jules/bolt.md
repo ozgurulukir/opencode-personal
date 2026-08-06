@@ -81,3 +81,7 @@
 ## 2026-08-04 - Chained Array Operations in Utility Functions
 **Learning:** Using chained array methods (like `.filter().filter().reduce()`) in utility functions creates multiple intermediate arrays and forces multiple O(N) traversals. While we generally avoid replacing native array methods in typical UI lists without a proven bottleneck or massive dataset (see 2024-03-24), replacing these specific chains in core utility functions (even when processing small arrays on low-frequency paths like prompt extraction) ensures consistent best practices and prevents accidental regression if usage scales.
 **Action:** Replace these chains with a single O(N) `for` loop that implements the filtering and reduction logic in a single pass without intermediate array allocations.
+
+## 2026-08-04 - Optimizing findLastIndex with backward loops
+**Learning:** In fast-path state selectors (like adapters running on every state update), using `Array.prototype.findLastIndex()` on arrays allocates an intermediate callback closure and iterates N items per call. This creates garbage collection pressure and traversal overhead for simple property checks.
+**Action:** Replace `.findLastIndex()` (and similar methods like `.findLast()`) with an imperative backward `for` loop to avoid closure allocation and short-circuit early, improving worst-case traversal speed and eliminating GC pressure in high-frequency functions.
