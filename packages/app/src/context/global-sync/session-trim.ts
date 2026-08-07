@@ -17,24 +17,14 @@ export function takeRecentSessions(sessions: Session[], limit: number, cutoff: n
   if (limit <= 0) return [] as Session[]
   const selected: Session[] = []
   const seen = new Set<string>()
-  for (let i = 0; i < sessions.length; i++) {
-    const session = sessions[i]
+  for (const session of sessions) {
     if (!session?.id) continue
     if (seen.has(session.id)) continue
     seen.add(session.id)
     if (sessionUpdatedAt(session) <= cutoff) continue
-
-    // ⚡ Bolt Optimization: Avoid function allocations in findIndex inside loop
-    let index = -1
-    for (let j = 0; j < selected.length; j++) {
-      if (compareSessionRecent(session, selected[j]) < 0) {
-        index = j
-        break
-      }
-    }
-
+    const index = selected.findIndex((x) => compareSessionRecent(session, x) < 0)
     if (index === -1) selected.push(session)
-    else selected.splice(index, 0, session)
+    if (index !== -1) selected.splice(index, 0, session)
     if (selected.length > limit) selected.pop()
   }
   return selected
