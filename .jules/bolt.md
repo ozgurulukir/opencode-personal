@@ -88,3 +88,6 @@
 ## 2024-05-18 - SolidJS reactive graph GC pressure from intermediate arrays
 **Learning:** In SolidJS, high-frequency reactive blocks like `createMemo` (e.g. within `<Index>` components iterating over chat messages and attachments) that use chained array operations (`.map().filter()`) allocate temporary intermediate arrays on every re-evaluation, causing noticeable GC pressure and redundant O(N) traversals.
 **Action:** Replace chained `.map().filter()` or `.filter().map()` operations in hot paths with a single `for` loop that iterates once and populates a result array in-place, reducing memory allocations and improving main-thread responsiveness.
+## 2026-08-07 - Avoid higher-order functions inside array iterations
+**Learning:** Using higher-order array methods like `.findIndex` inside an array iteration (like a `for` loop) allocates a callback function on every iteration, leading to significant GC pressure and unnecessary function call overhead on hot paths like session synchronization (`trimSessions` / `takeRecentSessions`).
+**Action:** Replace nested higher-order array methods with manual inner loops (like an insertion sort loop). Coupled with replacing chained `.filter()` operations with single-pass loops, this significantly reduces GC pressure and O(N) traversals in core synchronization algorithms.

@@ -36,21 +36,49 @@ export function trimSessions(
 ) {
   const limit = Math.max(0, options.limit)
   const cutoff = (options.now ?? Date.now()) - SESSION_RECENT_WINDOW
-  const all = input
-    .filter((s) => !!s?.id)
-    .filter((s) => !s.time?.archived)
-    .sort((a, b) => cmp(a.id, b.id))
-  const roots = all.filter((s) => !s.parentID)
-  const children = all.filter((s) => !!s.parentID)
+
+  // ⚡ Bolt Optimization: Replace chained .filter() with a single loop to reduce GC pressure and O(N) traversals
+  const roots: Session[] = []
+  const children: Session[] = []
+
+  for (let i = 0; i < input.length; i++) {
+    const s = input[i]
+    if (!s?.id || s.time?.archived) continue
+
+    if (!s.parentID) {
+      roots.push(s)
+    } else {
+      children.push(s)
+    }
+  }
+
+  roots.sort((a, b) => cmp(a.id, b.id))
+
   const base = roots.slice(0, limit)
   const recent = takeRecentSessions(roots.slice(limit), SESSION_RECENT_LIMIT, cutoff)
   const keepRoots = [...base, ...recent]
-  const keepRootIds = new Set(keepRoots.map((s) => s.id))
-  const keepChildren = children.filter((s) => {
-    if (s.parentID && keepRootIds.has(s.parentID)) return true
-    const perms = options.permission[s.id] ?? []
-    if (perms.length > 0) return true
-    return sessionUpdatedAt(s) > cutoff
-  })
+
+  const keepRootIds = new Set<string>()
+  for (let i = 0; i < keepRoots.length; i++) {
+    keepRootIds.add(keepRoots[i].id)
+  }
+
+  const keepChildren: Session[] = []
+  for (let i = 0; i < children.length; i++) {
+    const s = children[i]
+    if (s.parentID && keepRootIds.has(s.parentID)) {
+      keepChildren.push(s)
+      continue
+    }
+    const perms = options.permission[s.id]
+    if (perms && perms.length > 0) {
+      keepChildren.push(s)
+      continue
+    }
+    if (sessionUpdatedAt(s) > cutoff) {
+      keepChildren.push(s)
+    }
+  }
+
   return [...keepRoots, ...keepChildren].sort((a, b) => cmp(a.id, b.id))
 }
