@@ -1,4 +1,4 @@
-import { test, expect, mock, beforeEach } from "bun:test"
+import { test, expect, mock, beforeEach, afterAll } from "bun:test"
 import { EventEmitter } from "events"
 import { Effect } from "effect"
 import type { MCP as MCPNS } from "../../src/mcp/index"
@@ -93,6 +93,9 @@ void mock.module("@modelcontextprotocol/sdk/client/index.js", () => ({
 void mock.module("@modelcontextprotocol/sdk/client/auth.js", () => ({
   UnauthorizedError: MockUnauthorizedError,
 }))
+
+// mock.module() persists across test files — restore to prevent leakage (AGENTS.md).
+afterAll(() => mock.restore())
 
 beforeEach(() => {
   openShouldFail = false

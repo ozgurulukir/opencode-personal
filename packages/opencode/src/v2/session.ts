@@ -175,6 +175,32 @@ function promptToParts(prompt: Prompt): SessionPrompt.PromptInput["parts"] {
   ]
 }
 
+/**
+ * Bridge a V2 `Modelv2.Ref` to V1 model shapes at the delegation boundary.
+ * V1 `ModelID` and V2 `Modelv2.ID` are both branded strings over the same
+ * underlying `Schema.String`, but with different brand symbols (`ProviderID`
+ * vs `Model.ID`), so a cast is structurally required here. Centralized so the
+ * brand mismatch has exactly one explanation.
+ *
+ * V1 has TWO model-ref shapes: `Session.create` uses `{ id, providerID, variant? }`,
+ * while `PromptInput.model` / `SessionCompaction.create` use `{ modelID, providerID }`.
+ * @see v2/AGENTS.md "V1/V2 model-ID brand mismatch"
+ */
+function v2ModelToV1Session(model: Modelv2.Ref): { id: ModelID; providerID: ProviderID; variant?: string } {
+  return {
+    id: model.id as unknown as ModelID,
+    providerID: model.providerID as unknown as ProviderID,
+    variant: model.variant,
+  }
+}
+
+function v2ModelToV1Prompt(model: Modelv2.Ref): { modelID: ModelID; providerID: ProviderID } {
+  return {
+    modelID: model.id as unknown as ModelID,
+    providerID: model.providerID as unknown as ProviderID,
+  }
+}
+
 
 export const layer = Layer.effect(
   Service,
@@ -229,20 +255,13 @@ export const layer = Layer.effect(
 
     const result: Interface = {
       create: Effect.fn("V2Session.create")(function* (input) {
-        // TODO(v2-native): emit SessionEvent.Created and insert directly once the
-        // event/projector exist. For now delegate to V1 Session.create, which
-        // inserts via sync projectors and handles projectID/directory/slug/version.
+        // Delegates to V1 Session.create, which owns projectID/directory/slug/version
+        // resolution and inserts the row that `fromRow`/`toV2Info` project back to V2.
         const sessions = yield* requireV1(sessionsV1, "Session")
         const info = yield* sessions.create({
           parentID: input?.parentID,
           agent: input?.agent,
-          model: input?.model
-            ? {
-                id: input.model.id as unknown as ModelID,
-                providerID: input.model.providerID as unknown as ProviderID,
-                variant: input.model.variant,
-              }
-            : undefined,
+          model: input?.model ? v2ModelToV1Session(input.model) : undefined,
           workspaceID: input?.workspaceID,
           title: input?.title,
           permission: input?.permission,
@@ -367,11 +386,10 @@ export const layer = Layer.effect(
         return rows.map((row) => decode(row))
       }),
       prompt: Effect.fn("V2Session.prompt")(function* (input) {
-        // TODO(v2-native): drive the agent loop via V2 events directly. For now
-        // delegate to V1 SessionPrompt.prompt, which already dual-writes every
-        // SessionEvent.* behind OPENCODE_EXPERIMENTAL_EVENT_SYSTEM. The Prompted
-        // projector then populates SessionMessageTable, which `messages`/`context`
-        // already read from.
+        // Delegates to V1 SessionPrompt.prompt, which owns the agent loop and
+        // dual-writes SessionEvent.* behind OPENCODE_EXPERIMENTAL_EVENT_SYSTEM.
+        // The Prompted projector then populates SessionMessageTable, which the
+        // read methods (`messages`/`context`) query. V1 is the writer by design.
         const promptSvc = yield* requireV1(promptV1, "SessionPrompt")
         const delivery = input.delivery ?? DefaultDelivery
         const parts = promptToParts(input.prompt)
@@ -383,12 +401,7 @@ export const layer = Layer.effect(
           sessionID: input.sessionID,
           parts,
           noReply: delivery === "deferred",
-          model: input.model
-            ? {
-                modelID: input.model.id as unknown as ModelID,
-                providerID: input.model.providerID as unknown as ProviderID,
-              }
-            : undefined,
+          model: input.model ? v2ModelToV1Prompt(input.model) : undefined,
           agent: input.agent,
           tools: input.tools,
         })
@@ -414,9 +427,10 @@ export const layer = Layer.effect(
         })
       }),
       skill: Effect.fn("V2Session.skill")(function* (input) {
-        // Invoke a skill by prompting with the skill name as text. The skill
+        // Invokes a skill by prompting with the skill name as text. The skill
         // loader in the agent loop resolves `/skill-name` into the skill content.
-        // TODO(v2-native): emit a dedicated SessionEvent.Skill.Invoked.
+        // Delegates to V1 prompt — no dedicated Skill.Invoked event is needed
+        // because the prompt flow already emits Prompted.Sync + the tool events.
         const promptSvc = yield* requireV1(promptV1, "SessionPrompt")
         const session = yield* result.get(input.sessionID).pipe(Effect.orDie)
         yield* promptSvc.prompt({
@@ -514,10 +528,10 @@ export const layer = Layer.effect(
                 tools,
               })
               // After the subagent's loop finishes, post its final text back to
-              // the parent as a synthetic message so callers can observe the
-              // result. The interface returns void; changing it to return the
-              // text is a breaking change deferred to v2-native.
-              // TODO(v2-native): return the result instead of posting synthetically.
+              // the parent as a synthetic message so callers observing the parent
+              // can see the result. The `subagent()` interface returns void by
+              // design — callers read the synthetic message from the parent's
+              // `messages()`. @see v2/AGENTS.md "V2 subagent() posts results synthetically".
               const messages = yield* result.messages({ sessionID: session.id, order: "desc" })
               const assistant = messages.find((msg) => msg.type === "assistant")
               if (!assistant || assistant.type !== "assistant") return
@@ -555,11 +569,10 @@ export const layer = Layer.effect(
         )
       }),
       compact: Effect.fn("V2Session.compact")(function* (sessionID) {
-        // Stage a compaction. V1 SessionCompaction.create appends a user message
-        // with a CompactionPart + emits SessionEvent.Compaction.Started.Sync. The
-        // actual summarization runs on the next loop iteration (manual trigger:
-        // the caller should call prompt() or the loop must be running).
-        // TODO(v2-native): run the summarization inline via the V2 event stream.
+        // Delegates to V1 SessionCompaction.create, which appends a CompactionPart
+        // and emits SessionEvent.Compaction.Started.Sync. The actual summarization
+        // runs on the next loop iteration (manual trigger: the caller should call
+        // prompt() or the loop must be running). V1 owns the compaction lifecycle.
         const compactionSvc = yield* requireV1(compactionV1, "SessionCompaction")
         const session = yield* result.get(sessionID).pipe(Effect.orDie)
         const model = session.model ?? {
@@ -570,10 +583,7 @@ export const layer = Layer.effect(
         yield* compactionSvc.create({
           sessionID,
           agent: session.agent ?? "build",
-          model: {
-            providerID: model.providerID as unknown as ProviderID,
-            modelID: model.id as unknown as ModelID,
-          },
+          model: v2ModelToV1Prompt(model),
           auto: false,
         })
       }),
@@ -600,8 +610,8 @@ export const layer = Layer.effect(
     /**
      * Drain deferred-delivery prompts for a session by running the V1 loop.
      * Exposed via an extended service so tests/callers can trigger deferred
-     * processing. A real background worker can be wired later.
-     * TODO(v2-native): replace with a V2-native event-driven scheduler.
+     * processing. A real background worker can be wired later. Delegates to V1
+     * `SessionPrompt.loop` by design — V1 owns the loop execution.
      */
     const runDeferred = (sessionID: SessionID): Effect.Effect<void> =>
       Effect.gen(function* () {

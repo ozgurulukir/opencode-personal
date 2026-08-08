@@ -231,7 +231,7 @@ export const layer: Layer.Layer<
 
           case "reasoning-start":
             if (value.id in ctx.reasoningMap) return
-            // TODO(v2): Temporary dual-write while migrating session messages to v2 events.
+            // V2 read-model projection: emit the SessionEvent so V2 projectors populate SessionMessageTable.
             if (Flag.OPENCODE_EXPERIMENTAL_EVENT_SYSTEM) {
               yield* sync.run(SessionEvent.Reasoning.Started.Sync, {
                 sessionID: ctx.sessionID,
@@ -266,7 +266,7 @@ export const layer: Layer.Layer<
 
           case "reasoning-end":
             if (!(value.id in ctx.reasoningMap)) return
-            // TODO(v2): Temporary dual-write while migrating session messages to v2 events.
+            // V2 read-model projection: emit the SessionEvent so V2 projectors populate SessionMessageTable.
             if (Flag.OPENCODE_EXPERIMENTAL_EVENT_SYSTEM) {
               yield* sync.run(SessionEvent.Reasoning.Ended.Sync, {
                 sessionID: ctx.sessionID,
@@ -287,7 +287,7 @@ export const layer: Layer.Layer<
             if (ctx.assistantMessage.summary) {
               throw new Error(`Tool call not allowed while generating summary: ${value.toolName}`)
             }
-            // TODO(v2): Temporary dual-write while migrating session messages to v2 events.
+            // V2 read-model projection: emit the SessionEvent so V2 projectors populate SessionMessageTable.
             if (Flag.OPENCODE_EXPERIMENTAL_EVENT_SYSTEM) {
               yield* sync.run(SessionEvent.Tool.Input.Started.Sync, {
                 sessionID: ctx.sessionID,
@@ -318,7 +318,7 @@ export const layer: Layer.Layer<
             return
 
           case "tool-input-end": {
-            // TODO(v2): Temporary dual-write while migrating session messages to v2 events.
+            // V2 read-model projection: emit the SessionEvent so V2 projectors populate SessionMessageTable.
             if (Flag.OPENCODE_EXPERIMENTAL_EVENT_SYSTEM) {
               yield* sync.run(SessionEvent.Tool.Input.Ended.Sync, {
                 sessionID: ctx.sessionID,
@@ -335,7 +335,7 @@ export const layer: Layer.Layer<
               throw new Error(`Tool call not allowed while generating summary: ${value.toolName}`)
             }
             const toolCall = yield* readToolCall(value.toolCallId)
-            // TODO(v2): Temporary dual-write while migrating session messages to v2 events.
+            // V2 read-model projection: emit the SessionEvent so V2 projectors populate SessionMessageTable.
             if (Flag.OPENCODE_EXPERIMENTAL_EVENT_SYSTEM) {
               yield* sync.run(SessionEvent.Tool.Called.Sync, {
                 sessionID: ctx.sessionID,
@@ -417,7 +417,7 @@ export const layer: Layer.Layer<
                   : `${value.output.output}\n\n[${omitted} image${omitted === 1 ? "" : "s"} omitted: could not be resized below the inline image size limit.]`,
               attachments: attachments?.length ? attachments : undefined,
             }
-            // TODO(v2): Temporary dual-write while migrating session messages to v2 events.
+            // V2 read-model projection: emit the SessionEvent so V2 projectors populate SessionMessageTable.
             if (Flag.OPENCODE_EXPERIMENTAL_EVENT_SYSTEM) {
               yield* sync.run(SessionEvent.Tool.Success.Sync, {
                 sessionID: ctx.sessionID,
@@ -447,7 +447,7 @@ export const layer: Layer.Layer<
 
           case "tool-error": {
             const toolCall = yield* readToolCall(value.toolCallId)
-            // TODO(v2): Temporary dual-write while migrating session messages to v2 events.
+            // V2 read-model projection: emit the SessionEvent so V2 projectors populate SessionMessageTable.
             if (Flag.OPENCODE_EXPERIMENTAL_EVENT_SYSTEM) {
               yield* sync.run(SessionEvent.Tool.Failed.Sync, {
                 sessionID: ctx.sessionID,
@@ -472,7 +472,7 @@ export const layer: Layer.Layer<
           case "start-step":
             if (!ctx.snapshot) ctx.snapshot = yield* snapshot.track()
             if (!ctx.assistantMessage.summary) {
-              // TODO(v2): Temporary dual-write while migrating session messages to v2 events.
+              // V2 read-model projection: emit the SessionEvent so V2 projectors populate SessionMessageTable.
               if (Flag.OPENCODE_EXPERIMENTAL_EVENT_SYSTEM) {
                 yield* sync.run(SessionEvent.Step.Started.Sync, {
                   sessionID: ctx.sessionID,
@@ -504,7 +504,7 @@ export const layer: Layer.Layer<
               metadata: value.providerMetadata,
             })
             if (!ctx.assistantMessage.summary) {
-              // TODO(v2): Temporary dual-write while migrating session messages to v2 events.
+              // V2 read-model projection: emit the SessionEvent so V2 projectors populate SessionMessageTable.
               if (Flag.OPENCODE_EXPERIMENTAL_EVENT_SYSTEM) {
                 yield* sync.run(SessionEvent.Step.Ended.Sync, {
                   sessionID: ctx.sessionID,
@@ -566,7 +566,7 @@ export const layer: Layer.Layer<
 
           case "text-start":
             if (!ctx.assistantMessage.summary) {
-              // TODO(v2): Temporary dual-write while migrating session messages to v2 events.
+              // V2 read-model projection: emit the SessionEvent so V2 projectors populate SessionMessageTable.
               if (Flag.OPENCODE_EXPERIMENTAL_EVENT_SYSTEM) {
                 yield* sync.run(SessionEvent.Text.Started.Sync, {
                   sessionID: ctx.sessionID,
@@ -618,7 +618,7 @@ export const layer: Layer.Layer<
             // these tags so they don't appear as raw markers in the output.
             ctx.currentText.text = ctx.currentText.text.replace(/<\/?mm:think>/g, "")
             if (!ctx.assistantMessage.summary) {
-              // TODO(v2): Temporary dual-write while migrating session messages to v2 events.
+              // V2 read-model projection: emit the SessionEvent so V2 projectors populate SessionMessageTable.
               if (Flag.OPENCODE_EXPERIMENTAL_EVENT_SYSTEM) {
                 yield* sync.run(SessionEvent.Text.Ended.Sync, {
                   sessionID: ctx.sessionID,
@@ -715,7 +715,7 @@ export const layer: Layer.Layer<
           return
         }
         if (!ctx.assistantMessage.summary) {
-          // TODO(v2): Temporary dual-write while migrating session messages to v2 events.
+          // V2 read-model projection: emit the SessionEvent so V2 projectors populate SessionMessageTable.
           if (Flag.OPENCODE_EXPERIMENTAL_EVENT_SYSTEM) {
             yield* sync.run(SessionEvent.Step.Failed.Sync, {
               sessionID: ctx.sessionID,
@@ -769,7 +769,7 @@ export const layer: Layer.Layer<
                 provider: input.model.providerID,
                 parse,
                 set: (info) => {
-                  // TODO(v2): Temporary dual-write while migrating session messages to v2 events.
+                  // V2 read-model projection: emit the SessionEvent so V2 projectors populate SessionMessageTable.
                   const event = Flag.OPENCODE_EXPERIMENTAL_EVENT_SYSTEM
                     ? sync.run(SessionEvent.Retried.Sync, {
                         sessionID: ctx.sessionID,

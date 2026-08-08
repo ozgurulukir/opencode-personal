@@ -8,7 +8,7 @@ import type {
 import { Config } from "@/config/config"
 import { Bus } from "../bus"
 import * as Log from "@opencode-ai/core/util/log"
-import { createOpencodeClient } from "@opencode-ai/sdk"
+import { createOpencodeClient } from "@opencode-ai/sdk/v2/client"
 import { Flag } from "@opencode-ai/core/flag/flag"
 import { ServerAuth } from "@/server/auth"
 import { CodexAuthPlugin } from "./codex"
@@ -126,7 +126,10 @@ export const layer = Layer.effect(
           baseUrl: "http://localhost:4096",
           directory: ctx.directory,
           headers: ServerAuth.headers(),
-          fetch: async (...args) => Server.Default().app.fetch(...args),
+          fetch: (async (input: RequestInfo | URL, init?: RequestInit) => {
+            const request = new Request(input, init)
+            return Server.Default().app.fetch(request)
+          }) as typeof globalThis.fetch,
         })
         const cfg = yield* config.get()
         const input: PluginInput = {

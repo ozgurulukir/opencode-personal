@@ -1,4 +1,4 @@
-import { mock } from "bun:test"
+import { mock, afterAll } from "bun:test"
 mock.module("onnxruntime-web", () => {
   class InferenceSession {
     inputNames = ["input_ids", "attention_mask", "token_type_ids"]
@@ -16,6 +16,10 @@ mock.module("onnxruntime-web", () => {
     env: { wasm: {} }
   }
 })
+
+// mock.module() persists across test files — restore to prevent leakage (AGENTS.md).
+afterAll(() => mock.restore())
+
 import { describe, expect, test } from "bun:test"
 import { Effect, Layer } from "effect"
 import { Skill } from "../../src/skill"

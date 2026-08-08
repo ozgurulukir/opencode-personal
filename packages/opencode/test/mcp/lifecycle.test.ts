@@ -1,4 +1,4 @@
-import { test, expect, mock, beforeEach } from "bun:test"
+import { test, expect, mock, beforeEach, afterAll } from "bun:test"
 import { InstanceRuntime } from "../../src/project/instance-runtime"
 import { Effect } from "effect"
 import type { MCP as MCPNS } from "../../src/mcp/index"
@@ -185,6 +185,9 @@ beforeEach(() => {
   clientCreateCount = 0
   transportCloseCount = 0
 })
+
+// mock.module() persists across test files — restore to prevent leakage (AGENTS.md).
+afterAll(() => mock.restore())
 
 // Import after mocks
 const { MCP } = await import("../../src/mcp/index")
