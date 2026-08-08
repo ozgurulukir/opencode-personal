@@ -331,8 +331,20 @@ type TuiBindingLookupView = {
   omit: (name: string, commands: readonly string[]) => Binding<Renderable, KeyEvent>[]
 }
 
-type TuiConfigView = Pick<PluginConfig, "$schema" | "theme" | "plugin"> &
-  NonNullable<PluginConfig["tui"]> & {
+// `theme` and the `tui.*` keys were removed from the server Config schema in
+// the v2 SDK (they now live in a separate tui.json). Keep their shape local so
+// the TUI config view stays stable without depending on the dropped SDK keys.
+type TuiLocalConfig = {
+  theme?: string
+  scroll_speed?: number
+  scroll_acceleration?: {
+    enabled: boolean
+  }
+  diff_style?: "auto" | "stacked"
+}
+
+type TuiConfigView = Pick<PluginConfig, "$schema" | "plugin"> &
+  TuiLocalConfig & {
     leader_timeout: number
     plugin_enabled?: Record<string, boolean>
     keybinds: TuiBindingLookupView
