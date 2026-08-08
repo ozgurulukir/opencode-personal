@@ -1,4 +1,4 @@
-import { describe, expect, mock, test } from "bun:test"
+import { afterAll, describe, expect, mock, test } from "bun:test"
 import { Effect, Layer } from "effect"
 import { SearchService, type SearchServiceInterface } from "../../src/search/search"
 import {
@@ -21,6 +21,9 @@ mock.module("@opencode-ai/core/global", () => {
     Path: { ...actual.Path, get cache() { return _testCacheDir } },
   }
 })
+
+// mock.module() persists across test files — restore to prevent leakage (AGENTS.md).
+afterAll(() => mock.restore())
 
 describe("search.zvec", () => {
   test("@zvec/zvec loads and basic CRUD works", () => {

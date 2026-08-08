@@ -6,7 +6,7 @@ import * as core from "@actions/core"
 import * as github from "@actions/github"
 import type { Context as GitHubContext } from "@actions/github/lib/context"
 import type { IssueCommentEvent, PullRequestReviewCommentEvent } from "@octokit/webhooks-types"
-import { createOpencodeClient } from "@opencode-ai/sdk"
+import { createOpencodeClient } from "@opencode-ai/sdk/v2/client"
 import { spawn } from "node:child_process"
 import { setTimeout as sleep } from "node:timers/promises"
 
@@ -144,12 +144,12 @@ try {
 
   // Setup opencode session
   const repoData = await fetchRepo()
-  session = await client.session.create<true>().then((r) => r.data)
+  session = await client.session.create({}, { throwOnError: true }).then((r) => r.data)
   await subscribeSessionEvents()
   shareId = await (async () => {
     if (useEnvShare() === false) return
     if (!useEnvShare() && repoData.data.private) return
-    await client.session.share<true>({ path: session })
+    await client.session.share({ sessionID: session.id }, { throwOnError: true })
     return session.id.slice(-8)
   })()
   console.log("opencode session", session.id)
@@ -272,13 +272,14 @@ async function assertOpencodeConnected() {
   let connected = false
   do {
     try {
-      await client.app.log<true>({
-        body: {
+      await client.app.log(
+        {
           service: "github-workflow",
           level: "info",
           message: "Prepare to react to GitHub Workflow event",
         },
-      })
+        { throwOnError: true },
+      )
       connected = true
       break
     } catch {}
@@ -590,7 +591,7 @@ async function resolveAgent(): Promise<string | undefined> {
   if (!envAgent) return undefined
 
   // Validate the agent exists and is a primary agent
-  const agents = await client.agent.list<true>()
+  const agents = await client.app.agents({}, { throwOnError: true })
   const agent = agents.data?.find((a) => a.name === envAgent)
 
   if (!agent) {
@@ -611,11 +612,10 @@ async function chat(text: string, files: PromptFiles = []) {
   const { providerID, modelID } = useEnvModel()
   const agent = await resolveAgent()
 
-  const chat = await client.session.chat<true>({
-    path: session,
-    body: {
-      providerID,
-      modelID,
+  const chat = await client.session.prompt(
+    {
+      sessionID: session.id,
+      model: { providerID, modelID },
       agent,
       parts: [
         {
@@ -641,9 +641,9 @@ async function chat(text: string, files: PromptFiles = []) {
         ]),
       ],
     },
-  })
+    { throwOnError: true },
+  )
 
-  // @ts-ignore
   const match = chat.data.parts.findLast((p) => p.type === "text")
   if (!match) throw new Error("Failed to parse the text response")
 
