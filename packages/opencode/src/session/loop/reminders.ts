@@ -1,0 +1,168 @@
+// Extracted from session/prompt.ts Phase 2: inserts synthetic reminder text
+// parts (plan-mode prompt, build-switch, plan-file reminders) into the user
+// message of a message array. The plan-mode template literal is kept inline
+// because it interpolates runtime values (exists/plan path). Deps are passed
+// explicitly (deps-object pattern); InstanceState.context resolves from the
+// layer context.
+import path from "path"
+import { Effect } from "effect"
+import { Flag } from "@opencode-ai/core/flag/flag"
+import { AppFileSystem } from "@opencode-ai/core/filesystem"
+import { PartID } from "../schema"
+import { MessageV2 } from "../message-v2"
+import { Session } from "../session"
+import { Agent } from "@/agent/agent"
+import { InstanceState } from "@/effect/instance-state"
+import PROMPT_PLAN from "../prompt/plan.txt"
+import BUILD_SWITCH from "../prompt/build-switch.txt"
+
+export interface RemindersDeps {
+  sessions: Session.Interface
+  fsys: AppFileSystem.Interface
+}
+
+export const insertReminders = Effect.fn("SessionPrompt.insertReminders")(function* (
+  deps: RemindersDeps,
+  input: {
+    messages: MessageV2.WithParts[]
+    agent: Agent.Info
+    session: Session.Info
+  },
+) {
+  const userIndex = input.messages.findLastIndex((msg) => msg.info.role === "user")
+  if (userIndex === -1) return input.messages
+  const userMessage = input.messages[userIndex]
+
+  const appendParts = (parts: MessageV2.Part[]): MessageV2.WithParts[] => [
+    ...input.messages.slice(0, userIndex),
+    { ...userMessage, parts: [...userMessage.parts, ...parts] },
+    ...input.messages.slice(userIndex + 1),
+  ]
+
+  if (!Flag.OPENCODE_EXPERIMENTAL_PLAN_MODE) {
+    const extra: MessageV2.TextPart[] = []
+    if (input.agent.name === "plan") {
+      extra.push({
+        id: PartID.ascending(),
+        messageID: userMessage.info.id,
+        sessionID: userMessage.info.sessionID,
+        type: "text",
+        text: PROMPT_PLAN,
+        synthetic: true,
+      })
+    }
+    const wasPlan = input.messages.some((msg) => msg.info.role === "assistant" && msg.info.agent === "plan")
+    if (wasPlan && input.agent.name === "build") {
+      extra.push({
+        id: PartID.ascending(),
+        messageID: userMessage.info.id,
+        sessionID: userMessage.info.sessionID,
+        type: "text",
+        text: BUILD_SWITCH,
+        synthetic: true,
+      })
+    }
+    return extra.length > 0 ? appendParts(extra) : input.messages
+  }
+
+  const assistantMessage = input.messages.findLast((msg) => msg.info.role === "assistant")
+  if (input.agent.name !== "plan" && assistantMessage?.info.agent === "plan") {
+    const ctx = yield* InstanceState.context
+    const plan = Session.plan(input.session, ctx)
+    if (!(yield* deps.fsys.existsSafe(plan))) return input.messages
+    const part = yield* deps.sessions.updatePart({
+      id: PartID.ascending(),
+      messageID: userMessage.info.id,
+      sessionID: userMessage.info.sessionID,
+      type: "text",
+      text: `${BUILD_SWITCH}\n<system-reminder>\nA plan file exists at ${plan}. You should execute on the plan defined within it\n</system-reminder>`,
+      synthetic: true,
+    })
+    return appendParts([part])
+  }
+
+  if (input.agent.name !== "plan" || assistantMessage?.info.agent === "plan") return input.messages
+
+  const ctx = yield* InstanceState.context
+  const plan = Session.plan(input.session, ctx)
+  const exists = yield* deps.fsys.existsSafe(plan)
+  if (!exists) yield* deps.fsys.ensureDir(path.dirname(plan)).pipe(Effect.catch(Effect.die))
+  const part = yield* deps.sessions.updatePart({
+    id: PartID.ascending(),
+    messageID: userMessage.info.id,
+    sessionID: userMessage.info.sessionID,
+    type: "text",
+    text: `<system-reminder>
+Plan mode is active. The user indicated that they do not want you to execute yet -- you MUST NOT make any edits (with the exception of the plan file mentioned below), run any non-readonly tools (including changing configs or making commits), or otherwise make any changes to the system. This supersedes any other instructions you have received.
+
+## Plan File Info:
+${exists ? `A plan file already exists at ${plan}. You can read it and make incremental edits using the edit tool.` : `No plan file exists yet. You should create your plan at ${plan} using the write tool.`}
+You should build your plan incrementally by writing to or editing this file. NOTE that this is the only file you are allowed to edit - other than this you are only allowed to take READ-ONLY actions.
+
+## Plan Workflow
+
+### Phase 1: Initial Understanding
+Goal: Gain a comprehensive understanding of the user's request by reading through code and asking them questions. Critical: In this phase you should only use the explore subagent type.
+
+1. Focus on understanding the user's request and the code associated with their request
+
+2. **Launch up to 3 explore agents IN PARALLEL** (single message, multiple tool calls) to efficiently explore the codebase.
+ - Use 1 agent when the task is isolated to known files, the user provided specific file paths, or you're making a small targeted change.
+ - Use multiple agents when: the scope is uncertain, multiple areas of the codebase are involved, or you need to understand existing patterns before planning.
+ - Quality over quantity - 3 agents maximum, but you should try to use the minimum number of agents necessary (usually just 1)
+ - If using multiple agents: Provide each agent with a specific search focus or area to explore. Example: One agent searches for existing implementations, another explores related components, a third investigates testing patterns
+
+3. After exploring the code, use the question tool to clarify ambiguities in the user request up front.
+
+### Phase 2: Design
+Goal: Design an implementation approach.
+
+Launch general agent(s) to design the implementation based on the user's intent and your exploration results from Phase 1.
+
+You can launch up to 1 agent(s) in parallel.
+
+**Guidelines:**
+- **Default**: Launch at least 1 Plan agent for most tasks - it helps validate your understanding and consider alternatives
+- **Skip agents**: Only for truly trivial tasks (typo fixes, single-line changes, simple renames)
+
+Examples of when to use multiple agents:
+- The task touches multiple parts of the codebase
+- It is a large refactor or architectural change
+- There are many edge cases to consider
+- You'd benefit from exploring different approaches
+
+Example perspectives by task type:
+- New feature: simplicity vs performance vs maintainability
+- Bug fix: root cause vs workaround vs prevention
+- Refactoring: minimal change vs clean architecture
+
+In the agent prompt:
+- Provide comprehensive background context from Phase 1 exploration including filenames and code path traces
+- Describe requirements and constraints
+- Request a detailed implementation plan
+
+### Phase 3: Review
+Goal: Review the plan(s) from Phase 2 and ensure alignment with the user's intentions.
+1. Read the critical files identified by agents to deepen your understanding
+2. Ensure that the plans align with the user's original request
+3. Use question tool to clarify any further questions with the user
+
+### Phase 4: Final Plan
+Goal: Write your final plan to the plan file (the only file you can edit).
+- Include only your recommended approach, not all alternatives
+- Ensure that the plan file is concise enough to scan quickly, but detailed enough to execute effectively
+- Include the paths of critical files to be modified
+- Include a verification section describing how to test the changes end-to-end (run the code, run MCP tools, run tests)
+
+### Phase 5: Call plan_exit tool
+At the very end of your turn, once you have asked the user questions and are happy with your final plan file - you should always call plan_exit to indicate to the user that you are done planning.
+This is critical - your turn should only end with either asking the user a question or calling plan_exit. Do not stop unless it's for these 2 reasons.
+
+**Important:** Use question tool to clarify requirements/approach, use plan_exit to request plan approval. Do NOT use question tool to ask "Is this plan okay?" - that's what plan_exit does.
+
+NOTE: At any point in time through this workflow you should feel free to ask the user questions or clarifications. Don't make large assumptions about user intent. The goal is to present a well researched plan to the user, and tie any loose ends before implementation begins.
+</system-reminder>`,
+    synthetic: true,
+  })
+  return appendParts([part])
+})
