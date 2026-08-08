@@ -113,15 +113,16 @@ export function SessionTurn(
     if (!files?.length) return emptyDiffs
 
     const seen = new Set<string>()
-    return files
-      .reduceRight<SummaryDiff[]>((result, diff) => {
-        if (!summaryDiff(diff)) return result
-        if (seen.has(diff.file)) return result
+    // ⚡ Bolt Optimization: Replace .reduceRight().reverse() with backward loop to avoid intermediate array allocations
+    const result: SummaryDiff[] = []
+    for (let i = files.length - 1; i >= 0; i--) {
+      const diff = files[i]
+      if (summaryDiff(diff) && !seen.has(diff.file)) {
         seen.add(diff.file)
-        result.push(diff)
-        return result
-      }, [])
-      .reverse()
+        result.unshift(diff)
+      }
+    }
+    return result
   })
   const edited = createMemo(() => diffs().length)
 
@@ -195,12 +196,16 @@ export function SessionTurn(
     const start = message()?.time.created
     if (typeof start !== "number") return undefined
 
-    const end = assistantMessages().reduce<number | undefined>((max, item) => {
-      const completed = item.time.completed
-      if (typeof completed !== "number") return max
-      if (max === undefined) return completed
-      return Math.max(max, completed)
-    }, undefined)
+    // ⚡ Bolt Optimization: Replace .reduce() with direct loop to avoid intermediate allocations and O(N) functional overhead
+    let end: number | undefined = undefined
+    const msgs = assistantMessages()
+    for (let i = 0; i < msgs.length; i++) {
+      const completed = msgs[i].time.completed
+      if (typeof completed === "number") {
+        if (end === undefined) end = completed
+        else end = Math.max(end, completed)
+      }
+    }
 
     if (typeof end !== "number") return undefined
     if (end < start) return undefined
@@ -257,11 +262,7 @@ export function SessionTurn(
               <div data-slot="session-turn-message-content" aria-live="off">
                 <Message message={message()!} parts={parts()} actions={props.actions} />
               </div>
-              <SessionTurnHeader
-                divider={divider()}
-                error={error()}
-                errorText={errorText()}
-              />
+              <SessionTurnHeader divider={divider()} error={error()} errorText={errorText()} />
               <Show when={assistantMessages().length > 0}>
                 <div data-slot="session-turn-assistant-content" aria-hidden={working()}>
                   <AssistantParts
