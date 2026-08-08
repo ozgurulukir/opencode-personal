@@ -1,9 +1,12 @@
-import { mock, describe, expect, test } from "bun:test"
+import { mock, describe, expect, test, afterAll } from "bun:test"
 
 let mockedWhich: (cmd: string) => string | null = () => null
 mock.module("../../src/util/which", () => ({
   which: (cmd: string) => mockedWhich(cmd),
 }))
+
+// mock.module() persists across test files — restore to prevent leakage (AGENTS.md).
+afterAll(() => mock.restore())
 
 import { gofmt, mix } from "../../src/format/formatter"
 
