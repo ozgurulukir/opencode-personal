@@ -1,4 +1,4 @@
-import { test, expect, mock, beforeEach } from "bun:test"
+import { test, expect, mock, beforeEach, afterAll } from "bun:test"
 import { Effect } from "effect"
 
 // Mock UnauthorizedError to match the SDK's class
@@ -102,6 +102,9 @@ void mock.module("@modelcontextprotocol/sdk/client/index.js", () => ({
 void mock.module("@modelcontextprotocol/sdk/client/auth.js", () => ({
   UnauthorizedError: MockUnauthorizedError,
 }))
+
+// mock.module() persists across test files — restore to prevent leakage (AGENTS.md).
+afterAll(() => mock.restore())
 
 beforeEach(() => {
   transportCalls.length = 0

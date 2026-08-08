@@ -1,4 +1,4 @@
-import { test, expect, mock, beforeEach } from "bun:test"
+import { test, expect, mock, beforeEach, afterAll } from "bun:test"
 import { Effect } from "effect"
 import type { MCP as MCPNS } from "../../src/mcp/index"
 
@@ -43,6 +43,9 @@ void mock.module("@modelcontextprotocol/sdk/client/sse.js", () => ({
 beforeEach(() => {
   transportCalls.length = 0
 })
+
+// mock.module() persists across test files — restore to prevent leakage (AGENTS.md).
+afterAll(() => mock.restore())
 
 // Import MCP after mocking
 const { MCP } = await import("../../src/mcp/index")
