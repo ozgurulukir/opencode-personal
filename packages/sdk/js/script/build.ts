@@ -40,12 +40,12 @@ await createClient({
   ],
 })
 
-await $`bun prettier --write src/gen`
 await $`bun prettier --write src/v2`
 
-// Post-generation patch: fix data-style error return in both v1 (static) and v2 (regenerated).
-// v1 generation is frozen, but we patch it here too so the fix is co-located with the build logic.
-for (const genDir of ["src/gen", "src/v2/gen"] as const) {
+// Post-generation patch: fix data-style error return in the regenerated v2 client.
+// (The legacy v1 generation was removed during SDK consolidation; there is now a
+// single generated client under src/v2/gen.)
+for (const genDir of ["src/v2/gen"] as const) {
   const clientFile = path.join(dir, genDir, "client", "client.gen.ts")
   const typesFile = path.join(dir, genDir, "client", "types.gen.ts")
 
