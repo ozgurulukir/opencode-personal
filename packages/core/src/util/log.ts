@@ -40,7 +40,16 @@ export type Logger = {
   }
 }
 
-const loggers = new Map<string, Logger>()
+// Exported for testing purposes only
+export const _internal = {
+  loggers: new Map<string, Logger>(),
+  get last() {
+    return last
+  },
+  set last(v: number) {
+    last = v
+  },
+}
 
 export const Default = create({ service: "default" })
 
@@ -115,7 +124,7 @@ export function create(tags?: Record<string, any>) {
 
   const service = tags["service"]
   if (service && typeof service === "string") {
-    const cached = loggers.get(service)
+    const cached = _internal.loggers.get(service)
     if (cached) {
       return cached
     }
@@ -187,7 +196,7 @@ export function create(tags?: Record<string, any>) {
   }
 
   if (service && typeof service === "string") {
-    loggers.set(service, result)
+    _internal.loggers.set(service, result)
   }
 
   return result

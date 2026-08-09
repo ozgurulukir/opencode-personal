@@ -14,14 +14,11 @@ describe("Log", () => {
 
   beforeEach(async () => {
     // Reset internal state
-    originalLoggers = new Map((Log as any).loggers || [])
-    if ((Log as any).loggers) {
-      ;(Log as any).loggers.clear()
-    }
+    originalLoggers = new Map(Log._internal.loggers)
+    Log._internal.loggers.clear()
+
     // Also reset time to make tests predictable
-    if ((Log as any).last) {
-      ;(Log as any).last = Date.now()
-    }
+    Log._internal.last = Date.now()
 
     stderrWriteSpy = spyOn(process.stderr, "write").mockImplementation(() => true)
 
@@ -42,11 +39,9 @@ describe("Log", () => {
       delete (Global.Path as any).log
     }
 
-    if ((Log as any).loggers) {
-      ;(Log as any).loggers.clear()
-      for (const [k, v] of originalLoggers.entries()) {
-        ;(Log as any).loggers.set(k, v)
-      }
+    Log._internal.loggers.clear()
+    for (const [k, v] of originalLoggers.entries()) {
+      Log._internal.loggers.set(k, v)
     }
 
     stderrWriteSpy.mockRestore()
