@@ -119,9 +119,10 @@ export function SessionTurn(
       const diff = files[i]
       if (summaryDiff(diff) && !seen.has(diff.file)) {
         seen.add(diff.file)
-        result.unshift(diff)
+        result.push(diff)
       }
     }
+    result.reverse()
     return result
   })
   const edited = createMemo(() => diffs().length)
@@ -262,7 +263,11 @@ export function SessionTurn(
               <div data-slot="session-turn-message-content" aria-live="off">
                 <Message message={message()!} parts={parts()} actions={props.actions} />
               </div>
-              <SessionTurnHeader divider={divider()} error={error()} errorText={errorText()} />
+              <SessionTurnHeader
+                divider={divider()}
+                error={error()}
+                errorText={errorText()}
+              />
               <Show when={assistantMessages().length > 0}>
                 <div data-slot="session-turn-assistant-content" aria-hidden={working()}>
                   <AssistantParts
