@@ -1,7 +1,4 @@
-## 2025-03-09 - XSS Vulnerability in Shiki HTML Rendering
-
-**Vulnerability:** The `shiki.codeToHtml` output was being rendered directly via SolidJS's `innerHTML` without sanitization, exposing the application to Cross-Site Scripting (XSS) if user input (e.g. `command` or `output` props) could be manipulated to inject malicious scripts into the rendered HTML payload.
-
-**Learning:** Although Shiki aims to output safe HTML representing source code, it's not a security guarantee against creatively crafted inputs designed to exploit `innerHTML`. External content injected into the DOM must always be considered untrusted.
-
-**Prevention:** Always sanitize dynamically generated or external HTML payloads using a trusted sanitizer like `DOMPurify` (or `isomorphic-dompurify` for SSR-compatible components) before applying them to the DOM via properties like `innerHTML`.
+## 2025-03-05 - Fix TUI Plugin Error Leak
+**Vulnerability:** TUI plugin runtime error handling leaked sensitive API request/response bodies (in the `cause` object) to the terminal because `console.error` in Bun bypasses standard stderr interception.
+**Learning:** In Bun-based TUI applications, `console.error` and `console.warn` write directly to file descriptors, circumventing user-land stdout/stderr hooks. Relying on interceptors to sanitize or suppress logs is insufficient.
+**Prevention:** Do not use `console.error` or `console.warn` for handling potentially sensitive internal errors in the TUI plugin runtime. Rely strictly on the configured, file-bound `log.error` / `log.warn` utilities.
