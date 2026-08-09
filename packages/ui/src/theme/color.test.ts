@@ -40,7 +40,7 @@ describe("Color Utils", () => {
       expect(hexToRgb("#00ff0080")).toEqual({ r: 0, g: 1, b: 0 })
     })
 
-    test("works without hash", () => {
+    test("works with valid hex inputs (duplicate)", () => {
       expect(hexToRgb("#ff0000")).toEqual({ r: 1, g: 0, b: 0 })
       expect(hexToRgb("#f00")).toEqual({ r: 1, g: 0, b: 0 })
     })
