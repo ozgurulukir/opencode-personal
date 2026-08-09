@@ -404,10 +404,10 @@ async function resolveConfigPath(baseDir: string, global = false) {
     candidates.push(path.join(baseDir, ".opencode", "opencode.json"), path.join(baseDir, ".opencode", "opencode.jsonc"))
   }
 
-  for (const candidate of candidates) {
-    if (await Filesystem.exists(candidate)) {
-      return candidate
-    }
+  const results = await Promise.all(candidates.map((c) => Filesystem.exists(c)))
+  const index = results.findIndex((exists) => exists)
+  if (index !== -1) {
+    return candidates[index]
   }
 
   // Default to opencode.json if none exist
