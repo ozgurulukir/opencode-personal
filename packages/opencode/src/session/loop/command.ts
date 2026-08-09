@@ -51,7 +51,21 @@ export const command = Effect.fn("SessionPrompt.command")(function* (deps: Comma
 
   const raw = input.arguments.match(argsRegex) ?? []
   const args = raw.map((arg) => arg.replace(quoteTrimRegex, ""))
-  const templateCommand = yield* Effect.promise(async () => cmd.template)
+  const templateCommandRaw = yield* Effect.promise(async () => cmd.template)
+
+  let templateCommand = templateCommandRaw
+  const shellMatches = ConfigMarkdown.shell(templateCommand)
+  if (shellMatches.length > 0) {
+    const cfg = yield* deps.config.get()
+    const sh = Shell.preferred(cfg.shell)
+    const results = yield* Effect.promise(() =>
+      Promise.all(
+        shellMatches.map(async ([, cmd]) => (await Process.text([cmd], { shell: sh, nothrow: true })).text),
+      ),
+    )
+    let index = 0
+    templateCommand = templateCommand.replace(bashRegex, () => results[index++])
+  }
 
   const placeholders = templateCommand.match(placeholderRegex) ?? []
   let last = 0
@@ -72,19 +86,6 @@ export const command = Effect.fn("SessionPrompt.command")(function* (deps: Comma
 
   if (placeholders.length === 0 && !usesArgumentsPlaceholder && input.arguments.trim()) {
     template = template + "\n\n" + input.arguments
-  }
-
-  const shellMatches = ConfigMarkdown.shell(template)
-  if (shellMatches.length > 0) {
-    const cfg = yield* deps.config.get()
-    const sh = Shell.preferred(cfg.shell)
-    const results = yield* Effect.promise(() =>
-      Promise.all(
-        shellMatches.map(async ([, cmd]) => (await Process.text([cmd], { shell: sh, nothrow: true })).text),
-      ),
-    )
-    let index = 0
-    template = template.replace(bashRegex, () => results[index++])
   }
   template = template.trim()
 
