@@ -62,7 +62,17 @@ let write = (msg: any) => {
 export async function init(options: Options) {
   if (options.level) level = options.level
   void cleanup(Global.Path.log)
-  if (options.print) return
+  if (options.print) {
+    // When print mode is enabled, write directly to stderr instead of a file.
+    // Previously this returned early without setting a writer, so print mode
+    // silently dropped all log output.
+    logpath = ""
+    write = (msg: any) => {
+      process.stderr.write(msg)
+      return msg.length
+    }
+    return
+  }
   logpath = path.join(
     Global.Path.log,
     options.dev ? "dev.log" : new Date().toISOString().split(".")[0].replace(/:/g, "") + ".log",
