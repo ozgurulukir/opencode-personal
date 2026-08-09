@@ -1,0 +1,3 @@
+🎯 **What:** The `getRelativeTime` utility function in `packages/app/src/utils/time.ts` lacked test coverage.
+📊 **Coverage:** A test file (`time.test.ts`) has been added using `bun:test`, with mocked system time, testing all time intervals (seconds, minutes, hours, days) and verifying edge cases like future dates correctly fallback to "justNow".
+✨ **Result:** Enhanced test coverage and ensured deterministic testing without regressions on the time utility functions.
