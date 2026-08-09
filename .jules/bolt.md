@@ -97,3 +97,6 @@
 ## 2024-08-09 - Optimize sequential I/O in mcp.ts
 **Learning:** Sequential `await` calls in a `for` loop for independent I/O operations (like `Filesystem.exists`) introduce unnecessary latency, especially when dealing with multiple file paths.
 **Action:** Replaced the sequential `for` loop in `resolveConfigPath` with a concurrent check using `Promise.all` and `Array.prototype.findIndex`. This reduced execution time by approximately 75% in a simple benchmark (checking 4 paths).
+## 2025-03-23 - Concurrent I/O Checks in Loops
+**Learning:** Sequential `await` calls inside loops for I/O operations (like file existence checks) create unnecessary waterfalls and block execution, leading to O(N) wait times.
+**Action:** Replaced sequential `await dep.exists(file)` within a `for` loop with a single `await Promise.all(files.map(f => dep.exists(f)))` check before the loop. This reduces I/O wait time to O(1) latency without changing the original breaking/priority logic.
