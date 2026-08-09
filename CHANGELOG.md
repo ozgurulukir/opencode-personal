@@ -1,27 +1,35 @@
 # Changelog
 
-All notable changes to this project will be documented in this file.
-
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
-
-## Unreleased
+## [Unreleased]
 
 ### Added
 
-- Characterization tests for `runLoop` control-flow contract (4 scenarios: single text reply, tool-call continuation, infinite-reprompt guard, non-empty assistant entrypoint).
-- Regression guard in `test/_hygiene/mock-restore.guard.test.ts` that fails if any future test file adds `mock.module()` without a matching `afterAll(() => mock.restore())`.
+- Add `debug skill validate` CLI subcommand, `Skill.allIncludingInvalid()` registry, and `skill.warning` bus events for frontmatter validation ([`b796a61a`](https://github.com/ozgurulukir/opencode-personal/commit/b796a61a))
+- Add runLoop characterization tests (4 scenarios) locking agent loop control-flow contract ([`6b4b550f`](https://github.com/ozgurulukir/opencode-personal/commit/6b4b550f))
+- Add `afterAll(() => mock.restore())` regression guard across 7 test files to eliminate mock.module leakage ([`596f52a8`](https://github.com/ozgurulukir/opencode-personal/commit/596f52a8))
 
 ### Changed
 
-- Decomposed `session/prompt.ts` from 2146 lines to 374 lines (-83%) by extracting 11 functions into `session/loop/` (deps-object pattern) and 4 pure modules into `session/prompt/` (pure-sibling pattern). All `Effect.fn` span names preserved verbatim.
-- Rewrote `v2/AGENTS.md` to describe the actual V2 design (read projection + V1-delegating write facade, by design — not a migration in progress). Removed all `TODO(v2-native)` markers and centralized brand-mismatch casts into `v2ModelToV1Session` / `v2ModelToV1Prompt` helpers.
-- Repaired 16 provably-false claims in root `AGENTS.md` (verified against the current tree): corrected counts for `as any` casts, removed references to deleted packages and non-existent types, fixed line-number cross-references, and added a Documentation Integrity rule.
-
-### Removed
-
-- Deleted the frozen/stale v1 SDK generation (`src/gen/`, `client.ts`, `server.ts`), eliminating -7079 lines and the risk of the two generated clients silently drifting. The root `@opencode-ai/sdk` export now promotes v2 exclusively.
+- Consolidate SDK to single v2 generation and delete v1, removing 7,129 lines of frozen client code ([`83304e13`](https://github.com/ozgurulukir/opencode-personal/commit/83304e13))
+- Decompose `prompt.ts` from 2,146 to 374 lines by extracting 11 functions into `session/loop/` and 4 pure modules into `session/prompt/` ([`c3355e18`](https://github.com/ozgurulukir/opencode-personal/commit/c3355e18))
+- Document V2 session delegation architecture honestly, removing 6 `TODO(v2-native)` markers and centralizing brand-mismatch casts ([`6b91811a`](https://github.com/ozgurulukir/opencode-personal/commit/6b91811a))
+- Repair 16 provably-false claims in root `AGENTS.md` against the current tree ([`cbd09fe5`](https://github.com/ozgurulukir/opencode-personal/commit/cbd09fe5))
+- Upgrade AI SDK dependencies to latest patch versions (`ai` 6.0.238 → 6.0.246, all `@ai-sdk/*` providers) ([`c51d49e7`](https://github.com/ozgurulukir/opencode-personal/commit/c51d49e7))
+- Harmonize and simplify provider/agent/tool prompts, normalizing delta prompts to second-person imperatives and dropping core.txt duplication ([`15c67db3`](https://github.com/ozgurulukir/opencode-personal/commit/15c67db3))
+- Replace `findLastIndex` with backward loops in `session-message-updater.ts` fast paths to reduce closure allocation ([`f58a1b64`](https://github.com/ozgurulukir/opencode-personal/commit/f58a1b64))
+- Reduce runtime memory footprint via LSP LRU eviction, lazy `models-snapshot` transformation, and dynamic ONNX/WASM imports ([`dc1c307d`](https://github.com/ozgurulukir/opencode-personal/commit/dc1c307d))
+- Optimize `trimSessions` array methods to reduce GC pressure on hot path ([`c5ae903b`](https://github.com/ozgurulukir/opencode-personal/commit/c5ae903b))
+- Replace chained `.map().filter()` with single loops in `message-part.tsx` reactive hooks ([`8214722b`](https://github.com/ozgurulukir/opencode-personal/commit/8214722b))
+- Replace chained `.filter().filter().reduce()` with single loop in `textPartValue` prompt extraction ([`06a25d42`](https://github.com/ozgurulukir/opencode-personal/commit/06a25d42))
 
 ### Fixed
 
-- Eliminated `mock.module()` state leakage across 7 test files by adding `afterAll(() => mock.restore())` to all users. Fixes the documented order-dependent failures where tests passed in isolation but failed when run as a suite.
+- Retry on malformed tool-call stream data by classifying `InvalidResponseDataError` as retryable and buffering deltas until `function.name` is known ([`27b6eee7`](https://github.com/ozgurulukir/opencode-personal/commit/27b6eee7))
+- Handle non-existent paths in grep tool with clear early errors and preserve matches on per-file stat failure ([`7e402d42`](https://github.com/ozgurulukir/opencode-personal/commit/7e402d42))
+- Resolve undefined `input` in `DialogSelectServer` aria-label ([`6cc421f7`](https://github.com/ozgurulukir/opencode-personal/commit/6cc421f7))
+- Prevent double auto-compaction from `filterCompacted` reorder by using `MessageV2.latest()` instead of array position ([`97723f42`](https://github.com/ozgurulukir/opencode-personal/commit/97723f42))
+- Fix plugin-lifecycle and websocket test flakiness ([`56c1f895`](https://github.com/ozgurulukir/opencode-personal/commit/56c1f895))
+
+### Security
+
+- Prevent sensitive data leak via `console.error` in TUI plugin runtime error handlers ([`9a73cf92`](https://github.com/ozgurulukir/opencode-personal/commit/9a73cf92))

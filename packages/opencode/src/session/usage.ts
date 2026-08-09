@@ -13,7 +13,7 @@ export function getUsage(input: { model: Provider.Model; usage: LanguageModelUsa
   const reasoningTokens = safe(input.usage.outputTokenDetails?.reasoningTokens ?? input.usage.reasoningTokens ?? 0)
 
   const cacheReadInputTokens = safe(
-    input.usage.inputTokenDetails?.cacheReadTokens ?? input.usage.cachedInputTokens ?? 0,
+    input.usage.inputTokenDetails?.cacheReadTokens || input.usage.cachedInputTokens || 0,
   )
   const cacheWriteInputTokens = safe(Number(
     input.usage.inputTokenDetails?.cacheWriteTokens ||
