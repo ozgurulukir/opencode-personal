@@ -362,12 +362,16 @@ export default function FileTree(props: {
       return idx === -1 ? path : path.slice(idx + 1)
     }
 
-    const out = nodes.filter((node) => {
-      if (node.type === "file") return current.files.has(node.path)
-      return current.dirs.has(node.path)
-    })
-
-    const seen = new Set(out.map((node) => node.path))
+    // ⚡ Bolt Optimization: Replace nodes.filter(...) and out.map(...) with a single loop to reduce GC pressure
+    const out: typeof nodes = []
+    const seen = new Set<string>()
+    for (let i = 0; i < nodes.length; i++) {
+      const node = nodes[i]
+      if (node.type === "file" ? current.files.has(node.path) : current.dirs.has(node.path)) {
+        out.push(node)
+        seen.add(node.path)
+      }
+    }
 
     for (const dir of current.dirs) {
       if (parent(dir) !== props.path) continue
