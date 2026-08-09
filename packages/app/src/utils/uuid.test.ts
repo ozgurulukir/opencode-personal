@@ -1,47 +1,55 @@
-import { afterEach, describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, spyOn, test, mock } from "bun:test"
 import { uuid } from "./uuid"
 
-const cryptoDescriptor = Object.getOwnPropertyDescriptor(globalThis, "crypto")
-const secureDescriptor = Object.getOwnPropertyDescriptor(globalThis, "isSecureContext")
-const randomDescriptor = Object.getOwnPropertyDescriptor(Math, "random")
+const originalCrypto = globalThis.crypto
+const originalSecure = Object.getOwnPropertyDescriptor(globalThis, "isSecureContext")
+const originalRandom = Math.random
 
-const setCrypto = (value: Partial<Crypto>) => {
-  Object.defineProperty(globalThis, "crypto", {
-    configurable: true,
-    value: value as Crypto,
-  })
+const setCrypto = (value: Partial<Crypto> | undefined) => {
+  if (value === undefined) {
+    Object.defineProperty(globalThis, "crypto", {
+        value: undefined,
+        configurable: true,
+        writable: true
+    })
+  } else {
+    Object.defineProperty(globalThis, "crypto", {
+      configurable: true,
+      value: value as Crypto,
+    })
+  }
 }
 
-const setSecure = (value: boolean) => {
-  Object.defineProperty(globalThis, "isSecureContext", {
-    configurable: true,
-    value,
-  })
-}
-
-const setRandom = (value: () => number) => {
-  Object.defineProperty(Math, "random", {
-    configurable: true,
-    value,
-  })
+const setSecure = (value: boolean | undefined) => {
+  if (value === undefined) {
+    Object.defineProperty(globalThis, "isSecureContext", {
+        value: undefined,
+        configurable: true,
+        writable: true
+    })
+  } else {
+    Object.defineProperty(globalThis, "isSecureContext", {
+      configurable: true,
+      value,
+    })
+  }
 }
 
 afterEach(() => {
-  if (cryptoDescriptor) {
-    Object.defineProperty(globalThis, "crypto", cryptoDescriptor)
+  Object.defineProperty(globalThis, "crypto", {
+    configurable: true,
+    value: originalCrypto,
+    writable: true,
+  })
+
+  if (originalSecure) {
+    Object.defineProperty(globalThis, "isSecureContext", originalSecure)
+  } else {
+    delete (globalThis as any).isSecureContext
   }
 
-  if (secureDescriptor) {
-    Object.defineProperty(globalThis, "isSecureContext", secureDescriptor)
-  }
-
-  if (!secureDescriptor) {
-    delete (globalThis as { isSecureContext?: boolean }).isSecureContext
-  }
-
-  if (randomDescriptor) {
-    Object.defineProperty(Math, "random", randomDescriptor)
-  }
+  Math.random = originalRandom
+  mock.restore()
 })
 
 describe("uuid", () => {
@@ -54,7 +62,7 @@ describe("uuid", () => {
   test("falls back in insecure contexts", () => {
     setCrypto({ randomUUID: () => "00000000-0000-0000-0000-000000000000" })
     setSecure(false)
-    setRandom(() => 0.5)
+    spyOn(Math, "random").mockImplementation(() => 0.5)
     expect(uuid()).toBe("8")
   })
 
@@ -65,14 +73,28 @@ describe("uuid", () => {
       },
     })
     setSecure(true)
-    setRandom(() => 0.5)
+    spyOn(Math, "random").mockImplementation(() => 0.5)
     expect(uuid()).toBe("8")
   })
 
   test("falls back when randomUUID is unavailable", () => {
     setCrypto({})
     setSecure(true)
-    setRandom(() => 0.5)
+    spyOn(Math, "random").mockImplementation(() => 0.5)
     expect(uuid()).toBe("8")
+  })
+
+  test("falls back when crypto is undefined", () => {
+    setCrypto(undefined)
+    setSecure(true)
+    spyOn(Math, "random").mockImplementation(() => 0.5)
+    expect(uuid()).toBe("8")
+  })
+
+  test("falls back when isSecureContext is undefined", () => {
+    setCrypto({ randomUUID: () => "00000000-0000-0000-0000-000000000000" })
+    setSecure(undefined)
+    spyOn(Math, "random").mockImplementation(() => 0.5)
+    expect(uuid()).toBe("00000000-0000-0000-0000-000000000000")
   })
 })
