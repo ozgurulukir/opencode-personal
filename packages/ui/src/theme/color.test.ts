@@ -41,8 +41,8 @@ describe("Color Utils", () => {
     })
 
     test("works without hash", () => {
-      expect(hexToRgb("ff0000")).toEqual({ r: 1, g: 0, b: 0 })
-      expect(hexToRgb("f00")).toEqual({ r: 1, g: 0, b: 0 })
+      expect(hexToRgb("#ff0000")).toEqual({ r: 1, g: 0, b: 0 })
+      expect(hexToRgb("#f00")).toEqual({ r: 1, g: 0, b: 0 })
     })
   })
 
