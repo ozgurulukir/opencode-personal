@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test, mock } from "bun:test"
+import { afterAll, afterEach, beforeEach, describe, expect, test, mock } from "bun:test"
 
 mock.module("./sound", () => {
   const original = import.meta.require("./sound")
@@ -10,6 +10,10 @@ mock.module("./sound", () => {
       return "test-sound.aac"
     }
   }
+})
+
+afterAll(() => {
+  mock.restore()
 })
 
 import { playSound, playSoundById, soundSrc, SOUND_OPTIONS } from "./sound"
