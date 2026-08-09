@@ -100,3 +100,7 @@
 ## 2025-03-23 - Concurrent I/O Checks in Loops
 **Learning:** Sequential `await` calls inside loops for I/O operations (like file existence checks) create unnecessary waterfalls and block execution, leading to O(N) wait times.
 **Action:** Replaced sequential `await dep.exists(file)` within a `for` loop with a single `await Promise.all(files.map(f => dep.exists(f)))` check before the loop. This reduces I/O wait time to O(1) latency without changing the original breaking/priority logic.
+
+## 2024-03-24 - Avoiding Array Methods Map/Filter inside createMemo
+**Learning:** Using chained array methods (like `.filter().map()` or creating `new Set(array.map())`) in high-frequency reactive blocks like `createMemo` (e.g. within `FileTree` components iterating over files) allocate temporary intermediate arrays on every re-evaluation, causing noticeable GC pressure and redundant O(N) traversals.
+**Action:** Replace `nodes.filter(...)` and `new Set(out.map(...))` with a single `for` loop that iterates once and populates both the result array and the set in-place.
