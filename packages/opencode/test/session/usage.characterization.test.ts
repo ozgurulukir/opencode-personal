@@ -72,7 +72,7 @@ describe("getUsage — characterization", () => {
       }),
       metadata: { anthropic: { cacheCreationInputTokens: 75 } } as any,
     })
-    // cacheWriteTokens is 0, so the ?? chain reaches anthropic metadata
+    // cacheWriteTokens is 0, so the || chain reaches anthropic metadata
     expect(result.tokens.cache.write).toBe(75)
   })
 
