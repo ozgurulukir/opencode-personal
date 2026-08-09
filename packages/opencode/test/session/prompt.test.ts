@@ -1538,7 +1538,7 @@ unix(
 
           const run = yield* prompt.loop({ sessionID: chat.id }).pipe(Effect.forkChild)
           yield* llm.wait(1)
-          yield* Effect.sleep(150)
+          yield* Effect.sleep(500)
           yield* prompt.cancel(chat.id)
 
           const exit = yield* Fiber.await(run)
@@ -2082,6 +2082,37 @@ it.live(
               expect(err.data.message).toContain("init")
             }
           }
+        }),
+      { git: true },
+    ),
+  30_000,
+)
+
+// Command Injection Regression
+it.live(
+  "does not execute shell blocks injected via arguments",
+  () =>
+    provideTmpdirInstance(
+      (dir) =>
+        Effect.gen(function* () {
+          const prompt = yield* SessionPrompt.Service
+          const sessions = yield* Session.Service
+          const session = yield* sessions.create({})
+
+          // Assuming "init" command exists and doesn't execute shell blocks in its template natively,
+          // or we can use another existing command. "init" is verified to exist above.
+          const exit = yield* prompt
+            .command({
+              sessionID: session.id,
+              command: "init",
+              arguments: "!`echo INJECTED_SHELL_COMMAND > " + path.join(dir, "injected.txt") + "`",
+            })
+            .pipe(Effect.exit)
+
+          expect(Exit.isSuccess(exit)).toBe(true)
+
+          const fileExists = yield* Effect.promise(() => Bun.file(path.join(dir, "injected.txt")).exists())
+          expect(fileExists).toBe(false)
         }),
       { git: true },
     ),
