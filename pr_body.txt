@@ -1,9 +1,0 @@
-💡 **What:** Replaced sequential `for...of` loops and `await` calls with `Promise.all` and concurrent `map` logic when resolving virtual environment binary paths (Python/Ty) during the Ty and Pyright LSP initialization sequences.
-
-🎯 **Why:** The LSP initialization sequentially checked up to 3 different VENV paths for the existence of `python` and `ty` executables using `Filesystem.exists()`. Sequential file system I/O blocks initialization unnecessarilly when this can be easily done concurrently.
-
-📊 **Measured Improvement:**
-A quick benchmark using `setTimeout` to emulate 5ms filesystem latency on consecutive runs was executed:
-- **Baseline (Sequential):** ~638ms for 100 iterations.
-- **Improved (Parallel):** ~548ms for 100 iterations.
-This marks a **~14% reduction** in VENV path resolution overhead, resulting in faster Language Server startup times especially when resolving paths on slow filesystems.
