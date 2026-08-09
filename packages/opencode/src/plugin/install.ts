@@ -348,9 +348,10 @@ async function patchOne(dir: string, target: Target, spec: string, force: boolea
 
   const files = dep.files(dir, name)
   let cfg = files[0]
-  for (const file of files) {
-    if (!(await dep.exists(file))) continue
-    cfg = file
+  const exists = await Promise.all(files.map((file) => dep.exists(file)))
+  for (let i = 0; i < files.length; i++) {
+    if (!exists[i]) continue
+    cfg = files[i]
     break
   }
 
