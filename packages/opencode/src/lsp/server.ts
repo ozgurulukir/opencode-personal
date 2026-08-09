@@ -443,25 +443,24 @@ export const Ty: Info = {
     const potentialVenvPaths = [process.env["VIRTUAL_ENV"], path.join(root, ".venv"), path.join(root, "venv")].filter(
       (p): p is string => p !== undefined,
     )
-    for (const venvPath of potentialVenvPaths) {
-      const isWindows = process.platform === "win32"
-      const potentialPythonPath = isWindows
-        ? path.join(venvPath, "Scripts", "python.exe")
-        : path.join(venvPath, "bin", "python")
-      if (await Filesystem.exists(potentialPythonPath)) {
-        initialization["pythonPath"] = potentialPythonPath
-        break
-      }
+    const isWindows = process.platform === "win32"
+    const potentialPythonPaths = potentialVenvPaths.map((venvPath) =>
+      isWindows ? path.join(venvPath, "Scripts", "python.exe") : path.join(venvPath, "bin", "python"),
+    )
+    const existsResults = await Promise.all(potentialPythonPaths.map((p) => Filesystem.exists(p)))
+    const index = existsResults.findIndex((exists) => exists)
+    if (index !== -1) {
+      initialization["pythonPath"] = potentialPythonPaths[index]
     }
 
     if (!binary) {
-      for (const venvPath of potentialVenvPaths) {
-        const isWindows = process.platform === "win32"
-        const potentialTyPath = isWindows ? path.join(venvPath, "Scripts", "ty.exe") : path.join(venvPath, "bin", "ty")
-        if (await Filesystem.exists(potentialTyPath)) {
-          binary = potentialTyPath
-          break
-        }
+      const potentialTyPaths = potentialVenvPaths.map((venvPath) =>
+        isWindows ? path.join(venvPath, "Scripts", "ty.exe") : path.join(venvPath, "bin", "ty"),
+      )
+      const tyExistsResults = await Promise.all(potentialTyPaths.map((p) => Filesystem.exists(p)))
+      const tyIndex = tyExistsResults.findIndex((exists) => exists)
+      if (tyIndex !== -1) {
+        binary = potentialTyPaths[tyIndex]
       }
     }
 
@@ -501,15 +500,14 @@ export const Pyright: Info = {
     const potentialVenvPaths = [process.env["VIRTUAL_ENV"], path.join(root, ".venv"), path.join(root, "venv")].filter(
       (p): p is string => p !== undefined,
     )
-    for (const venvPath of potentialVenvPaths) {
-      const isWindows = process.platform === "win32"
-      const potentialPythonPath = isWindows
-        ? path.join(venvPath, "Scripts", "python.exe")
-        : path.join(venvPath, "bin", "python")
-      if (await Filesystem.exists(potentialPythonPath)) {
-        initialization["pythonPath"] = potentialPythonPath
-        break
-      }
+    const isWindows = process.platform === "win32"
+    const potentialPythonPaths = potentialVenvPaths.map((venvPath) =>
+      isWindows ? path.join(venvPath, "Scripts", "python.exe") : path.join(venvPath, "bin", "python"),
+    )
+    const existsResults = await Promise.all(potentialPythonPaths.map((p) => Filesystem.exists(p)))
+    const index = existsResults.findIndex((exists) => exists)
+    if (index !== -1) {
+      initialization["pythonPath"] = potentialPythonPaths[index]
     }
 
     const proc = spawn(binary, args, {
