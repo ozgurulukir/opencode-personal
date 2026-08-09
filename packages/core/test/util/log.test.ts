@@ -9,8 +9,20 @@ import { tmpdir } from "os"
 describe("Log", () => {
   let stderrWriteSpy: ReturnType<typeof spyOn>
   let tempLogDir: string
+  let originalGlobalPathLogDescriptor: PropertyDescriptor | undefined
+  let originalLoggers: Map<string, any>
 
   beforeEach(async () => {
+    // Reset internal state
+    originalLoggers = new Map((Log as any).loggers || [])
+    if ((Log as any).loggers) {
+      ;(Log as any).loggers.clear()
+    }
+    // Also reset time to make tests predictable
+    if ((Log as any).last) {
+      ;(Log as any).last = Date.now()
+    }
+
     stderrWriteSpy = spyOn(process.stderr, "write").mockImplementation(() => true)
 
     // Reset Log state using init to restore defaults for testing
@@ -18,10 +30,25 @@ describe("Log", () => {
 
     tempLogDir = await fs.mkdtemp(path.join(tmpdir(), "log-test-"))
     // Mock Global.Path.log to use temp directory
-    Object.defineProperty(Global.Path, "log", { value: tempLogDir, writable: true })
+    originalGlobalPathLogDescriptor = Object.getOwnPropertyDescriptor(Global.Path, "log")
+    Object.defineProperty(Global.Path, "log", { value: tempLogDir, writable: true, configurable: true })
   })
 
   afterEach(async () => {
+    if (originalGlobalPathLogDescriptor) {
+      Object.defineProperty(Global.Path, "log", originalGlobalPathLogDescriptor)
+    } else {
+      // fallback just in case
+      delete (Global.Path as any).log
+    }
+
+    if ((Log as any).loggers) {
+      ;(Log as any).loggers.clear()
+      for (const [k, v] of originalLoggers.entries()) {
+        ;(Log as any).loggers.set(k, v)
+      }
+    }
+
     stderrWriteSpy.mockRestore()
     await fs.rm(tempLogDir, { recursive: true, force: true })
   })
