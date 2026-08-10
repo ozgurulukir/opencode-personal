@@ -1,4 +1,4 @@
-import { createEffect, createMemo, createSignal, For, on, Show, type ValidComponent } from "solid-js"
+import { createEffect, createMemo, createResource, createSignal, For, on, Show, type ValidComponent } from "solid-js"
 import { createStore } from "solid-js/store"
 import { Dynamic } from "solid-js/web"
 import { getDirectory, getFilename } from "@opencode-ai/core/util/path"
@@ -6,7 +6,7 @@ import { Accordion } from "./accordion"
 import { StickyAccordionHeader } from "./sticky-accordion-header"
 import { DiffChanges } from "./diff-changes"
 import { Icon } from "./icon"
-import { normalize } from "./session-diff"
+import { normalize, type ViewDiff } from "./session-diff"
 import { MAX_FILES, type SummaryDiff } from "./session-turn-utils"
 
 export function SessionTurnDiffs(props: {
@@ -25,6 +25,7 @@ export function SessionTurnDiffs(props: {
   const expanded = () => state.expanded
   const overflow = createMemo(() => Math.max(0, props.edited - MAX_FILES))
   const visible = createMemo(() => (showAll() ? props.diffs : props.diffs.slice(0, MAX_FILES)))
+  const [views, setViews] = createResource(visible, (diffs) => Promise.all(diffs.map((d) => normalize(d))))
   const toggleAll = () => {
     props.autoScroll.pause()
     setState("showAll", !showAll())
@@ -56,9 +57,9 @@ export function SessionTurnDiffs(props: {
             value={expanded()}
             onChange={(value) => setState("expanded", Array.isArray(value) ? value : value ? [value] : [])}
           >
-            <For each={visible()}>
-              {(diff) => {
-                const view = normalize(diff)
+            <For each={views() ?? []}>
+              {(diff, i) => {
+                const view = diff
                 const active = createMemo(() => expanded().includes(diff.file))
                 const [shown, setShown] = createSignal(false)
 

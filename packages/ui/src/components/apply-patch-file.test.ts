@@ -3,8 +3,8 @@ import { patchFiles } from "./apply-patch-file"
 import { text } from "./session-diff"
 
 describe("apply patch file", () => {
-  test("parses patch metadata from the server", () => {
-    const file = patchFiles([
+  test("parses patch metadata from the server", async () => {
+    const file = (await patchFiles([
       {
         filePath: "/tmp/a.ts",
         relativePath: "a.ts",
@@ -14,7 +14,7 @@ describe("apply patch file", () => {
         additions: 1,
         deletions: 1,
       },
-    ])[0]
+    ]))[0]
 
     expect(file).toBeDefined()
     expect(file?.view.fileDiff.name).toBe("a.ts")
@@ -22,8 +22,8 @@ describe("apply patch file", () => {
     expect(text(file!.view, "additions")).toBe("one\nthree\n")
   })
 
-  test("keeps legacy before and after payloads working", () => {
-    const file = patchFiles([
+  test("keeps legacy before and after payloads working", async () => {
+    const file = (await patchFiles([
       {
         filePath: "/tmp/a.ts",
         relativePath: "a.ts",
@@ -33,7 +33,7 @@ describe("apply patch file", () => {
         additions: 1,
         deletions: 1,
       },
-    ])[0]
+    ]))[0]
 
     expect(file).toBeDefined()
     expect(file?.view.patch).toContain("@@ -1,1 +1,1 @@")

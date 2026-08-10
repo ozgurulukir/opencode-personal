@@ -56,7 +56,9 @@ export const WriteTool = Tool.define<
           const contentOld = source.text
           const contentNew = next.text
 
-          const diff = trimDiff(createTwoFilesPatch(filepath, filepath, contentOld, contentNew))
+          const diff = trimDiff(
+            (yield* Effect.tryPromise(() => createTwoFilesPatch(filepath, filepath, contentOld, contentNew))) as string,
+          )
           yield* ctx.ask({
             permission: "edit",
             patterns: [path.relative(instance.worktree, filepath)],

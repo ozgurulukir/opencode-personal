@@ -103,11 +103,13 @@ export const ApplyPatchTool = Tool.define<
               const newContent =
                 hunk.contents.length === 0 || hunk.contents.endsWith("\n") ? hunk.contents : `${hunk.contents}\n`
               const next = Bom.split(newContent)
-              const diff = trimDiff(createTwoFilesPatch(filePath, filePath, oldContent, next.text))
+              const diff = trimDiff(
+                (yield* Effect.tryPromise(() => createTwoFilesPatch(filePath, filePath, oldContent, next.text))) as string,
+              )
 
               let additions = 0
               let deletions = 0
-              for (const change of diffLines(oldContent, next.text)) {
+              for (const change of yield* Effect.tryPromise(() => diffLines(oldContent, next.text))) {
                 if (change.added) additions += change.count || 0
                 if (change.removed) deletions += change.count || 0
               }
@@ -156,11 +158,13 @@ export const ApplyPatchTool = Tool.define<
                 break
               }
 
-              const diff = trimDiff(createTwoFilesPatch(filePath, filePath, oldContent, newContent))
+              const diff = trimDiff(
+                (yield* Effect.tryPromise(() => createTwoFilesPatch(filePath, filePath, oldContent, newContent))) as string,
+              )
 
               let additions = 0
               let deletions = 0
-              for (const change of diffLines(oldContent, newContent)) {
+              for (const change of yield* Effect.tryPromise(() => diffLines(oldContent, newContent))) {
                 if (change.added) additions += change.count || 0
                 if (change.removed) deletions += change.count || 0
               }
@@ -208,7 +212,9 @@ export const ApplyPatchTool = Tool.define<
                 ),
               )
               const contentToDelete = source.text
-              const deleteDiff = trimDiff(createTwoFilesPatch(filePath, filePath, contentToDelete, ""))
+              const deleteDiff = trimDiff(
+                (yield* Effect.tryPromise(() => createTwoFilesPatch(filePath, filePath, contentToDelete, ""))) as string,
+              )
 
               const deletions = contentToDelete.split("\n").length
 

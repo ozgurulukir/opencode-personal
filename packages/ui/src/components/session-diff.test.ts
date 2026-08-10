@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { normalize, text } from "./session-diff"
 
 describe("session diff", () => {
-  test("keeps unified patch content", () => {
+  test("keeps unified patch content", async () => {
     const diff = {
       file: "a.ts",
       patch:
@@ -11,7 +11,7 @@ describe("session diff", () => {
       deletions: 1,
       status: "modified" as const,
     }
-    const view = normalize(diff)
+    const view = await normalize(diff)
 
     expect(view.patch).toBe(diff.patch)
     expect(view.fileDiff.name).toBe("a.ts")
@@ -19,7 +19,7 @@ describe("session diff", () => {
     expect(text(view, "additions")).toBe("one\nthree\n")
   })
 
-  test("keeps missing final newlines from unified patches", () => {
+  test("keeps missing final newlines from unified patches", async () => {
     const diff = {
       file: "a.ts",
       patch:
@@ -28,13 +28,13 @@ describe("session diff", () => {
       deletions: 1,
       status: "modified" as const,
     }
-    const view = normalize(diff)
+    const view = await normalize(diff)
 
     expect(text(view, "deletions")).toBe("one\ntwo")
     expect(text(view, "additions")).toBe("one\nthree")
   })
 
-  test("converts legacy content into a patch", () => {
+  test("converts legacy content into a patch", async () => {
     const diff = {
       file: "a.ts",
       before: "one\n",
@@ -43,14 +43,14 @@ describe("session diff", () => {
       deletions: 1,
       status: "modified" as const,
     }
-    const view = normalize(diff)
+    const view = await normalize(diff)
 
     expect(view.patch).toContain("@@ -1,1 +1,1 @@")
     expect(text(view, "deletions")).toBe("one\n")
     expect(text(view, "additions")).toBe("two\n")
   })
 
-  test("ignores malformed persisted patches", () => {
+  test("ignores malformed persisted patches", async () => {
     const diff = {
       file: "a.ts",
       patch:
@@ -59,7 +59,7 @@ describe("session diff", () => {
       deletions: 1,
       status: "modified" as const,
     }
-    const view = normalize(diff)
+    const view = await normalize(diff)
 
     expect(view.patch).toBe(diff.patch)
     expect(text(view, "deletions")).toBe("")

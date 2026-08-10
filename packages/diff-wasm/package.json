@@ -10,8 +10,12 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "build:wasm": "wasm-pack build --target web --out-dir pkg"
+    "build:wasm": "wasm-pack build --target web --out-dir pkg",
+    "build": "bun run build:wasm"
   },
+  "files": [
+    "pkg/**/*"
+  ],
   "dependencies": {
     "diff": "catalog:"
   },

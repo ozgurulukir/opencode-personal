@@ -543,7 +543,7 @@ export const layer: Layer.Layer<
           )
         })
 
-        const diffFull = Effect.fnUntraced(function* (from: string, to: string) {
+        const diffFullFn = Effect.fnUntraced(function* (from: string, to: string) {
           return yield* locked(
             Effect.gen(function* () {
               type Row = {
@@ -735,7 +735,9 @@ export const layer: Layer.Layer<
 
               const step = 100
               const patch = (file: string, before: string, after: string) =>
-                formatPatch(structuredPatch(file, file, before, after, "", "", { context: Number.MAX_SAFE_INTEGER }))
+                Effect.tryPromise(() =>
+                  structuredPatch(file, file, before, after, "", "", { context: Number.MAX_SAFE_INTEGER }),
+                ).pipe(Effect.map(formatPatch))
 
               for (let i = 0; i < rows.length; i += step) {
                 const run = rows.slice(i, i + step)
@@ -746,7 +748,7 @@ export const layer: Layer.Layer<
                   const [before, after] = row.binary ? ["", ""] : text ? [hit.before, hit.after] : yield* show(row)
                   result.push({
                     file: row.file,
-                    patch: row.binary ? "" : patch(row.file, before, after),
+                    patch: row.binary ? "" : (yield* patch(row.file, before, after)),
                     additions: row.additions,
                     deletions: row.deletions,
                     status: row.status,
@@ -768,6 +770,8 @@ export const layer: Layer.Layer<
           Effect.delay(Duration.minutes(1)),
           Effect.forkScoped,
         )
+
+        const diffFull = (from: string, to: string) => diffFullFn(from, to).pipe(Effect.orDie)
 
         return { cleanup, track, patch, diffNames, restore, revert, diff, diffFull }
       }),
