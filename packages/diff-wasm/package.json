@@ -12,6 +12,9 @@
   "scripts": {
     "build:wasm": "wasm-pack build --target web --out-dir pkg"
   },
+  "dependencies": {
+    "diff": "catalog:"
+  },
   "devDependencies": {
     "typescript": "catalog:"
   }
