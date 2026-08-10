@@ -2,6 +2,7 @@ import {
   Component,
   createEffect,
   createMemo,
+  createResource,
   createSignal,
   For,
   Match,
@@ -2048,10 +2049,10 @@ ToolRegistry.register({
   render(props) {
     const i18n = useI18n()
     const fileComponent = useFileComponent()
-    const files = createMemo(() => patchFiles(props.metadata.files))
+    const [files, setFiles] = createResource(() => props.metadata.files, patchFiles)
     const pending = createMemo(() => props.status === "pending" || props.status === "running")
     const single = createMemo(() => {
-      const list = files()
+      const list = files() ?? []
       if (list.length !== 1) return
       return list[0]
     })
@@ -2059,7 +2060,7 @@ ToolRegistry.register({
     let seeded = false
 
     createEffect(() => {
-      const list = files()
+      const list = files() ?? []
       if (list.length === 0) return
       if (seeded) return
       seeded = true
@@ -2075,7 +2076,7 @@ ToolRegistry.register({
     })
 
     const subtitle = createMemo(() => {
-      const count = files().length
+      const count = (files() ?? []).length
       if (count === 0) return ""
       return `${count} ${i18n.t(count > 1 ? "ui.common.file.other" : "ui.common.file.one")}`
     })
@@ -2094,7 +2095,7 @@ ToolRegistry.register({
                 subtitle: subtitle(),
               }}
             >
-              <Show when={files().length > 0}>
+              <Show when={(files() ?? []).length > 0}>
                 <Accordion
                   multiple
                   data-scope="apply-patch"
@@ -2102,7 +2103,7 @@ ToolRegistry.register({
                   value={expanded()}
                   onChange={(value) => setExpanded(Array.isArray(value) ? value : value ? [value] : [])}
                 >
-                  <For each={files()}>
+                  <For each={files() ?? []}>
                     {(file) => {
                       const active = createMemo(() => expanded().includes(file.filePath))
                       const [visible, setVisible] = createSignal(false)

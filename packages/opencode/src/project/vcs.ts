@@ -14,7 +14,8 @@ const PATCH_CONTEXT_LINES = 2_147_483_647
 const MAX_PATCH_BYTES = 10_000_000
 const MAX_TOTAL_PATCH_BYTES = 10_000_000
 
-const emptyPatch = (file: string) => formatPatch(structuredPatch(file, file, "", "", "", "", { context: 0 }))
+const emptyPatch = (file: string) =>
+  Effect.tryPromise(() => structuredPatch(file, file, "", "", "", "", { context: 0 })).pipe(Effect.map(formatPatch))
 
 const nums = (list: Git.Stat[]) =>
   new Map(list.map((item) => [item.file, { additions: item.additions, deletions: item.deletions }] as const))
@@ -126,13 +127,13 @@ const nativePatch = Effect.fnUntraced(function* (
   if (!result.truncated && result.text) return result.text
 
   if (result.truncated) log.warn("patch exceeded byte limit", { file: item.file, max: MAX_PATCH_BYTES })
-  return emptyPatch(item.file)
+  return yield* emptyPatch(item.file)
 })
 
 const totalPatch = (file: string, patch: string, total: number) => {
-  if (total + Buffer.byteLength(patch) <= MAX_TOTAL_PATCH_BYTES) return { patch, capped: false }
+  if (total + Buffer.byteLength(patch) <= MAX_TOTAL_PATCH_BYTES) return Effect.succeed({ patch, capped: false })
   log.warn("total patch budget exceeded", { file, max: MAX_TOTAL_PATCH_BYTES })
-  return { patch: emptyPatch(file), capped: true }
+  return emptyPatch(file).pipe(Effect.map((patch) => ({ patch, capped: true })))
 }
 
 const patchForItem = Effect.fnUntraced(function* (
@@ -143,11 +144,11 @@ const patchForItem = Effect.fnUntraced(function* (
   batch: { patches: Map<string, string>; capped: boolean },
   capped: boolean,
 ) {
-  if (capped) return emptyPatch(item.file)
+  if (capped) return yield* emptyPatch(item.file)
 
   const batched = batch.patches.get(item.file)
   if (batched !== undefined) return batched
-  if (item.code !== "??" && batch.capped) return emptyPatch(item.file)
+  if (item.code !== "??" && batch.capped) return yield* emptyPatch(item.file)
   return yield* nativePatch(git, cwd, ref, item)
 })
 
@@ -168,7 +169,7 @@ const files = Effect.fnUntraced(function* (
     const patch = yield* patchForItem(git, cwd, ref, item, batch, capped)
     const result: { patch: string; capped: boolean } = capped
       ? { patch, capped: true }
-      : totalPatch(item.file, patch, total)
+      : yield* totalPatch(item.file, patch, total)
     capped = capped || result.capped
     if (!capped) {
       total += Buffer.byteLength(result.patch)
@@ -325,6 +326,21 @@ export const layer: Layer.Layer<Service, never, Git.Service | Bus.Service> = Lay
       }),
     )
 
+    const diffFn = Effect.fn("Vcs.diff")(function* (mode: Mode) {
+      const value = yield* InstanceState.get(state)
+      const ctx = yield* InstanceState.context
+      if (ctx.project.vcs !== "git") return []
+      if (mode === "git") {
+        return yield* track(git, ctx.directory, (yield* git.hasHead(ctx.directory)) ? "HEAD" : undefined)
+      }
+
+      if (!value.root) return []
+      if (value.current && value.current === value.root.name) return []
+      const ref = yield* git.mergeBase(ctx.directory, value.root.ref)
+      if (!ref) return []
+      return yield* diffAgainstRef(git, ctx.directory, ref)
+    })
+
     return Service.of({
       init: Effect.fn("Vcs.init")(function* () {
         yield* InstanceState.get(state).pipe(Effect.forkIn(scope))
@@ -360,20 +376,7 @@ export const layer: Layer.Layer<Service, never, Git.Service | Bus.Service> = Lay
             }),
         )
       }),
-      diff: Effect.fn("Vcs.diff")(function* (mode: Mode) {
-        const value = yield* InstanceState.get(state)
-        const ctx = yield* InstanceState.context
-        if (ctx.project.vcs !== "git") return []
-        if (mode === "git") {
-          return yield* track(git, ctx.directory, (yield* git.hasHead(ctx.directory)) ? "HEAD" : undefined)
-        }
-
-        if (!value.root) return []
-        if (value.current && value.current === value.root.name) return []
-        const ref = yield* git.mergeBase(ctx.directory, value.root.ref)
-        if (!ref) return []
-        return yield* diffAgainstRef(git, ctx.directory, ref)
-      }),
+      diff: (mode) => diffFn(mode).pipe(Effect.orDie),
       diffRaw: Effect.fn("Vcs.diffRaw")(function* () {
         const ctx = yield* InstanceState.context
         if (ctx.project.vcs !== "git") return ""

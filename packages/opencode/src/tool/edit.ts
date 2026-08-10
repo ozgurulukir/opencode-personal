@@ -96,7 +96,9 @@ export const EditTool = Tool.define<
                 const desiredBom = source.bom || next.bom
                 contentOld = source.text
                 contentNew = next.text
-                diff = trimDiff(createTwoFilesPatch(filePath, filePath, contentOld, contentNew))
+                diff = trimDiff(
+                  (yield* Effect.tryPromise(() => createTwoFilesPatch(filePath, filePath, contentOld, contentNew))) as string,
+                )
                 yield* ctx.ask({
                   permission: "edit",
                   patterns: [path.relative(instance.worktree, filePath)],
@@ -129,17 +131,17 @@ export const EditTool = Tool.define<
               const old = convertToLineEnding(normalizeLineEndings(params.oldString), ending)
               const replacement = convertToLineEnding(normalizeLineEndings(params.newString), ending)
 
-              const next = Bom.split(replace(contentOld, old, replacement, params.replaceAll))
+               const next = Bom.split(replace(contentOld, old, replacement, params.replaceAll))
               const desiredBom = source.bom || next.bom
               contentNew = next.text
 
               diff = trimDiff(
-                createTwoFilesPatch(
+                (yield* Effect.tryPromise(() => createTwoFilesPatch(
                   filePath,
                   filePath,
                   normalizeLineEndings(contentOld),
                   normalizeLineEndings(contentNew),
-                ),
+                ))) as string,
               )
               yield* ctx.ask({
                 permission: "edit",
@@ -161,19 +163,19 @@ export const EditTool = Tool.define<
                 event: "change",
               })
               diff = trimDiff(
-                createTwoFilesPatch(
+                (yield* Effect.tryPromise(() => createTwoFilesPatch(
                   filePath,
                   filePath,
                   normalizeLineEndings(contentOld),
                   normalizeLineEndings(contentNew),
-                ),
+                ))) as string,
               )
             }).pipe(Effect.orDie),
           )
 
           let additions = 0
           let deletions = 0
-          for (const change of diffLines(contentOld, contentNew)) {
+          for (const change of yield* Effect.tryPromise(() => diffLines(contentOld, contentNew))) {
             if (change.added) additions += change.count || 0
             if (change.removed) deletions += change.count || 0
           }
@@ -210,7 +212,7 @@ export const EditTool = Tool.define<
             title: `${path.relative(instance.worktree, filePath)}`,
             output,
           }
-        }),
+        }).pipe(Effect.orDie),
     }
   }),
 )

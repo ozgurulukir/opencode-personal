@@ -26,7 +26,7 @@ export type ViewDiff = {
 
 const cache = new Map<string, FileDiffMetadata>()
 
-function patch(diff: ReviewDiff) {
+async function patch(diff: ReviewDiff) {
   if (typeof diff.patch === "string") {
     try {
       const [patch] = parsePatch(diff.patch)
@@ -76,7 +76,7 @@ function patch(diff: ReviewDiff) {
     before: "before" in diff && typeof diff.before === "string" ? diff.before : "",
     after: "after" in diff && typeof diff.after === "string" ? diff.after : "",
     patch: formatPatch(
-      structuredPatch(
+      await structuredPatch(
         diff.file,
         diff.file,
         "before" in diff && typeof diff.before === "string" ? diff.before : "",
@@ -98,8 +98,8 @@ function file(file: string, patch: string, before: string, after: string) {
   return value
 }
 
-export function normalize(diff: ReviewDiff): ViewDiff {
-  const next = patch(diff)
+export async function normalize(diff: ReviewDiff): Promise<ViewDiff> {
+  const next = await patch(diff)
   return {
     file: diff.file,
     patch: next.patch,

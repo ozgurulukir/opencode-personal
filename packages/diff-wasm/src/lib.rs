@@ -110,10 +110,10 @@ pub fn create_two_files_patch_rs(
     let ctx = context.unwrap_or(3);
     let diff = TextDiff::configure()
         .algorithm(Algorithm::Myers)
-        .context_radius(ctx)
         .diff_lines(old_str, new_str);
 
-    let u_diff = diff.unified_diff();
+    let mut unified = diff.unified_diff();
+    let u_diff = unified.context_radius(ctx);
     let header_old = old_header.unwrap_or_default();
     let header_new = new_header.unwrap_or_default();
 
@@ -141,16 +141,19 @@ pub fn structured_patch_rs(
     let ctx = context.unwrap_or(3);
     let diff = TextDiff::configure()
         .algorithm(Algorithm::Myers)
-        .context_radius(ctx)
         .diff_lines(old_str, new_str);
 
+    let mut unified = diff.unified_diff();
     let mut hunks_js: Vec<Hunk> = Vec::new();
 
-    for hunk in diff.unified_diff().context_radius(ctx).iter_hunks() {
-        let old_start = hunk.old_range().start();
-        let old_lines = hunk.old_range().len();
-        let new_start = hunk.new_range().start();
-        let new_lines = hunk.new_range().len();
+    for hunk in unified.context_radius(ctx).iter_hunks() {
+        let ops = hunk.ops();
+        let first = ops.first();
+        let last = ops.last();
+        let old_start = first.map(|op| op.old_range().start).unwrap_or(0);
+        let old_lines = last.map(|op| op.old_range().end).unwrap_or(0) - old_start;
+        let new_start = first.map(|op| op.new_range().start).unwrap_or(0);
+        let new_lines = last.map(|op| op.new_range().end).unwrap_or(0) - new_start;
 
         let mut lines_vec = Vec::new();
         for change in hunk.iter_changes() {

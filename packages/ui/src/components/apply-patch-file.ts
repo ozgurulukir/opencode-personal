@@ -35,7 +35,7 @@ function status(type: Kind): "added" | "deleted" | "modified" {
   return "modified"
 }
 
-export function patchFile(raw: unknown): ApplyPatchFile | undefined {
+export async function patchFile(raw: unknown): Promise<ApplyPatchFile | undefined> {
   if (!raw || typeof raw !== "object") return
 
   const value = raw as Raw
@@ -60,7 +60,7 @@ export function patchFile(raw: unknown): ApplyPatchFile | undefined {
     additions,
     deletions,
     movePath,
-    view: normalize({
+    view: await normalize({
       file: relativePath,
       patch,
       before,
@@ -72,7 +72,7 @@ export function patchFile(raw: unknown): ApplyPatchFile | undefined {
   }
 }
 
-export function patchFiles(raw: unknown) {
+export async function patchFiles(raw: unknown): Promise<ApplyPatchFile[]> {
   if (!Array.isArray(raw)) return []
-  return raw.map(patchFile).filter((file): file is ApplyPatchFile => !!file)
+  return (await Promise.all(raw.map(patchFile))).filter((file): file is ApplyPatchFile => !!file)
 }

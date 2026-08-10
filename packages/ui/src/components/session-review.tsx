@@ -13,7 +13,7 @@ import { useFileComponent } from "../context/file"
 import { useI18n } from "../context/i18n"
 import { getDirectory, getFilename } from "@opencode-ai/core/util/path"
 import { checksum } from "@opencode-ai/core/util/encode"
-import { createEffect, createMemo, For, Match, onCleanup, Show, Switch, untrack, type JSX } from "solid-js"
+import { createEffect, createMemo, createSignal, For, Match, onCleanup, Show, Switch, untrack, type JSX } from "solid-js"
 import { createStore } from "solid-js/store"
 import { type FileContent, type SnapshotFileDiff, type VcsFileDiff } from "@opencode-ai/sdk/v2"
 import { PreloadMultiFileDiffResult } from "@pierre/diffs/ssr"
@@ -183,13 +183,12 @@ export const SessionReview = (props: SessionReviewProps) => {
 
   const open = () => props.open ?? store.open
   // ⚡ Bolt Optimization: Use pre-allocated arrays and for-loops to avoid chained .map() GC pressure
-  const items = createMemo<Item[]>(() => {
+  const [items, setItems] = createSignal<Item[]>([])
+  createEffect(() => {
     const diffs = list(props.diffs)
-    const result = new Array<Item>(diffs.length)
-    for (let i = 0; i < diffs.length; i++) {
-      result[i] = { ...normalize(diffs[i]), preloaded: diffs[i].preloaded }
-    }
-    return result
+    Promise.all(
+      diffs.map(async (d, i) => ({ ...(await normalize(d)), preloaded: diffs[i].preloaded }))
+    ).then(setItems)
   })
   // ⚡ Bolt Optimization: Avoid .map() array allocations
   const files = createMemo(() => {

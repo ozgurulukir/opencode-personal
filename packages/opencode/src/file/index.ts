@@ -559,10 +559,12 @@ export const layer = Layer.effect(
         }
         if (diff.trim()) {
           const original = yield* git.show(ctx.directory, "HEAD", file)
-          const patch = structuredPatch(file, file, original, content, "old", "new", {
-            context: Infinity,
-            ignoreWhitespace: true,
-          })
+          const patch = yield* Effect.tryPromise(() =>
+            structuredPatch(file, file, original, content, "old", "new", {
+              context: Infinity,
+              ignoreWhitespace: true,
+            }),
+          ).pipe(Effect.orDie)
           return { type: "text" as const, content, patch, diff: formatPatch(patch) }
         }
         return { type: "text" as const, content }
