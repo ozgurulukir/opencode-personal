@@ -24,6 +24,7 @@ import { EffectBridge } from "@/effect/bridge"
 import { InstanceState } from "@/effect/instance-state"
 import { AppFileSystem } from "@opencode-ai/core/filesystem"
 import { isRecord } from "@/util/record"
+import { combineSignals } from "@/util/abort"
 import { optionalOmitUndefined, withStatics } from "@opencode-ai/core/schema"
 
 import * as ProviderTransform from "./transform"
@@ -1429,7 +1430,9 @@ const layer: Layer.Layer<
           if (options["timeout"] !== undefined && options["timeout"] !== null && options["timeout"] !== false)
             signals.push(AbortSignal.timeout(options["timeout"]))
 
-          const combined = signals.length === 0 ? null : signals.length === 1 ? signals[0] : AbortSignal.any(signals)
+          const { signal: combined, cleanup } = signals.length <= 1
+            ? { signal: signals[0] ?? null, cleanup: () => {} }
+            : combineSignals(signals)
           if (combined) opts.signal = combined
 
           // Strip openai itemId metadata following what codex does
@@ -1456,14 +1459,18 @@ const layer: Layer.Layer<
             }
           }
 
-          const res = await fetchFn(input, {
-            ...opts,
-            // @ts-ignore see here: https://github.com/oven-sh/bun/issues/16682
-            timeout: false,
-          })
+          try {
+            const res = await fetchFn(input, {
+              ...opts,
+              // @ts-ignore see here: https://github.com/oven-sh/bun/issues/16682
+              timeout: false,
+            })
 
-          if (!chunkAbortCtl) return res
-          return wrapSSE(res, chunkTimeout, chunkAbortCtl)
+            if (!chunkAbortCtl) return res
+            return wrapSSE(res, chunkTimeout, chunkAbortCtl)
+          } finally {
+            cleanup()
+          }
         }
 
         const bundledLoader = BUNDLED_PROVIDERS[model.api.npm]
