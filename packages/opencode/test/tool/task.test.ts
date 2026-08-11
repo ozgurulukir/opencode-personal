@@ -485,8 +485,9 @@ describe("tool.task", () => {
     }),
   )
 
-  it.instance("execute proceeds when parent agent is missing from config (characterization)", () =>
+  it.instance("execute applies fallback deny rules when parent agent is missing", () =>
     Effect.gen(function* () {
+      const sessions = yield* Session.Service
       const { chat, assistant } = yield* seed("Pinned", "deleted-agent")
       const tool = yield* TaskTool
       const def = yield* tool.init()
@@ -510,11 +511,17 @@ describe("tool.task", () => {
         },
       )
 
-      // Current behavior: succeeds even though parent agent is not found.
-      // The parentAgent lookup silently returns undefined via catchCause,
-      // skipping parent agent deny rules. This test documents that behavior.
+      // After Issue 2 fix: when parent agent is not found, fallback deny rules
+      // are applied instead of silently skipping all denies.
       expect(result.metadata.sessionId).toBeDefined()
-      expect(result.output).toContain("<task_result>")
+      const child = yield* sessions.get(result.metadata.sessionId)
+      expect(child.permission).toBeDefined()
+      const editDeny = child.permission?.find((r) => r.permission === "edit" && r.action === "deny")
+      const writeDeny = child.permission?.find((r) => r.permission === "write" && r.action === "deny")
+      const bashDeny = child.permission?.find((r) => r.permission === "bash" && r.action === "deny")
+      expect(editDeny).toBeDefined()
+      expect(writeDeny).toBeDefined()
+      expect(bashDeny).toBeDefined()
     }),
   )
 
@@ -575,5 +582,88 @@ describe("tool.task", () => {
         },
       },
     },
+  )
+
+  it.instance("execute dies for invalid subagent_type (characterization)", () =>
+    Effect.gen(function* () {
+      const { chat, assistant } = yield* seed()
+      const tool = yield* TaskTool
+      const def = yield* tool.init()
+
+      const result = yield* def
+        .execute(
+          {
+            description: "bad task",
+            prompt: "do something",
+            subagent_type: "nonexistent",
+          },
+          {
+            sessionID: chat.id,
+            messageID: assistant.id,
+            agent: "build",
+            abort: new AbortController().signal,
+            extra: { promptOps: stubOps() },
+            messages: [],
+            metadata: () => Effect.void,
+            ask: () => Effect.void,
+          },
+        )
+        .pipe(
+          Effect.map(() => ({ error: undefined as string | undefined, ok: true })),
+          Effect.catchDefect((defect) =>
+            Effect.succeed({ error: defect instanceof Error ? defect.message : String(defect), ok: false }),
+          ),
+        )
+
+      // Characterization: invalid subagent_type currently throws a defect
+      // because Effect.fail + orDie converts the failure to a defect.
+      // After Issue 5, this will use Effect.die directly (same observable behavior).
+      expect(result.ok).toBe(false)
+      expect(result.error).toContain("Unknown agent type")
+    }),
+  )
+
+  it.instance("execute rejects subagent when max nesting depth is exceeded", () =>
+    Effect.gen(function* () {
+      const sessions = yield* Session.Service
+      const { chat, assistant } = yield* seed()
+      const tool = yield* TaskTool
+      const def = yield* tool.init()
+      const promptOps = stubOps({ text: "done" })
+
+      // Create a chain: chat -> child1 -> child2 -> child3 (depth 3)
+      const child1 = yield* sessions.create({ parentID: chat.id, title: "child1" })
+      const child2 = yield* sessions.create({ parentID: child1.id, title: "child2" })
+      const child3 = yield* sessions.create({ parentID: child2.id, title: "child3" })
+
+      // Spawning a new subagent from child3 (depth 3) should be rejected
+      const result = yield* def
+        .execute(
+          {
+            description: "deep task",
+            prompt: "do something",
+            subagent_type: "general",
+          },
+          {
+            sessionID: child3.id,
+            messageID: assistant.id,
+            agent: "build",
+            abort: new AbortController().signal,
+            extra: { promptOps },
+            messages: [],
+            metadata: () => Effect.void,
+            ask: () => Effect.void,
+          },
+        )
+        .pipe(
+          Effect.map((r) => ({ error: undefined as string | undefined, ok: true })),
+          Effect.catchDefect((defect) =>
+            Effect.succeed({ error: defect instanceof Error ? defect.message : String(defect), ok: false }),
+          ),
+        )
+
+      expect(result.ok).toBe(false)
+      expect(result.error).toContain("Maximum subagent nesting depth")
+    }),
   )
 })

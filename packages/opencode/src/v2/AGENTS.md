@@ -86,3 +86,20 @@ result). The `subagent()` interface returns `void`. This is the delegation desig
 the child loop is driven via V1, and the result is surfaced through the event
 projection. If a caller needs the structured return value, it should read the
 synthetic message from the parent's `messages()`.
+
+## V2 subagent() fallback deny rules when parent agent is not found
+
+When the parent session's agent is not found (e.g., deleted or renamed), `subagent()`
+applies a conservative fallback deny ruleset (`edit`, `write`, `bash` denied) instead
+of silently skipping all parent agent deny rules. This closes a security hole where
+Plan Mode's `edit: { "*": "deny" }` would be bypassed if the parent agent was missing.
+The fallback is applied via `Effect.catchCause` in `v2/session.ts` and matches V1
+`tool/task.ts` behavior.
+
+## V2 subagent() max nesting depth
+
+`subagent()` enforces a maximum nesting depth of `MAX_SUBAGENT_DEPTH = 3` (defined in
+`agent/subagent-permissions.ts`). The depth check walks the `parentID` chain
+iteratively before creating the child session. If the chain length is already 3 or
+more, the subagent creation is rejected with an error. This prevents deeply nested
+recursive subagents from causing resource exhaustion.

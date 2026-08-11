@@ -4,7 +4,7 @@ import { Session } from "@/session/session"
 import { SessionID, MessageID } from "../session/schema"
 import { MessageV2 } from "../session/message-v2"
 import { Agent } from "../agent/agent"
-import { subagentSessionPermission, subagentToolRestrictions } from "../agent/subagent-permissions"
+import { subagentSessionPermission, subagentToolRestrictions, MAX_SUBAGENT_DEPTH } from "../agent/subagent-permissions"
 import type { SessionPrompt } from "../session/prompt"
 import { Config } from "@/config/config"
 import { Cause, Effect, Exit, Schema } from "effect"
@@ -72,7 +72,7 @@ export const TaskTool = Tool.define(
 
       const next = yield* agent.get(params.subagent_type)
       if (!next) {
-        return yield* Effect.fail(new Error(`Unknown agent type: ${params.subagent_type} is not a valid agent type`))
+        return yield* Effect.die(new Error(`Unknown agent type: ${params.subagent_type} is not a valid agent type`))
       }
 
       const taskID = params.task_id
@@ -85,17 +85,47 @@ export const TaskTool = Tool.define(
       const parent = yield* sessions.get(ctx.sessionID)
       const parentAgent = parent.agent
         ? yield* agent.get(parent.agent).pipe(
+            Effect.map((a) =>
+              a ??
+              ({
+                permission: [
+                  { permission: "edit", pattern: "*", action: "deny" },
+                  { permission: "write", pattern: "*", action: "deny" },
+                  { permission: "bash", pattern: "*", action: "deny" },
+                ],
+              } as Agent.Info),
+            ),
             Effect.catchCause((cause) =>
               Effect.gen(function* () {
-                log.warn("parent agent not found, skipping parent deny rules", {
+                log.warn("parent agent not found, applying fallback deny rules", {
                   parentAgent: parent.agent,
                   cause: Cause.squash(cause),
                 })
-                return undefined
+                return {
+                  permission: [
+                    { permission: "edit", pattern: "*", action: "deny" },
+                    { permission: "write", pattern: "*", action: "deny" },
+                    { permission: "bash", pattern: "*", action: "deny" },
+                  ],
+                } as Agent.Info
               }),
             ),
           )
         : undefined
+
+      let depth = 0
+      let currentParentID: SessionID | undefined = ctx.sessionID
+      while (currentParentID) {
+        depth++
+        if (depth >= MAX_SUBAGENT_DEPTH) {
+          return yield* Effect.fail(
+            new Error(`Maximum subagent nesting depth (${MAX_SUBAGENT_DEPTH}) exceeded`),
+          )
+        }
+        const ancestor: Session.Info = yield* sessions.get(currentParentID)
+        currentParentID = ancestor.parentID
+      }
+
       const nextSession =
         session ??
         (yield* sessions.create({
@@ -136,7 +166,7 @@ export const TaskTool = Tool.define(
       function onAbort() {
         if (cancelled) return
         cancelled = true
-        runCancel.fork(cancel)
+        Effect.runPromise(cancel).catch((error) => log.warn("subagent cancel failed", { error: String(error) }))
       }
 
       return yield* Effect.acquireUseRelease(
@@ -171,7 +201,10 @@ export const TaskTool = Tool.define(
                 `task_id: ${nextSession.id} (for resuming to continue this task if needed)`,
                 "",
                 "<task_result>",
-                result.parts.findLast((item) => item.type === "text")?.text ?? "",
+                (() => {
+                  const text = result.parts.findLast((item) => item.type === "text")?.text
+                  return text ?? "Subagent completed without producing a text response."
+                })(),
                 "</task_result>",
               ].join("\n"),
             }

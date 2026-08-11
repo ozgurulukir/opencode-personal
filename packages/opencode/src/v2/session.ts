@@ -22,7 +22,7 @@ import { Bus } from "@/bus"
 import { Agent } from "@/agent/agent"
 import { Config } from "@/config/config"
 import { Permission } from "@/permission"
-import { subagentSessionPermission, subagentToolRestrictions } from "@/agent/subagent-permissions"
+import { subagentSessionPermission, subagentToolRestrictions, MAX_SUBAGENT_DEPTH } from "@/agent/subagent-permissions"
 import * as Log from "@opencode-ai/core/util/log"
 
 const log = Log.create({ service: "v2.session" })
@@ -469,13 +469,29 @@ export const layer = Layer.effect(
         }
         const parentAgent = parent.agent
           ? yield* agents.get(parent.agent).pipe(
+              Effect.map((a) =>
+                a ??
+                ({
+                  permission: [
+                    { permission: "edit", pattern: "*", action: "deny" },
+                    { permission: "write", pattern: "*", action: "deny" },
+                    { permission: "bash", pattern: "*", action: "deny" },
+                  ],
+                } as Agent.Info),
+              ),
               Effect.catchCause((cause) =>
                 Effect.sync(() => {
-                  log.warn("parent agent not found, skipping parent deny rules", {
+                  log.warn("parent agent not found, applying fallback deny rules", {
                     parentAgent: parent.agent,
                     cause: Cause.squash(cause),
                   })
-                  return undefined
+                  return {
+                    permission: [
+                      { permission: "edit", pattern: "*", action: "deny" },
+                      { permission: "write", pattern: "*", action: "deny" },
+                      { permission: "bash", pattern: "*", action: "deny" },
+                    ],
+                  } as Agent.Info
                 }),
               ),
             )
@@ -487,6 +503,19 @@ export const layer = Layer.effect(
           subagent,
           primaryTools: cfgInfo.experimental?.primary_tools,
         })
+
+        let depth = 0
+        let currentParentID: SessionID | undefined = input.parentID
+        while (currentParentID) {
+          depth++
+          if (depth >= MAX_SUBAGENT_DEPTH) {
+            return yield* Effect.die(
+              new Error(`Maximum subagent nesting depth (${MAX_SUBAGENT_DEPTH}) exceeded`),
+            )
+          }
+          const ancestor: Info = yield* result.get(currentParentID)
+          currentParentID = ancestor.parentID
+        }
 
         const session = yield* result.create({
           agent: input.agent,
@@ -534,13 +563,20 @@ export const layer = Layer.effect(
               // `messages()`. @see v2/AGENTS.md "V2 subagent() posts results synthetically".
               const messages = yield* result.messages({ sessionID: session.id, order: "desc" })
               const assistant = messages.find((msg) => msg.type === "assistant")
-              if (!assistant || assistant.type !== "assistant") return
-              const text = assistant.content.findLast((part) => part.type === "text")
-              if (!text || text.type !== "text") return
+              if (!assistant || assistant.type !== "assistant") {
+                yield* sync.run(SessionEvent.Synthetic.Sync, {
+                  sessionID: input.parentID,
+                  timestamp: DateTime.makeUnsafe(Date.now()),
+                  text: "Subagent completed without producing a text response.",
+                })
+                return
+              }
+              const textPart = assistant.content.findLast((part) => part.type === "text")
+              const text = textPart?.text ?? "Subagent completed without producing a text response."
               yield* sync.run(SessionEvent.Synthetic.Sync, {
                 sessionID: input.parentID,
                 timestamp: DateTime.makeUnsafe(Date.now()),
-                text: text.text,
+                text,
               })
             }).pipe(
               Effect.catchCause((cause) =>
