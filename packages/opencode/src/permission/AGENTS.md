@@ -37,3 +37,11 @@ When the user replies with `"always"`, the approved ruleset is persisted to `Per
 ## Pre-existing flaky test: `reply - reject cancels all pending for same session`
 
 The test `reply - reject cancels all pending for same session` (`test/permission/next.test.ts`) fails intermittently in the full suite but passes in isolation. Not caused by recent changes.
+
+## Permission snapshot — comment vs reality
+
+The comment in `reply()` says "snapshot prevents race" but the real safety comes from
+JavaScript's single-threaded execution and the synchronous `Database.transaction`.
+Effect's cooperative scheduling can interleave yields between `approved.push()` and
+the upsert, but the snapshot ensures the DB write is atomic regardless. The comment
+has been updated to reflect the actual guarantees.

@@ -269,6 +269,8 @@ See `specs/effect/migration.md` for the compact pattern reference and examples.
 - `Effect.catchDefect` exists in Effect v4; `Effect.catchDie` does not. Use `Effect.catchDefect((defect) => ...)` to catch defects from `Effect.orDie` or `Effect.die`.
 - `Tool.define` wraps built-in tool output with `truncate.output()` automatically. Individual tools also wrap with `.pipe(Effect.orDie)` — this is redundant but consistent across the codebase. Do NOT yield `Truncate.Service` or `Agent.Service` explicitly in built-in tool implementations — it causes test timeouts without changing runtime behavior.
 - `Effect.catchIf` accepts a boolean predicate without requiring a type guard `is` annotation — TypeScript infers the narrowed type. The codebase uses duck-typing patterns like `(err) => "reason" in err && err.reason._tag === "NotFound"` without importing `PlatformError`. See `read.ts:176` and `grep.ts:58` for the pattern.
+- `EffectBridge.make()` allocates a bridge that must be used with `.fork(effect)` to preserve the Effect runtime context. Calling `Effect.runPromise(effect)` directly on a cancel effect drops the runtime, causing missing-service defects if the effect yields services. See `tool/task.ts` for the pattern.
+- `Effect.fail` creates a typed error (caught by `Effect.catch`), not a defect (caught by `Effect.catchDefect`). When testing code that uses `Effect.fail` + `Effect.orDie`, use `Effect.catch` in tests, not `Effect.catchDefect`. See `test/tool/task.test.ts` and `test/v2/session.test.ts` for examples.
 
 ## LLM side-channels (predict, summaries, classification)
 

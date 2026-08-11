@@ -103,3 +103,17 @@ The fallback is applied via `Effect.catchCause` in `v2/session.ts` and matches V
 iteratively before creating the child session. If the chain length is already 3 or
 more, the subagent creation is rejected with an error. This prevents deeply nested
 recursive subagents from causing resource exhaustion.
+
+## V2 subagent() error handling — use `Effect.fail`, not `Effect.die`
+
+V2 `subagent()` uses `Effect.fail` for max nesting depth exceeded (recoverable typed
+error), matching V1 `tool/task.ts`. Do NOT use `Effect.die` here — the caller may want
+to catch and surface the error gracefully. Tests should use `Effect.catch`, not
+`Effect.catchDefect`, for this path.
+
+## V2 subagent() empty output detection
+
+When the subagent's final assistant message has zero content parts, post a distinct
+synthetic message ("Subagent produced no output parts.") instead of falling back to
+the generic "completed without producing a text response." This helps the parent LLM
+distinguish between "had parts but none were text" and "completely empty output."
