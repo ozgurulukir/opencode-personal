@@ -71,3 +71,11 @@ The `grep`/`glob`/`read` permission ask uses `always: ["*"]` which always allows
 ## Permission ask ordering — ask happens before path validation
 
 All search tools (`grep.ts`, `glob.ts`) call `ctx.ask` (permission prompt) before resolving and validating `params.path`. This means the user sees a permission prompt even for non-existent or invalid paths. The permission is always-allowed (`always: ["*"]`), so the UX cost is minimal, but it means invalid paths still go through the permission flow before failing at ripgrep or stat.
+
+## Path traversal: `path.resolve()` does NOT resolve symlinks
+
+`path.resolve()` normalizes `..` segments but does not resolve symlinks. A directory inside the project that is a symlink to `/etc` allows paths like `linked-dir/passwd` to pass the `startsWith(instance.directory)` check and write outside the project. Use `fs.realpathSync()` on the resolved path to catch symlink escapes. This applies to `edit.ts`, `write.ts`, and `apply_patch.ts`.
+
+## SSRF: pin resolved IP + Host header to prevent DNS rebinding
+
+The SSRF guard in `webfetch.ts` resolves DNS before the HTTP request, but the HTTP client re-resolves DNS independently. An attacker's DNS server can return a public IP on the first lookup (passing the check) and a private IP on the second (DNS rebinding). Fix: set the request URL to the resolved IP and add the original hostname as the `Host` header. The retry path must use the same pinned URL.
