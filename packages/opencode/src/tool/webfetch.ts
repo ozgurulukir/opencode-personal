@@ -29,7 +29,13 @@ function isPrivateIPv4(ip: string): boolean {
 
 function isPrivateIPv6(ip: string): boolean {
   const lower = ip.toLowerCase()
-  return lower === "::1" || lower.startsWith("fe80:") || lower.startsWith("fc") || lower.startsWith("fd")
+  if (lower === "::1") return true
+  if (lower.startsWith("fe80:")) return true
+  if (lower.startsWith("fc") || lower.startsWith("fd")) return true
+  if (lower.startsWith("::ffff:0:")) return true
+  if (lower.startsWith("100::")) return true
+  if (lower.startsWith("2001:db8:")) return true
+  return false
 }
 
 function isPrivateIP(ip: string): boolean {
@@ -114,7 +120,13 @@ export const WebFetchTool = Tool.define(
             "Accept-Language": "en-US,en;q=0.9",
           }
 
-          const request = HttpClientRequest.get(params.url).pipe(HttpClientRequest.setHeaders(headers))
+          const pinnedUrl = new URL(params.url)
+          pinnedUrl.hostname = resolvedAddress.address
+          const pinnedHeaders = {
+            ...headers,
+            Host: new URL(params.url).hostname,
+          }
+          const request = HttpClientRequest.get(pinnedUrl.toString()).pipe(HttpClientRequest.setHeaders(pinnedHeaders))
 
           // Retry with honest UA if blocked by Cloudflare bot detection (TLS fingerprint mismatch)
           const response = yield* httpOk.execute(request).pipe(
@@ -125,8 +137,8 @@ export const WebFetchTool = Tool.define(
                 err.reason.response.headers["cf-mitigated"] === "challenge",
               () =>
                 httpOk.execute(
-                  HttpClientRequest.get(params.url).pipe(
-                    HttpClientRequest.setHeaders({ ...headers, "User-Agent": "opencode" }),
+                  HttpClientRequest.get(pinnedUrl.toString()).pipe(
+                    HttpClientRequest.setHeaders({ ...pinnedHeaders, "User-Agent": "opencode" }),
                   ),
                 ),
             ),

@@ -663,7 +663,7 @@ describe("tool.task", () => {
         )
 
       expect(result.ok).toBe(false)
-      expect(result.error).toContain("Maximum subagent nesting depth")
+      expect(result.error).toContain("Maximum subagent nesting levels")
     }),
   )
 })

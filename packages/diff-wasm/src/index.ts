@@ -10,11 +10,13 @@ import {
 const WASM_JS_PATH = (globalThis as any).OPENCODE_DIFF_WASM_JS_PATH ?? "../pkg/opencode_diff_rs.js"
 
 let wasmReady: Promise<void> | null = null
+let wasmFailed = false
 let diff_lines_rs: typeof import("../pkg/opencode_diff_rs.js").diff_lines_rs
 let create_two_files_patch_rs: typeof import("../pkg/opencode_diff_rs.js").create_two_files_patch_rs
 let structured_patch_rs: typeof import("../pkg/opencode_diff_rs.js").structured_patch_rs
 
 function ensureWasm(): Promise<void> {
+  if (wasmFailed) return wasmReady!
   if (wasmReady === null) {
     wasmReady = import(WASM_JS_PATH)
       .then((mod) => {
@@ -25,7 +27,7 @@ function ensureWasm(): Promise<void> {
       })
       .then(() => {})
       .catch((err) => {
-        wasmReady = null
+        wasmFailed = true
         throw err
       })
   }
@@ -129,7 +131,8 @@ export async function structuredPatch(
 }
 
 export function formatPatch(diff: ParsedDiff): string {
-  return jsFormatPatch(diff as any)
+  // ParsedDiff is structurally compatible with diff's internal format
+  return jsFormatPatch(diff as unknown as Parameters<typeof jsFormatPatch>[0])
 }
 
 export function parsePatch(diffStr: string, options?: { timeout?: number }): ParsedDiff[] {
@@ -141,5 +144,6 @@ export function applyPatch(
   patch: string | ParsedDiff | ParsedDiff[],
   options?: { fuzzFactor?: number }
 ): string | false {
-  return jsApplyPatch(source, patch as any, options)
+  // ParsedDiff is structurally compatible with diff's internal patch format
+  return jsApplyPatch(source, patch as unknown as Parameters<typeof jsApplyPatch>[1], options)
 }

@@ -15,8 +15,26 @@ import { trimDiff } from "./edit.replacer"
 import { assertExternalDirectoryEffect } from "./external-directory"
 import * as Bom from "@/util/bom"
 import { Todo } from "../session/todo"
+import fs from "fs"
 
 const MAX_PROJECT_DIAGNOSTICS_FILES = 5
+
+function resolvePath(filePath: string, instance: { directory: string; worktree: string }): string {
+  const resolved = AppFileSystem.resolve(path.resolve(filePath))
+  try {
+    const real = fs.realpathSync(resolved)
+    return real
+  } catch {
+    // Non-existent file: resolve the parent directory to catch symlinks in the path
+    const parent = path.dirname(resolved)
+    try {
+      const realParent = fs.realpathSync(parent)
+      return path.join(realParent, path.basename(resolved))
+    } catch {
+      return resolved
+    }
+  }
+}
 
 export const Parameters = Schema.Struct({
   content: Schema.String.annotate({ description: "The content to write to the file" }),
@@ -47,10 +65,14 @@ export const WriteTool = Tool.define<
           const filepath = path.isAbsolute(params.filePath)
             ? params.filePath
             : path.join(instance.directory, params.filePath)
-          yield* assertExternalDirectoryEffect(ctx, filepath)
+          const resolvedFilepath = resolvePath(filepath, instance)
+          if (!resolvedFilepath.startsWith(instance.directory + path.sep) && resolvedFilepath !== instance.directory) {
+            return yield* Effect.fail(new Error(`Path escapes project directory: ${resolvedFilepath}`))
+          }
+          yield* assertExternalDirectoryEffect(ctx, resolvedFilepath)
 
-          const exists = yield* fs.existsSafe(filepath)
-          const source = exists ? yield* Bom.readFile(fs, filepath) : { bom: false, text: "" }
+          const exists = yield* fs.existsSafe(resolvedFilepath)
+          const source = exists ? yield* Bom.readFile(fs, resolvedFilepath) : { bom: false, text: "" }
           const next = Bom.split(params.content)
           const desiredBom = source.bom || next.bom
           const contentOld = source.text
@@ -58,44 +80,44 @@ export const WriteTool = Tool.define<
 
           const diff = trimDiff(
             (yield* Effect.tryPromise({
-              try: () => createTwoFilesPatch(filepath, filepath, contentOld, contentNew),
+              try: () => createTwoFilesPatch(resolvedFilepath, resolvedFilepath, contentOld, contentNew),
               catch: (error) =>
                 new Error(
-                  `createTwoFilesPatch failed for ${filepath}: ${error instanceof Error ? error.message : String(error)}`,
+                  `createTwoFilesPatch failed for ${resolvedFilepath}: ${error instanceof Error ? error.message : String(error)}`,
                 ),
             })) as string,
           )
           yield* ctx.ask({
             permission: "edit",
-            patterns: [path.relative(instance.worktree, filepath)],
+            patterns: [path.relative(instance.worktree, resolvedFilepath)],
             always: ["*"],
             metadata: {
-              filepath,
+              filepath: resolvedFilepath,
               diff,
             },
           })
 
-          yield* fs.writeWithDirs(filepath, Bom.join(contentNew, desiredBom))
-          if (yield* format.file(filepath)) {
-            yield* Bom.syncFile(fs, filepath, desiredBom)
+          yield* fs.writeWithDirs(resolvedFilepath, Bom.join(contentNew, desiredBom))
+          if (yield* format.file(resolvedFilepath)) {
+            yield* Bom.syncFile(fs, resolvedFilepath, desiredBom)
           }
-          yield* bus.publish(File.Event.Edited, { file: filepath })
+          yield* bus.publish(File.Event.Edited, { file: resolvedFilepath })
           yield* bus.publish(FileWatcher.Event.Updated, {
-            file: filepath,
+            file: resolvedFilepath,
             event: exists ? "change" : "add",
           })
 
-          yield* todo.autoclose(ctx.sessionID, [{ filePath: filepath, diff }])
+          yield* todo.autoclose(ctx.sessionID, [{ filePath: resolvedFilepath, diff }])
 
           let output = "Wrote file successfully."
-          yield* lsp.touchFile(filepath, "document")
+          yield* lsp.touchFile(resolvedFilepath, "document")
           const diagnostics = yield* lsp.diagnostics()
-          const normalizedFilepath = AppFileSystem.normalizePath(filepath)
+          const normalizedFilepath = AppFileSystem.normalizePath(resolvedFilepath)
           let projectDiagnosticsCount = 0
           for (const [file, issues] of Object.entries(diagnostics)) {
             const current = file === normalizedFilepath
             if (!current && projectDiagnosticsCount >= MAX_PROJECT_DIAGNOSTICS_FILES) continue
-            const block = LSP.Diagnostic.report(current ? filepath : file, issues)
+            const block = LSP.Diagnostic.report(current ? resolvedFilepath : file, issues)
             if (!block) continue
             if (current) {
               output += `\n\nLSP errors detected in this file, please fix:\n${block}`
@@ -106,10 +128,10 @@ export const WriteTool = Tool.define<
           }
 
           return {
-            title: path.relative(instance.worktree, filepath),
+            title: path.relative(instance.worktree, resolvedFilepath),
             metadata: {
               diagnostics,
-              filepath,
+              filepath: resolvedFilepath,
               exists: exists,
             },
             output,

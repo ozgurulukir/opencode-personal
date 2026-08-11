@@ -1,7 +1,7 @@
 import type { Permission } from "../permission"
 import type { Agent } from "./agent"
 
-export const MAX_SUBAGENT_DEPTH = 3
+export const MAX_SUBAGENT_NESTING_LEVELS = 3
 
 /**
  * Deduplicate a permission ruleset by `permission:pattern` key, preserving

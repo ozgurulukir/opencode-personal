@@ -597,13 +597,13 @@ describe("v2.session", () => {
         })
         .pipe(
           Effect.map(() => ({ error: undefined as string | undefined, ok: true })),
-          Effect.catchDefect((defect) =>
-            Effect.succeed({ error: defect instanceof Error ? defect.message : String(defect), ok: false }),
+          Effect.catch((error) =>
+            Effect.succeed({ error: error instanceof Error ? error.message : String(error), ok: false }),
           ),
         )) as { error: string | undefined; ok: boolean }
 
       expect(result.ok).toBe(false)
-      expect(result.error).toContain("Maximum subagent nesting depth")
+      expect(result.error).toContain("Maximum subagent nesting levels")
     }),
   )
 
