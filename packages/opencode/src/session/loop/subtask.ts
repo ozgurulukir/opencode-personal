@@ -96,6 +96,7 @@ export const handleSubtask = Effect.fn("SessionPrompt.handleSubtask")(function* 
     { args: taskArgs },
   )
 
+  const parentAgent = yield* deps.agents.get(lastUser.agent)
   const taskAgent = yield* deps.agents.get(task.agent)
   if (!taskAgent) {
     const available = (yield* deps.agents.list()).filter((a) => !a.hidden).map((a) => a.name)
@@ -104,6 +105,8 @@ export const handleSubtask = Effect.fn("SessionPrompt.handleSubtask")(function* 
     yield* deps.bus.publish(Session.Event.Error, { sessionID, error: error.toObject() })
     throw error
   }
+
+  const parentRuleset = Permission.merge(parentAgent?.permission ?? [], session.permission ?? [])
 
   let error: Error | undefined
   const taskAbort = new AbortController()
@@ -114,7 +117,7 @@ export const handleSubtask = Effect.fn("SessionPrompt.handleSubtask")(function* 
       sessionID,
       abort: taskAbort.signal,
       callID: part.callID,
-      extra: { bypassAgentCheck: true, promptOps },
+      extra: { bypassAgentCheck: true, promptOps, permissionRuleset: parentRuleset },
       messages: msgs,
       metadata: (val: { title?: string; metadata?: Record<string, any> }) =>
         Effect.gen(function* () {
@@ -129,7 +132,7 @@ export const handleSubtask = Effect.fn("SessionPrompt.handleSubtask")(function* 
           .ask({
             ...req,
             sessionID,
-            ruleset: Permission.merge(taskAgent.permission, session.permission ?? []),
+            ruleset: parentRuleset,
           })
           .pipe(Effect.orDie),
     })

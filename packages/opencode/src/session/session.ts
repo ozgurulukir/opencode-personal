@@ -487,26 +487,22 @@ export const layer: Layer.Layer<Service, never, Bus.Service | Storage.Service | 
 
     const remove: Interface["remove"] = Effect.fnUntraced(function* (sessionID: SessionID) {
       const session = yield* get(sessionID)
-      try {
-        const kids = yield* children(sessionID)
-        for (const child of kids) {
-          yield* remove(child.id)
-        }
-
-        // `remove` needs to work in all cases, such as a broken
-        // sessions that run cleanup. In certain cases these will
-        // run without any instance state, so we need to turn off
-        // publishing of events in that case
-        const hasInstance = yield* InstanceState.directory.pipe(
-          Effect.as(true),
-          Effect.catchCause(() => Effect.succeed(false)),
-        )
-
-        yield* sync.run(Event.Deleted, { sessionID, info: session }, { publish: hasInstance })
-        yield* sync.remove(sessionID)
-      } catch (e) {
-        log.error(e)
+      const kids = yield* children(sessionID)
+      for (const child of kids) {
+        yield* remove(child.id).pipe(Effect.catchIf(NotFoundError.isInstance, () => Effect.void))
       }
+
+      // `remove` needs to work in all cases, such as a broken
+      // sessions that run cleanup. In certain cases these will
+      // run without any instance state, so we need to turn off
+      // publishing of events in that case
+      const hasInstance = yield* InstanceState.directory.pipe(
+        Effect.as(true),
+        Effect.catchCause(() => Effect.succeed(false)),
+      )
+
+      yield* sync.run(Event.Deleted, { sessionID, info: session }, { publish: hasInstance })
+      yield* sync.remove(sessionID)
     })
 
     const updateMessage = <T extends MessageV2.Info>(msg: T): Effect.Effect<T> =>

@@ -76,7 +76,11 @@ export const TaskTool = Tool.define(
 
       const taskID = params.task_id
       const session = taskID
-        ? yield* sessions.get(SessionID.make(taskID)).pipe(Effect.catchCause(() => Effect.succeed(undefined)))
+        ? yield* sessions.get(SessionID.make(taskID)).pipe(
+            Effect.catchCause((cause) =>
+              Effect.fail(new Error(`Cannot resume task: session ${taskID} not found (${Cause.squash(cause)})`)),
+            ),
+          )
         : undefined
       if (session && session.parentID !== ctx.sessionID) {
         return yield* Effect.fail(new Error(`task_id ${taskID} does not belong to this session`))
@@ -91,6 +95,8 @@ export const TaskTool = Tool.define(
                   { permission: "edit", pattern: "*", action: "deny" },
                   { permission: "write", pattern: "*", action: "deny" },
                   { permission: "bash", pattern: "*", action: "deny" },
+                  { permission: "task", pattern: "*", action: "deny" },
+                  { permission: "todowrite", pattern: "*", action: "deny" },
                 ],
               } as Agent.Info),
             ),
@@ -105,6 +111,8 @@ export const TaskTool = Tool.define(
                     { permission: "edit", pattern: "*", action: "deny" },
                     { permission: "write", pattern: "*", action: "deny" },
                     { permission: "bash", pattern: "*", action: "deny" },
+                    { permission: "task", pattern: "*", action: "deny" },
+                    { permission: "todowrite", pattern: "*", action: "deny" },
                   ],
                 } as Agent.Info
               }),
