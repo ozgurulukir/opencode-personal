@@ -5,17 +5,17 @@ export const MAX_SUBAGENT_NESTING_LEVELS = 3
 
 /**
  * Deduplicate a permission ruleset by `permission:pattern` key, preserving
- * first-occurrence order. Used to collapse duplicate `(permission, pattern)`
- * entries from parent agent + parent session deny rules.
+ * last-occurrence order (last match wins in Permission.evaluate).
  */
 function dedupe(rules: Permission.Ruleset): Permission.Ruleset {
   const seen = new Set<string>()
   const result: Permission.Ruleset = []
-  for (const rule of rules) {
+  for (let i = rules.length - 1; i >= 0; i--) {
+    const rule = rules[i]
     const key = `${rule.permission}:${rule.pattern}`
     if (seen.has(key)) continue
     seen.add(key)
-    result.push(rule)
+    result.unshift(rule)
   }
   return result
 }
@@ -24,18 +24,10 @@ function dedupe(rules: Permission.Ruleset): Permission.Ruleset {
  * Build the `permission` ruleset for a subagent's session when it's spawned
  * via the task tool. Combines:
  *
- * 1. The parent **agent's** deny rules — Plan Mode and other agent-level
- *    restrictions live on the agent ruleset, not on the session, so a
- *    subagent that only inherited the parent SESSION's permission would
- *    silently bypass them. (#26514)
- * 2. The parent **session's** deny rules and external_directory rules —
- *    same forwarding the original code already did.
- * 3. Default `todowrite` and `task` denies if the subagent's own ruleset
- *    doesn't already permit them.
- *
- * Duplicate `(permission, pattern)` entries from parent agent + parent
- * session are collapsed (first wins, so parent agent denies take priority
- * since they're listed first).
+ * 1. The parent **session's** permissions (including allowed directory/tool permissions)
+ * 2. Default `todowrite` and `task` denies if the subagent's own ruleset doesn't permit them
+ * 3. The parent **agent's** deny rules — Plan Mode and other agent-level restrictions
+ *    take precedence over session permissions by being placed last (last match wins in evaluate)
  */
 export function deriveSubagentSessionPermission(input: {
   parentSessionPermission: Permission.Ruleset
@@ -46,12 +38,10 @@ export function deriveSubagentSessionPermission(input: {
   const canTodo = input.subagent.permission.some((rule) => rule.permission === "todowrite" && rule.action === "allow")
   const parentAgentDenies = input.parentAgent?.permission.filter((rule) => rule.action === "deny") ?? []
   return dedupe([
-    ...parentAgentDenies,
-    ...input.parentSessionPermission.filter(
-      (rule) => rule.permission === "external_directory" || rule.action === "deny",
-    ),
+    ...input.parentSessionPermission,
     ...(canTodo ? [] : [{ permission: "todowrite" as const, pattern: "*" as const, action: "deny" as const }]),
     ...(canTask ? [] : [{ permission: "task" as const, pattern: "*" as const, action: "deny" as const }]),
+    ...parentAgentDenies,
   ])
 }
 

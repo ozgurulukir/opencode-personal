@@ -137,7 +137,7 @@ export const runLoop: (deps: RunLoopDeps, sessionID: SessionID) => Effect.Effect
       lastUser.model.modelID,
       sessionID,
     )
-    const task = tasks.pop()
+    const task = tasks.shift()
 
     if (task?.type === "subtask") {
       yield* handleSubtask(
