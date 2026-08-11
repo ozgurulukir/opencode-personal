@@ -1,35 +1,41 @@
 /**
- * Creates an AbortController that automatically aborts after a timeout.
+ * Combines multiple AbortSignals into one, with explicit cleanup.
  *
- * Uses bind() instead of arrow functions to avoid capturing the surrounding
- * scope in closures. Arrow functions like `() => controller.abort()` capture
- * request bodies and other large objects, preventing GC for the timer lifetime.
+ * Unlike `AbortSignal.any()`, this returns a `cleanup()` function that the
+ * caller MUST invoke when the combined signal is no longer needed. This
+ * prevents memory leaks when signals are reused across many calls without
+ * being aborted.
  *
- * @param ms Timeout in milliseconds
- * @returns Object with controller, signal, and clearTimeout function
+ * Call `cleanup()` after the operation that uses the combined signal completes
+ * (success or failure). Cleanup removes all event listeners from constituent
+ * signals, preventing listener accumulation.
  */
-export function abortAfter(ms: number) {
-  const controller = new AbortController()
-  const id = setTimeout(controller.abort.bind(controller), ms)
-  return {
-    controller,
-    signal: controller.signal,
-    clearTimeout: () => globalThis.clearTimeout(id),
-  }
-}
+export function combineSignals(signals: AbortSignal[]): {
+  signal: AbortSignal
+  cleanup: () => void
+} {
+  if (signals.length === 0) return { signal: new AbortController().signal, cleanup: () => {} }
+  if (signals.length === 1) return { signal: signals[0], cleanup: () => {} }
 
-/**
- * Combines multiple AbortSignals with a timeout.
- *
- * @param ms Timeout in milliseconds
- * @param signals Additional signals to combine
- * @returns Combined signal that aborts on timeout or when any input signal aborts
- */
-export function abortAfterAny(ms: number, ...signals: AbortSignal[]) {
-  const timeout = abortAfter(ms)
-  const signal = AbortSignal.any([timeout.signal, ...signals])
-  return {
-    signal,
-    clearTimeout: timeout.clearTimeout,
+  const controller = new AbortController()
+  const onAbort = () => {
+    controller.abort(signals.find((s) => s.aborted)?.reason)
+    cleanup()
   }
+  const cleanup = () => {
+    for (const signal of signals) {
+      signal.removeEventListener("abort", onAbort)
+    }
+  }
+
+  if (signals.some((s) => s.aborted)) {
+    controller.abort(signals.find((s) => s.aborted)?.reason)
+    return { signal: controller.signal, cleanup }
+  }
+
+  for (const signal of signals) {
+    signal.addEventListener("abort", onAbort, { once: true })
+  }
+
+  return { signal: controller.signal, cleanup }
 }
