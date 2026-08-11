@@ -14,7 +14,7 @@ Delta selection uses anchored regex in a fixed order: `gpt-4`/`o1`/`o3` → beas
 
 ## Two-phase system prompt prefix assembly
 
-`system.prefix` is intentionally set to `""` in `prompt.ts:runLoop` and filled by `LLM.stream` from `agent.prompt ?? SystemPrompt.provider(model).prefix`. This keeps the model+delta selection co-located with LLM submission logic. The JSDoc on `SystemPrompt` type in `llm.ts` documents this — don't move prefix resolution to `prompt.ts` without updating both sides.
+`system.prefix` is intentionally set to `""` in `session/loop/run-loop.ts:runLoop` and filled by `LLM.stream` from `agent.prompt ?? SystemPrompt.provider(model).prefix`. This keeps the model+delta selection co-located with LLM submission logic. The JSDoc on `SystemPrompt` type in `llm.ts` documents this — don't move prefix resolution to `prompt.ts` without updating both sides.
 
 ## `system.ts:skills()` — auto-match via semantic search
 
@@ -26,7 +26,7 @@ The `as Record<string, any>` cast in `mergeOptions` is deliberate — remeda's `
 
 ## `prompt()` tools-derived permissions must merge with existing session permission
 
-`prompt.ts:1486-1493` converts `input.tools` (from `subagentToolRestrictions`) into permission rules. It **must** merge with existing `session.permission` using `Permission.merge(session.permission ?? [], permissions)`, not overwrite. Overwriting destroys parent denies (e.g., Plan Mode `edit: { "*": "deny" }`) set by `subagentSessionPermission` — the #26514 fix was ineffective at runtime because of this overwrite. The merge is safe: `Permission.merge` = `rulesets.flat()`, and `findLast` in `evaluate` means tools-derived rules (appended last) override earlier rules for the same `(permission, pattern)` key.
+`session/loop/tools.ts:79,103` converts `input.tools` (from `subagentToolRestrictions`) into permission rules. It **must** merge with existing `session.permission` using `Permission.merge(session.permission ?? [], permissions)`, not overwrite. Overwriting destroys parent denies (e.g., Plan Mode `edit: { "*": "deny" }`) set by `subagentSessionPermission` — the #26514 fix was ineffective at runtime because of this overwrite. The merge is safe: `Permission.merge` = `rulesets.flat()`, and `findLast` in `evaluate` means tools-derived rules (appended last) override earlier rules for the same `(permission, pattern)` key.
 
 ## TodoWrite tool — autoclose architecture
 
@@ -49,7 +49,7 @@ When replacing per-item loops with batch writes, use the new `Session.updatePart
 
 ## Subagent permission wiring — two distinct `ctx.ask` merge strategies
 
-Normal tools merge `agent.permission + session.permission`. But subagent task's own ask (`prompt.ts:727-734`) merges `taskAgent.permission + PARENT session.permission` (not subagent session). This means a subagent's "always allow" does NOT inherit from its own session — it inherits from the parent. Don't assume subagent permissions are self-contained.
+Normal tools merge `agent.permission + session.permission`. But subagent task's own ask (`session/loop/subtask.ts:132`) merges `taskAgent.permission + PARENT session.permission` (not subagent session). This means a subagent's "always allow" does NOT inherit from its own session — it inherits from the parent. Don't assume subagent permissions are self-contained.
 
 ## Effect Schema cross-file identity — keep schemas in the consuming module
 
@@ -91,7 +91,7 @@ When filtering parts with `p is CompactionPart | SubtaskPart`, both types must b
 
 ### `compaction_continue` metadata guard scope
 
-`prompt.ts:1595-1598` — the double-compaction guard checks ALL visible messages for `compaction_continue` metadata, not just recent ones. This prevents infinite compaction loops but also means a `compaction_continue` marker from an old compaction blocks future auto-compaction. The guard is safe because `filterCompacted` removes old compaction markers from the visible window.
+`session/loop/run-loop.ts:171-182` — the double-compaction guard checks ALL visible messages for `compaction_continue` metadata, not just recent ones. This prevents infinite compaction loops but also means a `compaction_continue` marker from an old compaction blocks future auto-compaction. The guard is safe because `filterCompacted` removes old compaction markers from the visible window.
 
 ### `processCompaction` history computation is order-dependent
 

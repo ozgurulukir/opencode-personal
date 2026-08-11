@@ -1,6 +1,8 @@
 import type { Permission } from "../permission"
 import type { Agent } from "./agent"
 
+export const MAX_SUBAGENT_DEPTH = 3
+
 /**
  * Deduplicate a permission ruleset by `permission:pattern` key, preserving
  * first-occurrence order. Used to collapse duplicate `(permission, pattern)`
