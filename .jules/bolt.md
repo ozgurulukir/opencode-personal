@@ -104,3 +104,11 @@
 ## 2024-03-24 - Avoiding Array Methods Map/Filter inside createMemo
 **Learning:** Using chained array methods (like `.filter().map()` or creating `new Set(array.map())`) in high-frequency reactive blocks like `createMemo` (e.g. within `FileTree` components iterating over files) allocate temporary intermediate arrays on every re-evaluation, causing noticeable GC pressure and redundant O(N) traversals.
 **Action:** Replace `nodes.filter(...)` and `new Set(out.map(...))` with a single `for` loop that iterates once and populates both the result array and the set in-place.
+
+## 2024-05-18 - Avoid JSON.stringify for Keys in Hot Paths
+**Learning:** Using `JSON.stringify` inside hot, frequently invoked loops (like deduplicating hundreds of LSP diagnostics on every file change) introduces severe Garbage Collection pressure and serialization overhead.
+**Action:** Replace `JSON.stringify` with lightweight string concatenation combining primitive properties (e.g., `${item.code}:${item.source}:${item.line}`) when generating deduplication or tracking keys.
+
+## 2024-05-18 - Reduce Callback Overhead in Sizing Loops
+**Learning:** Using nested `.reduce()` to compute aggregate sizes over complex structures (like hunks and lines in patches) incurs significant function allocation and invocation overhead, particularly on operations that block the main thread.
+**Action:** Replace nested array reductions (`reduce`, `map`, `filter`) with manual imperative `for` loops in utility calculations to eliminate intermediate array allocations and closure executions.
