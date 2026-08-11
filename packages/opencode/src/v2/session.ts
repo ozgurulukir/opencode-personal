@@ -22,7 +22,7 @@ import { Bus } from "@/bus"
 import { Agent } from "@/agent/agent"
 import { Config } from "@/config/config"
 import { Permission } from "@/permission"
-import { subagentSessionPermission, subagentToolRestrictions, MAX_SUBAGENT_DEPTH } from "@/agent/subagent-permissions"
+import { subagentSessionPermission, subagentToolRestrictions, MAX_SUBAGENT_NESTING_LEVELS } from "@/agent/subagent-permissions"
 import * as Log from "@opencode-ai/core/util/log"
 
 const log = Log.create({ service: "v2.session" })
@@ -121,7 +121,7 @@ export interface Interface {
     agent: string
     model?: Modelv2.Ref
     abort?: AbortSignal
-  }) => Effect.Effect<void, NotFoundError>
+  }) => Effect.Effect<void, Error>
   readonly switchAgent: (input: { sessionID: SessionID; agent: string }) => Effect.Effect<void, never>
   readonly switchModel: (input: { sessionID: SessionID; model: Modelv2.Ref }) => Effect.Effect<void, never>
   readonly compact: (sessionID: SessionID) => Effect.Effect<void, never>
@@ -504,13 +504,11 @@ export const layer = Layer.effect(
           primaryTools: cfgInfo.experimental?.primary_tools,
         })
 
-        let depth = 0
-        let currentParentID: SessionID | undefined = input.parentID
-        while (currentParentID) {
+        for (let depth = 0, currentParentID: SessionID | undefined = input.parentID; currentParentID; ) {
           depth++
-          if (depth >= MAX_SUBAGENT_DEPTH) {
-            return yield* Effect.die(
-              new Error(`Maximum subagent nesting depth (${MAX_SUBAGENT_DEPTH}) exceeded`),
+          if (depth >= MAX_SUBAGENT_NESTING_LEVELS) {
+            return yield* Effect.fail(
+              new Error(`Maximum subagent nesting levels (${MAX_SUBAGENT_NESTING_LEVELS}) exceeded`),
             )
           }
           const ancestor: Info = yield* result.get(currentParentID)
@@ -571,8 +569,16 @@ export const layer = Layer.effect(
                 })
                 return
               }
+              if (assistant.content.length === 0) {
+                yield* sync.run(SessionEvent.Synthetic.Sync, {
+                  sessionID: input.parentID,
+                  timestamp: DateTime.makeUnsafe(Date.now()),
+                  text: "Subagent produced no output parts.",
+                })
+                return
+              }
               const textPart = assistant.content.findLast((part) => part.type === "text")
-              const text = textPart?.text ?? "Subagent completed without producing a text response."
+              const text = textPart?.text || "Subagent completed without producing a text response."
               yield* sync.run(SessionEvent.Synthetic.Sync, {
                 sessionID: input.parentID,
                 timestamp: DateTime.makeUnsafe(Date.now()),

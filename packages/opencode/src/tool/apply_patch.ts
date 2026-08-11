@@ -202,6 +202,13 @@ export const ApplyPatchTool = Tool.define<
 
               const movePath = hunk.move_path ? AppFileSystem.resolve(path.resolve(instance.directory, hunk.move_path)) : undefined
               if (movePath) {
+                if (!movePath.startsWith(instance.directory + path.sep) && movePath !== instance.directory) {
+                  failedHunks.push({
+                    path: hunk.path,
+                    error: `Move path escapes project directory: ${movePath}`,
+                  })
+                  break
+                }
                 yield* assertExternalDirectoryEffect(ctx, movePath)
                 // Refuse to silently overwrite an existing destination unless the
                 // patch explicitly uses *** Force Move to:. Without this gate, an

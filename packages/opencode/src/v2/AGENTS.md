@@ -98,7 +98,7 @@ The fallback is applied via `Effect.catchCause` in `v2/session.ts` and matches V
 
 ## V2 subagent() max nesting depth
 
-`subagent()` enforces a maximum nesting depth of `MAX_SUBAGENT_DEPTH = 3` (defined in
+`subagent()` enforces a maximum nesting levels of `MAX_SUBAGENT_NESTING_LEVELS = 3` (defined in
 `agent/subagent-permissions.ts`). The depth check walks the `parentID` chain
 iteratively before creating the child session. If the chain length is already 3 or
 more, the subagent creation is rejected with an error. This prevents deeply nested

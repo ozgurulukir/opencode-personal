@@ -267,10 +267,11 @@ export const layer = Layer.effect(
       // Use transaction for atomicity — the approved array construction and insert
       // must be atomic to prevent race conditions between concurrent reply("always").
       //
-      // Build a snapshot for the DB write instead of mutating the shared `approved`
-      // array in place. The in-memory push happens before the DB write so the
-      // local binding sees the new rules immediately, but the DB write uses the
-      // pre-push snapshot so concurrent calls cannot interleave pushes.
+      // Build a snapshot for the DB write so the upsert is atomic and so the
+      // in-memory `approved` array is not mutated mid-transaction by concurrent
+      // Effect yields. JavaScript is single-threaded, so this is not a traditional
+      // race-condition guard, but Effect's cooperative scheduling can interleave
+      // yields between push and upsert.
       const ctx = yield* InstanceState.context
       const newRules: Array<{ permission: string; pattern: string; action: "allow" }> = existing.info.always.map((pattern) => ({
         permission: existing.info.permission,

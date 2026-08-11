@@ -4,11 +4,10 @@ import { Session } from "@/session/session"
 import { SessionID, MessageID } from "../session/schema"
 import { MessageV2 } from "../session/message-v2"
 import { Agent } from "../agent/agent"
-import { subagentSessionPermission, subagentToolRestrictions, MAX_SUBAGENT_DEPTH } from "../agent/subagent-permissions"
+import { subagentSessionPermission, subagentToolRestrictions, MAX_SUBAGENT_NESTING_LEVELS } from "../agent/subagent-permissions"
 import type { SessionPrompt } from "../session/prompt"
 import { Config } from "@/config/config"
 import { Cause, Effect, Exit, Schema } from "effect"
-import { EffectBridge } from "@/effect/bridge"
 import { Permission } from "../permission"
 import * as Log from "@opencode-ai/core/util/log"
 
@@ -113,13 +112,11 @@ export const TaskTool = Tool.define(
           )
         : undefined
 
-      let depth = 0
-      let currentParentID: SessionID | undefined = ctx.sessionID
-      while (currentParentID) {
+      for (let depth = 0, currentParentID: SessionID | undefined = ctx.sessionID; currentParentID; ) {
         depth++
-        if (depth >= MAX_SUBAGENT_DEPTH) {
+        if (depth >= MAX_SUBAGENT_NESTING_LEVELS) {
           return yield* Effect.fail(
-            new Error(`Maximum subagent nesting depth (${MAX_SUBAGENT_DEPTH}) exceeded`),
+            new Error(`Maximum subagent nesting levels (${MAX_SUBAGENT_NESTING_LEVELS}) exceeded`),
           )
         }
         const ancestor: Session.Info = yield* sessions.get(currentParentID)
@@ -157,7 +154,6 @@ export const TaskTool = Tool.define(
 
       const ops = ctx.extra?.promptOps
       if (!ops) return yield* Effect.fail(new Error("TaskTool requires promptOps in ctx.extra"))
-      const runCancel = yield* EffectBridge.make()
 
       const messageID = MessageID.ascending()
       const cancel = ops.cancel(nextSession.id)
@@ -202,8 +198,9 @@ export const TaskTool = Tool.define(
                 "",
                 "<task_result>",
                 (() => {
+                  if (result.parts.length === 0) return "Subagent produced no output parts."
                   const text = result.parts.findLast((item) => item.type === "text")?.text
-                  return text ?? "Subagent completed without producing a text response."
+                  return text || "Subagent completed without producing a text response."
                 })(),
                 "</task_result>",
               ].join("\n"),
