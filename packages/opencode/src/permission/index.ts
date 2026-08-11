@@ -263,26 +263,32 @@ export const layer = Layer.effect(
       yield* Deferred.succeed(existing.deferred, undefined)
       if (input.reply === "once") return
 
-      // Persist approved ruleset to database so "always allow" survives restarts
+      // Persist approved ruleset to database so "always allow" survives restarts.
       // Use transaction for atomicity — the approved array construction and insert
-      // must be atomic to prevent race conditions between concurrent reply("always")
+      // must be atomic to prevent race conditions between concurrent reply("always").
       //
-      // IMPORTANT: `approved` is a shared mutable reference from InstanceState.
-      // We mutate in place (push) so concurrent reply("always") calls accumulate
-      // on the same array. Do NOT replace with spread assignment — that would
-      // break the local binding's link to state.approved and introduce a race.
+      // Build a snapshot for the DB write instead of mutating the shared `approved`
+      // array in place. The in-memory push happens before the DB write so the
+      // local binding sees the new rules immediately, but the DB write uses the
+      // pre-push snapshot so concurrent calls cannot interleave pushes.
       const ctx = yield* InstanceState.context
+      const newRules: Array<{ permission: string; pattern: string; action: "allow" }> = existing.info.always.map((pattern) => ({
+        permission: existing.info.permission,
+        pattern,
+        action: "allow",
+      }))
+      const snapshot = [...approved, ...newRules]
+      for (const pattern of existing.info.always) {
+        approved.push({
+          permission: existing.info.permission,
+          pattern,
+          action: "allow",
+        })
+      }
       Database.transaction((db) => {
-        for (const pattern of existing.info.always) {
-          approved.push({
-            permission: existing.info.permission,
-            pattern,
-            action: "allow",
-          })
-        }
         db.insert(PermissionTable)
-          .values({ project_id: ctx.project.id, data: approved })
-          .onConflictDoUpdate({ target: PermissionTable.project_id, set: { data: approved } })
+          .values({ project_id: ctx.project.id, data: snapshot })
+          .onConflictDoUpdate({ target: PermissionTable.project_id, set: { data: snapshot } })
           .run()
       })
 

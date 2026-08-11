@@ -404,6 +404,11 @@ export const layer: Layer.Layer<Service, never, AppFileSystem.Service | ChildPro
               return yield* Effect.fail(error(stderr, code))
             }
 
+            const isRegexError = /regex parse error|invalid regex|error parsing regex/i.test(stderr)
+            if (code === 2 && isRegexError) {
+              return yield* Effect.fail(error(stderr, code))
+            }
+
             return {
               items: code === 1 ? [] : items,
               partial: code === 2,
