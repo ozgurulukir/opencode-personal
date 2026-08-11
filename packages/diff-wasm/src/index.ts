@@ -1,6 +1,13 @@
-import { formatPatch as jsFormatPatch, parsePatch as jsParsePatch, applyPatch as jsApplyPatch } from "diff"
+import {
+  createTwoFilesPatch as jsCreateTwoFilesPatch,
+  diffLines as jsDiffLines,
+  structuredPatch as jsStructuredPatch,
+  formatPatch as jsFormatPatch,
+  parsePatch as jsParsePatch,
+  applyPatch as jsApplyPatch,
+} from "diff"
 
-const WASM_JS_PATH = (globalThis as any).OPENCODE_DIFF_WASM_JS_PATH ?? "./pkg/opencode_diff_rs.js"
+const WASM_JS_PATH = (globalThis as any).OPENCODE_DIFF_WASM_JS_PATH ?? "../pkg/opencode_diff_rs.js"
 
 let wasmReady: Promise<void> | null = null
 let diff_lines_rs: typeof import("../pkg/opencode_diff_rs.js").diff_lines_rs
@@ -9,12 +16,18 @@ let structured_patch_rs: typeof import("../pkg/opencode_diff_rs.js").structured_
 
 function ensureWasm(): Promise<void> {
   if (wasmReady === null) {
-    wasmReady = import(WASM_JS_PATH).then((mod) => {
-      diff_lines_rs = mod.diff_lines_rs
-      create_two_files_patch_rs = mod.create_two_files_patch_rs
-      structured_patch_rs = mod.structured_patch_rs
-      return mod.init()
-    }).then(() => {})
+    wasmReady = import(WASM_JS_PATH)
+      .then((mod) => {
+        diff_lines_rs = mod.diff_lines_rs
+        create_two_files_patch_rs = mod.create_two_files_patch_rs
+        structured_patch_rs = mod.structured_patch_rs
+        return mod.init()
+      })
+      .then(() => {})
+      .catch((err) => {
+        wasmReady = null
+        throw err
+      })
   }
   return wasmReady!
 }
@@ -45,13 +58,21 @@ export interface ParsedDiff {
 }
 
 /**
- * High-performance line diffing via Rust/WASM.
+ * High-performance line diffing via Rust/WASM with JS fallback.
  * Preserves 100% full compatibility with js `diff` package Hunk & Change format.
  */
-export async function diffLines(oldStr: string, newStr: string, options?: { ignoreWhitespace?: boolean }): Promise<Change[]> {
-  await ensureWasm()
-  const result = diff_lines_rs(oldStr, newStr)
-  return result as unknown as Change[]
+export async function diffLines(
+  oldStr: string,
+  newStr: string,
+  options?: { ignoreWhitespace?: boolean },
+): Promise<Change[]> {
+  try {
+    await ensureWasm()
+    const result = diff_lines_rs(oldStr, newStr)
+    return result as unknown as Change[]
+  } catch {
+    return jsDiffLines(oldStr, newStr, options) as unknown as Change[]
+  }
 }
 
 export async function createTwoFilesPatch(
@@ -61,11 +82,23 @@ export async function createTwoFilesPatch(
   newStr: string,
   oldHeader?: string,
   newHeader?: string,
-  options?: { context?: number }
+  options?: { context?: number },
 ): Promise<string> {
-  await ensureWasm()
-  const context = options?.context
-  return create_two_files_patch_rs(oldFileName, newFileName, oldStr, newStr, oldHeader ?? null, newHeader ?? null, context ?? null)
+  try {
+    await ensureWasm()
+    const context = options?.context
+    return create_two_files_patch_rs(
+      oldFileName,
+      newFileName,
+      oldStr,
+      newStr,
+      oldHeader ?? null,
+      newHeader ?? null,
+      context ?? null,
+    )
+  } catch {
+    return jsCreateTwoFilesPatch(oldFileName, newFileName, oldStr, newStr, oldHeader, newHeader, options)
+  }
 }
 
 export async function structuredPatch(
@@ -75,12 +108,24 @@ export async function structuredPatch(
   newStr: string,
   oldHeader?: string,
   newHeader?: string,
-  options?: { context?: number; ignoreWhitespace?: boolean }
+  options?: { context?: number; ignoreWhitespace?: boolean },
 ): Promise<ParsedDiff> {
-  await ensureWasm()
-  const context = options?.context
-  const result = structured_patch_rs(oldFileName, newFileName, oldStr, newStr, oldHeader ?? null, newHeader ?? null, context ?? null)
-  return result as unknown as ParsedDiff
+  try {
+    await ensureWasm()
+    const context = options?.context
+    const result = structured_patch_rs(
+      oldFileName,
+      newFileName,
+      oldStr,
+      newStr,
+      oldHeader ?? null,
+      newHeader ?? null,
+      context ?? null,
+    )
+    return result as unknown as ParsedDiff
+  } catch {
+    return jsStructuredPatch(oldFileName, newFileName, oldStr, newStr, oldHeader, newHeader, options) as unknown as ParsedDiff
+  }
 }
 
 export function formatPatch(diff: ParsedDiff): string {

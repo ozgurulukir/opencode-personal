@@ -80,8 +80,11 @@ export const EditTool = Tool.define<
 
           const instance = yield* InstanceState.context
           const filePath = path.isAbsolute(params.filePath)
-            ? params.filePath
-            : path.join(instance.directory, params.filePath)
+            ? AppFileSystem.resolve(params.filePath)
+            : AppFileSystem.resolve(path.resolve(instance.directory, params.filePath))
+          if (!filePath.startsWith(instance.directory + path.sep) && filePath !== instance.directory) {
+            throw new Error(`Path escapes project directory: ${filePath}`)
+          }
           yield* assertExternalDirectoryEffect(ctx, filePath)
 
           let diff = ""
@@ -97,7 +100,13 @@ export const EditTool = Tool.define<
                 contentOld = source.text
                 contentNew = next.text
                 diff = trimDiff(
-                  (yield* Effect.tryPromise(() => createTwoFilesPatch(filePath, filePath, contentOld, contentNew))) as string,
+                  (yield* Effect.tryPromise({
+                    try: () => createTwoFilesPatch(filePath, filePath, contentOld, contentNew),
+                    catch: (error) =>
+                      new Error(
+                        `createTwoFilesPatch failed for ${filePath}: ${error instanceof Error ? error.message : String(error)}`,
+                      ),
+                  })) as string,
                 )
                 yield* ctx.ask({
                   permission: "edit",
@@ -136,12 +145,19 @@ export const EditTool = Tool.define<
               contentNew = next.text
 
               diff = trimDiff(
-                (yield* Effect.tryPromise(() => createTwoFilesPatch(
-                  filePath,
-                  filePath,
-                  normalizeLineEndings(contentOld),
-                  normalizeLineEndings(contentNew),
-                ))) as string,
+                (yield* Effect.tryPromise({
+                  try: () =>
+                    createTwoFilesPatch(
+                      filePath,
+                      filePath,
+                      normalizeLineEndings(contentOld),
+                      normalizeLineEndings(contentNew),
+                    ),
+                  catch: (error) =>
+                    new Error(
+                      `createTwoFilesPatch failed for ${filePath}: ${error instanceof Error ? error.message : String(error)}`,
+                    ),
+                })) as string,
               )
               yield* ctx.ask({
                 permission: "edit",
@@ -162,20 +178,18 @@ export const EditTool = Tool.define<
                 file: filePath,
                 event: "change",
               })
-              diff = trimDiff(
-                (yield* Effect.tryPromise(() => createTwoFilesPatch(
-                  filePath,
-                  filePath,
-                  normalizeLineEndings(contentOld),
-                  normalizeLineEndings(contentNew),
-                ))) as string,
-              )
             }).pipe(Effect.orDie),
           )
 
           let additions = 0
           let deletions = 0
-          for (const change of yield* Effect.tryPromise(() => diffLines(contentOld, contentNew))) {
+          for (const change of yield* Effect.tryPromise({
+            try: () => diffLines(contentOld, contentNew),
+            catch: (error) =>
+              new Error(
+                `diffLines failed for ${filePath}: ${error instanceof Error ? error.message : String(error)}`,
+              ),
+          })) {
             if (change.added) additions += change.count || 0
             if (change.removed) deletions += change.count || 0
           }

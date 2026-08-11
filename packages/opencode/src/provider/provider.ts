@@ -1438,7 +1438,13 @@ const layer: Layer.Layer<
             opts.body &&
             opts.method === "POST"
           ) {
-            const body = JSON.parse(opts.body as string)
+            let body: Record<string, unknown>
+            try {
+              body = JSON.parse(opts.body as string)
+            } catch {
+              // Malformed JSON — pass through unmodified
+              return fetchFn(input, { ...opts, timeout: false })
+            }
             const keepIds = body.store === true
             if (!keepIds && Array.isArray(body.input)) {
               for (const item of body.input) {

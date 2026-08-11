@@ -57,7 +57,13 @@ export const WriteTool = Tool.define<
           const contentNew = next.text
 
           const diff = trimDiff(
-            (yield* Effect.tryPromise(() => createTwoFilesPatch(filepath, filepath, contentOld, contentNew))) as string,
+            (yield* Effect.tryPromise({
+              try: () => createTwoFilesPatch(filepath, filepath, contentOld, contentNew),
+              catch: (error) =>
+                new Error(
+                  `createTwoFilesPatch failed for ${filepath}: ${error instanceof Error ? error.message : String(error)}`,
+                ),
+            })) as string,
           )
           yield* ctx.ask({
             permission: "edit",

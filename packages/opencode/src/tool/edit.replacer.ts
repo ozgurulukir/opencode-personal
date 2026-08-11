@@ -11,6 +11,7 @@ export type Replacer = (content: string, find: string) => Generator<string, void
 // Similarity thresholds for block anchor fallback matching
 const SINGLE_CANDIDATE_SIMILARITY_THRESHOLD = 0.0
 const MULTIPLE_CANDIDATES_SIMILARITY_THRESHOLD = 0.3
+const MAX_REGEX_WORDS = 20
 
 /**
  * Levenshtein distance algorithm implementation
@@ -195,17 +196,22 @@ export const WhitespaceNormalizedReplacer: Replacer = function* (content, find) 
       if (normalizedLine.includes(normalizedFind)) {
         // Find the actual substring in the original line that matches
         const words = find.trim().split(/\s+/)
-        if (words.length > 0) {
-          const pattern = words.map((word) => word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("\\s+")
-          try {
-            const regex = new RegExp(pattern)
-            const match = line.match(regex)
-            if (match) {
-              yield match[0]
-            }
-          } catch {
-            // Invalid regex pattern, skip
+        if (words.length === 0) return
+        if (words.length > MAX_REGEX_WORDS) {
+          const literal = words.slice(0, MAX_REGEX_WORDS).join(" ")
+          const idx = line.indexOf(literal)
+          if (idx >= 0) yield line.slice(idx, idx + literal.length)
+          return
+        }
+        const pattern = words.map((word) => word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("\\s+")
+        try {
+          const regex = new RegExp(pattern)
+          const match = line.match(regex)
+          if (match) {
+            yield match[0]
           }
+        } catch {
+          // Invalid regex pattern, skip
         }
       }
     }

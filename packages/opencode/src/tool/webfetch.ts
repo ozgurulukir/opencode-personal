@@ -4,10 +4,43 @@ import * as Tool from "./tool"
 import TurndownService from "turndown"
 import DESCRIPTION from "./webfetch.txt"
 import { isImageAttachment } from "@/util/media"
+import dns from "dns"
 
 const MAX_RESPONSE_SIZE = 5 * 1024 * 1024 // 5MB
 const DEFAULT_TIMEOUT = 30 * 1000 // 30 seconds
 const MAX_TIMEOUT = 120 * 1000 // 2 minutes
+
+function ipv4ToInt(ip: string): number {
+  const parts = ip.split(".").map(Number)
+  return parts[0] * 16777216 + parts[1] * 65536 + parts[2] * 256 + parts[3]
+}
+
+function isPrivateIPv4(ip: string): boolean {
+  const num = ipv4ToInt(ip)
+  return (
+    (num >= 0x0A000000 && num <= 0x0AFFFFFF) || // 10.0.0.0/8
+    (num >= 0xAC100000 && num <= 0xAC1FFFFF) || // 172.16.0.0/12
+    (num >= 0xC0A80000 && num <= 0xC0A8FFFF) || // 192.168.0.0/16
+    (num >= 0x7F000000 && num <= 0x7FFFFFFF) || // 127.0.0.0/8
+    (num >= 0xA9FE0000 && num <= 0xA9FEFFFF) || // 169.254.0.0/16
+    num === 0xA9FEA9FE // 169.254.169.254
+  )
+}
+
+function isPrivateIPv6(ip: string): boolean {
+  const lower = ip.toLowerCase()
+  return lower === "::1" || lower.startsWith("fe80:") || lower.startsWith("fc") || lower.startsWith("fd")
+}
+
+function isPrivateIP(ip: string): boolean {
+  if (ip.startsWith("::ffff:")) {
+    const v4 = ip.slice(7)
+    if (v4.includes(":")) return false
+    return isPrivateIPv4(v4)
+  }
+  if (ip.includes(":")) return isPrivateIPv6(ip)
+  return isPrivateIPv4(ip)
+}
 
 export const Parameters = Schema.Struct({
   url: Schema.String.annotate({ description: "The URL to fetch content from" }),
@@ -32,6 +65,16 @@ export const WebFetchTool = Tool.define(
         Effect.gen(function* () {
           if (!params.url.startsWith("http://") && !params.url.startsWith("https://")) {
             throw new Error("URL must start with http:// or https://")
+          }
+
+          const { hostname } = new URL(params.url)
+          const resolvedAddress = yield* Effect.tryPromise({
+            try: () => dns.promises.lookup(hostname, { all: false }),
+            catch: (error) => new Error(`DNS lookup failed: ${error instanceof Error ? error.message : String(error)}`),
+          })
+
+          if (isPrivateIP(resolvedAddress.address)) {
+            throw new Error("SSRF guard: requests to private/internal IPs are not allowed")
           }
 
           yield* ctx.ask({

@@ -2,6 +2,13 @@ import { sortBy, pipe } from "remeda"
 
 const MAX_WILDCARDS = 10
 
+/**
+ * Matches `str` against `pattern` with glob-style wildcards.
+ *
+ * Backslashes are normalized to forward slashes on all platforms, making `\`
+ * and `/` interchangeable in patterns. This is intentional for Windows path
+ * compatibility but also affects non-path patterns.
+ */
 export function match(str: string, pattern: string) {
   if (str) str = str.replaceAll("\\", "/")
   if (pattern) pattern = pattern.replaceAll("\\", "/")

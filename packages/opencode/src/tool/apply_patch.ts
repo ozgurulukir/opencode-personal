@@ -93,7 +93,14 @@ export const ApplyPatchTool = Tool.define<
       const failedHunks: Array<{ path: string; error: string }> = []
 
       for (const hunk of hunks) {
-        const filePath = path.resolve(instance.directory, hunk.path)
+        const filePath = AppFileSystem.resolve(path.resolve(instance.directory, hunk.path))
+        if (!filePath.startsWith(instance.directory + path.sep) && filePath !== instance.directory) {
+          failedHunks.push({
+            path: hunk.path,
+            error: `Path escapes project directory: ${filePath}`,
+          })
+          continue
+        }
         try {
           yield* assertExternalDirectoryEffect(ctx, filePath)
 
@@ -104,12 +111,24 @@ export const ApplyPatchTool = Tool.define<
                 hunk.contents.length === 0 || hunk.contents.endsWith("\n") ? hunk.contents : `${hunk.contents}\n`
               const next = Bom.split(newContent)
               const diff = trimDiff(
-                (yield* Effect.tryPromise(() => createTwoFilesPatch(filePath, filePath, oldContent, next.text))) as string,
+                (yield* Effect.tryPromise({
+                  try: () => createTwoFilesPatch(filePath, filePath, oldContent, next.text),
+                  catch: (error) =>
+                    new Error(
+                      `createTwoFilesPatch failed for ${filePath}: ${error instanceof Error ? error.message : String(error)}`,
+                    ),
+                })) as string,
               )
 
               let additions = 0
               let deletions = 0
-              for (const change of yield* Effect.tryPromise(() => diffLines(oldContent, next.text))) {
+              for (const change of yield* Effect.tryPromise({
+                try: () => diffLines(oldContent, next.text),
+                catch: (error) =>
+                  new Error(
+                    `diffLines failed for ${filePath}: ${error instanceof Error ? error.message : String(error)}`,
+                  ),
+              })) {
                 if (change.added) additions += change.count || 0
                 if (change.removed) deletions += change.count || 0
               }
@@ -159,17 +178,29 @@ export const ApplyPatchTool = Tool.define<
               }
 
               const diff = trimDiff(
-                (yield* Effect.tryPromise(() => createTwoFilesPatch(filePath, filePath, oldContent, newContent))) as string,
+                (yield* Effect.tryPromise({
+                  try: () => createTwoFilesPatch(filePath, filePath, oldContent, newContent),
+                  catch: (error) =>
+                    new Error(
+                      `createTwoFilesPatch failed for ${filePath}: ${error instanceof Error ? error.message : String(error)}`,
+                    ),
+                })) as string,
               )
 
               let additions = 0
               let deletions = 0
-              for (const change of yield* Effect.tryPromise(() => diffLines(oldContent, newContent))) {
+              for (const change of yield* Effect.tryPromise({
+                try: () => diffLines(oldContent, newContent),
+                catch: (error) =>
+                  new Error(
+                    `diffLines failed for ${filePath}: ${error instanceof Error ? error.message : String(error)}`,
+                  ),
+              })) {
                 if (change.added) additions += change.count || 0
                 if (change.removed) deletions += change.count || 0
               }
 
-              const movePath = hunk.move_path ? path.resolve(instance.directory, hunk.move_path) : undefined
+              const movePath = hunk.move_path ? AppFileSystem.resolve(path.resolve(instance.directory, hunk.move_path)) : undefined
               if (movePath) {
                 yield* assertExternalDirectoryEffect(ctx, movePath)
                 // Refuse to silently overwrite an existing destination unless the
@@ -213,7 +244,13 @@ export const ApplyPatchTool = Tool.define<
               )
               const contentToDelete = source.text
               const deleteDiff = trimDiff(
-                (yield* Effect.tryPromise(() => createTwoFilesPatch(filePath, filePath, contentToDelete, ""))) as string,
+                (yield* Effect.tryPromise({
+                  try: () => createTwoFilesPatch(filePath, filePath, contentToDelete, ""),
+                  catch: (error) =>
+                    new Error(
+                      `createTwoFilesPatch failed for ${filePath}: ${error instanceof Error ? error.message : String(error)}`,
+                    ),
+                })) as string,
               )
 
               const deletions = contentToDelete.split("\n").length
