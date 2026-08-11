@@ -1,11 +1,20 @@
 import { formatPatch as jsFormatPatch, parsePatch as jsParsePatch, applyPatch as jsApplyPatch } from "diff"
-import init, { diff_lines_rs, create_two_files_patch_rs, structured_patch_rs } from "../pkg/opencode_diff_rs.js"
+
+const WASM_JS_PATH = (globalThis as any).OPENCODE_DIFF_WASM_JS_PATH ?? "./pkg/opencode_diff_rs.js"
 
 let wasmReady: Promise<void> | null = null
+let diff_lines_rs: typeof import("../pkg/opencode_diff_rs.js").diff_lines_rs
+let create_two_files_patch_rs: typeof import("../pkg/opencode_diff_rs.js").create_two_files_patch_rs
+let structured_patch_rs: typeof import("../pkg/opencode_diff_rs.js").structured_patch_rs
 
 function ensureWasm(): Promise<void> {
   if (wasmReady === null) {
-    wasmReady = init().then(() => {})
+    wasmReady = import(WASM_JS_PATH).then((mod) => {
+      diff_lines_rs = mod.diff_lines_rs
+      create_two_files_patch_rs = mod.create_two_files_patch_rs
+      structured_patch_rs = mod.structured_patch_rs
+      return mod.init()
+    }).then(() => {})
   }
   return wasmReady!
 }

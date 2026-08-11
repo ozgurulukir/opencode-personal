@@ -92,6 +92,15 @@ const createEmbeddedWebUIBundle = async () => {
 
 const embeddedFileMap = skipEmbedWebUi ? null : await createEmbeddedWebUIBundle()
 
+// Build diff-wasm WASM package
+console.log("Building diff-wasm WASM package...")
+await $`bun run --cwd ${path.join(dir, "..", "diff-wasm")} build:wasm`
+
+// Read diff-wasm WASM artifacts
+const diffWasmDir = path.join(dir, "..", "diff-wasm", "pkg")
+const diffWasmJs = await Bun.file(path.join(diffWasmDir, "opencode_diff_rs.js")).text()
+const diffWasmWasm = await Bun.file(path.join(diffWasmDir, "opencode_diff_rs_bg.wasm")).arrayBuffer()
+
 const allTargets: {
   os: string
   arch: "arm64" | "x64"
@@ -304,6 +313,8 @@ for (const item of targets) {
     },
     files: {
       [treeSitterWorkerPath]: treeSitterWorker,
+      "diff-wasm/opencode_diff_rs.js": diffWasmJs,
+      "diff-wasm/opencode_diff_rs_bg.wasm": new Uint8Array(diffWasmWasm),
       ...(embeddedFileMap ? { "opencode-web-ui.gen.ts": embeddedFileMap } : {}),
     },
     entrypoints: ["./src/index.ts", treeSitterWorkerPath, workerPath, ...(embeddedFileMap ? ["opencode-web-ui.gen.ts"] : [])],
@@ -311,6 +322,7 @@ for (const item of targets) {
       OPENCODE_VERSION: `'${Script.version}'`,
       OPENCODE_MIGRATIONS: JSON.stringify(migrations),
       OTUI_TREE_SITTER_WORKER_PATH: bunfsRoot + treeSitterWorkerPath,
+      OPENCODE_DIFF_WASM_JS_PATH: bunfsRoot + "diff-wasm/opencode_diff_rs.js",
       OPENCODE_WORKER_PATH: workerPath,
       OPENCODE_CHANNEL: `'${Script.channel}'`,
       OPENCODE_LIBC: item.os === "linux" ? `'${item.abi ?? "glibc"}'` : "",
