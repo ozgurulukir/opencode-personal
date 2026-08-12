@@ -113,18 +113,21 @@ function endPosition(text: string) {
 
 function dedupeDiagnostics(items: Diagnostic[]) {
   const seen = new Set<string>()
-  return items.filter((item) => {
-    const key = JSON.stringify({
-      code: item.code,
-      severity: item.severity,
-      message: item.message,
-      source: item.source,
-      range: item.range,
-    })
-    if (seen.has(key)) return false
-    seen.add(key)
-    return true
-  })
+  const result: Diagnostic[] = []
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i]
+    const code = typeof item.code === "number" ? `n:${item.code}` : `s:${item.code ?? ""}`
+    const range = item.range
+      ? `${item.range.start.line}:${item.range.start.character}:${item.range.end.line}:${item.range.end.character}`
+      : "null"
+    const msg = typeof item.message === "string" ? item.message : JSON.stringify(item.message)
+    const key = `${code}:${item.severity ?? ""}:${item.source ?? ""}:${range}:${msg}`
+    if (!seen.has(key)) {
+      seen.add(key)
+      result.push(item)
+    }
+  }
+  return result
 }
 
 function configurationValue(settings: unknown, section?: string) {
