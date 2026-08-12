@@ -6,7 +6,8 @@ import { IconButton } from "./icon-button"
 import { Tooltip } from "./tooltip"
 
 export interface TextFieldProps
-  extends ComponentProps<typeof Kobalte.Input>,
+  extends
+    ComponentProps<typeof Kobalte.Input>,
     Partial<
       Pick<
         ComponentProps<typeof Kobalte>,
@@ -103,9 +104,17 @@ export function TextField(props: TextFieldProps) {
       <div data-slot="input-wrapper">
         <Show
           when={local.multiline}
-          fallback={<Kobalte.Input {...others} autofocus={local.autofocus} data-slot="input-input" class={local.class} />}
+          fallback={
+            <Kobalte.Input {...others} autofocus={local.autofocus} data-slot="input-input" class={local.class} />
+          }
         >
-          <Kobalte.TextArea {...others} autoResize autofocus={local.autofocus} data-slot="input-input" class={local.class} />
+          <Kobalte.TextArea
+            {...others}
+            autoResize
+            autofocus={local.autofocus}
+            data-slot="input-input"
+            class={local.class}
+          />
         </Show>
         <Show when={local.copyable}>
           <Tooltip value={label()} placement="top" gutter={4} forceOpen={copied()} skipDelayDuration={0}>
@@ -114,7 +123,7 @@ export function TextField(props: TextFieldProps) {
               icon={icon()}
               variant="ghost"
               onClick={handleCopy}
-              tabIndex={-1}
+
               data-slot="input-copy-button"
               aria-label={label()}
             />
