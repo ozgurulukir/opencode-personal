@@ -117,3 +117,32 @@ When the subagent's final assistant message has zero content parts, post a disti
 synthetic message ("Subagent produced no output parts.") instead of falling back to
 the generic "completed without producing a text response." This helps the parent LLM
 distinguish between "had parts but none were text" and "completely empty output."
+
+## V2 subagent() release handler must catch `cancelChild` errors
+
+`Effect.acquireUseRelease`'s release handler runs during cleanup. If `cancelChild`
+fails there, the defect propagates uncaught. Wrap `yield* cancelChild` in
+`Effect.catch` to log and suppress cleanup errors, matching the V1 TaskTool pattern
+(`tool/task.ts:173`).
+
+## V2 subagent() accepts `description` for child session titles
+
+The V2 `subagent()` interface now includes `description?: string`. The child session
+title is `${input.description ?? "Subagent"} @${input.agent}`, matching the V1
+TaskTool's title format (`tool/task.ts:138`). This makes subagent sessions identifiable
+in the session list.
+
+## V2 `messages()` order is safe for `find()` — no compaction reordering
+
+V2 `messages()` queries `SessionMessageTable` directly via Drizzle with `ORDER BY
+time_created DESC, id DESC`. Unlike V1's in-memory `filterCompacted()`, the V2 read
+path does **not** reorder messages. So `messages.find(m => m.type === "assistant")`
+reliably returns the most recent assistant message. Reserve `MessageV2.latest()` for
+V1 paths where compaction reordering is possible.
+
+## V2 subagent() error handler — use `Cause.squash(cause)` for context
+
+When posting synthetic error messages to the parent, use `Cause.squash(cause)` instead
+of manual `cause instanceof Error` checks. `Cause.squash` flattens composite causes
+(`parallel`, `sequential`, `nested`) into a single error with full context, producing
+more actionable error messages for the parent LLM.
