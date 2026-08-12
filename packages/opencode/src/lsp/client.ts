@@ -325,7 +325,7 @@ export async function create(input: { serverID: string; server: LSPServer.Handle
     })
   }
 
-  const files: Record<string, { version: number; text: string }> = {}
+  const files: Record<string, { version: number; text: string; lastUsed: number }> = {}
 
   // --- Diagnostic helpers ---
 
@@ -622,7 +622,10 @@ export async function create(input: { serverID: string; server: LSPServer.Handle
         const MAX_OPEN_FILES = 50
         const openPaths = Object.keys(files)
         if (openPaths.length >= MAX_OPEN_FILES && !files[request.path]) {
-          const oldest = openPaths[0]
+          const sorted = openPaths.sort(
+            (a, b) => files[a].lastUsed - files[b].lastUsed,
+          )
+          const oldest = sorted[0]
           pushDiagnostics.delete(oldest)
           pullDiagnostics.delete(oldest)
           published.delete(oldest)
@@ -649,7 +652,7 @@ export async function create(input: { serverID: string; server: LSPServer.Handle
           })
 
           const next = document.version + 1
-          files[request.path] = { version: next, text }
+          files[request.path] = { version: next, text, lastUsed: Date.now() }
           logger.info("textDocument/didChange", {
             path: request.path,
             version: next,
@@ -697,7 +700,7 @@ export async function create(input: { serverID: string; server: LSPServer.Handle
             text,
           },
         })
-        files[request.path] = { version: 0, text }
+        files[request.path] = { version: 0, text, lastUsed: Date.now() }
         return 0
       },
       async close(request: { path: string }) {

@@ -639,34 +639,107 @@ describe("LSPClient interop", () => {
           directory: tmp.path,
         })
 
-        // Open the first file and push diagnostics for it so it is present in
-        // both the files record and the diagnostic maps.
-        const first = path.join(tmp.path, "open-0.ts")
-        await Bun.write(first, "const x = 1\n")
-        await client.notify.open({ path: first })
+        // Open file A, then open 49 additional unique files (B through 50,
+        // for a total of 50). Touch file A again to update its lastUsed.
+        const fileA = path.join(tmp.path, "open-a.ts")
+        await Bun.write(fileA, "const x = 1\n")
+        await client.notify.open({ path: fileA })
         await client.connection.sendNotification("test/publish-diagnostics", {
-          uri: pathToFileURL(first).href,
+          uri: pathToFileURL(fileA).href,
           diagnostics: [
             {
               range: { start: { line: 0, character: 0 }, end: { line: 0, character: 5 } },
-              message: "first file",
+              message: "file a",
               severity: 1,
             },
           ],
         })
 
-        // Open 50 more files (MAX_OPEN_FILES = 50) so the LRU guard fires and
-        // evicts the oldest entry (open-0.ts).
-        for (let i = 1; i <= 50; i++) {
+        for (let i = 1; i <= 49; i++) {
           const file = path.join(tmp.path, `open-${i}.ts`)
           await Bun.write(file, "const x = 1\n")
           await client.notify.open({ path: file })
         }
 
+        // Touch file A again so it is no longer the least-recently-used.
+        await client.notify.open({ path: fileA })
+
+        // Open file 51 (triggers eviction because openPaths.length >= 50).
+        const file51 = path.join(tmp.path, "open-51.ts")
+        await Bun.write(file51, "const x = 1\n")
+        await client.notify.open({ path: file51 })
+
         await new Promise((resolve) => setTimeout(resolve, 100))
 
-        // The evicted file's diagnostics are gone from all maps.
-        expect(client.diagnostics.get(first)).toBeUndefined()
+        // File B (open-1.ts) is the true LRU and should be evicted, not file A.
+        const fileB = path.join(tmp.path, "open-1.ts")
+        expect(client.diagnostics.get(fileA)).toBeDefined()
+        expect(client.diagnostics.get(fileB)).toBeUndefined()
+
+        await client.shutdown()
+      },
+    })
+  })
+
+  test("notify.open LRU eviction uses lastUsed, not insertion order", async () => {
+    const handle = spawnFakeServer() as any
+    await using tmp = await tmpdir()
+
+    await WithInstance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        const client = await LSPClient.create({
+          serverID: "fake",
+          server: handle as unknown as LSPServer.Handle,
+          root: tmp.path,
+          directory: tmp.path,
+        })
+
+        // Open files in an order where insertion order and LRU order diverge:
+        // A (oldest), B, C, then touch A, then open D (triggers eviction).
+        const fileA = path.join(tmp.path, "a.ts")
+        const fileB = path.join(tmp.path, "b.ts")
+        const fileC = path.join(tmp.path, "c.ts")
+        const fileD = path.join(tmp.path, "d.ts")
+        for (const file of [fileA, fileB, fileC]) {
+          await Bun.write(file, "const x = 1\n")
+          await client.notify.open({ path: file })
+        }
+
+        // Push diagnostics for A, B, C so we can observe eviction.
+        for (const file of [fileA, fileB, fileC]) {
+          await client.connection.sendNotification("test/publish-diagnostics", {
+            uri: pathToFileURL(file).href,
+            diagnostics: [
+              {
+                range: { start: { line: 0, character: 0 }, end: { line: 0, character: 5 } },
+                message: path.basename(file),
+                severity: 1,
+              },
+            ],
+          })
+        }
+
+        // Touch A so it is no longer the least-recently-used.
+        await client.notify.open({ path: fileA })
+
+        // Open D to trigger eviction (3 open + 47 fillers = 50, then D = 51,
+        // so eviction fires when openPaths.length >= 50).
+        for (let i = 0; i < 47; i++) {
+          const filler = path.join(tmp.path, `filler-${i}.ts`)
+          await Bun.write(filler, "const x = 1\n")
+          await client.notify.open({ path: filler })
+        }
+
+        await Bun.write(fileD, "const x = 1\n")
+        await client.notify.open({ path: fileD })
+
+        await new Promise((resolve) => setTimeout(resolve, 100))
+
+        // B is the true LRU (opened second, never touched) and should be evicted.
+        expect(client.diagnostics.get(fileA)?.[0]?.message).toBe("a.ts")
+        expect(client.diagnostics.get(fileB)).toBeUndefined()
+        expect(client.diagnostics.get(fileC)?.[0]?.message).toBe("c.ts")
 
         await client.shutdown()
       },
