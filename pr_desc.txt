@@ -1,0 +1,7 @@
+🎯 **What:** The `Chunk` type in the `TransformStream` parser of `OpenAICompatibleChatLanguageModel` lost its type safety because the error schema was typed dynamically as `ProviderErrorStructure<any>`, resulting in `z.infer` falling back to `any`. This commit restores type safety by explicitly defining the default expected schema type.
+
+💡 **Why:** By explicitly capturing the `ReturnType` based on the `openaiCompatibleErrorDataSchema` default fallback and bypassing the dynamic typing constraint during instantiation, we restore type inference and eliminate `any` leakage in the `transform` stream chunks, making the parser code safer to maintain.
+
+✅ **Verification:** Ran `bun run turbo typecheck` to confirm the code safely infers `Chunk`'s properties and passes the test suite successfully. I also verified the `copilot` provider specific unit tests explicitly (`bun test test/provider/copilot`).
+
+✨ **Result:** Removed the `TODO` comment as type safety is securely restored for the `chunk` variable logic in the parsing loop without polluting the model classes with complicated generics.
