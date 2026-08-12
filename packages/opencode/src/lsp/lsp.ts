@@ -18,6 +18,20 @@ import { zod, ZodOverride } from "@opencode-ai/core/effect-zod"
 
 const log = Log.create({ service: "lsp" })
 
+export const brokenConfig = { ttl: 5 * 60_000, maxBackoff: 30_000 }
+
+const backoffFor = (attempts: number) => Math.min(1000 * 2 ** (attempts - 1), brokenConfig.maxBackoff)
+
+const isInBackoff = (s: State, key: string): boolean => {
+  const entry = s.broken.get(key)
+  if (!entry) return false
+  if (Date.now() - entry.lastAttempt > brokenConfig.ttl) {
+    s.broken.delete(key)
+    return false
+  }
+  return Date.now() - entry.lastAttempt < backoffFor(entry.attempts)
+}
+
 export const Event = {
   Updated: BusEvent.define("lsp.updated", Schema.Struct({})),
 }
@@ -128,7 +142,7 @@ type LocInput = { file: string; line: number; character: number }
 interface State {
   clients: LSPClient.Info[]
   servers: Record<string, LSPServer.Info>
-  broken: Set<string>
+  broken: Map<string, { attempts: number; lastAttempt: number }>
   spawning: Map<string, Promise<LSPClient.Info | undefined>>
 }
 
@@ -205,7 +219,7 @@ export const layer = Layer.effect(
         const s: State = {
           clients: [],
           servers,
-          broken: new Set(),
+          broken: new Map(),
           spawning: new Map(),
         }
 
@@ -234,11 +248,11 @@ export const layer = Layer.effect(
           const handle = await server
             .spawn(root, ctx)
             .then((value) => {
-              if (!value) s.broken.add(key)
+              if (!value) s.broken.set(key, { attempts: (s.broken.get(key)?.attempts ?? 0) + 1, lastAttempt: Date.now() })
               return value
             })
             .catch((err) => {
-              s.broken.add(key)
+              s.broken.set(key, { attempts: (s.broken.get(key)?.attempts ?? 0) + 1, lastAttempt: Date.now() })
               log.error(`Failed to spawn LSP server ${server.id}`, { error: err })
               return undefined
             })
@@ -252,13 +266,15 @@ export const layer = Layer.effect(
             root,
             directory: ctx.directory,
           }).catch(async (err) => {
-            s.broken.add(key)
+            s.broken.set(key, { attempts: (s.broken.get(key)?.attempts ?? 0) + 1, lastAttempt: Date.now() })
             await Process.stop(handle.process)
             log.error(`Failed to initialize LSP client ${server.id}`, { error: err })
             return undefined
           })
 
           if (!client) return undefined
+
+          s.broken.delete(key)
 
           const existing = s.clients.find((x) => x.root === root && x.serverID === server.id)
           if (existing) {
@@ -275,7 +291,7 @@ export const layer = Layer.effect(
 
           const root = await server.root(file, ctx)
           if (!root) continue
-          if (s.broken.has(root + server.id)) continue
+          if (isInBackoff(s, root + server.id)) continue
 
           const match = s.clients.find((x) => x.root === root && x.serverID === server.id)
           if (match) {
@@ -347,9 +363,12 @@ export const layer = Layer.effect(
         const extension = path.parse(file).ext || file
         for (const server of Object.values(s.servers)) {
           if (server.extensions.length && !server.extensions.includes(extension)) continue
-          const root = await server.root(file, ctx)
+          const root = await server.root(file, ctx).catch((err) => {
+            log.error("failed to resolve LSP root", { server: server.id, error: err })
+            return undefined
+          })
           if (!root) continue
-          if (s.broken.has(root + server.id)) continue
+          if (isInBackoff(s, root + server.id)) continue
           return true
         }
         return false
@@ -359,23 +378,35 @@ export const layer = Layer.effect(
     const touchFile = Effect.fn("LSP.touchFile")(function* (input: string, diagnostics?: "document" | "full") {
       log.info("touching file", { file: input })
       const clients = yield* getClients(input)
-      yield* Effect.promise(() =>
-        Promise.all(
-          clients.map(async (client) => {
-            const after = Date.now()
-            const version = await client.notify.open({ path: input })
-            if (!diagnostics) return
-            return client.waitForDiagnostics({
-              path: input,
-              version,
-              mode: diagnostics,
-              after,
-            })
-          }),
-        ).catch((err) => {
-          log.error("failed to touch file", { err, file: input })
-        }),
+      if (!clients.length) return
+
+      const results = yield* Effect.forEach(
+        clients,
+        (client) =>
+          Effect.promise(() =>
+            (async () => {
+              const after = Date.now()
+              const version = await client.notify.open({ path: input })
+              if (!diagnostics) return { success: true as const }
+              await client.waitForDiagnostics({
+                path: input,
+                version,
+                mode: diagnostics,
+                after,
+              })
+              return { success: true as const }
+            })().catch((err) => {
+              log.error("failed to touch file", { err, file: input })
+              return { success: false as const }
+            }),
+          ),
+        { concurrency: "unbounded" },
       )
+
+      const failedCount = results.filter((r) => !r.success).length
+      if (failedCount === clients.length) {
+        log.error("all clients failed to touch file", { file: input, count: clients.length })
+      }
     })
 
     const diagnostics = Effect.fn("LSP.diagnostics")(function* () {
