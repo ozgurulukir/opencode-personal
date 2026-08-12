@@ -18,6 +18,7 @@ import { Session } from "@/session/session"
 import { SessionPrompt } from "@/session/prompt"
 import { SessionCompaction } from "@/session/compaction"
 import { SessionStatus } from "@/session/status"
+import { MessageV2 } from "@/session/message-v2"
 import { Bus } from "@/bus"
 import { Agent } from "@/agent/agent"
 import { Config } from "@/config/config"
@@ -119,6 +120,7 @@ export interface Interface {
     parentID: SessionID
     prompt: Prompt
     agent: string
+    description?: string
     model?: Modelv2.Ref
     abort?: AbortSignal
   }) => Effect.Effect<void, Error>
@@ -520,7 +522,7 @@ export const layer = Layer.effect(
           model: input.model,
           parentID: input.parentID,
           workspaceID: parent.workspaceID,
-          title: `Subagent @${input.agent}`,
+          title: `${input.description ?? "Subagent"} @${input.agent}`,
           permission,
         })
 
@@ -560,6 +562,9 @@ export const layer = Layer.effect(
               // design — callers read the synthetic message from the parent's
               // `messages()`. @see v2/AGENTS.md "V2 subagent() posts results synthetically".
               const messages = yield* result.messages({ sessionID: session.id, order: "desc" })
+              // V2 messages() returns DB rows ordered by id DESC; find() gives
+              // the chronologically latest assistant. No compaction reordering
+              // in V2, so array position matches id order (MessageID is monotonic).
               const assistant = messages.find((msg) => msg.type === "assistant")
               if (!assistant || assistant.type !== "assistant") {
                 yield* sync.run(SessionEvent.Synthetic.Sync, {
@@ -595,7 +600,7 @@ export const layer = Layer.effect(
                   yield* sync.run(SessionEvent.Synthetic.Sync, {
                     sessionID: input.parentID,
                     timestamp: DateTime.makeUnsafe(Date.now()),
-                    text: `Subagent error: ${cause instanceof Error ? cause.message : String(cause)}`,
+                    text: `Subagent error: ${Cause.squash(cause)}`,
                   })
                 }),
               ),
@@ -605,7 +610,11 @@ export const layer = Layer.effect(
               if (input.abort) input.abort.removeEventListener("abort", onAbort)
               if (Exit.hasInterrupts(exit) && !cancelled) {
                 cancelled = true
-                yield* cancelChild
+                yield* cancelChild.pipe(
+                  Effect.catch((error) =>
+                    Effect.sync(() => log.warn("subagent cancel failed", { error: String(error) })),
+                  ),
+                )
               }
             }),
         )

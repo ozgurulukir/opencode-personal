@@ -167,3 +167,7 @@ This is much shorter than stubbing every method with `Effect.void` / `Effect.suc
 ## Testing the scrollback streaming surface
 
 `test/cli/run/scrollback.surface.test.ts` is the canonical pattern for testing `RunScrollbackStream`. It uses `createTestRenderer` + `MockTreeSitterClient` from `@opentui/core/testing` (real `MarkdownRenderable`/`CodeRenderable`, not mocked), then extracts committed snapshots via `Reflect.get(renderer, "externalOutputQueue").claim()` and renders them with `snapshot.getRealCharBytes(true)`. Reuse the `setup()`, `claim()`, `render()`, `renderRows()` helpers in that file rather than building a new harness. Call `scrollback.destroy()` in a `finally` block and `renderer.destroy()` in `afterEach` (via the `active[]` array).
+
+## V2 subagent error-path test coverage
+
+`test/v2/session.test.ts` stubs `SessionPrompt.prompt` to return successfully by default, so the subagent error path (synthetic error message to parent) is not exercised. Use `stubPromptLayer({ failPrompt: true })` or a custom stub that throws to verify `SessionEvent.Synthetic.Sync` is posted with the error text when the child loop fails.

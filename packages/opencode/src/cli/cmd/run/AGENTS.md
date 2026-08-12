@@ -106,6 +106,14 @@ export function handleEventName(
 
 **Do not unify these implementations.** They operate on different state substrates (class signals vs SolidJS store), have different guard requirements, and different action targets. The only shared value is the 5s timeout duration.
 
+## `reduceSubagentData` — `message.part.updated` branch is reachable
+
+`subagent-data.ts:782-784` handles `message.part.updated` by extracting
+`event.properties.part.sessionID`. This branch is reachable when the event carries a
+`part` whose `sessionID` differs from the input `sessionID` (e.g., cross-session part
+updates during subagent bootstrap). Do not remove this branch as dead code without
+verifying the `part.sessionID` invariant.
+
 ## Refactoring Precedents
 
 ### Phase 2 — State Machine Decomposition
@@ -157,3 +165,11 @@ This symptom means the DB path has full content but the TUI streaming path lost 
 ## `MarkdownRenderable` settle/commit quirks (`@opentui/core`)
 
 `MarkdownRenderable._blockStates` / `_stableBlockCount` / `settle()` are external `@opentui/core` APIs (not indexed by codebase-memory-mcp). `settle()` resolving does NOT guarantee all `_blockStates` entries are populated — `commitMarkdownBlocks` can return false on the final block (incomplete code fence, whitespace-only trailing block). `flushActive` has a force-commit fallback (`done && surface.height > committedRows`) to prevent content loss before `finishActive` destroys the surface.
+
+## `reduceSubagentData` — `message.part.updated` branch is reachable
+
+`subagent-data.ts:782-784` handles `message.part.updated` by extracting
+`event.properties.part.sessionID`. This branch is reachable when the event carries a
+`part` whose `sessionID` differs from the input `sessionID` (e.g., cross-session part
+updates during subagent bootstrap). Do not remove this branch as dead code without
+verifying the `part.sessionID` invariant.

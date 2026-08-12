@@ -33,6 +33,7 @@ const ref = {
 /** A stub V1 SessionPrompt that records calls and returns canned messages. */
 function stubPromptLayer(opts?: {
   loopResult?: MessageV2.WithParts
+  failPrompt?: boolean
 }) {
   const calls: { prompt: unknown[]; loop: string[]; shell: unknown[] } = { prompt: [], loop: [], shell: [] }
   const loopResult =
@@ -73,6 +74,9 @@ function stubPromptLayer(opts?: {
         prompt: (input: any) =>
           Effect.gen(function* () {
             calls.prompt.push(input)
+            if (opts?.failPrompt) {
+              yield* Effect.die(new Error("simulated prompt failure"))
+            }
             // Emit the Prompted sync event so the V2 projector writes a
             // SessionMessageTable row — this mirrors what the real V1 prompt
             // does (prompt.ts:1440) and lets the V2 `messages`/`prompt` read-back work.
@@ -185,6 +189,24 @@ function makeTestLayer() {
   // Stubs depend on SyncEvent, so provide infra to them.
   const stubs = Layer.mergeAll(promptStub.layer, compactionStub.layer).pipe(Layer.provide(infra))
   // V2 layer needs both infra and stubs so serviceOption finds them at build.
+  const v2WithStubs = SessionV2.layer.pipe(Layer.provide(Layer.mergeAll(infra, stubs)))
+  return { layer: v2WithStubs, promptStub, compactionStub }
+}
+
+function makeFailingTestLayer() {
+  const promptStub = stubPromptLayer({ failPrompt: true })
+  const compactionStub = stubCompactionLayer()
+  const infra = Layer.mergeAll(
+    SessionV1.defaultLayer,
+    Config.defaultLayer,
+    Agent.defaultLayer,
+    CrossSpawnSpawner.defaultLayer,
+    SessionStatus.defaultLayer,
+    Bus.layer,
+    SyncEvent.defaultLayer,
+    Todo.defaultLayer,
+  )
+  const stubs = Layer.mergeAll(promptStub.layer, compactionStub.layer).pipe(Layer.provide(infra))
   const v2WithStubs = SessionV2.layer.pipe(Layer.provide(Layer.mergeAll(infra, stubs)))
   return { layer: v2WithStubs, promptStub, compactionStub }
 }
@@ -723,6 +745,46 @@ describe("v2.session", () => {
       )
 
       expect(true).toBe(true)
+    }),
+  )
+})
+
+describe("v2.session.error-path", () => {
+  const failingTestLayer = makeFailingTestLayer()
+  const failingIt = testEffect(failingTestLayer.layer)
+  const failingPromptStub = failingTestLayer.promptStub
+
+  failingIt.instance("subagent posts synthetic error message when prompt fails", () =>
+    Effect.gen(function* () {
+      const session = yield* SessionV2.Service
+      const parent = yield* session.create({ agent: "build" })
+
+      yield* session.subagent({
+        parentID: parent.id,
+        agent: "general",
+        prompt: { text: "do something" },
+      })
+
+      // Verify the failing prompt was actually called
+      expect(failingPromptStub.calls.prompt.length).toBeGreaterThan(0)
+
+      // Poll parent messages for the synthetic error message.
+      const messages = yield* Effect.gen(function* () {
+        for (let i = 0; i < 50; i++) {
+          const msgs = yield* session.messages({ sessionID: parent.id, order: "desc" })
+          const synthetic = msgs.find((m) => m.type === "synthetic")
+          if (synthetic) return msgs
+          yield* Effect.sleep("10 millis")
+        }
+        throw new Error("timed out waiting for synthetic error message")
+      })
+
+      const synthetic = messages.find((m) => m.type === "synthetic")
+      expect(synthetic?.type).toBe("synthetic")
+      if (synthetic?.type === "synthetic") {
+        expect(synthetic.text).toContain("Subagent error:")
+        expect(synthetic.text).toContain("simulated prompt failure")
+      }
     }),
   )
 })
