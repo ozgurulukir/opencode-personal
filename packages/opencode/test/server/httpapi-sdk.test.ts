@@ -28,7 +28,7 @@ const original = {
 
 type ServerPath = "default" | "raw"
 type Sdk = ReturnType<typeof createOpencodeClient>
-type SdkResult = { response: Response; data?: unknown; error?: unknown }
+type SdkResult = { response?: Response; data?: unknown; error?: unknown }
 type Captured = { status: number; data?: unknown; error?: unknown }
 type ProjectFixture = { sdk: Sdk; directory: string }
 type LlmProjectFixture = ProjectFixture & { llm: TestLLMServer["Service"] }
@@ -125,7 +125,7 @@ function call<T>(request: () => Promise<T>) {
 function capture(request: () => Promise<SdkResult>) {
   return call(request).pipe(
     Effect.map((result) => ({
-      status: result.response.status,
+      status: result.response!.status, // response is present once the HTTP request completes (all tested paths)
       data: result.data,
       error: result.error,
     })),
@@ -142,9 +142,9 @@ function captureThrown(request: () => Promise<unknown>) {
   })
 }
 
-function expectStatus(request: () => Promise<{ response: Response }>, status: number) {
+function expectStatus(request: () => Promise<SdkResult>, status: number) {
   return call(request).pipe(
-    Effect.tap((result) => Effect.sync(() => expect(result.response.status).toBe(status))),
+    Effect.tap((result) => Effect.sync(() => expect(result.response!.status).toBe(status))),
     Effect.asVoid,
   )
 }
@@ -318,12 +318,12 @@ describe("HttpApi SDK", () => {
       const health = yield* call(() => sdk.global.health())
       const log = yield* call(() => sdk.app.log({ service: "httpapi-sdk-test", level: "info", message: "hello" }))
 
-      expect(health.response.status).toBe(200)
+      expect(health.response!.status).toBe(200)
       expect(health.data).toMatchObject({ healthy: true })
       expect(yield* firstEvent(() => sdk.global.event({ signal: AbortSignal.timeout(1_000) }))).toMatchObject({
         payload: { type: "server.connected" },
       })
-      expect(log.response.status).toBe(200)
+      expect(log.response!.status).toBe(200)
       expect(log.data).toBe(true)
       yield* expectStatus(() => sdk.auth.set({ providerID: "test" }), 400)
     }),
@@ -337,11 +337,11 @@ describe("HttpApi SDK", () => {
         const session = yield* call(() => sdk.session.create({ title: "sdk" }))
         const listed = yield* call(() => sdk.session.list({ roots: true, limit: 10 }))
 
-        expect(file.response.status).toBe(200)
+        expect(file.response!.status).toBe(200)
         expect(file.data).toMatchObject({ content: "hello" })
-        expect(session.response.status).toBe(200)
+        expect(session.response!.status).toBe(200)
         expect(session.data).toMatchObject({ title: "sdk" })
-        expect(listed.response.status).toBe(200)
+        expect(listed.response!.status).toBe(200)
         expect(listed.data?.map((item) => item.id)).toContain(session.data?.id)
 
         yield* Effect.all([
