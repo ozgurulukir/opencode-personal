@@ -305,7 +305,7 @@ export function Markdown(
       copied: i18n.t("ui.message.copied"),
     }
     const temp = document.createElement("div")
-    temp.innerHTML = content
+    temp.innerHTML = sanitize(content)
     decorate(temp, labels)
 
     morphdom(container, temp, {
