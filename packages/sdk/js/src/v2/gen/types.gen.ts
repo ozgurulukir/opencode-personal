@@ -23,6 +23,9 @@ export type Event =
   | EventSessionError
   | EventInstallationUpdated
   | EventInstallationUpdateAvailable
+  | EventSkillLoaded
+  | EventSkillUnloaded
+  | EventSkillWarning
   | EventQuestionAsked
   | EventQuestionReplied
   | EventQuestionRejected
@@ -32,6 +35,7 @@ export type Event =
   | EventSessionCompacted
   | EventMcpToolsChanged
   | EventMcpBrowserOpenFailed
+  | EventMcpStatusChanged
   | EventCommandExecuted
   | EventProjectUpdated
   | EventVcsBranchUpdated
@@ -47,7 +51,9 @@ export type Event =
   | EventMessageUpdated
   | EventMessageRemoved
   | EventMessagePartUpdated
+  | EventMessagePartUpdatedBatch
   | EventMessagePartRemoved
+  | EventMessageUpdatedBatch
   | EventSessionCreated
   | EventSessionUpdated
   | EventSessionDeleted
@@ -251,11 +257,11 @@ export type Todo = {
   /**
    * Current status of the task: pending, in_progress, completed, cancelled
    */
-  status: string
+  status: "pending" | "in_progress" | "completed" | "cancelled"
   /**
    * Priority level of the task: high, medium, low
    */
-  priority: string
+  priority: "high" | "medium" | "low"
 }
 
 export type SessionStatus =
@@ -279,6 +285,31 @@ export type SessionStatus =
   | {
       type: "busy"
     }
+
+export type McpStatusConnected = {
+  status: "connected"
+}
+
+export type McpStatusDisabled = {
+  status: "disabled"
+}
+
+export type McpStatusFailed = {
+  status: "failed"
+  error: string
+}
+
+export type McpStatusNeedsAuth = {
+  status: "needs_auth"
+}
+
+export type McpStatusNeedsClientRegistration = {
+  status: "needs_client_registration"
+  error: string
+}
+
+export type McpStatus =
+  McpStatusConnected | McpStatusDisabled | McpStatusFailed | McpStatusNeedsAuth | McpStatusNeedsClientRegistration
 
 export type Project = {
   id: string
@@ -741,6 +772,9 @@ export type GlobalEvent = {
     | EventSessionError
     | EventInstallationUpdated
     | EventInstallationUpdateAvailable
+    | EventSkillLoaded
+    | EventSkillUnloaded
+    | EventSkillWarning
     | EventQuestionAsked
     | EventQuestionReplied
     | EventQuestionRejected
@@ -750,6 +784,7 @@ export type GlobalEvent = {
     | EventSessionCompacted
     | EventMcpToolsChanged
     | EventMcpBrowserOpenFailed
+    | EventMcpStatusChanged
     | EventCommandExecuted
     | EventProjectUpdated
     | EventVcsBranchUpdated
@@ -765,7 +800,9 @@ export type GlobalEvent = {
     | EventMessageUpdated
     | EventMessageRemoved
     | EventMessagePartUpdated
+    | EventMessagePartUpdatedBatch
     | EventMessagePartRemoved
+    | EventMessageUpdatedBatch
     | EventSessionCreated
     | EventSessionUpdated
     | EventSessionDeleted
@@ -798,7 +835,9 @@ export type GlobalEvent = {
     | SyncEventMessageUpdated
     | SyncEventMessageRemoved
     | SyncEventMessagePartUpdated
+    | SyncEventMessagePartUpdatedBatch
     | SyncEventMessagePartRemoved
+    | SyncEventMessageUpdatedBatch
     | SyncEventSessionCreated
     | SyncEventSessionUpdated
     | SyncEventSessionDeleted
@@ -921,31 +960,7 @@ export type AgentConfig = {
   steps?: number
   maxSteps?: number
   permission?: PermissionConfig
-  [key: string]:
-    | unknown
-    | string
-    | number
-    | {
-        [key: string]: boolean
-      }
-    | boolean
-    | "subagent"
-    | "primary"
-    | "all"
-    | {
-        [key: string]: unknown
-      }
-    | string
-    | "primary"
-    | "secondary"
-    | "accent"
-    | "success"
-    | "warning"
-    | "error"
-    | "info"
-    | number
-    | PermissionConfig
-    | undefined
+  [key: string]: unknown
 }
 
 export type ProviderConfig = {
@@ -961,12 +976,9 @@ export type ProviderConfig = {
     baseURL?: string
     enterpriseUrl?: string
     setCacheKey?: boolean
-    /**
-     * Timeout in milliseconds for requests to this provider. Default is 300000 (5 minutes). Set to false to disable timeout.
-     */
     timeout?: number | false
-    chunkTimeout?: number
-    [key: string]: unknown | string | boolean | number | false | number | undefined
+    chunkTimeout?: number | false
+    [key: string]: unknown
   }
   models?: {
     [key: string]: {
@@ -1022,7 +1034,7 @@ export type ProviderConfig = {
       variants?: {
         [key: string]: {
           disabled?: boolean
-          [key: string]: unknown | boolean | undefined
+          [key: string]: unknown
         }
       }
     }
@@ -1105,6 +1117,15 @@ export type Config = {
   skills?: {
     paths?: Array<string>
     urls?: Array<string>
+    autoMatch?: boolean
+    /**
+     * Number of top-matching skills to inject (default: 3)
+     */
+    autoMatchCount?: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+    /**
+     * Minimum cosine similarity threshold (0-1, default: 0.25). Skills below this score are not injected.
+     */
+    autoMatchThreshold?: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
   }
   reference?: ReferenceConfig
   watcher?: {
@@ -1216,6 +1237,15 @@ export type Config = {
     tail_turns?: number
     preserve_recent_tokens?: number
     reserved?: number
+    prune_minimum_tokens?: number
+    prune_protect_tokens?: number
+    tool_output_max_chars?: number
+    min_preserve_recent_tokens?: number
+    max_preserve_recent_tokens?: number
+    prune_protected_tools?: Array<string>
+    summary_max_tokens?: number
+    autocontinue?: boolean
+    context_limit?: number
   }
   experimental?: {
     disable_paste_summary?: boolean
@@ -1440,8 +1470,8 @@ export type FileContent = {
   content: string
   diff?: string
   patch?: {
-    oldFileName: string
-    newFileName: string
+    oldFileName?: string
+    newFileName?: string
     oldHeader?: string
     newHeader?: string
     hunks: Array<{
@@ -1545,35 +1575,6 @@ export type FormatterStatus = {
   extensions: Array<string>
   enabled: boolean
 }
-
-export type McpStatusConnected = {
-  status: "connected"
-}
-
-export type McpStatusDisabled = {
-  status: "disabled"
-}
-
-export type McpStatusFailed = {
-  status: "failed"
-  error: string
-}
-
-export type McpStatusNeedsAuth = {
-  status: "needs_auth"
-}
-
-export type McpStatusNeedsClientRegistration = {
-  status: "needs_client_registration"
-  error: string
-}
-
-export type McpStatus =
-  | McpStatusConnected
-  | McpStatusDisabled
-  | McpStatusFailed
-  | McpStatusNeedsAuth
-  | McpStatusNeedsClientRegistration
 
 export type McpUnsupportedOAuthError = {
   error: string
@@ -1799,6 +1800,19 @@ export type SyncEventMessagePartUpdated = {
   }
 }
 
+export type SyncEventMessagePartUpdatedBatch = {
+  type: "sync"
+  name: "message.part.updated.batch.1"
+  id: string
+  seq: number
+  aggregateID: "sessionID"
+  data: {
+    sessionID: string
+    parts: Array<Part>
+    time: number
+  }
+}
+
 export type SyncEventMessagePartRemoved = {
   type: "sync"
   name: "message.part.removed.1"
@@ -1809,6 +1823,19 @@ export type SyncEventMessagePartRemoved = {
     sessionID: string
     messageID: string
     partID: string
+  }
+}
+
+export type SyncEventMessageUpdatedBatch = {
+  type: "sync"
+  name: "message.updated.batch.1"
+  id: string
+  seq: number
+  aggregateID: "sessionID"
+  data: {
+    sessionID: string
+    infos: Array<Message>
+    time_created: number
   }
 }
 
@@ -2466,6 +2493,34 @@ export type EventInstallationUpdateAvailable = {
   }
 }
 
+export type EventSkillLoaded = {
+  id: string
+  type: "skill.loaded"
+  properties: {
+    name: string
+    location: string
+  }
+}
+
+export type EventSkillUnloaded = {
+  id: string
+  type: "skill.unloaded"
+  properties: {
+    name: string
+    location: string
+  }
+}
+
+export type EventSkillWarning = {
+  id: string
+  type: "skill.warning"
+  properties: {
+    name: string
+    location: string
+    message: string
+  }
+}
+
 export type EventQuestionAsked = {
   id: string
   type: "question.asked"
@@ -2532,6 +2587,15 @@ export type EventMcpBrowserOpenFailed = {
   properties: {
     mcpName: string
     url: string
+  }
+}
+
+export type EventMcpStatusChanged = {
+  id: string
+  type: "mcp.status.changed"
+  properties: {
+    server: string
+    status: McpStatus
   }
 }
 
@@ -2663,6 +2727,16 @@ export type EventMessagePartUpdated = {
   }
 }
 
+export type EventMessagePartUpdatedBatch = {
+  id: string
+  type: "message.part.updated.batch"
+  properties: {
+    sessionID: string
+    parts: Array<Part>
+    time: number
+  }
+}
+
 export type EventMessagePartRemoved = {
   id: string
   type: "message.part.removed"
@@ -2670,6 +2744,16 @@ export type EventMessagePartRemoved = {
     sessionID: string
     messageID: string
     partID: string
+  }
+}
+
+export type EventMessageUpdatedBatch = {
+  id: string
+  type: "message.updated.batch"
+  properties: {
+    sessionID: string
+    infos: Array<Message>
+    time_created: number
   }
 }
 
@@ -3087,6 +3171,7 @@ export type SessionInfo = {
     archived?: number
   }
   title: string
+  permission?: PermissionRuleset
 }
 
 export type SessionDelivery = "immediate" | "deferred"
@@ -4253,9 +4338,16 @@ export type AppSkillsResponses = {
    */
   200: Array<{
     name: string
-    description?: string
+    description: string
     location: string
     content: string
+    license?: string
+    compatibility?: string
+    metadata?: {
+      [key: string]: string
+    }
+    allowedTools?: string
+    warnings?: Array<string>
   }>
 }
 
