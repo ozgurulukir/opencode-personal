@@ -10,6 +10,7 @@ import { MessageID, PartID, SessionID } from "../../src/session/schema"
 import { ModelID, ProviderID } from "../../src/provider/schema"
 import { TaskTool, type TaskPromptOps } from "../../src/tool/task"
 import { Truncate } from "@/tool/truncate"
+import { Instance } from "../../src/project/instance"
 import { ToolRegistry } from "@/tool/registry"
 import { SearchService } from "@/search/search"
 import { EmbeddingService } from "@/search/embedding"
@@ -331,6 +332,62 @@ describe("tool.task", () => {
       const input = yield* Effect.promise(() => ready.promise)
       abort.abort()
       expect(yield* Effect.promise(() => cancelled.promise)).toBe(input.sessionID)
+
+      const exit = yield* Fiber.await(fiber)
+      expect(Exit.isSuccess(exit)).toBe(true)
+    }),
+  )
+
+  it.instance("execute runs cancel inside instance context (bridged), no context-found defect", () =>
+    Effect.gen(function* () {
+      const { chat, assistant } = yield* seed()
+      const tool = yield* TaskTool
+      const def = yield* tool.init()
+      const ready = defer<SessionPrompt.PromptInput>()
+      const cancelled = defer<string>()
+      const abort = new AbortController()
+      const promptOps: TaskPromptOps = {
+        // Reading `Instance.current` requires the legacy Instance ALS. Under an
+        // unbridged `Effect.runPromise` the AsyncLocalStorage is dropped, so this
+        // throws `LocalContext.NotFound`. The EffectBridge reinstalls it, so the
+        // cancel should resolve with the instance directory instead.
+        cancel: (_) =>
+          Effect.sync(() => {
+            cancelled.resolve(Instance.current.directory)
+          }),
+        resolvePromptParts: (template) => Effect.succeed([{ type: "text" as const, text: template }]),
+        prompt: (input) =>
+          Effect.promise(() => {
+            ready.resolve(input)
+            return cancelled.promise
+          }).pipe(Effect.as(reply(input, "cancelled"))),
+      }
+
+      const fiber = yield* def
+        .execute(
+          {
+            description: "inspect bug",
+            prompt: "look into the cache key path",
+            subagent_type: "general",
+          },
+          {
+            sessionID: chat.id,
+            messageID: assistant.id,
+            agent: "build",
+            abort: abort.signal,
+            extra: { promptOps },
+            messages: [],
+            metadata: () => Effect.void,
+            ask: () => Effect.void,
+          },
+        )
+        .pipe(Effect.forkChild)
+
+      const input = yield* Effect.promise(() => ready.promise)
+      abort.abort()
+      // Resolves to the instance directory — not a "No context found" rejection.
+      const dir = yield* Effect.promise(() => cancelled.promise)
+      expect(dir).toBeTruthy()
 
       const exit = yield* Fiber.await(fiber)
       expect(Exit.isSuccess(exit)).toBe(true)

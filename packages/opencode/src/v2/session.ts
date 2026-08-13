@@ -25,6 +25,7 @@ import { Config } from "@/config/config"
 import { Permission } from "@/permission"
 import { subagentSessionPermission, subagentToolRestrictions, MAX_SUBAGENT_NESTING_LEVELS } from "@/agent/subagent-permissions"
 import * as Log from "@opencode-ai/core/util/log"
+import { EffectBridge } from "@/effect/bridge"
 
 const log = Log.create({ service: "v2.session" })
 
@@ -537,11 +538,12 @@ export const layer = Layer.effect(
         // immediately after prompt returns.
         const promptSvc = yield* requireV1(promptV1, "SessionPrompt")
         const cancelChild = promptSvc.cancel(session.id)
+        const bridge = yield* EffectBridge.make()
         let cancelled = false
         const onAbort = () => {
           if (cancelled) return
           cancelled = true
-          Effect.runPromise(cancelChild).catch((error) => log.warn("subagent cancel failed", { error: String(error) }))
+          bridge.promise(cancelChild).catch((error) => log.warn("subagent cancel failed", { error: String(error) }))
         }
         if (input.abort) input.abort.addEventListener("abort", onAbort)
 

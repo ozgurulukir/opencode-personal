@@ -41,6 +41,27 @@ function shouldUseCopilotResponsesApi(modelID: string): boolean {
   return Number(match[1]) >= 5 && !modelID.startsWith("gpt-5-mini")
 }
 
+export const DEFAULT_HTTP_TIMEOUT = 300_000
+export const DEFAULT_CHUNK_TIMEOUT = 60_000
+
+// Narrowing, not casting. `false` preserves the documented opt-out (unbounded);
+// a positive number is honored verbatim; anything else (undefined/null/etc.)
+// resolves to the documented default. Guards a genuinely stuck request.
+export function resolveHttpTimeout(t: unknown): number | false {
+  if (t === false) return false
+  if (typeof t === "number") return t
+  return DEFAULT_HTTP_TIMEOUT
+}
+
+// Narrowing. `false` disables the chunk watchdog; a positive number wins over
+// the default; otherwise fall back to DEFAULT_CHUNK_TIMEOUT. Never returns a
+// non-positive number, so `=== false` is the only no-controller branch.
+export function resolveChunkTimeout(t: unknown): number | false {
+  if (t === false) return false
+  if (typeof t === "number" && t > 0) return t
+  return DEFAULT_CHUNK_TIMEOUT
+}
+
 function wrapSSE(res: Response, ms: number, ctl: AbortController) {
   if (typeof ms !== "number" || ms <= 0) return res
   if (!res.body) return res
@@ -1416,19 +1437,19 @@ const layer: Layer.Layer<
         if (existing) return existing
 
         const customFetch = options["fetch"]
-        const chunkTimeout = options["chunkTimeout"]
+        const chunkTimeout = resolveChunkTimeout(options["chunkTimeout"])
         delete options["chunkTimeout"]
 
         options["fetch"] = async (input: any, init?: BunFetchRequestInit) => {
           const fetchFn = customFetch ?? fetch
           const opts = init ?? {}
-          const chunkAbortCtl = typeof chunkTimeout === "number" && chunkTimeout > 0 ? new AbortController() : undefined
+          const chunkAbortCtl = chunkTimeout === false ? undefined : new AbortController()
+          const timeout = resolveHttpTimeout(options["timeout"])
           const signals: AbortSignal[] = []
 
           if (opts.signal) signals.push(opts.signal)
           if (chunkAbortCtl) signals.push(chunkAbortCtl.signal)
-          if (options["timeout"] !== undefined && options["timeout"] !== null && options["timeout"] !== false)
-            signals.push(AbortSignal.timeout(options["timeout"]))
+          if (timeout !== false) signals.push(AbortSignal.timeout(timeout))
 
           const { signal: combined, cleanup } = signals.length <= 1
             ? { signal: signals[0] ?? null, cleanup: () => {} }
@@ -1466,8 +1487,8 @@ const layer: Layer.Layer<
               timeout: false,
             })
 
-            if (!chunkAbortCtl) return res
-            return wrapSSE(res, chunkTimeout, chunkAbortCtl)
+            if (chunkTimeout === false) return res
+            return wrapSSE(res, chunkTimeout, chunkAbortCtl!)
           } finally {
             cleanup()
           }
