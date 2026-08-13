@@ -105,4 +105,34 @@ describe("HttpApi CORS", () => {
       expect(response.headers.get("access-control-allow-headers")).toBe("authorization")
     }),
   )
+
+  it.live("validates allowed origins securely (opencode.ai subdomains whitelist)", () =>
+    Effect.gen(function* () {
+      const handler = HttpRouter.toWebHandler(
+        ExperimentalHttpApiServer.createRoutes().pipe(
+          Layer.provide(ConfigProvider.layer(ConfigProvider.fromUnknown({ OPENCODE_SERVER_PASSWORD: "secret" }))),
+        ),
+        { disableLogger: true },
+      ).handler
+
+      const checkOrigin = (origin: string) => Effect.promise(async () => {
+        const response = await handler(
+          new Request(new URL("/global/config", "http://localhost"), {
+            headers: { origin },
+          }),
+          ExperimentalHttpApiServer.context,
+        )
+        return response.headers.get("access-control-allow-origin")
+      })
+
+      // Allowed
+      expect(yield* checkOrigin("https://opencode.ai")).toBe("https://opencode.ai")
+      expect(yield* checkOrigin("https://app.opencode.ai")).toBe("https://app.opencode.ai")
+
+      // Rejected
+      expect(yield* checkOrigin("https://evil.com.opencode.ai")).toBe(null)
+      expect(yield* checkOrigin("https://user-controlled.opencode.ai")).toBe(null)
+      expect(yield* checkOrigin("https://evilopencode.ai")).toBe(null)
+    }),
+  )
 })

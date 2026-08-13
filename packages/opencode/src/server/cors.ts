@@ -1,6 +1,7 @@
 import { Context } from "effect"
 
-const opencodeOrigin = /^https:\/\/([a-z0-9-]+\.)*opencode\.ai$/
+const ALLOWED_ORIGINS = ["opencode.ai", "app.opencode.ai"]
+const opencodeOrigin = new RegExp(`^https:\\/\\/(${ALLOWED_ORIGINS.map((o) => o.replace(/\./g, "\\.")).join("|")})$`)
 
 export type CorsOptions = { readonly cors?: ReadonlyArray<string> }
 
