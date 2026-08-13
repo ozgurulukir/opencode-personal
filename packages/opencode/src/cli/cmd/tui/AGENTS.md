@@ -86,3 +86,7 @@ The `Spinner` component (`component/spinner.tsx`) wraps the native `<spinner>` e
 ## Skill warnings
 
 `skill.warning` bus events are emitted for non-critical skill frontmatter issues. The event is not in the generated SDK `Event` union and is NOT shown as a TUI toast. Warnings are surfaced to the user via the `skill` tool output when an invalid skill is loaded.
+
+## Permission/question prompts aggregate over the full descendant session subtree
+
+The session route renders pending prompts from **every** session in the viewed session's subtree (`collectSessionDescendants`, `tui/util/session-tree.ts`), not just the viewed session + its direct children. This is load-bearing: a depth-2+ subagent's `Permission.ask` is keyed under its own `sessionID`, and if aggregation were limited to direct children that ask would never surface → the subagent's shell command hangs (its `Deferred.await` never resolves). The `children` memo (direct children) is kept for subagent tab navigation only — don't reuse it for prompt aggregation.

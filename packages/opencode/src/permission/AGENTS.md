@@ -45,3 +45,11 @@ JavaScript's single-threaded execution and the synchronous `Database.transaction
 Effect's cooperative scheduling can interleave yields between `approved.push()` and
 the upsert, but the snapshot ensures the DB write is atomic regardless. The comment
 has been updated to reflect the actual guarantees.
+
+## Timeout alarm must use `Effect.raceFirst`, not `Effect.race`
+
+`ask()` boundaries its `Deferred.await` with `Effect.raceFirst(await, sleep→fail)` (`index.ts`). `Effect.race` returns only the first branch to **succeed**, so a failing timeout branch would be ignored and the hang would persist; `Effect.raceFirst` returns whichever branch completes first (success **or** failure). Use `raceFirst` whenever a timeout branch is intended to win on expiry.
+
+## `ask()` timeout broadcasts a synthetic `Event.Replied(reject)` on expiry
+
+When the permission ask times out (`PERMISSION_ASK_TIMEOUT_MS` default 5 min, overridable via `AskInput.timeoutMs`), `ask()` publishes a synthetic `Event.Replied({ reply: "reject" })` before failing with `TimedOutError`. This is so the TUI/run/store remove the stale pending prompt (they clean up on `reply`, not on the ask error itself). A nested subagent whose ask is never surfaced still hangs until this timeout fires — the synthetic reply is what unblocks the store.

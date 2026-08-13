@@ -20,6 +20,7 @@ Bun workspace monorepo: `packages/*`, `packages/sdk/js`. Catalog versioning via 
 - `bun run dev` / `dev:web` / `dev:desktop` / `dev:storybook`
 - `bun run lint` (oxlint)
 - `bun run typecheck` (turbo typecheck)
+- A **husky `pre-push` hook runs `bun turbo typecheck` across all packages** and blocks the push on any failure (`error: failed to push some refs`). Do your best typecheck in the changed package (`bun typecheck` from its dir) before pushing, and regenerate the SDK via `./packages/sdk/js/script/build.ts` first when a server-side schema/config change needs to flow into `@opencode-ai/sdk` — otherwise the SDK regen's downstream type effects only surface at push time.
 - Regenerate JS SDK: `./packages/sdk/js/script/build.ts`
 - There is a SINGLE generated SDK client at `packages/sdk/js/src/v2/gen/` (regenerated from `openapi.json`; fixes patched in `script/build.ts`). The legacy v1 generation (`src/gen/`, `src/client.ts`, `src/server.ts`) was removed during SDK consolidation — the root `@opencode-ai/sdk` export now re-exports v2 (`src/v2/index.ts`). All internal consumers (TUI, web/app, ACP, plugin host, github action) import from `@opencode-ai/sdk/v2` or the v2-backed root.
 - SDK package (`@opencode-ai/sdk`) exports source `.ts` directly; `dist/` exists but isn't what consumers resolve in dev. `node_modules/@opencode-ai/sdk` symlinks to `packages/sdk/js/`, so `src/` edits are live without rebuilding.

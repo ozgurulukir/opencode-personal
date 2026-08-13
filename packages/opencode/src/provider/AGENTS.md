@@ -51,3 +51,11 @@ repeating inline JSON parse logic.
 ## `models-snapshot.js` is eagerly transformed — use lazy `getDatabaseProvider`
 
 `provider.ts:1031` previously did `const database = mapValues(modelsDev, fromModelsDevProvider)`, transforming all 5949 models (178 providers) into full `Model` objects at init time. The fix is a `databaseCache` + `getDatabaseProvider(providerID)` wrapper that calls `fromModelsDevProvider` only on first access. This cuts provider init memory by ~50-100 MB. Call sites (`mergeProvider`, env loop, plugin hooks, `custom()`) must use `getDatabaseProvider` instead of direct `database[providerID]` access.
+
+## HTTP request timeout is now applied as a default in `customFetch`
+
+The `customFetch` wrapper (`provider.ts`) applies `AbortSignal.timeout(resolveHttpTimeout(options["timeout"]))` with `DEFAULT_HTTP_TIMEOUT = 300_000` (5 min) unless `timeout` is explicitly `false`. This matters because the raw fetch is called with `timeout: false` (Bun's own fetch timeout is disabled), so previously a provider request could hang indefinitely when no `timeout`/`chunkTimeout` was configured.
+
+## `chunkTimeout` is a liveness watchdog, not a deadline, and is SSE-only
+
+`resolveChunkTimeout` defaults to `DEFAULT_CHUNK_TIMEOUT = 60_000`. `wrapSSE` resets its timer on every successful `reader.read()`, so a **drip** stream (a provider dribbling partial tokens/keepalives periodically) defeats it — it only guards a fully **silent** stream. It also only applies to SSE responses (non-`text/event-stream` responses bypass `wrapSSE`). Configure `timeout` for an absolute cap, `chunkTimeout` for idle-stream detection; a stream can still hang if it drips within the chunk window without ever finishing.
