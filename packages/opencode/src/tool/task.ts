@@ -10,6 +10,7 @@ import { Config } from "@/config/config"
 import { Cause, Effect, Exit, Schema } from "effect"
 import { Permission } from "../permission"
 import * as Log from "@opencode-ai/core/util/log"
+import { EffectBridge } from "@/effect/bridge"
 
 const log = Log.create({ service: "tool.task" })
 
@@ -165,12 +166,13 @@ export const TaskTool = Tool.define(
 
       const messageID = MessageID.ascending()
       const cancel = ops.cancel(nextSession.id)
+      const bridge = yield* EffectBridge.make()
       let cancelled = false
 
       function onAbort() {
         if (cancelled) return
         cancelled = true
-        Effect.runPromise(cancel).catch((error) => log.warn("subagent cancel failed", { error: String(error) }))
+        bridge.promise(cancel).catch((error) => log.warn("subagent cancel failed", { error: String(error) }))
       }
 
       return yield* Effect.acquireUseRelease(

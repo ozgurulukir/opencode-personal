@@ -88,19 +88,21 @@ export const Info = Schema.Struct({
         setCacheKey: Schema.optional(Schema.Boolean).annotate({
           description: "Enable promptCacheKey for this provider (default false)",
         }),
+        // NOTE: `timeout: false` disables the TOTAL timeout (no abort timer),
+        // while `chunkTimeout: false` disables the SSE chunk watchdog. They are
+        // independent bounds — a user disabling one still gets the other.
         timeout: Schema.optional(
           Schema.Union([PositiveInt, Schema.Literal(false)]).annotate({
             description:
               "Timeout in milliseconds for requests to this provider. Default is 300000 (5 minutes). Set to false to disable timeout.",
           }),
-        ).annotate({
-          description:
-            "Timeout in milliseconds for requests to this provider. Default is 300000 (5 minutes). Set to false to disable timeout.",
-        }),
-        chunkTimeout: Schema.optional(PositiveInt).annotate({
-          description:
-            "Timeout in milliseconds between streamed SSE chunks for this provider. If no chunk arrives within this window, the request is aborted.",
-        }),
+        ),
+        chunkTimeout: Schema.optional(
+          Schema.Union([PositiveInt, Schema.Literal(false)]).annotate({
+            description:
+              "Timeout in milliseconds between streamed SSE chunks for this provider. Default is 60000 (60 seconds). Set to false to disable.",
+          }),
+        ),
       }),
       [Schema.Record(Schema.String, Schema.Any)],
     ),
