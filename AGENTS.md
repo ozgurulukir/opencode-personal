@@ -27,6 +27,7 @@ Bun workspace monorepo: `packages/*`, `packages/sdk/js`. Catalog versioning via 
 - SDK tests live in `packages/opencode/test/server/`, not `packages/sdk/js/test/`. Add SDK behavior tests there.
 - `bun run build -- --single` produces a self-contained compiled binary via `packages/opencode/script/build.ts`. Wasm files (web-tree-sitter.wasm, tree-sitter-markdown.wasm) and native libs (libopentui.so) are embedded.
 - **`packages/diff-wasm` cannot typecheck until its WASM artifacts are built locally.** `src/index.ts` imports `from "../pkg/opencode_diff_rs.js"`, but `pkg/` is gitignored (`pkg/.gitignore` is `*`, itself untracked), so a fresh clone / new box has an empty `pkg/` → `opencode` typecheck fails with `TS2307: Cannot find module '../pkg/opencode_diff_rs.js'` (and the `pre-push` hook rejects the push). Fix: `cd packages/diff-wasm && bun run build:wasm` (wasm-pack `--target web --out-dir pkg`; requires rust toolchain + wasm-pack). This misleadingly resembles an SDK-regen break — if a clean box fails typecheck on `diff-wasm`, run the wasm build, not the SDK regen.
+- `bun run turbo run typecheck --force` only re-runs cached tasks; it does **not** regenerate gitignored task inputs like `diff-wasm/pkg/`. turbo doesn't track `pkg/` as an input (gitignored), so `--force` on a box with an empty `pkg/` still fails — the WASM build must be run explicitly. A clean `--force` on one box does not prove another box has missing artifacts.
 
 ## Bulk Dependency Updates
 
