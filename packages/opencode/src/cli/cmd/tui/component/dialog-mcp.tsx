@@ -64,7 +64,7 @@ export function DialogMcp() {
             Log.Default.error("Failed to refresh MCP status: no data returned")
           }
         } catch (error) {
-          Log.Default.error("Failed to toggle MCP:", { error })
+          Log.Default.error("Failed to toggle MCP", { error })
         } finally {
           setLoading(null)
         }
