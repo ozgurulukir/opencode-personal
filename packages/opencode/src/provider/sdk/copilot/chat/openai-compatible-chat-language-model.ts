@@ -66,7 +66,7 @@ export class OpenAICompatibleChatLanguageModel implements LanguageModelV3 {
 
     // initialize error handling:
     const errorStructure = config.errorStructure ?? defaultOpenAICompatibleErrorStructure
-    this.chunkSchema = createOpenAICompatibleChatChunkSchema(errorStructure.errorSchema) as any
+    this.chunkSchema = createOpenAICompatibleChatChunkSchema(errorStructure.errorSchema as unknown as typeof defaultOpenAICompatibleErrorStructure.errorSchema)
     this.failedResponseHandler = createJsonErrorResponseHandler(errorStructure)
 
     this.supportsStructuredOutputs = config.supportsStructuredOutputs ?? false
@@ -393,7 +393,6 @@ export class OpenAICompatibleChatLanguageModel implements LanguageModelV3 {
           start(controller) {
             controller.enqueue({ type: "stream-start", warnings })
           },
-
 
           transform(chunk, controller) {
             // Emit raw chunk if requested (before anything else)
