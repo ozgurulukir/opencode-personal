@@ -67,6 +67,7 @@ import { Flag } from "@opencode-ai/core/flag/flag"
 import { LANGUAGE_EXTENSIONS } from "@/lsp/language"
 import parsers from "../../../../../../parsers-config.ts"
 import * as Clipboard from "../../util/clipboard"
+import { collectSessionDescendants } from "../../util/session-tree"
 import { errorMessage } from "@/util/error"
 import { Toast, useToast } from "../../ui/toast"
 import { useKV } from "../../context/kv.tsx"
@@ -169,14 +170,14 @@ export function Session() {
       .toSorted((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
   })
   const messages = createMemo(() => sync.data.message[route.sessionID] ?? [])
-  const permissions = createMemo(() => {
-    if (session()?.parentID) return []
-    return children().flatMap((x) => sync.data.permission[x.id] ?? [])
+  // Every session in the viewed session's subtree (itself + all descendants through
+  // the parentID chain, any depth). Powers recursive aggregation of pending asks.
+  const sessionIDs = createMemo(() => {
+    const root = session()?.id
+    return root ? collectSessionDescendants(sync.data.session, root) : new Set<string>()
   })
-  const questions = createMemo(() => {
-    if (session()?.parentID) return []
-    return children().flatMap((x) => sync.data.question[x.id] ?? [])
-  })
+  const permissions = createMemo(() => [...sessionIDs()].flatMap((id) => sync.data.permission[id] ?? []))
+  const questions = createMemo(() => [...sessionIDs()].flatMap((id) => sync.data.question[id] ?? []))
   const visible = createMemo(() => !session()?.parentID && permissions().length === 0 && questions().length === 0)
   const disabled = createMemo(() => permissions().length > 0 || questions().length > 0)
 
