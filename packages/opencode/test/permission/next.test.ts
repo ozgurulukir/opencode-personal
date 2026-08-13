@@ -1274,3 +1274,123 @@ it.live("ask - abort should clear pending request", () =>
     }),
   ),
 )
+
+// --- ask timeout (safety net) ---
+//
+// The permission layer needs a real instance (InstanceState backed by ScopedCache),
+// which the TestClock-based `it.effect` runtime cannot provide, so these timeout
+// tests use `it.live` with short `timeoutMs` overrides rather than TestClock.
+
+it.live("ask - resolves when reply arrives before the timeout override", () =>
+  withDir({ git: true }, () =>
+    Effect.gen(function* () {
+      const fiber = yield* ask({
+        id: PermissionID.make("per_to_reply_first"),
+        sessionID: SessionID.make("session_test"),
+        permission: "bash",
+        patterns: ["ls"],
+        metadata: {},
+        always: [],
+        ruleset: [],
+        timeoutMs: 60_000,
+      }).pipe(Effect.forkScoped)
+
+      yield* waitForPending(1)
+      yield* reply({ requestID: PermissionID.make("per_to_reply_first"), reply: "once" })
+      yield* Fiber.join(fiber)
+    }),
+  ),
+)
+
+it.live("ask - fails with TimedOutError after the timeout override expires", () =>
+  withDir({ git: true }, () =>
+    Effect.gen(function* () {
+      const fiber = yield* ask({
+        id: PermissionID.make("per_to_expire"),
+        sessionID: SessionID.make("session_test"),
+        permission: "bash",
+        patterns: ["ls"],
+        metadata: {},
+        always: [],
+        ruleset: [],
+        timeoutMs: 50,
+      }).pipe(Effect.forkScoped)
+
+      yield* waitForPending(1)
+      const exit = yield* Fiber.await(fiber)
+      expect(Exit.isFailure(exit)).toBe(true)
+      if (Exit.isFailure(exit)) expect(Cause.squash(exit.cause)).toBeInstanceOf(Permission.TimedOutError)
+      // The pending entry is removed by the `ensuring` finalizer once the timeout branch wins.
+      expect(yield* list()).toHaveLength(0)
+    }),
+  ),
+)
+
+it.live("ask - publishes Event.Replied(reject) on timeout with the correct requestID", () =>
+  withDir({ git: true }, () =>
+    Effect.gen(function* () {
+      const bus = yield* Bus.Service
+      const requestID = PermissionID.make("per_to_pub")
+      let resolve!: (value: { sessionID: SessionID; requestID: PermissionID; reply: Permission.Reply }) => void
+      const seen = Effect.promise<{ sessionID: SessionID; requestID: PermissionID; reply: Permission.Reply }>(
+        () =>
+          new Promise((res) => {
+            resolve = res
+          }),
+      )
+
+      const unsub = yield* bus.subscribeCallback(Permission.Event.Replied, (event) => {
+        resolve(event.properties)
+      })
+
+      try {
+        const fiber = yield* ask({
+          id: requestID,
+          sessionID: SessionID.make("session_test"),
+          permission: "bash",
+          patterns: ["ls"],
+          metadata: {},
+          always: [],
+          ruleset: [],
+          timeoutMs: 50,
+        }).pipe(Effect.forkScoped)
+
+        yield* waitForPending(1)
+        expect(yield* seen).toEqual({
+          sessionID: SessionID.make("session_test"),
+          requestID,
+          reply: "reject",
+        })
+        const exit = yield* Fiber.await(fiber)
+        expect(Exit.isFailure(exit)).toBe(true)
+        if (Exit.isFailure(exit)) expect(Cause.squash(exit.cause)).toBeInstanceOf(Permission.TimedOutError)
+      } finally {
+        unsub()
+      }
+    }),
+  ),
+)
+
+it.live("ask - long timeout override waits instead of timing out early", () =>
+  withDir({ git: true }, () =>
+    Effect.gen(function* () {
+      const fiber = yield* ask({
+        id: PermissionID.make("per_to_long"),
+        sessionID: SessionID.make("session_test"),
+        permission: "bash",
+        patterns: ["ls"],
+        metadata: {},
+        always: [],
+        ruleset: [],
+        timeoutMs: 60_000,
+      }).pipe(Effect.forkScoped)
+
+      yield* waitForPending(1)
+      // A short window that would exceed a small default must not expire a 60s override.
+      yield* Effect.sleep("100 millis")
+      expect(yield* list()).toHaveLength(1)
+      yield* rejectAll()
+      yield* Fiber.await(fiber)
+    }),
+  ),
+)

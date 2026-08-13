@@ -11,12 +11,16 @@ import { zod } from "@opencode-ai/core/effect-zod"
 import * as Log from "@opencode-ai/core/util/log"
 import { withStatics } from "@opencode-ai/core/schema"
 import { Wildcard } from "@/util/wildcard"
-import { Deferred, Effect, Layer, Schema, Context } from "effect"
+import { Deferred, Duration, Effect, Layer, Schema, Context } from "effect"
 import os from "os"
 import { evaluate as evalRule, evaluateWithSource as evalWithSource } from "./evaluate"
 import { PermissionID } from "./schema"
 
 const log = Log.create({ service: "permission" })
+
+// Safety-net timeout for a never-surfaced / never-replied permission prompt. A
+// generous default since a real user may legitimately take a while to answer.
+export const PERMISSION_ASK_TIMEOUT_MS = 5 * 60_000
 
 export const Action = Schema.Literals(["allow", "deny", "ask"])
   .annotate({ identifier: "PermissionAction" })
@@ -110,12 +114,21 @@ export class DeniedError extends Schema.TaggedErrorClass<DeniedError>()("Permiss
   }
 }
 
-export type Error = DeniedError | RejectedError | CorrectedError
+export class TimedOutError extends Schema.TaggedErrorClass<TimedOutError>()("PermissionTimedOutError", {
+  timeoutMs: Schema.Number,
+}) {
+  override get message() {
+    return `Permission prompt timed out after ${this.timeoutMs}ms and was rejected.`
+  }
+}
+
+export type Error = DeniedError | RejectedError | CorrectedError | TimedOutError
 
 export const AskInput = Schema.Struct({
   ...Request.fields,
   id: Schema.optional(PermissionID),
   ruleset: Ruleset,
+  timeoutMs: Schema.optional(Schema.Number),
 })
   .annotate({ identifier: "PermissionAskInput" })
   .pipe(withStatics((s) => ({ zod: zod(s) })))
@@ -137,7 +150,7 @@ export interface Interface {
 
 interface PendingEntry {
   info: Request
-  deferred: Deferred.Deferred<void, RejectedError | CorrectedError>
+  deferred: Deferred.Deferred<void, RejectedError | CorrectedError | TimedOutError>
 }
 
 interface State {
@@ -188,7 +201,7 @@ export const layer = Layer.effect(
 
     const ask = Effect.fn("Permission.ask")(function* (input: AskInput) {
       const { approved, pending } = yield* InstanceState.get(state)
-      const { ruleset, ...request } = input
+      const { ruleset, timeoutMs, ...request } = input
       let needsAsk = false
 
       for (const pattern of request.patterns) {
@@ -218,11 +231,23 @@ export const layer = Layer.effect(
       })
       log.info("asking", { id, permission: info.permission, patterns: info.patterns })
 
-      const deferred = yield* Deferred.make<void, RejectedError | CorrectedError>()
+      const timeout = timeoutMs ?? PERMISSION_ASK_TIMEOUT_MS
+      const deferred = yield* Deferred.make<void, RejectedError | CorrectedError | TimedOutError>()
       pending.set(id, { info, deferred })
       yield* bus.publish(Event.Asked, info)
       return yield* Effect.ensuring(
-        Deferred.await(deferred),
+        // raceFirst returns whichever branch completes FIRST (success or failure), so the
+        // failing timeout branch wins over a still-pending Deferred.await. Effect.race would
+        // only return the first branch to SUCCEED, ignoring the timeout failure and hanging.
+        Effect.raceFirst(
+          Deferred.await(deferred),
+          Effect.gen(function* () {
+            yield* Effect.sleep(Duration.millis(timeout))
+            // Broadcast a synthetic "reject" so the TUI/run/web stores remove the stale prompt.
+            yield* bus.publish(Event.Replied, { sessionID: info.sessionID, requestID: id, reply: "reject" })
+            return yield* Effect.fail(new TimedOutError({ timeoutMs: timeout }))
+          }),
+        ),
         Effect.sync(() => {
           pending.delete(id)
         }),
