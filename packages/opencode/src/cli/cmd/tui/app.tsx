@@ -1,3 +1,4 @@
+import { Log } from "@opencode-ai/core/util/log"
 import { render, TimeToFirstDraw, useRenderer, useTerminalDimensions } from "@opentui/solid"
 import { createDefaultOpenTuiKeymap } from "@opentui/keymap/opentui"
 import * as Clipboard from "@tui/util/clipboard"
@@ -123,7 +124,7 @@ function rendererConfig(_config: TuiConfig.Resolved): CliRendererConfig {
       keyBindings: [{ name: "y", ctrl: true, action: "copy-selection" }],
       onCopySelection: (text) => {
         Clipboard.copy(text).catch((error) => {
-          console.error(`Failed to copy console selection to clipboard: ${error}`)
+          Log.Default.error(`Failed to copy console selection to clipboard: ${error}`, { error })
         })
       },
     },
@@ -301,7 +302,7 @@ function App(props: { onSnapshot?: () => Promise<string[]> }) {
     config: tuiConfig,
   })
     .catch((error) => {
-      console.error("Failed to load TUI plugins", error)
+      Log.Default.error("Failed to load TUI plugins", { error })
     })
     .finally(() => {
       setReady(true)
