@@ -237,6 +237,38 @@ describe("tool.webfetch", () => {
     })
   })
 
+  test("decodes quoted charset correctly", async () => {
+    await WithInstance.provide({
+      directory: projectRoot,
+      fn: async () => {
+        const quotedClient = HttpClient.make((request: HttpClientRequest.HttpClientRequest) =>
+          Effect.succeed(
+            HttpClientResponse.fromWeb(
+              request,
+              new Response("<p>hello from quoted charset</p>", {
+                status: 200,
+                headers: { "content-type": 'text/html; charset="utf-8"' },
+              }),
+            ),
+          ),
+        )
+
+        const { WebFetchTool } = await import("../../src/tool/webfetch")
+        const result = await WebFetchTool.pipe(
+          Effect.flatMap((info) => info.init()),
+          Effect.flatMap((tool) =>
+            tool.execute({ url: "http://localhost/quoted-charset", format: "text" }, ctx),
+          ),
+          Effect.provideService(HttpClient.HttpClient, quotedClient),
+          Effect.provide(Layer.mergeAll(Truncate.defaultLayer, Agent.defaultLayer)),
+          Effect.runPromise,
+        )
+
+        expect(result.output).toContain("hello from quoted charset")
+      },
+    })
+  })
+
   test("rejects requests to [fd00::1]", async () => {
     await WithInstance.provide({
       directory: projectRoot,

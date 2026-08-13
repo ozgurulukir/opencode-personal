@@ -60,9 +60,9 @@ When the `skill` tool loads a skill that has `warnings` in its `Skill.Info`, the
 ```
 This gives the LLM immediate feedback about frontmatter problems. The skill is still loaded and its content is returned after the warning block.
 
-## Ripgrep exit code 2 masks regex errors as "partial"
+## Ripgrep exit code 2 — regex errors are now surfaced
 
-`Ripgrep.search` (`file/ripgrep.ts`) treats exit code 2 as `partial: true` (inaccessible paths), even when the actual error is a regex parse failure. This means invalid regex patterns surface as "Some paths were inaccessible and skipped" instead of a clear error. The stderr is discarded for code 2. If you need to distinguish regex errors from path errors, inspect stderr before returning partial.
+`Ripgrep.search` (`file/ripgrep.ts`) previously treated exit code 2 as `partial: true` (inaccessible paths) even for regex parse failures, discarding stderr. That's fixed: for code 2 the stderr is inspected for regex error markers (`regex parse error`, `invalid regex`, `error parsing regex`) and those are returned as a hard failure instead of `partial: true`. Exit code 2 without those markers still means inaccessible-some-paths → `partial: true`.
 
 ## `assertExternalDirectoryEffect` is the real permission gate
 

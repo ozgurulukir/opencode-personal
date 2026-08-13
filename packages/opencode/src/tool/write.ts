@@ -15,26 +15,9 @@ import { trimDiff } from "./edit.replacer"
 import { assertExternalDirectoryEffect } from "./external-directory"
 import * as Bom from "@/util/bom"
 import { Todo } from "../session/todo"
-import fs from "fs"
+import { resolvePath, projectContainmentError } from "./file-path"
 
 const MAX_PROJECT_DIAGNOSTICS_FILES = 5
-
-function resolvePath(filePath: string, instance: { directory: string; worktree: string }): string {
-  const resolved = AppFileSystem.resolve(path.resolve(filePath))
-  try {
-    const real = fs.realpathSync(resolved)
-    return real
-  } catch {
-    // Non-existent file: resolve the parent directory to catch symlinks in the path
-    const parent = path.dirname(resolved)
-    try {
-      const realParent = fs.realpathSync(parent)
-      return path.join(realParent, path.basename(resolved))
-    } catch {
-      return resolved
-    }
-  }
-}
 
 export const Parameters = Schema.Struct({
   content: Schema.String.annotate({ description: "The content to write to the file" }),
@@ -65,9 +48,10 @@ export const WriteTool = Tool.define<
           const filepath = path.isAbsolute(params.filePath)
             ? params.filePath
             : path.join(instance.directory, params.filePath)
-          const resolvedFilepath = resolvePath(filepath, instance)
-          if (!resolvedFilepath.startsWith(instance.directory + path.sep) && resolvedFilepath !== instance.directory) {
-            return yield* Effect.fail(new Error(`Path escapes project directory: ${resolvedFilepath}`))
+          const resolvedFilepath = resolvePath(filepath)
+          const containmentError = projectContainmentError(resolvedFilepath, instance.directory)
+          if (containmentError) {
+            return yield* Effect.fail(new Error(containmentError))
           }
           yield* assertExternalDirectoryEffect(ctx, resolvedFilepath)
 

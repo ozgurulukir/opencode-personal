@@ -155,6 +155,20 @@ export const layer: Layer.Layer<
       Effect.fn("ToolRegistry.state")(function* (ctx) {
         const custom: Tool.Def[] = []
 
+        // Dedupe custom (plugin/tool-file) definitions by id — later definitions
+        // for an already-registered id are dropped (first load wins) instead of
+        // silently overwriting at the AI-SDK tool-map stage, which would mask
+        // collisions between multiple plugins.
+        const seen = new Set<string>()
+        const pushCustom = (def: Tool.Def) => {
+          if (seen.has(def.id)) {
+            log.warn("duplicate custom tool definition ignored", { tool: def.id })
+            return
+          }
+          seen.add(def.id)
+          custom.push(def)
+        }
+
         function fromPlugin(id: string, def: ToolDefinition): Tool.Def {
           // Plugin tools define their args as a raw Zod shape. Wrap the
           // derived Zod object in a `Schema.declare` so it slots into the
@@ -176,7 +190,14 @@ export const layer: Layer.Layer<
                   directory: ctx.directory,
                   worktree: ctx.worktree,
                 }
-                const result = yield* Effect.promise(() => def.execute(args as any, pluginCtx))
+                // Plugin args are typed by the plugin's own Zod shape, which is
+                // structurally unrelated to the LLM-supplied `unknown` args. The
+                // two-step cast bridges the boundary; TypeScript cannot prove the
+                // overlap. The Zod `parameters` guard at the framework boundary
+                // still validates before this runs.
+                const result = yield* Effect.promise(() =>
+                  def.execute(args as unknown as Parameters<typeof def.execute>[0], pluginCtx),
+                )
                 const output = typeof result === "string" ? result : result.output
                 const metadata = typeof result === "string" ? {} : (result.metadata ?? {})
                 const info = yield* agent.get(toolCtx.agent)
@@ -214,14 +235,14 @@ export const layer: Layer.Layer<
           // Import it as `file://` so Node on Windows accepts the dynamic import.
           const mod = yield* Effect.promise(() => import(pathToFileURL(match).href))
           for (const [id, def] of Object.entries<ToolDefinition>(mod)) {
-            custom.push(fromPlugin(id === "default" ? namespace : `${namespace}_${id}`, def))
+            pushCustom(fromPlugin(id === "default" ? namespace : `${namespace}_${id}`, def))
           }
         }
 
         const plugins = yield* plugin.list()
         for (const p of plugins) {
           for (const [id, def] of Object.entries(p.tool ?? {})) {
-            custom.push(fromPlugin(id, def))
+            pushCustom(fromPlugin(id, def))
           }
         }
 

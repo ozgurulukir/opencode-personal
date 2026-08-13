@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import path from "path"
 import * as fs from "fs/promises"
+import * as fsSync from "fs"
 import { Effect, ManagedRuntime, Layer } from "effect"
 import { ApplyPatchTool } from "../../src/tool/apply_patch"
 import { Instance } from "../../src/project/instance"
@@ -388,7 +389,9 @@ describe("tool.apply_patch freeform", () => {
       fn: async () => {
         const patchText = "*** Begin Patch\n*** Delete File: missing.txt\n*** End Patch"
 
-        await expect(execute({ patchText }, ctx)).rejects.toThrow()
+        const result = await execute({ patchText }, ctx)
+        expect(result.metadata.failedHunks.length).toBeGreaterThan(0)
+        expect(result.metadata.failedHunks[0].error).toContain("Failed to read file to delete")
       },
     })
   })
@@ -405,7 +408,9 @@ describe("tool.apply_patch freeform", () => {
 
         const patchText = "*** Begin Patch\n*** Delete File: dir\n*** End Patch"
 
-        await expect(execute({ patchText }, ctx)).rejects.toThrow()
+        const result = await execute({ patchText }, ctx)
+        expect(result.metadata.failedHunks.length).toBeGreaterThan(0)
+        expect(result.metadata.failedHunks[0].error).toContain("Failed to read file to delete")
       },
     })
   })
@@ -804,6 +809,26 @@ EOF`
         expect(result.metadata.failedHunks.length).toBeGreaterThan(0)
         expect(result.metadata.failedHunks[0].error).toContain("Ambiguous")
         expect(await fs.readFile(target, "utf-8")).toBe("}\n  value\n}\n  value\n")
+      },
+    })
+  })
+
+  test("rejects symlink pointing outside project", async () => {
+    await using outside = await tmpdir()
+    await using fixture = await tmpdir({ git: true })
+    fsSync.symlinkSync(
+      outside.path,
+      path.join(fixture.path, "evil-link"),
+      process.platform === "win32" ? "junction" : "dir",
+    )
+    const { ctx } = makeCtx()
+    await WithInstance.provide({
+      directory: fixture.path,
+      fn: async () => {
+        const patchText = `*** Begin Patch\n*** Add File: evil-link/secret.txt\n+secret\n*** End Patch`
+        const result = await execute({ patchText }, ctx)
+        expect(result.metadata.failedHunks.length).toBeGreaterThan(0)
+        expect(result.metadata.failedHunks[0].error).toContain("Path escapes project directory")
       },
     })
   })
