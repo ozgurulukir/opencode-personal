@@ -66,7 +66,7 @@ export class OpenAICompatibleChatLanguageModel implements LanguageModelV3 {
 
     // initialize error handling:
     const errorStructure = config.errorStructure ?? defaultOpenAICompatibleErrorStructure
-    this.chunkSchema = createOpenAICompatibleChatChunkSchema(errorStructure.errorSchema) as any
+    this.chunkSchema = createOpenAICompatibleChatChunkSchema(errorStructure.errorSchema) as unknown as typeof this.chunkSchema
     this.failedResponseHandler = createJsonErrorResponseHandler(errorStructure)
 
     this.supportsStructuredOutputs = config.supportsStructuredOutputs ?? false
