@@ -576,12 +576,12 @@ describe("applyDirectoryEvent", () => {
     const todos: (string | undefined)[] = []
     const [store, setStore] = createStore(
       baseState({
-        todo: { [sessionID]: [{ content: "old", status: "open", priority: "0" } as Todo] },
+        todo: { [sessionID]: [{ content: "old", status: "pending", priority: "medium" } as Todo] },
       }),
     )
 
     applyDirectoryEvent({
-      event: { type: "todo.updated", properties: { sessionID, todos: [{ content: "new", status: "open", priority: "0" } as Todo] } },
+      event: { type: "todo.updated", properties: { sessionID, todos: [{ content: "new", status: "pending", priority: "medium" } as Todo] } },
       store,
       setStore,
       push() {},
