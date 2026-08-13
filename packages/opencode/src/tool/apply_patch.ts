@@ -15,6 +15,7 @@ import { File } from "../file"
 import { Format } from "../format"
 import * as Bom from "@/util/bom"
 import { Todo } from "../session/todo"
+import { projectContainmentError, resolvePath } from "./file-path"
 
 export const Parameters = Schema.Struct({
   patchText: Schema.String.annotate({ description: "The full patch text that describes all changes to be made" }),
@@ -93,11 +94,12 @@ export const ApplyPatchTool = Tool.define<
       const failedHunks: Array<{ path: string; error: string }> = []
 
       for (const hunk of hunks) {
-        const filePath = AppFileSystem.resolve(path.resolve(instance.directory, hunk.path))
-        if (!filePath.startsWith(instance.directory + path.sep) && filePath !== instance.directory) {
+        const filePath = resolvePath(path.resolve(instance.directory, hunk.path))
+        const containedError = projectContainmentError(filePath, instance.directory)
+        if (containedError) {
           failedHunks.push({
             path: hunk.path,
-            error: `Path escapes project directory: ${filePath}`,
+            error: containedError,
           })
           continue
         }
@@ -159,7 +161,16 @@ export const ApplyPatchTool = Tool.define<
                 break
               }
 
-              const source = yield* Bom.readFile(afs, filePath)
+              const source = yield* Bom.readFile(afs, filePath).pipe(
+                Effect.catch((error) => {
+                  failedHunks.push({
+                    path: hunk.path,
+                    error: `Failed to read file to update: ${error instanceof Error ? error.message : String(error)}`,
+                  })
+                  return Effect.succeed(undefined)
+                }),
+              )
+              if (!source) break
               const oldContent = source.text
               let newContent = oldContent
               let bom = source.bom
@@ -200,12 +211,13 @@ export const ApplyPatchTool = Tool.define<
                 if (change.removed) deletions += change.count || 0
               }
 
-              const movePath = hunk.move_path ? AppFileSystem.resolve(path.resolve(instance.directory, hunk.move_path)) : undefined
+              const movePath = hunk.move_path ? resolvePath(path.resolve(instance.directory, hunk.move_path)) : undefined
               if (movePath) {
-                if (!movePath.startsWith(instance.directory + path.sep) && movePath !== instance.directory) {
+                const moveError = projectContainmentError(movePath, instance.directory)
+                if (moveError) {
                   failedHunks.push({
                     path: hunk.path,
-                    error: `Move path escapes project directory: ${movePath}`,
+                    error: moveError,
                   })
                   break
                 }
@@ -241,14 +253,15 @@ export const ApplyPatchTool = Tool.define<
 
             case "delete": {
               const source = yield* Bom.readFile(afs, filePath).pipe(
-                Effect.catch((error) =>
-                  Effect.fail(
-                    new Error(
-                      `Failed to read file to delete: ${error instanceof Error ? error.message : String(error)}`,
-                    ),
-                  ),
-                ),
+                Effect.catch((error) => {
+                  failedHunks.push({
+                    path: hunk.path,
+                    error: `Failed to read file to delete: ${error instanceof Error ? error.message : String(error)}`,
+                  })
+                  return Effect.succeed(undefined)
+                }),
               )
+              if (!source) break
               const contentToDelete = source.text
               const deleteDiff = trimDiff(
                 (yield* Effect.tryPromise({

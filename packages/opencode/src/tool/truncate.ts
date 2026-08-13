@@ -28,7 +28,11 @@ export interface Options {
 
 function hasTaskTool(agent?: Agent.Info) {
   if (!agent?.permission) return false
-  return evaluate("task", "*", agent.permission).action !== "deny"
+  // Only suggest the Task-tool delegation hint when the agent's ruleset
+  // EXPLICITLY allows the task tool. `evaluate` returns "ask" for an empty
+  // ruleset, so "!== deny" would suggest Task to restricted agents or those
+  // without the tool — misleading the model.
+  return evaluate("task", "*", agent.permission).action === "allow"
 }
 
 export interface Interface {

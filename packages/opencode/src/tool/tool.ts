@@ -7,7 +7,7 @@ import { Agent } from "@/agent/agent"
 import type { TaskPromptOps } from "./task"
 
 interface Metadata {
-  [key: string]: any
+  [key: string]: unknown
 }
 
 export interface ToolContextExtra {

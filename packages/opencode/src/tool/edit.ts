@@ -1,5 +1,5 @@
 import * as path from "path"
-import { Effect, Schema, Semaphore } from "effect"
+import { Effect, Schema } from "effect"
 import * as Tool from "./tool"
 import { LSP } from "@/lsp/lsp"
 import { createTwoFilesPatch, diffLines } from "@opencode-ai/diff-wasm"
@@ -15,7 +15,8 @@ import { AppFileSystem } from "@opencode-ai/core/filesystem"
 import * as Bom from "@/util/bom"
 import { replace, trimDiff } from "./edit.replacer"
 import { Todo } from "../session/todo"
-import fs from "fs"
+import { resolvePath, projectContainmentError } from "./file-path"
+import { LockRegistry } from "./lock"
 
 function normalizeLineEndings(text: string): string {
   return text.replaceAll("\r\n", "\n")
@@ -28,35 +29,6 @@ function detectLineEnding(text: string): "\n" | "\r\n" {
 function convertToLineEnding(text: string, ending: "\n" | "\r\n"): string {
   if (ending === "\n") return text
   return text.replaceAll("\n", "\r\n")
-}
-
-function resolvePath(filePath: string, instance: { directory: string; worktree: string }): string {
-  const resolved = AppFileSystem.resolve(path.resolve(filePath))
-  try {
-    const real = fs.realpathSync(resolved)
-    return real
-  } catch {
-    // Non-existent file: resolve the parent directory to catch symlinks in the path
-    const parent = path.dirname(resolved)
-    try {
-      const realParent = fs.realpathSync(parent)
-      return path.join(realParent, path.basename(resolved))
-    } catch {
-      return resolved
-    }
-  }
-}
-
-const locks = new Map<string, Semaphore.Semaphore>()
-
-function lock(filePath: string) {
-  const resolvedFilePath = AppFileSystem.resolve(filePath)
-  const hit = locks.get(resolvedFilePath)
-  if (hit) return hit
-
-  const next = Semaphore.makeUnsafe(1)
-  locks.set(resolvedFilePath, next)
-  return next
 }
 
 export const Parameters = Schema.Struct({
@@ -82,6 +54,7 @@ export const EditTool = Tool.define<
     const format = yield* Format.Service
     const bus = yield* Bus.Service
     const todo = yield* Todo.Service
+    const editLocks = new LockRegistry() // Per-instance: cross-instance edits are not serialized.
 
     return {
       description: DESCRIPTION,
@@ -100,16 +73,17 @@ export const EditTool = Tool.define<
           const filePath = path.isAbsolute(params.filePath)
             ? params.filePath
             : path.join(instance.directory, params.filePath)
-          const resolvedFilePath = resolvePath(filePath, instance)
-          if (!resolvedFilePath.startsWith(instance.directory + path.sep) && resolvedFilePath !== instance.directory) {
-            throw new Error(`Path escapes project directory: ${resolvedFilePath}`)
+          const resolvedFilePath = resolvePath(filePath)
+          const containmentError = projectContainmentError(resolvedFilePath, instance.directory)
+          if (containmentError) {
+            throw new Error(containmentError)
           }
           yield* assertExternalDirectoryEffect(ctx, resolvedFilePath)
 
           let diff = ""
           let contentOld = ""
           let contentNew = ""
-          yield* lock(resolvedFilePath).withPermits(1)(
+          yield* editLocks.withLock(resolvedFilePath,
             Effect.gen(function* () {
               if (params.oldString === "") {
                 const existed = yield* afs.existsSafe(resolvedFilePath)

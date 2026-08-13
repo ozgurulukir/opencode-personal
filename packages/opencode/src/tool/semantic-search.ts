@@ -22,8 +22,18 @@ export const SemanticSearchTool = Tool.define(
     return {
       description: DESCRIPTION,
       parameters: Parameters,
-      execute: (params: { query: string; topK: number }) =>
+      execute: (params: { query: string; topK: number }, ctx: Tool.Context) =>
         Effect.gen(function* () {
+          yield* ctx.ask({
+            permission: "semantic_search",
+            patterns: [params.query],
+            always: ["*"],
+            metadata: {
+              query: params.query,
+              topK: params.topK,
+            },
+          })
+
           const [embedding] = yield* embedder.embed([params.query])
           const results = yield* search.search(params.query, embedding, params.topK)
           if (results.length === 0) {

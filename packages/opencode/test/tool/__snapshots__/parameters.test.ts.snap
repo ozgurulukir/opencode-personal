@@ -439,7 +439,9 @@ exports[`tool parameters JSON Schema (wire shape) websearch 1`] = `
   "properties": {
     "contextMaxCharacters": {
       "description": "Maximum characters for context string optimized for LLMs (default: 10000)",
-      "type": "number",
+      "maximum": 9007199254740991,
+      "minimum": 0,
+      "type": "integer",
     },
     "livecrawl": {
       "description": "Live crawl mode - 'fallback': use live crawling as backup if cached content unavailable, 'preferred': prioritize live crawling (default: 'fallback')",
@@ -451,7 +453,9 @@ exports[`tool parameters JSON Schema (wire shape) websearch 1`] = `
     },
     "numResults": {
       "description": "Number of search results to return (default: 8)",
-      "type": "number",
+      "exclusiveMinimum": 0,
+      "maximum": 9007199254740991,
+      "type": "integer",
     },
     "query": {
       "description": "Websearch query",

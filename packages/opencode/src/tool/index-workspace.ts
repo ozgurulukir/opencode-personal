@@ -1,4 +1,4 @@
-import { Effect, Schema } from "effect"
+import { Effect, Option, Schema } from "effect"
 import path from "path"
 import * as Tool from "./tool"
 import { SearchService } from "@/search/search"
@@ -16,6 +16,16 @@ export const Parameters = Schema.Struct({
   }),
 })
 
+const Manifest = Schema.Record(
+  Schema.String,
+  Schema.Struct({
+    chunkIds: Schema.Array(Schema.String),
+  }),
+)
+const ManifestFile = Schema.Struct({
+  files: Manifest,
+})
+
 export const IndexWorkspaceTool = Tool.define(
   "index_workspace",
   Effect.gen(function* () {
@@ -27,8 +37,15 @@ export const IndexWorkspaceTool = Tool.define(
     return {
       description: DESCRIPTION,
       parameters: Parameters,
-      execute: (params: { force: boolean }) =>
+      execute: (params: { force: boolean }, ctx: Tool.Context) =>
         Effect.gen(function* () {
+          yield* ctx.ask({
+            permission: "index_workspace",
+            patterns: ["*"],
+            always: ["*"],
+            metadata: { force: params.force },
+          })
+
           const directory = yield* InstanceState.directory
           const dirHash = Hash.fast(directory)
           const manifestPath = path.join(GlobalPath.cache, "zvec", `${dirHash}_manifest.json`)
@@ -42,17 +59,17 @@ export const IndexWorkspaceTool = Tool.define(
 
           let filesCount = 0
           let chunksCount = 0
-          try {
-            const manifest = (yield* fs.readJson(manifestPath)) as any
-            if (manifest && manifest.files) {
-              const filePaths = Object.keys(manifest.files)
-              filesCount = filePaths.length
-              for (const f of filePaths) {
-                chunksCount += manifest.files[f].chunkIds.length
-              }
+          const manifestRaw = yield* fs
+            .readJson(manifestPath)
+            // Missing/corrupt manifest is not an error — just means nothing indexed yet.
+            .pipe(Effect.catch(() => Effect.succeed(undefined)))
+          const manifest = Option.getOrUndefined(Schema.decodeUnknownOption(ManifestFile)(manifestRaw))
+          if (manifest) {
+            const filePaths = Object.keys(manifest.files)
+            filesCount = filePaths.length
+            for (const f of filePaths) {
+              chunksCount += manifest.files[f].chunkIds.length
             }
-          } catch {
-            // ignore
           }
 
           if (filesCount === 0) {

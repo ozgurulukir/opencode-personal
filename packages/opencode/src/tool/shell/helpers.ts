@@ -1,10 +1,10 @@
 import os from "os"
-import { createReadStream } from "node:fs"
-import { createInterface } from "readline"
 import path from "path"
 import { fileURLToPath } from "url"
 import { type Node } from "web-tree-sitter"
 import * as Log from "@opencode-ai/core/util/log"
+
+export { getChangedRanges } from "../file-read"
 
 export const MAX_METADATA_LENGTH = 30_000
 
@@ -224,124 +224,4 @@ export function tail(text: string, maxLines: number, maxBytes: number) {
     text: out.join("\n"),
     cut: true,
   }
-}
-
-export async function lines(filepath: string, opts: { limit: number; offset: number }) {
-  const stream = createReadStream(filepath, { encoding: "utf8" })
-  const rl = createInterface({
-    input: stream,
-    crlfDelay: Infinity,
-  })
-
-  const start = opts.offset - 1
-  const raw: string[] = []
-  let bytes = 0
-  let count = 0
-  let cut = false
-  let more = false
-  try {
-    for await (const text of rl) {
-      count += 1
-      if (count <= start) continue
-
-      if (raw.length >= opts.limit) {
-        more = true
-        continue
-      }
-
-      const line = text.length > 2000 ? text.substring(0, 2000) + `... (line truncated to 2000 chars)` : text
-      const size = Buffer.byteLength(line, "utf-8") + (raw.length > 0 ? 1 : 0)
-      if (bytes + size > 50 * 1024) {
-        cut = true
-        more = true
-        break
-      }
-
-      raw.push(line)
-      bytes += size
-    }
-  } finally {
-    rl.close()
-    stream.destroy()
-  }
-
-  return { raw, count, cut, more, offset: opts.offset }
-}
-
-export function getChangedRanges(diffText: string): Array<{ start: number; end: number }> {
-  const ranges: Array<{ start: number; end: number }> = []
-  const lines = diffText.split("\n")
-  for (const line of lines) {
-    if (line.startsWith("@@ ")) {
-      const match = line.match(/@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@/)
-      if (match) {
-        const start = parseInt(match[1], 10)
-        const length = match[2] ? parseInt(match[2], 10) : 1
-        ranges.push({ start, end: start + (length > 0 ? length - 1 : 0) })
-      }
-    }
-  }
-  return ranges
-}
-
-export async function linesWithHunks(
-  filepath: string,
-  ranges: Array<{ start: number; end: number }>,
-  contextLines = 3,
-) {
-  const stream = createReadStream(filepath, { encoding: "utf8" })
-  const rl = createInterface({
-    input: stream,
-    crlfDelay: Infinity,
-  })
-
-  const expanded = ranges
-    .map((r) => ({
-      start: Math.max(1, r.start - contextLines),
-      end: r.end + contextLines,
-    }))
-    .sort((a, b) => a.start - b.start)
-
-  const merged: Array<{ start: number; end: number }> = []
-  for (const r of expanded) {
-    if (merged.length === 0) {
-      merged.push(r)
-    } else {
-      const last = merged[merged.length - 1]
-      if (r.start <= last.end + 1) {
-        last.end = Math.max(last.end, r.end)
-      } else {
-        merged.push(r)
-      }
-    }
-  }
-
-  const raw: string[] = []
-  let count = 0
-  let bytes = 0
-  let cut = false
-
-  try {
-    for await (const text of rl) {
-      count += 1
-
-      const inRange = merged.some((r) => count >= r.start && count <= r.end)
-      if (!inRange) continue
-
-      const line = text.length > 2000 ? text.substring(0, 2000) + `... (line truncated to 2000 chars)` : text
-      const size = Buffer.byteLength(line, "utf-8") + (raw.length > 0 ? 1 : 0)
-      if (bytes + size > 50 * 1024) {
-        cut = true
-        break
-      }
-
-      raw.push(`${count}: ${line}`)
-      bytes += size
-    }
-  } finally {
-    rl.close()
-    stream.destroy()
-  }
-
-  return { raw, count, cut, more: false, offset: 1 }
 }
