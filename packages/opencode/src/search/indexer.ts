@@ -5,6 +5,7 @@ import { Path as GlobalPath } from "@opencode-ai/core/global"
 import { Hash } from "@opencode-ai/core/util/hash"
 import { SearchService } from "./search"
 import { EmbeddingService } from "./embedding"
+import { manifestPathFor } from "./manifest"
 import { InstanceState } from "@/effect/instance-state"
 import { FileIgnore } from "@/file/ignore"
 import * as NFS from "node:fs/promises"
@@ -61,7 +62,10 @@ export const IndexWorkspace = Effect.gen(function* () {
 
     const dirHash = Hash.fast(directory)
     yield* fs.ensureDir(path.join(GlobalPath.cache, "zvec")).pipe(Effect.catch(() => Effect.void))
-    const manifestPath = path.join(GlobalPath.cache, "zvec", `${dirHash}_manifest.json`)
+    const manifestPath = manifestPathFor(path.join(GlobalPath.cache, "zvec", dirHash))
+    // Open before reading the manifest: a dimension migration inside open() wipes
+    // the manifest, so a copy read before open() would resurrect stale entries.
+    yield* search.open
     const manifestExists = yield* fs.existsSafe(manifestPath)
     let manifest: { version: number; files: Record<string, { mtime: number; chunkIds: string[] }> } = {
       version: 1,
@@ -175,4 +179,3 @@ export const SemanticSearch = Effect.gen(function* () {
       }),
   }
 })
-

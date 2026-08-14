@@ -263,6 +263,7 @@ function makeLayer() {
     Layer.provideMerge(deps),
     Layer.provide(
       Layer.succeed(SearchService, {
+        open: Effect.void,
         index: () => Effect.void,
         search: () => Effect.succeed([]),
         reset: Effect.void,
@@ -272,6 +273,7 @@ function makeLayer() {
     Layer.provide(
       Layer.succeed(EmbeddingService, {
         embed: () => Effect.succeed([]),
+        resolve: Effect.void,
         dimension: 384,
       }),
     ),
@@ -283,20 +285,22 @@ function makeLayer() {
     Layer.provideMerge(deps),
   )
   const compact = SessionCompaction.layer.pipe(Layer.provideMerge(proc), Layer.provideMerge(deps))
-  return SessionPrompt.layer.pipe(
-    Layer.provide(SessionRevert.defaultLayer),
-    Layer.provide(Image.defaultLayer),
-    Layer.provide(summary),
-    Layer.provideMerge(run),
-    Layer.provideMerge(compact),
-    Layer.provideMerge(proc),
-    Layer.provideMerge(registry),
-    Layer.provideMerge(trunc),
-    Layer.provide(Instruction.defaultLayer),
-    Layer.provide(SystemPrompt.defaultLayer),
-    Layer.provideMerge(deps),
-    Layer.provide(llm.layer),
-  ).pipe(Layer.provide(summary))
+  return SessionPrompt.layer
+    .pipe(
+      Layer.provide(SessionRevert.defaultLayer),
+      Layer.provide(Image.defaultLayer),
+      Layer.provide(summary),
+      Layer.provideMerge(run),
+      Layer.provideMerge(compact),
+      Layer.provideMerge(proc),
+      Layer.provideMerge(registry),
+      Layer.provideMerge(trunc),
+      Layer.provide(Instruction.defaultLayer),
+      Layer.provide(SystemPrompt.defaultLayer),
+      Layer.provideMerge(deps),
+      Layer.provide(llm.layer),
+    )
+    .pipe(Layer.provide(summary))
 }
 
 const it = testEffect(makeLayer())

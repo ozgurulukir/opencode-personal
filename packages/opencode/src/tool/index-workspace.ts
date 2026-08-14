@@ -3,6 +3,7 @@ import path from "path"
 import * as Tool from "./tool"
 import { SearchService } from "@/search/search"
 import { EmbeddingService } from "@/search/embedding"
+import { manifestPathFor } from "@/search/manifest"
 import { AppFileSystem } from "@opencode-ai/core/filesystem"
 import { Path as GlobalPath } from "@opencode-ai/core/global"
 import { Hash } from "@opencode-ai/core/util/hash"
@@ -47,12 +48,12 @@ export const IndexWorkspaceTool = Tool.define(
           })
 
           const directory = yield* InstanceState.directory
-          const dirHash = Hash.fast(directory)
-          const manifestPath = path.join(GlobalPath.cache, "zvec", `${dirHash}_manifest.json`)
+          const manifestPath = manifestPathFor(path.join(GlobalPath.cache, "zvec", Hash.fast(directory)))
 
           if (params.force) {
+            // reset() owns manifest removal — a surviving manifest would make the
+            // next indexing pass skip files whose mtimes appear unchanged.
             yield* search.reset
-            yield* fs.remove(manifestPath, { force: true }).pipe(Effect.catch(() => Effect.void))
           }
 
           yield* runIndexer
@@ -89,4 +90,3 @@ export const IndexWorkspaceTool = Tool.define(
     }
   }),
 )
-

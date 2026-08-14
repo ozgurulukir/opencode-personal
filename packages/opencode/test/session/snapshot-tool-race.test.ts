@@ -144,6 +144,7 @@ function makeHttp() {
     Layer.provideMerge(deps),
     Layer.provide(
       Layer.succeed(SearchService, {
+        open: Effect.void,
         index: () => Effect.void,
         search: () => Effect.succeed([]),
         reset: Effect.void,
@@ -153,6 +154,7 @@ function makeHttp() {
     Layer.provide(
       Layer.succeed(EmbeddingService, {
         embed: () => Effect.succeed([]),
+        resolve: Effect.void,
         dimension: 384,
       }),
     ),

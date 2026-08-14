@@ -8,6 +8,12 @@ export interface SearchResult {
 }
 
 export interface SearchServiceInterface {
+  /**
+   * Opens the underlying index (create or reopen, dimension validation/migration).
+   * Idempotent. Consumers must run this BEFORE reading the index manifest — a
+   * dimension migration wipes the manifest, so a pre-read copy would go stale.
+   */
+  readonly open: Effect.Effect<void, Error>
   readonly index: (
     chunks: Array<{ id: string; path: string; content: string; embedding: number[]; mtime: number }>,
   ) => Effect.Effect<void, Error>
@@ -19,4 +25,3 @@ export interface SearchServiceInterface {
 export class SearchService extends Context.Service<SearchService, SearchServiceInterface>()(
   "@opencode/SearchService",
 ) {}
-

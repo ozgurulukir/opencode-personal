@@ -37,6 +37,7 @@ const configLayer = TestConfig.layer({
 
 const searchAndEmbeddingMock = Layer.mergeAll(
   Layer.succeed(SearchService, {
+    open: Effect.void,
     index: () => Effect.void,
     search: () => Effect.succeed([]),
     reset: Effect.void,
@@ -44,6 +45,7 @@ const searchAndEmbeddingMock = Layer.mergeAll(
   }),
   Layer.succeed(EmbeddingService, {
     embed: () => Effect.succeed([]),
+    resolve: Effect.void,
     dimension: 384,
   }),
 )

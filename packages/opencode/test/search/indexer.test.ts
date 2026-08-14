@@ -34,6 +34,7 @@ describe("IndexWorkspace", () => {
 
       let indexedChunks: any[] = []
       const mockSearch = Layer.succeed(SearchService, {
+        open: Effect.void,
         index: (chunks) =>
           Effect.sync(() => {
             indexedChunks = chunks
@@ -45,6 +46,7 @@ describe("IndexWorkspace", () => {
 
       const mockEmbedder = Layer.succeed(EmbeddingService, {
         embed: (texts) => Effect.succeed(texts.map(() => [0.1, 0.2, 0.3])),
+        resolve: Effect.void,
         dimension: 3,
       })
 
@@ -52,11 +54,7 @@ describe("IndexWorkspace", () => {
       yield* Effect.gen(function* () {
         const runIndexer = yield* IndexWorkspace
         yield* runIndexer
-      }).pipe(
-        Effect.provide(mockSearch),
-        Effect.provide(mockEmbedder),
-        provideInstance(dir),
-      )
+      }).pipe(Effect.provide(mockSearch), Effect.provide(mockEmbedder), provideInstance(dir))
 
       // Assertions
       expect(indexedChunks.length).toBeGreaterThan(0)
@@ -84,6 +82,7 @@ describe("IndexWorkspace", () => {
       let embeddedTexts: string[] = []
 
       const mockSearch = Layer.succeed(SearchService, {
+        open: Effect.void,
         index: (chunks) =>
           Effect.sync(() => {
             indexedChunks.push(...chunks)
@@ -102,6 +101,7 @@ describe("IndexWorkspace", () => {
             embeddedTexts.push(...texts)
             return texts.map(() => [0.1, 0.2, 0.3])
           }),
+        resolve: Effect.void,
         dimension: 3,
       })
 
@@ -109,11 +109,7 @@ describe("IndexWorkspace", () => {
         Effect.gen(function* () {
           const runIndexer = yield* IndexWorkspace
           yield* runIndexer
-        }).pipe(
-          Effect.provide(mockSearch),
-          Effect.provide(mockEmbedder),
-          provideInstance(dir),
-        )
+        }).pipe(Effect.provide(mockSearch), Effect.provide(mockEmbedder), provideInstance(dir))
 
       // First run: index both files
       yield* run()
@@ -172,9 +168,7 @@ describe("chunkFile", () => {
 
   test("returns one chunk for content at CHUNK_MIN_CHARS with no newlines", () => {
     const content = "x".repeat(CHUNK_MIN_CHARS)
-    expect(chunkFile("a.ts", content, MOCK_MTIME)).toEqual([
-      { id: "a.ts:0", path: "a.ts", content, mtime: MOCK_MTIME }
-    ])
+    expect(chunkFile("a.ts", content, MOCK_MTIME)).toEqual([{ id: "a.ts:0", path: "a.ts", content, mtime: MOCK_MTIME }])
   })
 
   test("returns one chunk for file exactly at CHUNK_LINES", () => {
@@ -185,7 +179,9 @@ describe("chunkFile", () => {
   })
 
   test("splits file at CHUNK_LINES + 1 into two chunks", () => {
-    const lines = Array(CHUNK_LINES + 1).fill(longLine).join("\n")
+    const lines = Array(CHUNK_LINES + 1)
+      .fill(longLine)
+      .join("\n")
     const result = chunkFile("a.ts", lines, MOCK_MTIME)
     expect(result).toHaveLength(2)
     expect(result[0]?.id).toBe("a.ts:0")
@@ -193,16 +189,20 @@ describe("chunkFile", () => {
   })
 
   test("drops chunks below CHUNK_MIN_CHARS", () => {
-    const lines = Array(CHUNK_LINES + 1).fill("x").join("\n")
+    const lines = Array(CHUNK_LINES + 1)
+      .fill("x")
+      .join("\n")
     const result = chunkFile("a.ts", lines, MOCK_MTIME)
     expect(result).toHaveLength(0)
   })
 
   test("keeps chunks at or above CHUNK_MIN_CHARS", () => {
-    const lines = Array(CHUNK_LINES + 1).fill(longLine).join("\n")
+    const lines = Array(CHUNK_LINES + 1)
+      .fill(longLine)
+      .join("\n")
     const result = chunkFile("a.ts", lines, MOCK_MTIME)
     expect(result).toHaveLength(2)
-    expect(result.every(c => c.content.length >= CHUNK_MIN_CHARS)).toBe(true)
+    expect(result.every((c) => c.content.length >= CHUNK_MIN_CHARS)).toBe(true)
   })
 
   test("strips ANSI escape codes before chunking", () => {
@@ -220,7 +220,9 @@ describe("chunkFile", () => {
   })
 
   test("assigns sequential ids by line offset", () => {
-    const lines = Array(CHUNK_LINES * 3).fill(longLine).join("\n")
+    const lines = Array(CHUNK_LINES * 3)
+      .fill(longLine)
+      .join("\n")
     const result = chunkFile("a.ts", lines, MOCK_MTIME)
     expect(result).toHaveLength(3)
     expect(result[0]?.id).toBe("a.ts:0")

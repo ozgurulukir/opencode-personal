@@ -1,21 +1,24 @@
 import { describe, expect, test } from "bun:test"
 import { Effect, Layer } from "effect"
-import { EmbeddingService, type EmbeddingServiceInterface, WordPieceTokenizer, meanPool } from "../../src/search/embedding"
+import {
+  EmbeddingService,
+  type EmbeddingServiceInterface,
+  WordPieceTokenizer,
+  meanPool,
+} from "../../src/search/embedding"
 
 describe("EmbeddingService DI", () => {
   test("resolves from layer and satisfies interface contract", async () => {
     const mockService: EmbeddingServiceInterface = {
       embed: (texts) => Effect.succeed(texts.map(() => [0.1, 0.2, 0.3])),
+      resolve: Effect.void,
       dimension: 3,
     }
     const layer = Layer.succeed(EmbeddingService, mockService)
 
     const resolved = await Effect.gen(function* () {
       return yield* EmbeddingService
-    }).pipe(
-      Effect.provide(layer),
-      Effect.runPromise,
-    )
+    }).pipe(Effect.provide(layer), Effect.runPromise)
 
     expect(resolved).toBeDefined()
     expect(resolved.embed).toBeDefined()

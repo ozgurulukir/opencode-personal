@@ -7,9 +7,20 @@ import { Config } from "@/config/config"
 // Type-only import so module load does not pull in onnxruntime-web eagerly.
 import type * as ort from "onnxruntime-web"
 
-export interface EmbeddingServiceInterface {
+/** A concrete embedding backend; the service wraps it with lazy config resolution. */
+interface EmbeddingProvider {
   readonly embed: (texts: string[]) => Effect.Effect<number[][], Error>
   readonly dimension: number
+}
+
+export interface EmbeddingServiceInterface extends EmbeddingProvider {
+  /**
+   * Idempotently reads config and creates the backend so `dimension` reflects the
+   * configured value. Cheap: heavy ONNX/API initialization stays inside `embed()`.
+   * Callers that validate against `dimension` (e.g. ZvecIndex.open) must resolve
+   * first — the raw getter returns the pre-config default (384) until then.
+   */
+  readonly resolve: Effect.Effect<void, Error>
 }
 
 export class EmbeddingService extends Context.Service<EmbeddingService, EmbeddingServiceInterface>()(
@@ -126,7 +137,7 @@ export function meanPool(logits: Float32Array, mask: number[], dim: number): num
   return out
 }
 
-function createLocalProvider(_modelId: string, dimension: number): EmbeddingServiceInterface {
+function createLocalProvider(_modelId: string, dimension: number): EmbeddingProvider {
   let ortModule: typeof ort | null = null
   let session: ort.InferenceSession | null = null
   let tokenizer: WordPieceTokenizer | null = null
@@ -184,11 +195,7 @@ function createLocalProvider(_modelId: string, dimension: number): EmbeddingServ
 
 // --- OpenAI provider using AI SDK ---
 
-function createOpenAIProvider(
-  apiKey: string,
-  model = "text-embedding-3-small",
-  dimension = 1536,
-): EmbeddingServiceInterface {
+function createOpenAIProvider(apiKey: string, model = "text-embedding-3-small", dimension = 1536): EmbeddingProvider {
   const embed = (texts: string[]): Effect.Effect<number[][], Error> =>
     Effect.tryPromise({
       try: async () => {
@@ -207,7 +214,7 @@ function createOpenAIProvider(
 
 // --- Layer ---
 
-// Config is read lazily on first embed() (not at layer build time): reading the opencode
+// Config is read lazily on first embed()/resolve() (not at layer build time): reading the opencode
 // config needs the Instance context, which is only bound during tool execution, not when
 // the registry builds its layers at startup. The read happens via yield* inside the Effect
 // so it runs in the calling fiber's context (where Instance is available).
@@ -215,30 +222,41 @@ export const layer = Layer.effect(
   EmbeddingService,
   Effect.gen(function* () {
     const config = yield* Config.Service
-    let backend: EmbeddingServiceInterface | null = null
+    let backend: EmbeddingProvider | null = null
     let dimension = 384
+
+    const resolve: Effect.Effect<void, Error> = Effect.gen(function* () {
+      if (backend) return
+      const cfg = (yield* config.get()) as Record<string, unknown>
+      const embeddingCfg = ((cfg.search ?? {}) as Record<string, unknown>).embedding as
+        Record<string, unknown> | undefined
+      const provider = (embeddingCfg?.provider as string) ?? "local"
+      const modelId = (embeddingCfg?.model as string) ?? HF_REPO
+      // openai's default model (text-embedding-3-small) emits 1536-dim vectors;
+      // the local ONNX model (all-MiniLM-L6-v2) emits 384.
+      dimension = (embeddingCfg?.dimension as number) ?? (provider === "openai" ? 1536 : 384)
+      const apiKey =
+        provider === "openai" ? ((embeddingCfg?.openaiApiKey as string) ?? process.env.OPENAI_API_KEY ?? "") : ""
+      backend =
+        provider === "openai" && apiKey
+          ? createOpenAIProvider(apiKey, modelId, dimension)
+          : createLocalProvider(modelId, dimension)
+    })
 
     const embed = (texts: string[]): Effect.Effect<number[][], Error> =>
       Effect.gen(function* () {
-        if (!backend) {
-          const cfg = (yield* config.get()) as Record<string, unknown>
-          const embeddingCfg = ((cfg.search ?? {}) as Record<string, unknown>).embedding as
-            | Record<string, unknown>
-            | undefined
-          const provider = (embeddingCfg?.provider as string) ?? "local"
-          const modelId = (embeddingCfg?.model as string) ?? HF_REPO
-          dimension = (embeddingCfg?.dimension as number) ?? 384
-          const apiKey =
-            provider === "openai" ? ((embeddingCfg?.openaiApiKey as string) ?? process.env.OPENAI_API_KEY ?? "") : ""
-          backend =
-            provider === "openai" && apiKey
-              ? createOpenAIProvider(apiKey, modelId, dimension)
-              : createLocalProvider(modelId, dimension)
-        }
+        yield* resolve
+        if (!backend) return yield* Effect.fail(new Error("embedding backend unavailable"))
         return yield* backend.embed(texts)
       })
 
-    return { embed, get dimension() { return dimension } }
+    return {
+      embed,
+      resolve,
+      get dimension() {
+        return dimension
+      },
+    }
   }),
 )
 
