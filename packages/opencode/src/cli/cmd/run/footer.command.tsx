@@ -270,6 +270,89 @@ function PanelShell(props: {
   )
 }
 
+function PanelBody<T extends PanelEntry>(props: {
+  id: string
+  title: string
+  theme: Accessor<RunFooterTheme>
+  entries: Accessor<T[]>
+  onPick: (item: T) => void
+  onClose: () => void
+  countVisible?: boolean
+  groupByCategory?: boolean
+  empty?: string
+  isCurrent?: (item: T) => boolean
+}) {
+  let field: InputRenderable | undefined
+  const [query, setQuery] = createSignal("")
+  const items = createMemo<T[]>(() => match(query(), props.entries()))
+  const menu = createFooterMenuState({ count: () => items().length, limit: PANEL_LIST_ROWS })
+  const select = () => {
+    const item = items()[menu.selected()]
+    if (!item) {
+      return
+    }
+
+    props.onPick(item)
+  }
+
+  createEffect(() => {
+    query()
+    menu.reset()
+  })
+
+  createEffect(() => {
+    const isCurrent = props.isCurrent
+    if (!isCurrent || query().trim()) {
+      return
+    }
+
+    const index = items().findIndex(isCurrent)
+    if (index !== -1) {
+      menu.reveal(index)
+    }
+  })
+
+  useKeyboard((event) => {
+    if (event.defaultPrevented) {
+      return
+    }
+
+    handleKey({ event, menu, field: () => field, setQuery, select, close: props.onClose })
+  })
+
+  return (
+    <PanelShell
+      id={`run-direct-footer-${props.id}-panel`}
+      title={props.title}
+      countVisible={props.countVisible}
+      query={query()}
+      count={items().length}
+      total={props.entries().length}
+      placeholder="Search"
+      theme={props.theme}
+      inputRef={(input) => {
+        field = input
+      }}
+      onQuery={setQuery}
+    >
+      <RunFooterMenu
+        id={`run-direct-footer-${props.id}-list`}
+        theme={props.theme}
+        items={items}
+        selected={menu.selected}
+        offset={menu.offset}
+        rows={() => PANEL_LIST_ROWS}
+        limit={PANEL_LIST_ROWS}
+        empty={props.empty ?? "No results found"}
+        border={false}
+        paddingLeft={PANEL_PAD}
+        paddingRight={PANEL_PAD}
+        grouped={props.groupByCategory !== false && !query().trim()}
+      />
+    </PanelShell>
+  )
+}
+
 export function RunCommandMenuBody(props: {
   theme: Accessor<RunFooterTheme>
   commands: Accessor<RunCommand[] | undefined>
@@ -283,8 +366,6 @@ export function RunCommandMenuBody(props: {
   onNew: () => void
   onExit: () => void
 }) {
-  let field: InputRenderable | undefined
-  const [query, setQuery] = createSignal("")
   const entries = createMemo<CommandEntry[]>(() => {
     const builtins = ["new"]
     return [
@@ -338,8 +419,6 @@ export function RunCommandMenuBody(props: {
       { action: "exit", category: "System", display: "Exit", footer: "/exit", keywords: "/exit exit" },
     ]
   })
-  const items = createMemo<CommandEntry[]>(() => match(query(), entries()))
-  const menu = createFooterMenuState({ count: () => items().length, limit: PANEL_LIST_ROWS })
   const pick = (item: CommandEntry) => {
     if (item.action === "model") {
       props.onModel()
@@ -368,58 +447,9 @@ export function RunCommandMenuBody(props: {
 
     props.onCommand(item.name)
   }
-  const select = () => {
-    const item = items()[menu.selected()]
-    if (!item) {
-      return
-    }
-
-    pick(item)
-  }
-
-  createEffect(() => {
-    query()
-    menu.reset()
-  })
-
-  useKeyboard((event) => {
-    if (event.defaultPrevented) {
-      return
-    }
-
-    handleKey({ event, menu, field: () => field, setQuery, select, close: props.onClose })
-  })
 
   return (
-    <PanelShell
-      id="run-direct-footer-command-panel"
-      title="Commands"
-      countVisible={false}
-      query={query()}
-      count={items().length}
-      total={entries().length}
-      placeholder="Search"
-      theme={props.theme}
-      inputRef={(input) => {
-        field = input
-      }}
-      onQuery={setQuery}
-    >
-      <RunFooterMenu
-        id="run-direct-footer-command-list"
-        theme={props.theme}
-        items={items}
-        selected={menu.selected}
-        offset={menu.offset}
-        rows={() => PANEL_LIST_ROWS}
-        limit={PANEL_LIST_ROWS}
-        empty="No results found"
-        border={false}
-        paddingLeft={PANEL_PAD}
-        paddingRight={PANEL_PAD}
-        grouped={!query().trim()}
-      />
-    </PanelShell>
+    <PanelBody id="command" title="Commands" countVisible={false} theme={props.theme} entries={entries} onPick={pick} onClose={props.onClose} />
   )
 }
 
@@ -430,8 +460,6 @@ export function RunVariantSelectBody(props: {
   onClose: () => void
   onSelect: (variant: string | undefined) => void
 }) {
-  let field: InputRenderable | undefined
-  const [query, setQuery] = createSignal("")
   const entries = createMemo<VariantEntry[]>(() => [
     {
       category: "",
@@ -450,73 +478,18 @@ export function RunVariantSelectBody(props: {
       current: props.current() === variant,
     })),
   ])
-  const items = createMemo<VariantEntry[]>(() => match(query(), entries()))
-  const menu = createFooterMenuState({ count: () => items().length, limit: PANEL_LIST_ROWS })
-  const pick = (item: VariantEntry) => {
-    props.onSelect(item.variant)
-  }
-  const select = () => {
-    const item = items()[menu.selected()]
-    if (!item) {
-      return
-    }
-
-    pick(item)
-  }
-
-  createEffect(() => {
-    query()
-    menu.reset()
-  })
-
-  createEffect(() => {
-    if (query().trim()) {
-      return
-    }
-
-    const index = items().findIndex((item) => item.current)
-    if (index !== -1) {
-      menu.reveal(index)
-    }
-  })
-
-  useKeyboard((event) => {
-    if (event.defaultPrevented) {
-      return
-    }
-
-    handleKey({ event, menu, field: () => field, setQuery, select, close: props.onClose })
-  })
 
   return (
-    <PanelShell
-      id="run-direct-footer-variant-panel"
+    <PanelBody
+      id="variant"
       title="Select variant"
-      query={query()}
-      count={items().length}
-      total={entries().length}
-      placeholder="Search"
       theme={props.theme}
-      inputRef={(input) => {
-        field = input
-      }}
-      onQuery={setQuery}
-    >
-      <RunFooterMenu
-        id="run-direct-footer-variant-list"
-        theme={props.theme}
-        items={items}
-        selected={menu.selected}
-        offset={menu.offset}
-        rows={() => PANEL_LIST_ROWS}
-        limit={PANEL_LIST_ROWS}
-        empty="No results found"
-        border={false}
-        paddingLeft={PANEL_PAD}
-        paddingRight={PANEL_PAD}
-        grouped={false}
-      />
-    </PanelShell>
+      entries={entries}
+      onPick={(item) => props.onSelect(item.variant)}
+      onClose={props.onClose}
+      groupByCategory={false}
+      isCurrent={(item) => item.current}
+    />
   )
 }
 
@@ -527,8 +500,6 @@ export function RunModelSelectBody(props: {
   onClose: () => void
   onSelect: (model: NonNullable<RunInput["model"]>) => void
 }) {
-  let field: InputRenderable | undefined
-  const [query, setQuery] = createSignal("")
   const entries = createMemo<ModelEntry[]>(() =>
     (props.providers() ?? [])
       .flatMap((provider) =>
@@ -570,72 +541,17 @@ export function RunModelSelectBody(props: {
         return a.display.localeCompare(b.display)
       }),
   )
-  const items = createMemo<ModelEntry[]>(() => match(query(), entries()))
-  const menu = createFooterMenuState({ count: () => items().length, limit: PANEL_LIST_ROWS })
-  const pick = (item: ModelEntry) => {
-    props.onSelect({ providerID: item.providerID, modelID: item.modelID })
-  }
-  const select = () => {
-    const item = items()[menu.selected()]
-    if (!item) {
-      return
-    }
-
-    pick(item)
-  }
-
-  createEffect(() => {
-    query()
-    menu.reset()
-  })
-
-  createEffect(() => {
-    if (query().trim()) {
-      return
-    }
-
-    const index = items().findIndex((item) => item.current)
-    if (index !== -1) {
-      menu.reveal(index)
-    }
-  })
-
-  useKeyboard((event) => {
-    if (event.defaultPrevented) {
-      return
-    }
-
-    handleKey({ event, menu, field: () => field, setQuery, select, close: props.onClose })
-  })
 
   return (
-    <PanelShell
-      id="run-direct-footer-model-panel"
+    <PanelBody
+      id="model"
       title="Select model"
-      query={query()}
-      count={items().length}
-      total={entries().length}
-      placeholder="Search"
       theme={props.theme}
-      inputRef={(input) => {
-        field = input
-      }}
-      onQuery={setQuery}
-    >
-      <RunFooterMenu
-        id="run-direct-footer-model-list"
-        theme={props.theme}
-        items={items}
-        selected={menu.selected}
-        offset={menu.offset}
-        rows={() => PANEL_LIST_ROWS}
-        limit={PANEL_LIST_ROWS}
-        empty={props.providers() ? "No results found" : "Models loading"}
-        border={false}
-        paddingLeft={PANEL_PAD}
-        paddingRight={PANEL_PAD}
-        grouped={!query().trim()}
-      />
-    </PanelShell>
+      entries={entries}
+      onPick={(item) => props.onSelect({ providerID: item.providerID, modelID: item.modelID })}
+      onClose={props.onClose}
+      empty={props.providers() ? "No results found" : "Models loading"}
+      isCurrent={(item) => item.current}
+    />
   )
 }

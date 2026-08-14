@@ -530,6 +530,23 @@ export const layer = Layer.effect(
       connections.delete(id)
     })
 
+    const insertWorkspace = Effect.fn("Workspace.insert")(function* (info: Info) {
+      yield* db((db) => {
+        db.insert(WorkspaceTable)
+          .values({
+            id: info.id,
+            type: info.type,
+            branch: info.branch,
+            name: info.name,
+            directory: info.directory,
+            extra: info.extra,
+            project_id: info.projectID,
+            time_used: info.timeUsed,
+          })
+          .run()
+      })
+    })
+
     const create = Effect.fn("Workspace.create")(function* (input: CreateInput) {
       const id = WorkspaceID.ascending(input.id)
       const adapter = getAdapter(input.projectID, input.type)
@@ -554,20 +571,7 @@ export const layer = Layer.effect(
         timeUsed: Date.now(),
       }
 
-      yield* db((db) => {
-        db.insert(WorkspaceTable)
-          .values({
-            id: info.id,
-            type: info.type,
-            branch: info.branch,
-            name: info.name,
-            directory: info.directory,
-            extra: info.extra,
-            project_id: info.projectID,
-            time_used: info.timeUsed,
-          })
-          .run()
-      })
+      yield* insertWorkspace(info)
 
       const env = {
         OPENCODE_AUTH_CONTENT: JSON.stringify(yield* auth.all()),
@@ -881,20 +885,7 @@ export const layer = Layer.effect(
               timeUsed: Date.now(),
             }
 
-            yield* db((db) => {
-              db.insert(WorkspaceTable)
-                .values({
-                  id: info.id,
-                  type: info.type,
-                  branch: info.branch,
-                  name: info.name,
-                  directory: info.directory,
-                  extra: info.extra,
-                  project_id: info.projectID,
-                  time_used: info.timeUsed,
-                })
-                .run()
-            })
+            yield* insertWorkspace(info)
 
             yield* startSync(info)
           }),

@@ -14,6 +14,7 @@ import { which } from "../util/which"
 import { Module } from "@opencode-ai/core/util/module"
 import { spawn } from "./launch"
 import { Npm } from "@opencode-ai/core/npm"
+import { venvCandidates, resolveVenvPython } from "./venv"
 
 const log = Log.create({ service: "lsp.server" })
 const pathExists = async (p: string) =>
@@ -440,22 +441,14 @@ export const Ty: Info = {
 
     const initialization: Record<string, string> = {}
 
-    const potentialVenvPaths = [process.env["VIRTUAL_ENV"], path.join(root, ".venv"), path.join(root, "venv")].filter(
-      (p): p is string => p !== undefined,
-    )
-
-    const isWindows = process.platform === "win32"
-    const pythonPaths = potentialVenvPaths.map((venvPath) =>
-      isWindows ? path.join(venvPath, "Scripts", "python.exe") : path.join(venvPath, "bin", "python"),
-    )
-    const pythonExists = await Promise.all(pythonPaths.map((p) => Filesystem.exists(p)))
-    const pythonIndex = pythonExists.findIndex(Boolean)
-    if (pythonIndex !== -1) {
-      initialization["pythonPath"] = pythonPaths[pythonIndex]
+    const pythonPath = await resolveVenvPython(root)
+    if (pythonPath) {
+      initialization["pythonPath"] = pythonPath
     }
 
     if (!binary) {
-      const tyPaths = potentialVenvPaths.map((venvPath) =>
+      const isWindows = process.platform === "win32"
+      const tyPaths = venvCandidates(root).map((venvPath) =>
         isWindows ? path.join(venvPath, "Scripts", "ty.exe") : path.join(venvPath, "bin", "ty"),
       )
       const tyExists = await Promise.all(tyPaths.map((p) => Filesystem.exists(p)))
@@ -498,18 +491,9 @@ export const Pyright: Info = {
 
     const initialization: Record<string, string> = {}
 
-    const potentialVenvPaths = [process.env["VIRTUAL_ENV"], path.join(root, ".venv"), path.join(root, "venv")].filter(
-      (p): p is string => p !== undefined,
-    )
-
-    const isWindows = process.platform === "win32"
-    const pythonPaths = potentialVenvPaths.map((venvPath) =>
-      isWindows ? path.join(venvPath, "Scripts", "python.exe") : path.join(venvPath, "bin", "python"),
-    )
-    const pythonExists = await Promise.all(pythonPaths.map((p) => Filesystem.exists(p)))
-    const pythonIndex = pythonExists.findIndex(Boolean)
-    if (pythonIndex !== -1) {
-      initialization["pythonPath"] = pythonPaths[pythonIndex]
+    const pythonPath = await resolveVenvPython(root)
+    if (pythonPath) {
+      initialization["pythonPath"] = pythonPath
     }
 
     const proc = spawn(binary, args, {

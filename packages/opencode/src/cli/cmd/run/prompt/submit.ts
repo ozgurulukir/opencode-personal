@@ -3,6 +3,7 @@
 // Handles slash command parsing, exit detection, and prompt validation.
 // All functions are pure — no TUI or SolidJS dependencies.
 import { isExitCommand, isNewCommand } from "../prompt.shared"
+import { slashHead } from "./autocomplete"
 import type { RunCommand, RunPrompt } from "../types"
 
 export type SlashCommand = {
@@ -57,21 +58,4 @@ export function validateSubmit(prompt: RunPrompt, commands: RunCommand[] | undef
   }
 
   return { type: "valid", command: parsed?.type === "command" ? parsed.command : undefined }
-}
-
-function slashHead(text: string): { name: string; arguments: string; end: number } | undefined {
-  if (!text.startsWith("/")) {
-    return
-  }
-
-  for (let i = 1; i < text.length; i++) {
-    switch (text[i]) {
-      case " ":
-      case "\t":
-      case "\n":
-        return { name: text.slice(1, i), arguments: text.slice(i + 1), end: i }
-    }
-  }
-
-  return { name: text.slice(1), arguments: "", end: text.length }
 }

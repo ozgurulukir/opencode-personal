@@ -20,6 +20,7 @@ import { useSync } from "@tui/context/sync"
 import { useEvent } from "@tui/context/event"
 import { SplitBorder } from "@tui/component/border"
 import { Spinner } from "@tui/component/spinner"
+import { ThemedDiff } from "@tui/component/diff-block"
 import { selectedForeground, useTheme } from "@tui/context/theme"
 import { BoxRenderable, ScrollBoxRenderable, addDefaultParsers, TextAttributes, RGBA } from "@opentui/core"
 import { Prompt, type PromptRef } from "@tui/component/prompt"
@@ -68,6 +69,7 @@ import { LANGUAGE_EXTENSIONS } from "@/lsp/language"
 import parsers from "../../../../../../parsers-config.ts"
 import * as Clipboard from "../../util/clipboard"
 import { collectSessionDescendants } from "../../util/session-tree"
+import { isDeniedErrorMessage } from "../../util/denied-error.shared"
 import { errorMessage } from "@/util/error"
 import { Toast, useToast } from "../../ui/toast"
 import { useKV } from "../../context/kv.tsx"
@@ -1735,13 +1737,7 @@ function InlineTool(props: {
 
   const error = createMemo(() => (props.part.state.status === "error" ? errorMessage(props.part.state.error) : undefined))
 
-  const denied = createMemo(
-    () =>
-      error()?.includes("QuestionRejectedError") ||
-      error()?.includes("rejected permission") ||
-      error()?.includes("specified a rule") ||
-      error()?.includes("user dismissed"),
-  )
+  const denied = createMemo(() => isDeniedErrorMessage(error()))
 
   return (
     <box
@@ -2080,7 +2076,6 @@ function Task(props: ToolProps<typeof TaskTool>) {
 
 function Edit(props: ToolProps<typeof EditTool>) {
   const ctx = use()
-  const { theme, syntax } = useTheme()
   const pathFormatter = usePathFormatter()
 
   const view = createMemo(() => {
@@ -2099,25 +2094,7 @@ function Edit(props: ToolProps<typeof EditTool>) {
       <Match when={props.metadata.diff !== undefined}>
         <BlockTool title={"← Edit " + pathFormatter.format(props.input.filePath)} part={props.part}>
           <box paddingLeft={1}>
-            <diff
-              diff={diffContent()}
-              view={view()}
-              filetype={ft()}
-              syntaxStyle={syntax()}
-              showLineNumbers={true}
-              width="100%"
-              wrapMode={ctx.diffWrapMode()}
-              fg={theme.text}
-              addedBg={theme.diffAddedBg}
-              removedBg={theme.diffRemovedBg}
-              contextBg={theme.diffContextBg}
-              addedSignColor={theme.diffHighlightAdded}
-              removedSignColor={theme.diffHighlightRemoved}
-              lineNumberFg={theme.diffLineNumber}
-              lineNumberBg={theme.diffContextBg}
-              addedLineNumberBg={theme.diffAddedLineNumberBg}
-              removedLineNumberBg={theme.diffRemovedLineNumberBg}
-            />
+            <ThemedDiff diff={diffContent()} view={view()} filetype={ft()} wrapMode={ctx.diffWrapMode()} />
           </box>
           <Diagnostics diagnostics={props.metadata.diagnostics} filePath={props.input.filePath ?? ""} />
         </BlockTool>
@@ -2133,7 +2110,7 @@ function Edit(props: ToolProps<typeof EditTool>) {
 
 function ApplyPatch(props: ToolProps<typeof ApplyPatchTool>) {
   const ctx = use()
-  const { theme, syntax } = useTheme()
+  const { theme } = useTheme()
   const pathFormatter = usePathFormatter()
 
   const files = createMemo(() => props.metadata.files ?? [])
@@ -2147,25 +2124,7 @@ function ApplyPatch(props: ToolProps<typeof ApplyPatchTool>) {
   function Diff(p: { diff: string; filePath: string }) {
     return (
       <box paddingLeft={1}>
-        <diff
-          diff={p.diff}
-          view={view()}
-          filetype={filetype(p.filePath)}
-          syntaxStyle={syntax()}
-          showLineNumbers={true}
-          width="100%"
-          wrapMode={ctx.diffWrapMode()}
-          fg={theme.text}
-          addedBg={theme.diffAddedBg}
-          removedBg={theme.diffRemovedBg}
-          contextBg={theme.diffContextBg}
-          addedSignColor={theme.diffHighlightAdded}
-          removedSignColor={theme.diffHighlightRemoved}
-          lineNumberFg={theme.diffLineNumber}
-          lineNumberBg={theme.diffContextBg}
-          addedLineNumberBg={theme.diffAddedLineNumberBg}
-          removedLineNumberBg={theme.diffRemovedLineNumberBg}
-        />
+        <ThemedDiff diff={p.diff} view={view()} filetype={filetype(p.filePath)} wrapMode={ctx.diffWrapMode()} />
       </box>
     )
   }

@@ -6,6 +6,7 @@ import { useTheme, selectedForeground } from "../../context/theme"
 import type { PermissionRequest } from "@opencode-ai/sdk/v2"
 import { useSDK } from "../../context/sdk"
 import { SplitBorder } from "../../component/border"
+import { ThemedDiff } from "../../component/diff-block"
 import { useSync } from "../../context/sync"
 import { useProject } from "../../context/project"
 import path from "path"
@@ -32,7 +33,6 @@ function filetype(input?: string) {
 function EditBody(props: { request: PermissionRequest }) {
   const themeState = useTheme()
   const theme = themeState.theme
-  const syntax = themeState.syntax
   const config = useTuiConfig()
   const dimensions = useTerminalDimensions()
 
@@ -61,25 +61,7 @@ function EditBody(props: { request: PermissionRequest }) {
             },
           }}
         >
-          <diff
-            diff={diff()}
-            view={view()}
-            filetype={ft()}
-            syntaxStyle={syntax()}
-            showLineNumbers={true}
-            width="100%"
-            wrapMode="word"
-            fg={theme.text}
-            addedBg={theme.diffAddedBg}
-            removedBg={theme.diffRemovedBg}
-            contextBg={theme.diffContextBg}
-            addedSignColor={theme.diffHighlightAdded}
-            removedSignColor={theme.diffHighlightRemoved}
-            lineNumberFg={theme.diffLineNumber}
-            lineNumberBg={theme.diffContextBg}
-            addedLineNumberBg={theme.diffAddedLineNumberBg}
-            removedLineNumberBg={theme.diffRemovedLineNumberBg}
-          />
+          <ThemedDiff diff={diff()} view={view()} filetype={ft()} wrapMode="word" />
         </scrollbox>
       </Show>
       <Show when={!diff()}>

@@ -3,6 +3,7 @@ import type { InternalTuiPlugin } from "../../plugin/internal-types"
 import { useSyncV2 } from "@tui/context/sync-v2"
 import { SplitBorder } from "@tui/component/border"
 import { Spinner } from "@tui/component/spinner"
+import { ThemedDiff } from "@tui/component/diff-block"
 import { useTheme } from "@tui/context/theme"
 import { useLocal } from "@tui/context/local"
 import { useRenderer, useTerminalDimensions, type JSX } from "@opentui/solid"
@@ -10,6 +11,7 @@ import { TextAttributes, type BoxRenderable, type SyntaxStyle } from "@opentui/c
 import { useBindings } from "../../keymap"
 import { Locale } from "@/util/locale"
 import { errorMessage } from "@/util/error"
+import { isDeniedErrorMessage } from "../../util/denied-error.shared"
 import { LANGUAGE_EXTENSIONS } from "@/lsp/language"
 import { webSearchProviderLabel } from "@/tool/websearch"
 import path from "path"
@@ -532,16 +534,7 @@ function InlineTool(props: {
   const [showError, setShowError] = createSignal(false)
   const error = createMemo(() => (props.part.state.status === "error" ? errorMessage(props.part.state.error) : undefined))
   const complete = createMemo(() => !!props.complete)
-  const denied = createMemo(() => {
-    const message = error()
-    if (!message) return false
-    return (
-      message.includes("QuestionRejectedError") ||
-      message.includes("rejected permission") ||
-      message.includes("specified a rule") ||
-      message.includes("user dismissed")
-    )
-  })
+  const denied = createMemo(() => isDeniedErrorMessage(error()))
   const fg = createMemo(() => {
     if (error()) return theme.error
     if (complete()) return theme.textMuted
@@ -823,7 +816,6 @@ function Write(props: ToolProps) {
 }
 
 function Edit(props: ToolProps) {
-  const { theme, syntax } = useTheme()
   const dimensions = useTerminalDimensions()
   const filePath = createMemo(() => stringValue(props.input.filePath) ?? "")
   const diff = createMemo(() => stringValue(props.metadata.diff))
@@ -833,24 +825,11 @@ function Edit(props: ToolProps) {
         {(diff) => (
           <BlockTool title={"← Edit " + normalizePath(filePath())} part={props.part}>
             <box paddingLeft={1}>
-              <diff
+              <ThemedDiff
                 diff={diff()}
                 view={dimensions().width > 120 ? "split" : "unified"}
                 filetype={filetype(filePath())}
-                syntaxStyle={syntax()}
-                showLineNumbers={true}
-                width="100%"
                 wrapMode="word"
-                fg={theme.text}
-                addedBg={theme.diffAddedBg}
-                removedBg={theme.diffRemovedBg}
-                contextBg={theme.diffContextBg}
-                addedSignColor={theme.diffHighlightAdded}
-                removedSignColor={theme.diffHighlightRemoved}
-                lineNumberFg={theme.diffLineNumber}
-                lineNumberBg={theme.diffContextBg}
-                addedLineNumberBg={theme.diffAddedLineNumberBg}
-                removedLineNumberBg={theme.diffRemovedLineNumberBg}
               />
             </box>
             <Diagnostics diagnostics={props.metadata.diagnostics} filePath={filePath()} />
@@ -867,7 +846,7 @@ function Edit(props: ToolProps) {
 }
 
 function ApplyPatch(props: ToolProps) {
-  const { theme, syntax } = useTheme()
+  const { theme } = useTheme()
   const dimensions = useTerminalDimensions()
   const files = createMemo(() => arrayValue(props.metadata.files).flatMap((item) => (isRecord(item) ? [item] : [])))
   const fileTitle = (file: Record<string, unknown>) => {
@@ -894,24 +873,11 @@ function ApplyPatch(props: ToolProps) {
               >
                 {(patch) => (
                   <box paddingLeft={1}>
-                    <diff
+                    <ThemedDiff
                       diff={patch()}
                       view={dimensions().width > 120 ? "split" : "unified"}
                       filetype={filetype(stringValue(file.filePath) ?? stringValue(file.relativePath))}
-                      syntaxStyle={syntax()}
-                      showLineNumbers={true}
-                      width="100%"
                       wrapMode="word"
-                      fg={theme.text}
-                      addedBg={theme.diffAddedBg}
-                      removedBg={theme.diffRemovedBg}
-                      contextBg={theme.diffContextBg}
-                      addedSignColor={theme.diffHighlightAdded}
-                      removedSignColor={theme.diffHighlightRemoved}
-                      lineNumberFg={theme.diffLineNumber}
-                      lineNumberBg={theme.diffContextBg}
-                      addedLineNumberBg={theme.diffAddedLineNumberBg}
-                      removedLineNumberBg={theme.diffRemovedLineNumberBg}
                     />
                   </box>
                 )}

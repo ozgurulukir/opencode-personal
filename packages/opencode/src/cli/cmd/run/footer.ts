@@ -33,10 +33,12 @@ import { RUN_COMMAND_PANEL_ROWS } from "./footer.command"
 import { SUBAGENT_INSPECTOR_ROWS, SUBAGENT_TAB_ROWS } from "./footer.subagent"
 import { PROMPT_MAX_ROWS, TEXTAREA_MIN_ROWS } from "./footer.prompt"
 import { printableBinding } from "./prompt.shared"
+import { modelSelectStale, selectApply, variantSelectStale } from "./footer.shared"
 import { RunFooterView } from "./footer.view"
 import { RunScrollbackStream } from "./scrollback.surface"
 import type { RunTheme } from "./theme"
 import type {
+  CycleResult,
   FooterApi,
   FooterEvent,
   FooterKeybinds,
@@ -57,13 +59,6 @@ import type {
   RunResource,
   StreamCommit,
 } from "./types"
-
-type CycleResult = {
-  modelLabel?: string
-  status?: string
-  variant?: string | undefined
-  variants?: string[]
-}
 
 type RunFooterOptions = {
   directory: string
@@ -672,48 +667,37 @@ export class RunFooter implements FooterApi {
     this.patch(patch)
   }
 
+  private applySelect(invoke: () => CycleResult | void | Promise<CycleResult | void>, stale: () => boolean): void {
+    void Promise.resolve()
+      .then(invoke)
+      .then((result) => {
+        if (!result || this.isClosed || stale()) {
+          return
+        }
+
+        for (const action of selectApply(result)) {
+          if (action.type === "variants") {
+            this.setVariants(action.variants)
+          } else if (action.type === "variant") {
+            this.setCurrentVariant(action.variant)
+          } else {
+            this.patch(action.patch)
+          }
+        }
+      })
+      .catch(() => {})
+  }
+
   private handleModelSelect = (model: NonNullable<RunInput["model"]>): void => {
     if (this.isClosed) {
       return
     }
 
     this.setCurrentModel(model)
-    void Promise.resolve()
-      .then(() => this.options.onModelSelect?.(model))
-      .then((result) => {
-        const current = this.currentModel()
-        if (
-          !result ||
-          this.isClosed ||
-          !current ||
-          current.providerID !== model.providerID ||
-          current.modelID !== model.modelID
-        ) {
-          return
-        }
-
-        if ("variants" in result) {
-          this.setVariants(result.variants ?? [])
-        }
-
-        if ("variant" in result) {
-          this.setCurrentVariant(result.variant)
-        }
-
-        const patch: FooterPatch = {}
-        if (result.modelLabel) {
-          patch.model = result.modelLabel
-        }
-
-        if (result.status) {
-          patch.status = result.status
-        }
-
-        if (patch.model || patch.status) {
-          this.patch(patch)
-        }
-      })
-      .catch(() => {})
+    this.applySelect(
+      () => this.options.onModelSelect?.(model),
+      () => modelSelectStale(this.currentModel(), model),
+    )
   }
 
   private handleVariantSelect = (variant: string | undefined): void => {
@@ -721,41 +705,11 @@ export class RunFooter implements FooterApi {
       return
     }
 
-    const model = this.currentModel()
-    void Promise.resolve()
-      .then(() => this.options.onVariantSelect?.(variant))
-      .then((result) => {
-        const current = this.currentModel()
-        if (
-          !result ||
-          this.isClosed ||
-          (model && (!current || current.providerID !== model.providerID || current.modelID !== model.modelID))
-        ) {
-          return
-        }
-
-        if ("variants" in result) {
-          this.setVariants(result.variants ?? [])
-        }
-
-        if ("variant" in result) {
-          this.setCurrentVariant(result.variant)
-        }
-
-        const patch: FooterPatch = {}
-        if (result.modelLabel) {
-          patch.model = result.modelLabel
-        }
-
-        if (result.status) {
-          patch.status = result.status
-        }
-
-        if (patch.model || patch.status) {
-          this.patch(patch)
-        }
-      })
-      .catch(() => {})
+    const atSelect = this.currentModel()
+    this.applySelect(
+      () => this.options.onVariantSelect?.(variant),
+      () => variantSelectStale(this.currentModel(), atSelect),
+    )
   }
 
   private clearInterruptTimer(): void {
