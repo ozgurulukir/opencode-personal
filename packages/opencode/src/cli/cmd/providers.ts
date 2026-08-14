@@ -11,7 +11,7 @@ import os from "os"
 import { Config } from "@/config/config"
 import { Global } from "@opencode-ai/core/global"
 import { Plugin } from "../../plugin"
-import type { Hooks } from "@opencode-ai/plugin"
+import type { AuthOAuthResult, Hooks } from "@opencode-ai/plugin"
 import { Process } from "@/util/process"
 import { errorMessage } from "@/util/error"
 import { text } from "node:stream/consumers"
@@ -34,6 +34,34 @@ const cliTry = <Value>(message: string, fn: () => PromiseLike<Value>) =>
     try: fn,
     catch: (error) => new CliError({ message: message + errorMessage(error) }),
   })
+
+type OAuthCallbackSuccess = Extract<
+  Awaited<ReturnType<Extract<AuthOAuthResult, { method: "auto" }>["callback"]>>,
+  { type: "success" }
+>
+
+const persistResult = Effect.fn("Cli.providers.persistResult")(function* (
+  result: OAuthCallbackSuccess,
+  provider: string,
+) {
+  const saveProvider = result.provider ?? provider
+  if ("refresh" in result) {
+    const { type: _, provider: __, refresh, access, expires, ...extraFields } = result
+    yield* put(saveProvider, {
+      type: "oauth",
+      refresh,
+      access,
+      expires,
+      ...extraFields,
+    })
+  }
+  if ("key" in result) {
+    yield* put(saveProvider, {
+      type: "api",
+      key: result.key,
+    })
+  }
+})
 
 const handlePluginAuth = Effect.fn("Cli.providers.pluginAuth")(function* (
   plugin: { auth: PluginAuth },
@@ -109,23 +137,7 @@ const handlePluginAuth = Effect.fn("Cli.providers.pluginAuth")(function* (
         yield* spinner.stop("Failed to authorize", 1)
       }
       if (result.type === "success") {
-        const saveProvider = result.provider ?? provider
-        if ("refresh" in result) {
-          const { type: _, provider: __, refresh, access, expires, ...extraFields } = result
-          yield* put(saveProvider, {
-            type: "oauth",
-            refresh,
-            access,
-            expires,
-            ...extraFields,
-          })
-        }
-        if ("key" in result) {
-          yield* put(saveProvider, {
-            type: "api",
-            key: result.key,
-          })
-        }
+        yield* persistResult(result, provider)
         yield* spinner.stop("Login successful")
       }
     }
@@ -141,23 +153,7 @@ const handlePluginAuth = Effect.fn("Cli.providers.pluginAuth")(function* (
         yield* Prompt.log.error("Failed to authorize")
       }
       if (result.type === "success") {
-        const saveProvider = result.provider ?? provider
-        if ("refresh" in result) {
-          const { type: _, provider: __, refresh, access, expires, ...extraFields } = result
-          yield* put(saveProvider, {
-            type: "oauth",
-            refresh,
-            access,
-            expires,
-            ...extraFields,
-          })
-        }
-        if ("key" in result) {
-          yield* put(saveProvider, {
-            type: "api",
-            key: result.key,
-          })
-        }
+        yield* persistResult(result, provider)
         yield* Prompt.log.success("Login successful")
       }
     }

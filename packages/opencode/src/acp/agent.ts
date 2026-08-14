@@ -56,6 +56,23 @@ import {
 
 const log = Log.create({ service: "acp-agent" })
 
+/**
+ * Maps a caught error to an ACP auth-required request error and rethrows.
+ * Note: MessageV2.fromError returns a serialized plain object, so the
+ * LoadAPIKeyError branch is unreachable for fromError outputs today — it is
+ * preserved verbatim from the original inline catch blocks. Pinned by
+ * test/acp/agent-auth-error.characterization.test.ts.
+ */
+export function rethrowAuthAware(e: unknown, defaultProviderID: string | undefined): never {
+  const error = MessageV2.fromError(e, {
+    providerID: ProviderID.make(defaultProviderID ?? "unknown"),
+  })
+  if (LoadAPIKeyError.isInstance(error)) {
+    throw RequestError.authRequired()
+  }
+  throw e
+}
+
 function unwrapSyncEvent(event: any): any {
   if (event?.type !== "sync" || !event.syncEvent) return event
   const syncEvent = event.syncEvent
@@ -380,13 +397,7 @@ export class Agent implements ACPAgent {
         _meta: load._meta,
       }
     } catch (e) {
-      const error = MessageV2.fromError(e, {
-        providerID: ProviderID.make(this.config.defaultModel?.providerID ?? "unknown"),
-      })
-      if (LoadAPIKeyError.isInstance(error)) {
-        throw RequestError.authRequired()
-      }
-      throw e
+      rethrowAuthAware(e, this.config.defaultModel?.providerID)
     }
   }
 
@@ -420,13 +431,7 @@ export class Agent implements ACPAgent {
 
       return result
     } catch (e) {
-      const error = MessageV2.fromError(e, {
-        providerID: ProviderID.make(this.config.defaultModel?.providerID ?? "unknown"),
-      })
-      if (LoadAPIKeyError.isInstance(error)) {
-        throw RequestError.authRequired()
-      }
-      throw e
+      rethrowAuthAware(e, this.config.defaultModel?.providerID)
     }
   }
 
@@ -465,13 +470,7 @@ export class Agent implements ACPAgent {
       if (next) response.nextCursor = next
       return response
     } catch (e) {
-      const error = MessageV2.fromError(e, {
-        providerID: ProviderID.make(this.config.defaultModel?.providerID ?? "unknown"),
-      })
-      if (LoadAPIKeyError.isInstance(error)) {
-        throw RequestError.authRequired()
-      }
-      throw e
+      rethrowAuthAware(e, this.config.defaultModel?.providerID)
     }
   }
 
@@ -519,13 +518,7 @@ export class Agent implements ACPAgent {
 
       return mode
     } catch (e) {
-      const error = MessageV2.fromError(e, {
-        providerID: ProviderID.make(this.config.defaultModel?.providerID ?? "unknown"),
-      })
-      if (LoadAPIKeyError.isInstance(error)) {
-        throw RequestError.authRequired()
-      }
-      throw e
+      rethrowAuthAware(e, this.config.defaultModel?.providerID)
     }
   }
 
@@ -553,13 +546,7 @@ export class Agent implements ACPAgent {
 
       return result
     } catch (e) {
-      const error = MessageV2.fromError(e, {
-        providerID: ProviderID.make(this.config.defaultModel?.providerID ?? "unknown"),
-      })
-      if (LoadAPIKeyError.isInstance(error)) {
-        throw RequestError.authRequired()
-      }
-      throw e
+      rethrowAuthAware(e, this.config.defaultModel?.providerID)
     }
   }
 

@@ -423,6 +423,54 @@ function googleSmallThinkingConfig(apiId: string) {
   return { thinkingBudget: googleThinkingBudgetMax(apiId) === 32_768 ? 128 : 0 }
 }
 
+function anthropicAdaptiveThinkingVariants(adaptiveEfforts: string[]): Record<string, Record<string, any>> {
+  return Object.fromEntries(
+    adaptiveEfforts.map((effort) => [
+      effort,
+      {
+        thinking: {
+          type: "adaptive",
+        },
+        effort,
+      },
+    ]),
+  )
+}
+
+function anthropicFixedThinkingVariants(): Record<string, Record<string, any>> {
+  return {
+    high: {
+      thinking: {
+        type: "enabled",
+        budgetTokens: 16000,
+      },
+    },
+    max: {
+      thinking: {
+        type: "enabled",
+        budgetTokens: 31999,
+      },
+    },
+  }
+}
+
+function gemini25ThinkingVariants(): Record<string, Record<string, any>> {
+  return {
+    high: {
+      thinkingConfig: {
+        includeThoughts: true,
+        thinkingBudget: 16000,
+      },
+    },
+    max: {
+      thinkingConfig: {
+        includeThoughts: true,
+        thinkingBudget: 24576,
+      },
+    },
+  }
+}
+
 export function variants(model: Model): Record<string, Record<string, any>> {
   if (!model.capabilities.reasoning) return {}
 
@@ -484,49 +532,13 @@ export function variants(model: Model): Record<string, Record<string, any>> {
     case "@ai-sdk/gateway":
       if (model.id.includes("anthropic")) {
         if (adaptiveEfforts) {
-          return Object.fromEntries(
-            adaptiveEfforts.map((effort) => [
-              effort,
-              {
-                thinking: {
-                  type: "adaptive",
-                },
-                effort,
-              },
-            ]),
-          )
+          return anthropicAdaptiveThinkingVariants(adaptiveEfforts)
         }
-        return {
-          high: {
-            thinking: {
-              type: "enabled",
-              budgetTokens: 16000,
-            },
-          },
-          max: {
-            thinking: {
-              type: "enabled",
-              budgetTokens: 31999,
-            },
-          },
-        }
+        return anthropicFixedThinkingVariants()
       }
       if (model.id.includes("google")) {
         if (id.includes("2.5")) {
-          return {
-            high: {
-              thinkingConfig: {
-                includeThoughts: true,
-                thinkingBudget: 16000,
-              },
-            },
-            max: {
-              thinkingConfig: {
-                includeThoughts: true,
-                thinkingBudget: 24576,
-              },
-            },
-          }
+          return gemini25ThinkingVariants()
         }
         return Object.fromEntries(
           ["low", "high"].map((effort) => [
@@ -786,48 +798,12 @@ export function variants(model: Model): Record<string, Record<string, any>> {
     case "@jerome-benoit/sap-ai-provider-v2":
       if (model.api.id.includes("anthropic")) {
         if (adaptiveEfforts) {
-          return Object.fromEntries(
-            adaptiveEfforts.map((effort) => [
-              effort,
-              {
-                thinking: {
-                  type: "adaptive",
-                },
-                effort,
-              },
-            ]),
-          )
+          return anthropicAdaptiveThinkingVariants(adaptiveEfforts)
         }
-        return {
-          high: {
-            thinking: {
-              type: "enabled",
-              budgetTokens: 16000,
-            },
-          },
-          max: {
-            thinking: {
-              type: "enabled",
-              budgetTokens: 31999,
-            },
-          },
-        }
+        return anthropicFixedThinkingVariants()
       }
       if (model.api.id.includes("gemini") && id.includes("2.5")) {
-        return {
-          high: {
-            thinkingConfig: {
-              includeThoughts: true,
-              thinkingBudget: 16000,
-            },
-          },
-          max: {
-            thinkingConfig: {
-              includeThoughts: true,
-              thinkingBudget: 24576,
-            },
-          },
-        }
+        return gemini25ThinkingVariants()
       }
       if (model.api.id.includes("gpt") || /\bo[1-9]/.test(model.api.id)) {
         return Object.fromEntries(WIDELY_SUPPORTED_EFFORTS.map((effort) => [effort, { reasoningEffort: effort }]))

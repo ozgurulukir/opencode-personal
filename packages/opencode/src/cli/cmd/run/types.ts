@@ -84,6 +84,16 @@ export type FooterState = {
 // A partial update to FooterState. The footer merges this onto the current state.
 export type FooterPatch = Partial<FooterState>
 
+// Result of a model/variant select (or variant cycle) callback. Field presence
+// (not truthiness) is meaningful: "variants" in result distinguishes an
+// explicit `{ variants: undefined }` from an absent field.
+export type CycleResult = {
+  modelLabel?: string
+  status?: string
+  variant?: string | undefined
+  variants?: string[]
+}
+
 export type RunDiffStyle = "auto" | "stacked"
 
 export type ScrollbackOptions = {

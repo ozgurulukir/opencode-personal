@@ -14,6 +14,7 @@ import { errorMessage } from "../util/error"
 import { BusEvent } from "@/bus/bus-event"
 import { GlobalBus } from "@/bus/global"
 import { Git } from "@/git"
+import { gitRunner, type GitResult } from "../git/local-runner"
 import { Effect, Layer, Path, Schema, Scope, Context, Stream } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process"
 import { NodePath } from "@effect/platform-node"
@@ -153,8 +154,6 @@ export interface Interface {
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/Worktree") {}
 
-type GitResult = { code: number; text: string; stderr: string }
-
 export const layer: Layer.Layer<
   Service,
   never,
@@ -175,23 +174,11 @@ export const layer: Layer.Layer<
     const project = yield* Project.Service
     const store = yield* InstanceStore.Service
 
-    const git = Effect.fnUntraced(
-      function* (args: string[], opts?: { cwd?: string }) {
-        const handle = yield* spawner.spawn(
-          ChildProcess.make("git", args, { cwd: opts?.cwd, extendEnv: true, stdin: "ignore" }),
-        )
-        const [text, stderr] = yield* Effect.all(
-          [Stream.mkString(Stream.decodeText(handle.stdout)), Stream.mkString(Stream.decodeText(handle.stderr))],
-          { concurrency: 2 },
-        )
-        const code = yield* handle.exitCode
-        return { code, text, stderr } satisfies GitResult
-      },
-      Effect.scoped,
-      Effect.catch((e) =>
-        Effect.succeed({ code: 1, text: "", stderr: e instanceof Error ? e.message : String(e) } satisfies GitResult),
-      ),
-    )
+    const git = gitRunner(spawner, (e) => ({
+      code: 1,
+      text: "",
+      stderr: e instanceof Error ? e.message : String(e),
+    }))
 
     const MAX_NAME_ATTEMPTS = 26
     const candidate = Effect.fn("Worktree.candidate")(function* (root: string, base?: string) {
