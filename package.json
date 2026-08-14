@@ -95,15 +95,15 @@
     "@typescript/native-preview": "catalog:",
     "glob": "13.0.6",
     "husky": "9.1.7",
-    "oxlint": "1.73.0",
-    "oxlint-tsgolint": "0.24.0",
-    "prettier": "3.9.5",
+    "oxlint": "1.78.0",
+    "oxlint-tsgolint": "0.25.0",
+    "prettier": "3.9.6",
     "semver": "^7.8.5",
     "sst": "3.19.3",
-    "turbo": "2.10.4"
+    "turbo": "2.10.9"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "3.1085.0",
+    "@aws-sdk/client-s3": "3.1110.0",
     "@opencode-ai/plugin": "workspace:*",
     "@opencode-ai/script": "workspace:*",
     "@opencode-ai/sdk": "workspace:*",
