@@ -35,6 +35,7 @@ const it = testEffect(
     Truncate.defaultLayer,
     ToolRegistry.defaultLayer,
     Layer.succeed(SearchService, {
+      open: Effect.void,
       index: () => Effect.void,
       search: () => Effect.succeed([]),
       reset: Effect.void,
@@ -42,6 +43,7 @@ const it = testEffect(
     }),
     Layer.succeed(EmbeddingService, {
       embed: () => Effect.succeed([]),
+      resolve: Effect.void,
       dimension: 384,
     }),
   ),
@@ -622,9 +624,7 @@ describe("tool.task", () => {
         const promptOps = stubOps({ text: "should not reach" })
 
         // Permission ruleset that denies "dangerous-agent" subagent type
-        const permissionRuleset = [
-          { permission: "task", pattern: "dangerous-agent", action: "deny" as const },
-        ]
+        const permissionRuleset = [{ permission: "task", pattern: "dangerous-agent", action: "deny" as const }]
 
         const result = yield* def
           .execute(

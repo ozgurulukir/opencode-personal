@@ -33,6 +33,7 @@ const it = testEffect(
     Truncate.defaultLayer,
     ToolRegistry.defaultLayer,
     Layer.succeed(SearchService, {
+      open: Effect.void,
       index: () => Effect.void,
       search: () => Effect.succeed([]),
       reset: Effect.void,
@@ -40,94 +41,79 @@ const it = testEffect(
     }),
     Layer.succeed(EmbeddingService, {
       embed: () => Effect.succeed([]),
+      resolve: Effect.void,
       dimension: 384,
     }),
   ),
 )
 
 describe("prompt() permission overwrite bug", () => {
-  it.instance(
-    "setPermission merges with existing session permission instead of overwriting",
-    () =>
-      Effect.gen(function* () {
-        const sessions = yield* Session.Service
+  it.instance("setPermission merges with existing session permission instead of overwriting", () =>
+    Effect.gen(function* () {
+      const sessions = yield* Session.Service
 
-        // Create a session with parent denies (simulating subagent creation
-        // via subagentSessionPermission which adds edit: deny from plan mode)
-        const parentDenies: Permission.Ruleset = [
-          { permission: "edit", pattern: "*", action: "deny" },
-          { permission: "write", pattern: "*", action: "deny" },
-        ]
-        const chat = yield* sessions.create({
-          title: "Permission merge test",
-          permission: parentDenies,
-        })
+      // Create a session with parent denies (simulating subagent creation
+      // via subagentSessionPermission which adds edit: deny from plan mode)
+      const parentDenies: Permission.Ruleset = [
+        { permission: "edit", pattern: "*", action: "deny" },
+        { permission: "write", pattern: "*", action: "deny" },
+      ]
+      const chat = yield* sessions.create({
+        title: "Permission merge test",
+        permission: parentDenies,
+      })
 
-        // Simulate what prompt() does: compute tools-derived permissions
-        // and call setPermission. The bug is that it OVERWRITES instead of
-        // merging, destroying the parent denies.
-        const toolsDerived: Permission.Ruleset = [
-          { permission: "todowrite", pattern: "*", action: "deny" },
-          { permission: "task", pattern: "*", action: "deny" },
-        ]
+      // Simulate what prompt() does: compute tools-derived permissions
+      // and call setPermission. The bug is that it OVERWRITES instead of
+      // merging, destroying the parent denies.
+      const toolsDerived: Permission.Ruleset = [
+        { permission: "todowrite", pattern: "*", action: "deny" },
+        { permission: "task", pattern: "*", action: "deny" },
+      ]
 
-        // Simulate the FIXED prompt() behavior: merge tools-derived permissions
-        // with existing session permissions instead of overwriting.
-        const merged = Permission.merge(chat.permission ?? [], toolsDerived)
-        yield* sessions.setPermission({ sessionID: chat.id, permission: merged })
+      // Simulate the FIXED prompt() behavior: merge tools-derived permissions
+      // with existing session permissions instead of overwriting.
+      const merged = Permission.merge(chat.permission ?? [], toolsDerived)
+      yield* sessions.setPermission({ sessionID: chat.id, permission: merged })
 
-        // Reload the session from DB
-        const reloaded = yield* sessions.get(chat.id)
+      // Reload the session from DB
+      const reloaded = yield* sessions.get(chat.id)
 
-        // The parent denies (edit, write) should still be present after
-        // setPermission. If the bug exists, they will be gone.
-        const editDeny = reloaded.permission?.find(
-          (r) => r.permission === "edit" && r.action === "deny",
-        )
-        const writeDeny = reloaded.permission?.find(
-          (r) => r.permission === "write" && r.action === "deny",
-        )
+      // The parent denies (edit, write) should still be present after
+      // setPermission. If the bug exists, they will be gone.
+      const editDeny = reloaded.permission?.find((r) => r.permission === "edit" && r.action === "deny")
+      const writeDeny = reloaded.permission?.find((r) => r.permission === "write" && r.action === "deny")
 
-        // These assertions FAIL on the buggy code (overwrite) because
-        // parent denies are lost. They should PASS after the fix (merge).
-        expect(editDeny).toBeDefined()
-        expect(writeDeny).toBeDefined()
+      // These assertions FAIL on the buggy code (overwrite) because
+      // parent denies are lost. They should PASS after the fix (merge).
+      expect(editDeny).toBeDefined()
+      expect(writeDeny).toBeDefined()
 
-        // Tools-derived permissions should also be present
-        const todowriteDeny = reloaded.permission?.find(
-          (r) => r.permission === "todowrite" && r.action === "deny",
-        )
-        const taskDeny = reloaded.permission?.find(
-          (r) => r.permission === "task" && r.action === "deny",
-        )
-        expect(todowriteDeny).toBeDefined()
-        expect(taskDeny).toBeDefined()
-      }),
+      // Tools-derived permissions should also be present
+      const todowriteDeny = reloaded.permission?.find((r) => r.permission === "todowrite" && r.action === "deny")
+      const taskDeny = reloaded.permission?.find((r) => r.permission === "task" && r.action === "deny")
+      expect(todowriteDeny).toBeDefined()
+      expect(taskDeny).toBeDefined()
+    }),
   )
 
-  it.instance(
-    "setPermission with empty tools-derived list does not affect existing permissions",
-    () =>
-      Effect.gen(function* () {
-        const sessions = yield* Session.Service
+  it.instance("setPermission with empty tools-derived list does not affect existing permissions", () =>
+    Effect.gen(function* () {
+      const sessions = yield* Session.Service
 
-        const parentDenies: Permission.Ruleset = [
-          { permission: "edit", pattern: "*", action: "deny" },
-        ]
-        const chat = yield* sessions.create({
-          title: "Empty tools test",
-          permission: parentDenies,
-        })
+      const parentDenies: Permission.Ruleset = [{ permission: "edit", pattern: "*", action: "deny" }]
+      const chat = yield* sessions.create({
+        title: "Empty tools test",
+        permission: parentDenies,
+      })
 
-        // Simulate prompt() with no tools (empty permissions list)
-        // The buggy code skips the setPermission call entirely when
-        // permissions.length === 0, so this is already correct.
-        // This test just verifies the baseline.
-        const reloaded = yield* sessions.get(chat.id)
-        const editDeny = reloaded.permission?.find(
-          (r) => r.permission === "edit" && r.action === "deny",
-        )
-        expect(editDeny).toBeDefined()
-      }),
+      // Simulate prompt() with no tools (empty permissions list)
+      // The buggy code skips the setPermission call entirely when
+      // permissions.length === 0, so this is already correct.
+      // This test just verifies the baseline.
+      const reloaded = yield* sessions.get(chat.id)
+      const editDeny = reloaded.permission?.find((r) => r.permission === "edit" && r.action === "deny")
+      expect(editDeny).toBeDefined()
+    }),
   )
 })

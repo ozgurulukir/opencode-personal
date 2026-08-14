@@ -12,8 +12,10 @@ mock.module("onnxruntime-web", () => {
   }
   return {
     InferenceSession,
-    Tensor: class { constructor() {} },
-    env: { wasm: {} }
+    Tensor: class {
+      constructor() {}
+    },
+    env: { wasm: {} },
   }
 })
 
@@ -22,7 +24,16 @@ afterAll(() => mock.restore())
 
 import { describe, expect, test } from "bun:test"
 import { Effect, Layer } from "effect"
-import { Skill } from "../../src/skill"
+import * as os from "node:os"
+import { Skill, type Interface } from "../../src/skill"
+import { Discovery } from "../../src/skill/discovery"
+import { Config } from "@/config/config"
+import { Bus } from "@/bus"
+import { Global } from "@opencode-ai/core/global"
+import { AppFileSystem } from "@opencode-ai/core/filesystem"
+import { Hash } from "@opencode-ai/core/util/hash"
+import { EmbeddingService } from "@/search/embedding"
+import { manifestPathFor } from "@/search/manifest"
 import { CrossSpawnSpawner } from "@opencode-ai/core/cross-spawn-spawner"
 import { provideInstance, provideTmpdirInstance, tmpdir } from "../fixture/fixture"
 import { testEffect } from "../lib/effect"
@@ -872,4 +883,108 @@ description: Any skill.
       { git: true },
     ),
   )
+})
+
+describe("skill semantic index resilience", () => {
+  // Regression (H3+H4): a failing embedder must not kill skill loading or the
+  // system-prompt build, and the manifest must only record successful indexing —
+  // stale hashes are retried on the next session's state init.
+  test("embedding failure degrades, keeps manifest retryable, and retries next session", async () => {
+    let embedCalls = 0
+    let embedFails = false
+    const embedderLayer = Layer.succeed(EmbeddingService, {
+      embed: (texts: string[]) =>
+        embedFails
+          ? Effect.fail(new Error("embedder unavailable (test)"))
+          : Effect.sync(() => {
+              embedCalls += texts.length
+              return texts.map(() => Array(4).fill(0.25))
+            }),
+      resolve: Effect.void,
+      dimension: 4,
+    })
+
+    // A fresh layer value per runtime: Effect memoizes layer builds by reference,
+    // so reusing one value would share the InstanceState cache across sessions and
+    // never re-run the state init this test needs to observe.
+    const makeSkillLayer = () =>
+      Skill.layer.pipe(
+        Layer.provide(Discovery.defaultLayer),
+        Layer.provide(Config.defaultLayer),
+        Layer.provide(Bus.layer),
+        Layer.provide(AppFileSystem.defaultLayer),
+        Layer.provide(Global.layer),
+        Layer.provide(embedderLayer),
+      )
+
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "opencode-skill-h34-"))
+    const indexPath = path.join(Global.Path.cache, "zvec", "skills", Hash.fast(dir))
+    const manifestPath = manifestPathFor(indexPath)
+
+    // Assertions must run inside the provided effect: InstanceState-backed methods
+    // (all/matchBySemantics/state init) read the instance context lazily.
+    const runSkill = <A>(use: (skill: Interface) => Effect.Effect<A>) =>
+      Effect.gen(function* () {
+        const skill = yield* Skill.Service
+        return yield* use(skill)
+      }).pipe(Effect.provide(makeSkillLayer()), Effect.provide(node), provideInstance(dir), Effect.runPromise)
+
+    const readManifest = async () => JSON.parse(await fs.readFile(manifestPath, "utf8"))
+
+    try {
+      await Bun.write(
+        path.join(dir, ".opencode", "skill", "s1", "SKILL.md"),
+        `---
+name: s1
+description: Skill one.
+---
+
+# S1
+
+body
+`,
+      )
+
+      const agent = {
+        name: "build",
+        description: "Default agent",
+        mode: "primary" as const,
+        permission: [],
+        options: {},
+      }
+
+      // Runtime 1: embedding fails — skills must still load, semantic matching
+      // degrades to [], and the manifest must NOT record the skill as indexed.
+      embedFails = true
+      const r1 = await runSkill((skill) =>
+        Effect.gen(function* () {
+          return {
+            list: yield* skill.all(),
+            matched: yield* skill.matchBySemantics("query", agent, { count: 3, threshold: 0 }),
+          }
+        }),
+      )
+      expect(r1.list).toHaveLength(1)
+      expect(r1.matched).toEqual([])
+      expect((await readManifest()).skills).toEqual({})
+
+      // Runtime 2: embedder recovers — the unrecorded hash makes it retry, and the
+      // manifest now records the skill.
+      embedFails = false
+      embedCalls = 0
+      // Calling all() forces the lazy state init (embedding + manifest update).
+      await runSkill((skill) => skill.all())
+      expect(embedCalls).toBeGreaterThanOrEqual(1)
+      expect((await readManifest()).skills["s1"]).toBeDefined()
+
+      // Runtime 3: hashes match — nothing re-embedded.
+      embedCalls = 0
+      await runSkill((skill) => skill.all())
+      expect(embedCalls).toBe(0)
+    } finally {
+      await fs.rm(indexPath, { recursive: true, force: true }).catch(() => {})
+      await fs.rm(manifestPath, { force: true }).catch(() => {})
+      await fs.rm(dir, { recursive: true, force: true }).catch(() => {})
+    }
+  })
 })

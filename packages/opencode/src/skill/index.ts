@@ -21,6 +21,7 @@ import { Hash } from "@opencode-ai/core/util/hash"
 import * as Log from "@opencode-ai/core/util/log"
 import { Discovery } from "./discovery"
 import { EmbeddingService, defaultLayer as embeddingDefaultLayer } from "@/search/embedding"
+import { manifestPathFor } from "@/search/manifest"
 import { ZvecIndex } from "@/search/zvec"
 import CUSTOMIZE_OPENCODE_SKILL_BODY from "./prompt/customize-opencode.md" with { type: "text" }
 
@@ -159,27 +160,17 @@ const add = Effect.fnUntraced(function* (state: State, match: string, bus: Bus.I
   const folderName = path.basename(path.dirname(match))
 
   const FRONTMATTER_SCHEMA = z.object({
-    name: z
-      .string()
-      .min(1, "name must not be empty")
-      .max(64, "name must be ≤64 characters"),
-    description: z
-      .string()
-      .max(1024, "description must be ≤1024 characters")
-      .optional(),
+    name: z.string().min(1, "name must not be empty").max(64, "name must be ≤64 characters"),
+    description: z.string().max(1024, "description must be ≤1024 characters").optional(),
     license: z.string().optional(),
-    compatibility: z
-      .string()
-      .max(500, "compatibility must be ≤500 characters")
-      .optional(),
+    compatibility: z.string().max(500, "compatibility must be ≤500 characters").optional(),
     metadata: z.record(z.string(), z.string()).optional(),
     "allowed-tools": z.string().optional(),
   })
 
   const parsed = FRONTMATTER_SCHEMA.safeParse(md.data)
   const warnings: string[] = []
-  const rawName =
-    typeof md.data?.name === "string" && md.data.name.length > 0 ? md.data.name : folderName
+  const rawName = typeof md.data?.name === "string" && md.data.name.length > 0 ? md.data.name : folderName
 
   if (!parsed.success) {
     const issues = parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")
@@ -368,9 +359,11 @@ export const layer = Layer.effect(
       Effect.fn("Skill.zvecIndex")(function* () {
         const directory = yield* InstanceState.directory
         const dirHash = Hash.fast(directory)
-        const indexPath = path.join(Global.Path.cache, "zvec", "skills", dirHash)
-        yield* fsys.ensureDir(path.join(Global.Path.cache, "zvec", "skills")).pipe(Effect.catch(() => Effect.void))
-        return new ZvecIndex(indexPath)
+        const indexPath = path.join(global.cache, "zvec", "skills", dirHash)
+        yield* fsys.ensureDir(path.join(global.cache, "zvec", "skills")).pipe(Effect.catch(() => Effect.void))
+        const index = new ZvecIndex(indexPath, () => embedder.dimension, fsys)
+        yield* Effect.addFinalizer(() => index.close())
+        return index
       }),
     )
 
@@ -378,7 +371,7 @@ export const layer = Layer.effect(
       Effect.fn("Skill.state")(function* () {
         const directory = yield* InstanceState.directory
         const dirHash = Hash.fast(directory)
-        const manifestPath = path.join(Global.Path.cache, "zvec", "skills", `${dirHash}_manifest.json`)
+        const manifestPath = manifestPathFor(path.join(global.cache, "zvec", "skills", dirHash))
 
         const s: State = {
           skills: {},
@@ -387,12 +380,38 @@ export const layer = Layer.effect(
           manifest: { version: 1, skills: {} },
         }
 
+        // Open the zvec index BEFORE reading the manifest: a dimension migration
+        // inside open() wipes the manifest, so a copy read before open() would
+        // resurrect stale entries. The embedder config must resolve first — opening
+        // with the pre-config default dimension could destroy a valid collection via
+        // a bogus migration. Any failure only disables the semantic index: skills
+        // still load and the manifest is retried next session.
+        const zi = yield* InstanceState.get(zvecIndex)
+        const resolved = yield* embedder.resolve.pipe(
+          Effect.as(true),
+          Effect.catch((e) => {
+            log.warn("skill: embedding config resolve failed, semantic skill indexing disabled", {
+              error: e instanceof Error ? e.message : String(e),
+            })
+            return Effect.succeed(false)
+          }),
+        )
+        const indexOpen = resolved
+          ? yield* zi.open().pipe(
+              Effect.as(true),
+              Effect.catch((e) => {
+                log.warn("skill: zvec open failed, semantic skill indexing disabled", {
+                  error: e instanceof Error ? e.message : String(e),
+                })
+                return Effect.succeed(false)
+              }),
+            )
+          : false
+
         // Load persisted manifest
         const manifestExists = yield* fsys.existsSafe(manifestPath)
         if (manifestExists) {
-          const raw = yield* fsys.readJson(manifestPath).pipe(
-            Effect.catch(() => Effect.succeed(undefined)),
-          )
+          const raw = yield* fsys.readJson(manifestPath).pipe(Effect.catch(() => Effect.succeed(undefined)))
           if (raw && typeof raw === "object" && (raw as any).version === 1 && (raw as any).skills) {
             s.manifest = raw as any
           }
@@ -411,7 +430,6 @@ export const layer = Layer.effect(
         yield* loadSkills(s, yield* InstanceState.get(discovered), bus)
 
         // Incremental indexing: find changed/new skills, embed, upsert to zvec
-        const zi = yield* InstanceState.get(zvecIndex)
         const toIndex: Array<{ id: string; path: string; content: string; embedding: number[]; mtime: number }> = []
         const toDelete: string[] = []
         const currentNames = new Set(Object.keys(s.skills))
@@ -438,29 +456,62 @@ export const layer = Layer.effect(
           }
         }
 
-        // Delete removed skills from zvec
-        if (toDelete.length > 0) {
-          yield* zi.delete(toDelete).pipe(Effect.catch(() => Effect.void))
-        }
+        // When the index never opened, deletes were not attempted either — keep the
+        // manifest entries so they are retried once the index is available again.
+        let deleteOk = indexOpen
+        if (indexOpen) {
+          // Manifest entries are dropped only after the docs actually left the index —
+          // otherwise a failed delete would leave orphaned docs with no way to retry.
+          if (toDelete.length > 0) {
+            deleteOk = yield* zi.delete(toDelete).pipe(
+              Effect.as(true),
+              Effect.catch((e) => {
+                log.warn("skill: zvec delete failed, keeping manifest entries for retry", {
+                  error: e instanceof Error ? e.message : String(e),
+                })
+                return Effect.succeed(false)
+              }),
+            )
+          }
 
-        // Embed and index new/changed skills
-        if (toIndex.length > 0) {
-          const contents = toIndex.map((c) => c.content)
-          const vectors = yield* embedder.embed(contents).pipe(Effect.orDie)
-          const enriched = toIndex.map((c, i) => ({ ...c, embedding: vectors[i] }))
-          yield* zi.index(enriched).pipe(Effect.catch(() => Effect.void))
-
-          // Update manifest
-          for (const c of toIndex) {
-            const name = c.id.slice("skill:".length)
-            s.manifest.skills[name] = { contentHash: skillContentHash(s.skills[name]) }
+          // Embed and index new/changed skills. Failures skip the manifest update so
+          // stale hashes make the next session retry them.
+          if (toIndex.length > 0) {
+            const contents = toIndex.map((c) => c.content)
+            const vectors = yield* embedder.embed(contents).pipe(
+              Effect.catch((e) => {
+                log.warn("skill: embedding failed, skipping semantic index update", {
+                  error: e instanceof Error ? e.message : String(e),
+                })
+                return Effect.succeed(undefined)
+              }),
+            )
+            if (vectors) {
+              const enriched = toIndex.map((c, i) => ({ ...c, embedding: vectors[i] }))
+              const indexed = yield* zi.index(enriched).pipe(
+                Effect.as(true),
+                Effect.catch((e) => {
+                  log.warn("skill: zvec index failed, keeping manifest hashes for retry", {
+                    error: e instanceof Error ? e.message : String(e),
+                  })
+                  return Effect.succeed(false)
+                }),
+              )
+              if (indexed) {
+                for (const c of toIndex) {
+                  const name = c.id.slice("skill:".length)
+                  s.manifest.skills[name] = { contentHash: skillContentHash(s.skills[name]) }
+                }
+              }
+            }
           }
         }
 
-        // Remove deleted from manifest
+        // The Unloaded event reports registry state (the skill is gone from disk),
+        // so it fires regardless of whether its zvec docs were deleted.
         for (const id of toDelete) {
           const name = id.slice("skill:".length)
-          delete s.manifest.skills[name]
+          if (deleteOk) delete s.manifest.skills[name]
           yield* bus.publish(Event.Unloaded, { name, location: s.skills[name]?.location ?? "" })
         }
 
@@ -512,10 +563,24 @@ export const layer = Layer.effect(
       const s = yield* InstanceState.get(state)
       const zi = yield* InstanceState.get(zvecIndex)
 
-      const [queryVec] = yield* embedder.embed([userMessage]).pipe(Effect.orDie)
-      const results = yield* zi.search(userMessage, queryVec, opts.count * 2).pipe(
-        Effect.catch(() => Effect.succeed([] as Array<{ id: string; score: number; path: string; content: string }>)),
+      // Semantic matching is optional: an embedding failure must not kill the
+      // system-prompt build — degrade to no matches this turn.
+      const embedded = yield* embedder.embed([userMessage]).pipe(
+        Effect.catch((e) => {
+          log.warn("skill: embedding failed, skipping semantic skill matching", {
+            error: e instanceof Error ? e.message : String(e),
+          })
+          return Effect.succeed(undefined)
+        }),
       )
+      const queryVec = embedded?.[0]
+      if (!queryVec) return []
+
+      const results = yield* zi
+        .search(userMessage, queryVec, opts.count * 2)
+        .pipe(
+          Effect.catch(() => Effect.succeed([] as Array<{ id: string; score: number; path: string; content: string }>)),
+        )
 
       // Filter by loadedSkills, permission, and threshold
       const matched: Info[] = []
@@ -563,10 +628,7 @@ export function fmt(list: Info[], opts: { verbose: boolean }) {
     ].join("\n")
   }
 
-  return [
-    "## Available Skills",
-    ...list.map((skill) => `- **${skill.name}**: ${skill.description}`),
-  ].join("\n")
+  return ["## Available Skills", ...list.map((skill) => `- **${skill.name}**: ${skill.description}`)].join("\n")
 }
 
 export * as Skill from "."

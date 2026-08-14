@@ -35,6 +35,7 @@ const it = testEffect(
     ToolRegistry.defaultLayer,
     node,
     Layer.succeed(SearchService, {
+      open: Effect.void,
       index: () => Effect.void,
       search: () => Effect.succeed([]),
       reset: Effect.void,
@@ -42,6 +43,7 @@ const it = testEffect(
     }),
     Layer.succeed(EmbeddingService, {
       embed: () => Effect.succeed([]),
+      resolve: Effect.void,
       dimension: 384,
     }),
   ),
@@ -180,9 +182,7 @@ description: Skill with many files.
           )
           yield* Effect.promise(() =>
             Promise.all(
-              Array.from({ length: 15 }, (_, i) =>
-                Bun.write(path.join(skill, `file-${i}.txt`), `content ${i}`),
-              ),
+              Array.from({ length: 15 }, (_, i) => Bun.write(path.join(skill, `file-${i}.txt`), `content ${i}`)),
             ),
           )
 
