@@ -449,7 +449,15 @@ export function RunCommandMenuBody(props: {
   }
 
   return (
-    <PanelBody id="command" title="Commands" countVisible={false} theme={props.theme} entries={entries} onPick={pick} onClose={props.onClose} />
+    <PanelBody
+      id="command"
+      title="Commands"
+      countVisible={false}
+      theme={props.theme}
+      entries={entries}
+      onPick={pick}
+      onClose={props.onClose}
+    />
   )
 }
 
