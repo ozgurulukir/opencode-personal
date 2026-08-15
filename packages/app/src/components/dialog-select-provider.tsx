@@ -5,7 +5,6 @@ import { Dialog } from "@opencode-ai/ui/dialog"
 import { List } from "@opencode-ai/ui/list"
 import { Tag } from "@opencode-ai/ui/tag"
 import { ProviderIcon } from "@opencode-ai/ui/provider-icon"
-import { DialogConnectProvider } from "./dialog-connect-provider"
 import { useLanguage } from "@/context/language"
 import { DialogCustomProvider } from "./dialog-custom-provider"
 
@@ -58,7 +57,9 @@ export const DialogSelectProvider: Component = () => {
             dialog.show(() => <DialogCustomProvider back="providers" />)
             return
           }
-          dialog.show(() => <DialogConnectProvider provider={x.id} />)
+          void import("./dialog-connect-provider").then((m) => {
+            dialog.show(() => <m.DialogConnectProvider provider={x.id} />)
+          })
         }}
       >
         {(i) => (
