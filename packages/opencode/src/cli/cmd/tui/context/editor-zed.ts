@@ -1,3 +1,4 @@
+import { Log } from "@opencode-ai/core/util/log"
 import { Database } from "bun:sqlite"
 import os from "node:os"
 import path from "node:path"
@@ -122,7 +123,7 @@ function queryZedActiveEditor(dbPath: string, cwd: string) {
     if (!isZedActiveEditorRow(row)) return { type: "empty" as const }
     return { type: "row" as const, row }
   } catch (err) {
-    console.error("[editor-zed] resolveZedEditorRow failed:", err)
+    Log.Default.error("[editor-zed] resolveZedEditorRow failed:", { err })
     return { type: "unavailable" as const }
   } finally {
     db?.close()
@@ -151,7 +152,7 @@ function queryZedEditorSelections(dbPath: string, row: ZedActiveEditorRow) {
     if (raw.length > 0 && selections.length === 0) return { type: "unavailable" as const }
     return { type: "selections" as const, selections }
   } catch (err) {
-    console.error("[editor-zed] queryZedEditorSelections failed:", err)
+    Log.Default.error("[editor-zed] queryZedEditorSelections failed:", { err })
     return { type: "unavailable" as const }
   } finally {
     db?.close()
@@ -174,7 +175,7 @@ function queryZedEditorContents(dbPath: string, row: ZedActiveEditorRow) {
     if (!parsed.success) return { type: "unavailable" as const }
     return { type: "contents" as const, contents: parsed.data.contents }
   } catch (err) {
-    console.error("[editor-zed] queryZedEditorContents failed:", err)
+    Log.Default.error("[editor-zed] queryZedEditorContents failed:", { err })
     return { type: "unavailable" as const }
   } finally {
     db?.close()
@@ -199,7 +200,7 @@ function isFile(item: string) {
   try {
     return Filesystem.stat(item)?.isFile() === true
   } catch (err) {
-    console.error("[editor-zed] isFile stat failed:", err)
+    Log.Default.error("[editor-zed] isFile stat failed:", { err })
     return false
   }
 }
@@ -279,7 +280,7 @@ function parseJson(value: string) {
   try {
     return JSON.parse(value) as unknown
   } catch (err) {
-    console.error("[editor-zed] parseJson failed:", err)
+    Log.Default.error("[editor-zed] parseJson failed:", { err })
     return
   }
 }
