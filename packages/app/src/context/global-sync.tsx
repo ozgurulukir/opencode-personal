@@ -87,7 +87,7 @@ function createGlobalSync() {
 
   const [globalStore, setGlobalStore] = createStore<GlobalStore>({
     get ready() {
-      return bootstrap.isPending
+      return !bootstrap.isPending
     },
     project: [],
     session_todo: {},

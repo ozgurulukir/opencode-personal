@@ -7,7 +7,7 @@ import { useSpring } from "@opencode-ai/ui/motion-spring"
 import { TextReveal } from "@opencode-ai/ui/text-reveal"
 import { TextStrikethrough } from "@opencode-ai/ui/text-strikethrough"
 import { createResizeObserver } from "@solid-primitives/resize-observer"
-import { Index, createEffect, createMemo } from "solid-js"
+import { Index, createMemo } from "solid-js"
 import { createStore } from "solid-js/store"
 import { useLanguage } from "@/context/language"
 
@@ -101,15 +101,12 @@ export function SessionTodoDock(props: {
   const full = createMemo(() => Math.max(78, store.height))
   let contentRef: HTMLDivElement | undefined
 
-  createEffect(() => {
-    const el = contentRef
-    if (!el) return
-    const update = () => {
-      setStore("height", el.getBoundingClientRect().height)
-    }
-    update()
-    createResizeObserver(el, update)
-  })
+  createResizeObserver(
+    () => contentRef,
+    (entry) => {
+      setStore("height", entry.height)
+    },
+  )
 
   return (
     <DockTray

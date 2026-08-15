@@ -178,8 +178,10 @@ export const SessionQuestionDock: Component<{ request: QuestionRequest; onSubmit
     makeEventListener(window, "resize", update)
 
     const dock = root?.closest('[data-component="session-prompt-dock"]')
-    const scroller = document.querySelector(".scroll-view__viewport")
-    createResizeObserver([dock, scroller], update)
+    const scroller =
+      root?.closest('[data-component="session-view"]')?.querySelector(".scroll-view__viewport") ??
+      document.querySelector(".scroll-view__viewport")
+    createResizeObserver([dock, scroller].filter(Boolean) as Element[], update)
 
     onCleanup(() => {
       if (raf !== undefined) cancelAnimationFrame(raf)
