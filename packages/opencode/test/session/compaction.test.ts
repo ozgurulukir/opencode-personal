@@ -478,7 +478,7 @@ describe("session.compaction.isOverflow", () => {
   // Open PRs: #6875, #12924
 
   it.live(
-    "BUG: no headroom when limit.input is set — compaction should trigger near boundary but does not",
+    "reserves headroom when limit.input is set — compaction triggers near boundary",
     provideTmpdirInstance(() =>
       Effect.gen(function* () {
         const compact = yield* SessionCompaction.Service
@@ -487,14 +487,11 @@ describe("session.compaction.isOverflow", () => {
 
         // We've used 198K tokens total. Only 2K under the input limit.
         // On the next turn, the full conversation (198K) becomes input,
-        // plus the model needs room to generate output — this WILL overflow.
+        // plus the model needs room to generate output.
         const tokens = { input: 180_000, output: 15_000, reasoning: 0, cache: { read: 3_000, write: 0 } }
         // count = 180K + 3K + 15K = 198K
-        // usable = limit.input = 200K (no output subtracted!)
-        // 198K > 200K = false → no compaction triggered
-
-        // WITHOUT limit.input: usable = 200K - 32K = 168K, and 198K > 168K = true ✓
-        // WITH limit.input: usable = 200K, and 198K > 200K = false ✗
+        // usable = limit.input - output limit = 200K - 32K = 168K
+        // 198K > 168K = true → compaction correctly triggered
 
         // With 198K used and only 2K headroom, the next turn will overflow.
         // Compaction MUST trigger here.
@@ -504,7 +501,7 @@ describe("session.compaction.isOverflow", () => {
   )
 
   it.live(
-    "BUG: without limit.input, same token count correctly triggers compaction",
+    "without limit.input, same token count correctly triggers compaction",
     provideTmpdirInstance(() =>
       Effect.gen(function* () {
         const compact = yield* SessionCompaction.Service
@@ -524,7 +521,7 @@ describe("session.compaction.isOverflow", () => {
   )
 
   it.live(
-    "BUG: asymmetry — limit.input model allows 30K more usage before compaction than equivalent model without it",
+    "symmetry — limit.input model triggers compaction identically to equivalent model without it",
     provideTmpdirInstance(() =>
       Effect.gen(function* () {
         const compact = yield* SessionCompaction.Service
