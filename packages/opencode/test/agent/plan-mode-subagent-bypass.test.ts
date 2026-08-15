@@ -133,8 +133,7 @@ test("[#26514] custom user subagent launched from plan mode bypasses Plan Mode r
       })
       const effective = Permission.merge(my!.permission, subagentSessionPermission)
 
-      // BUG: on origin/dev edit resolves to "allow" because the plan
-      // agent's `edit: deny *` rule never reaches the subagent.
+      // The plan agent's `edit: deny *` rule reaches the subagent and correctly resolves to deny.
       expect(Permission.evaluate("edit", "/some/file.ts", effective).action).toBe("deny")
     },
   })
