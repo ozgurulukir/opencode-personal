@@ -74,6 +74,24 @@ const list = () =>
     return yield* permission.list()
   })
 
+const listApproved = () =>
+  Effect.gen(function* () {
+    const permission = yield* Permission.Service
+    return yield* permission.listApproved()
+  })
+
+const removeApproved = (input: Parameters<Permission.Interface["removeApproved"]>[0]) =>
+  Effect.gen(function* () {
+    const permission = yield* Permission.Service
+    return yield* permission.removeApproved(input)
+  })
+
+const clearApproved = () =>
+  Effect.gen(function* () {
+    const permission = yield* Permission.Service
+    return yield* permission.clearApproved()
+  })
+
 function withDir(options: { git?: boolean } | undefined, self: (dir: string) => Effect.Effect<any, any, any>) {
   return provideTmpdirInstance(self, options)
 }
@@ -1391,6 +1409,134 @@ it.live("ask - long timeout override waits instead of timing out early", () =>
       expect(yield* list()).toHaveLength(1)
       yield* rejectAll()
       yield* Fiber.await(fiber)
+    }),
+  ),
+)
+
+test("dedupe - eliminates duplicate rules preserving last match", () => {
+  const rules = [
+    { permission: "bash", pattern: "ls", action: "allow" as const },
+    { permission: "read", pattern: "file.txt", action: "allow" as const },
+    { permission: "bash", pattern: "ls", action: "allow" as const },
+  ]
+  const result = Permission.dedupe(rules)
+  expect(result).toHaveLength(2)
+  expect(result).toEqual([
+    { permission: "read", pattern: "file.txt", action: "allow" },
+    { permission: "bash", pattern: "ls", action: "allow" },
+  ])
+})
+
+test("fromConfig - expand handles ~/ and $HOME without corrupting variables", () => {
+  const home = os.homedir()
+  const result = Permission.fromConfig({
+    read: {
+      "~/foo": "allow",
+      "$HOME/bar": "allow",
+      "$HOME_DIR/baz": "allow",
+    },
+  })
+  expect(result).toContainEqual({ permission: "read", pattern: `${home}/foo`, action: "allow" })
+  expect(result).toContainEqual({ permission: "read", pattern: `${home}/bar`, action: "allow" })
+  expect(result).toContainEqual({ permission: "read", pattern: "$HOME_DIR/baz", action: "allow" })
+})
+
+it.live("ask - empty patterns array is normalized to catch-all and enforces deny rule", () =>
+  withDir({ git: true }, () =>
+    Effect.gen(function* () {
+      const err = yield* fail(
+        ask({
+          id: PermissionID.make("per_empty_patterns_deny"),
+          sessionID: SessionID.make("session_test"),
+          permission: "bash",
+          patterns: [],
+          metadata: {},
+          always: [],
+          ruleset: [{ permission: "bash", pattern: "*", action: "deny" }],
+        }),
+      )
+      expect(err).toBeInstanceOf(Permission.DeniedError)
+    }),
+  ),
+)
+
+it.live("reply - deduplicates approved rules on always reply", () =>
+  withDir({ git: true }, () =>
+    Effect.gen(function* () {
+      const fiber = yield* ask({
+        id: PermissionID.make("per_dup_1"),
+        sessionID: SessionID.make("session_test"),
+        permission: "bash",
+        patterns: ["unique-dup-cmd"],
+        metadata: {},
+        always: ["unique-dup-cmd", "unique-dup-cmd"],
+        ruleset: [],
+      }).pipe(Effect.forkScoped)
+      yield* waitForPending(1)
+      yield* reply({ requestID: PermissionID.make("per_dup_1"), reply: "always" })
+      yield* Fiber.await(fiber)
+
+      const approved = yield* listApproved()
+      expect(approved).toHaveLength(1)
+      expect(approved).toEqual([{ permission: "bash", pattern: "unique-dup-cmd", action: "allow" }])
+    }),
+  ),
+)
+
+it.live("removeApproved & clearApproved - removes rules and persists across reload", () =>
+  withDir({ git: true }, (dir) =>
+    Effect.gen(function* () {
+      const fiber1 = yield* ask({
+        id: PermissionID.make("per_crud_1"),
+        sessionID: SessionID.make("session_test"),
+        permission: "bash",
+        patterns: ["unique-crud-cmd-1"],
+        metadata: {},
+        always: ["unique-crud-cmd-1"],
+        ruleset: [],
+      }).pipe(Effect.forkScoped)
+      yield* waitForPending(1)
+      yield* reply({ requestID: PermissionID.make("per_crud_1"), reply: "always" })
+      yield* Fiber.await(fiber1)
+
+      const fiber2 = yield* ask({
+        id: PermissionID.make("per_crud_2"),
+        sessionID: SessionID.make("session_test"),
+        permission: "edit",
+        patterns: ["unique-crud-cmd-2"],
+        metadata: {},
+        always: ["unique-crud-cmd-2"],
+        ruleset: [],
+      }).pipe(Effect.forkScoped)
+      yield* waitForPending(1)
+      yield* reply({ requestID: PermissionID.make("per_crud_2"), reply: "always" })
+      yield* Fiber.await(fiber2)
+
+      const before = yield* listApproved()
+      expect(before).toHaveLength(2)
+
+      // Remove single rule
+      const removed = yield* removeApproved({ permission: "bash", pattern: "unique-crud-cmd-1" })
+      expect(removed).toBe(true)
+
+      const afterRemove = yield* listApproved()
+      expect(afterRemove).toHaveLength(1)
+      expect(afterRemove[0]).toEqual({ permission: "edit", pattern: "unique-crud-cmd-2", action: "allow" })
+
+      // Reload instance to verify persistence in SQLite
+      yield* Effect.promise(() => reloadTestInstance({ directory: dir }))
+      const afterReload = yield* listApproved()
+      expect(afterReload).toHaveLength(1)
+      expect(afterReload[0]).toEqual({ permission: "edit", pattern: "unique-crud-cmd-2", action: "allow" })
+
+      // Clear all approved rules
+      const cleared = yield* clearApproved()
+      expect(cleared).toBe(true)
+      expect(yield* listApproved()).toHaveLength(0)
+
+      // Reload instance again and verify still empty
+      yield* Effect.promise(() => reloadTestInstance({ directory: dir }))
+      expect(yield* listApproved()).toHaveLength(0)
     }),
   ),
 )

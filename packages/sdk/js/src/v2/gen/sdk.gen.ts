@@ -89,7 +89,11 @@ import type {
   PartUpdateErrors,
   PartUpdateResponses,
   PathGetResponses,
+  PermissionClearApprovedResponses,
+  PermissionListApprovedResponses,
   PermissionListResponses,
+  PermissionRemoveApprovedErrors,
+  PermissionRemoveApprovedResponses,
   PermissionReplyErrors,
   PermissionReplyResponses,
   PermissionRespondErrors,
@@ -2759,6 +2763,109 @@ export class Permission extends HeyApiClient {
         ...options?.headers,
         ...params.headers,
       },
+    })
+  }
+
+  /**
+   * List approved permissions
+   *
+   * Get all persisted always-allow permission rules for this project.
+   */
+  public listApproved<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ): RequestResult<PermissionListApprovedResponses, unknown, ThrowOnError> {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<PermissionListApprovedResponses, unknown, ThrowOnError>({
+      url: "/permission/approved",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Revoke approved permission
+   *
+   * Revoke a specific always-allowed permission rule or all rules for a permission key.
+   */
+  public removeApproved<ThrowOnError extends boolean = false>(
+    parameters: {
+      directory?: string
+      workspace?: string
+      permission: string
+      pattern?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ): RequestResult<PermissionRemoveApprovedResponses, PermissionRemoveApprovedErrors, ThrowOnError> {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "permission" },
+            { in: "body", key: "pattern" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      PermissionRemoveApprovedResponses,
+      PermissionRemoveApprovedErrors,
+      ThrowOnError
+    >({
+      url: "/permission/approved/remove",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Clear all approved permissions
+   *
+   * Clear all persisted always-allow permission rules for this project.
+   */
+  public clearApproved<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ): RequestResult<PermissionClearApprovedResponses, unknown, ThrowOnError> {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<PermissionClearApprovedResponses, unknown, ThrowOnError>({
+      url: "/permission/approved/clear",
+      ...options,
+      ...params,
     })
   }
 

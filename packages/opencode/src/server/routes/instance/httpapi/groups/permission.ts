@@ -40,6 +40,41 @@ export const PermissionApi = HttpApi.make("permission")
             description: "Approve or deny a permission request from the AI assistant.",
           }),
         ),
+        HttpApiEndpoint.get("listApproved", `${root}/approved`, {
+          query: WorkspaceRoutingQuery,
+          success: described(Schema.Array(Permission.Rule), "List of approved permissions"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "permission.listApproved",
+            summary: "List approved permissions",
+            description: "Get all persisted always-allow permission rules for this project.",
+          }),
+        ),
+        HttpApiEndpoint.post("removeApproved", `${root}/approved/remove`, {
+          query: WorkspaceRoutingQuery,
+          payload: Schema.Struct({
+            permission: Schema.String,
+            pattern: Schema.optional(Schema.String),
+          }),
+          success: described(Schema.Boolean, "Approved permission rule removed successfully"),
+          error: HttpApiError.BadRequest,
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "permission.removeApproved",
+            summary: "Revoke approved permission",
+            description: "Revoke a specific always-allowed permission rule or all rules for a permission key.",
+          }),
+        ),
+        HttpApiEndpoint.post("clearApproved", `${root}/approved/clear`, {
+          query: WorkspaceRoutingQuery,
+          success: described(Schema.Boolean, "All approved permissions cleared successfully"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "permission.clearApproved",
+            summary: "Clear all approved permissions",
+            description: "Clear all persisted always-allow permission rules for this project.",
+          }),
+        ),
       )
       .annotateMerge(
         OpenApi.annotations({

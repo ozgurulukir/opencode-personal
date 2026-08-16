@@ -59,14 +59,18 @@ export function createOpencodeClient(config?: Config & { directory?: string; exp
 
   if (config?.directory) {
     config.headers = {
-      ...(config.headers instanceof Headers ? Object.fromEntries(config.headers.entries()) : Object.fromEntries(Object.entries(config.headers ?? {}))),
+      ...(config.headers instanceof Headers
+        ? Object.fromEntries(config.headers.entries())
+        : Object.fromEntries(Object.entries(config.headers ?? {}))),
       "x-opencode-directory": encodeURIComponent(config.directory),
     }
   }
 
   if (config?.experimental_workspaceID) {
     config.headers = {
-      ...(config.headers instanceof Headers ? Object.fromEntries(config.headers.entries()) : Object.fromEntries(Object.entries(config.headers ?? {}))),
+      ...(config.headers instanceof Headers
+        ? Object.fromEntries(config.headers.entries())
+        : Object.fromEntries(Object.entries(config.headers ?? {}))),
       "x-opencode-workspace": config.experimental_workspaceID,
     }
   }
