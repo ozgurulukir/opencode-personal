@@ -24,6 +24,25 @@ export const permissionHandlers = HttpApiBuilder.group(InstanceHttpApi, "permiss
       return true
     })
 
-    return handlers.handle("list", list).handle("reply", reply)
+    const listApproved = Effect.fn("PermissionHttpApi.listApproved")(function* () {
+      return yield* svc.listApproved()
+    })
+
+    const removeApproved = Effect.fn("PermissionHttpApi.removeApproved")(function* (ctx: {
+      payload: { permission: string; pattern?: string }
+    }) {
+      return yield* svc.removeApproved(ctx.payload)
+    })
+
+    const clearApproved = Effect.fn("PermissionHttpApi.clearApproved")(function* () {
+      return yield* svc.clearApproved()
+    })
+
+    return handlers
+      .handle("list", list)
+      .handle("reply", reply)
+      .handle("listApproved", listApproved)
+      .handle("removeApproved", removeApproved)
+      .handle("clearApproved", clearApproved)
   }),
 )

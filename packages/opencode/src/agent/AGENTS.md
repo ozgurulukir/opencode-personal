@@ -8,9 +8,9 @@
 
 `primary_tools` are simultaneously `allow`ed in the session permission (`subagentSessionPermission`) and `false`d in the tools list (`subagentToolRestrictions`). This is intentional: session permission `allow` means slash-command invocations don't block, but tools list `false` means the LLM can't call them directly. Primary tools are for the primary agent only; indirect access via slash commands is permitted.
 
-## `deriveSubagentSessionPermission` — deny-only forwarding, dedupe first-wins
+## `deriveSubagentSessionPermission` — deny-only forwarding, dedupe last-wins
 
-`deriveSubagentSessionPermission` forwards **only deny rules and external_directory rules** from the parent, NOT allow or ask rules. This is least-privilege by design — parent allows don't automatically grant subagent access. `dedupe()` collapses duplicate `(permission, pattern)` entries keeping the first occurrence, so parent agent denies (listed first) take priority over parent session denies for the same key.
+`deriveSubagentSessionPermission` forwards **only deny rules and external_directory rules** from the parent, NOT allow or ask rules. This is least-privilege by design — parent allows don't automatically grant subagent access. `Permission.dedupe()` collapses duplicate `(permission, pattern)` entries keeping the last occurrence (last match wins in `evaluate`), so parent agent denies (listed last) take priority over parent session denies for the same key.
 
 ## `prompt()` must merge, not overwrite, session permission
 

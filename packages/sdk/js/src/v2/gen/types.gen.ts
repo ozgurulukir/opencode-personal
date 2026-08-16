@@ -5089,6 +5089,76 @@ export type PermissionReplyResponses = {
 
 export type PermissionReplyResponse = PermissionReplyResponses[keyof PermissionReplyResponses]
 
+export type PermissionListApprovedData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/permission/approved"
+}
+
+export type PermissionListApprovedResponses = {
+  /**
+   * List of approved permissions
+   */
+  200: Array<PermissionRule>
+}
+
+export type PermissionListApprovedResponse = PermissionListApprovedResponses[keyof PermissionListApprovedResponses]
+
+export type PermissionRemoveApprovedData = {
+  body?: {
+    permission: string
+    pattern?: string
+  }
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/permission/approved/remove"
+}
+
+export type PermissionRemoveApprovedErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type PermissionRemoveApprovedError = PermissionRemoveApprovedErrors[keyof PermissionRemoveApprovedErrors]
+
+export type PermissionRemoveApprovedResponses = {
+  /**
+   * Approved permission rule removed successfully
+   */
+  200: boolean
+}
+
+export type PermissionRemoveApprovedResponse =
+  PermissionRemoveApprovedResponses[keyof PermissionRemoveApprovedResponses]
+
+export type PermissionClearApprovedData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/permission/approved/clear"
+}
+
+export type PermissionClearApprovedResponses = {
+  /**
+   * All approved permissions cleared successfully
+   */
+  200: boolean
+}
+
+export type PermissionClearApprovedResponse = PermissionClearApprovedResponses[keyof PermissionClearApprovedResponses]
+
 export type ProviderListData = {
   body?: never
   path?: never

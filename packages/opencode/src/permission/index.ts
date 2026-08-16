@@ -142,10 +142,21 @@ export const ReplyInput = Schema.Struct({
   .pipe(withStatics((s) => ({ zod: zod(s) })))
 export type ReplyInput = Schema.Schema.Type<typeof ReplyInput>
 
+export const RemoveApprovedInput = Schema.Struct({
+  permission: Schema.String,
+  pattern: Schema.optional(Schema.String),
+})
+  .annotate({ identifier: "PermissionRemoveApprovedInput" })
+  .pipe(withStatics((s) => ({ zod: zod(s) })))
+export type RemoveApprovedInput = Schema.Schema.Type<typeof RemoveApprovedInput>
+
 export interface Interface {
   readonly ask: (input: AskInput) => Effect.Effect<void, Error>
   readonly reply: (input: ReplyInput) => Effect.Effect<void>
   readonly list: () => Effect.Effect<ReadonlyArray<Request>>
+  readonly listApproved: () => Effect.Effect<ReadonlyArray<Rule>>
+  readonly removeApproved: (input: RemoveApprovedInput) => Effect.Effect<boolean>
+  readonly clearApproved: () => Effect.Effect<boolean>
 }
 
 interface PendingEntry {
@@ -170,6 +181,24 @@ export function evaluateWithSource(
   return evalWithSource(permission, pattern, ...rulesets)
 }
 
+/**
+ * Deduplicate a permission ruleset by `permission:pattern` key, preserving
+ * last-occurrence order (last match wins in Permission.evaluate).
+ * Time complexity: O(N), Space complexity: O(N).
+ */
+export function dedupe(rules: Ruleset): Ruleset {
+  const seen = new Set<string>()
+  const result: Rule[] = []
+  for (let i = rules.length - 1; i >= 0; i--) {
+    const rule = rules[i]
+    const key = `${rule.permission}:${rule.pattern}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    result.push(rule)
+  }
+  return result.reverse()
+}
+
 export class Service extends Context.Service<Service, Interface>()("@opencode/Permission") {}
 
 export const layer = Layer.effect(
@@ -183,7 +212,7 @@ export const layer = Layer.effect(
         )
         const state = {
           pending: new Map<PermissionID, PendingEntry>(),
-          approved: row?.data ?? [],
+          approved: dedupe(row?.data ?? []),
         }
 
         yield* Effect.addFinalizer(() =>
@@ -202,9 +231,13 @@ export const layer = Layer.effect(
     const ask = Effect.fn("Permission.ask")(function* (input: AskInput) {
       const { approved, pending } = yield* InstanceState.get(state)
       const { ruleset, timeoutMs, ...request } = input
+
+      // Guard against empty patterns: normalize to ["*"] to enforce fail-closed deny checks
+      const patterns = request.patterns.length > 0 ? request.patterns : ["*"]
+      const always = request.always.length > 0 ? request.always : patterns
       let needsAsk = false
 
-      for (const pattern of request.patterns) {
+      for (const pattern of patterns) {
         // Deny rules from config/agent always win (security).
         // DB-persisted "always allow" overrides config "ask" rules — otherwise
         // the user's explicit approval is silently ignored on every subsequent call.
@@ -228,6 +261,8 @@ export const layer = Layer.effect(
       const info = Schema.decodeUnknownSync(Request)({
         id,
         ...request,
+        patterns,
+        always,
       })
       log.info("asking", { id, permission: info.permission, patterns: info.patterns })
 
@@ -289,34 +324,22 @@ export const layer = Layer.effect(
       if (input.reply === "once") return
 
       // Persist approved ruleset to database so "always allow" survives restarts.
-      // Use transaction for atomicity — the approved array construction and insert
-      // must be atomic to prevent race conditions between concurrent reply("always").
-      //
-      // Build a snapshot for the DB write so the upsert is atomic and so the
-      // in-memory `approved` array is not mutated mid-transaction by concurrent
-      // Effect yields. JavaScript is single-threaded, so this is not a traditional
-      // race-condition guard, but Effect's cooperative scheduling can interleave
-      // yields between push and upsert.
+      // Commit to SQLite first before mutating in-memory array to prevent state divergence on write failure.
       const ctx = yield* InstanceState.context
       const newRules: Array<{ permission: string; pattern: string; action: "allow" }> = existing.info.always.map((pattern) => ({
         permission: existing.info.permission,
         pattern,
         action: "allow",
       }))
-      const snapshot = [...approved, ...newRules]
-      for (const pattern of existing.info.always) {
-        approved.push({
-          permission: existing.info.permission,
-          pattern,
-          action: "allow",
-        })
-      }
+      const nextApproved = dedupe([...approved, ...newRules])
       Database.transaction((db) => {
         db.insert(PermissionTable)
-          .values({ project_id: ctx.project.id, data: snapshot })
-          .onConflictDoUpdate({ target: PermissionTable.project_id, set: { data: snapshot } })
+          .values({ project_id: ctx.project.id, data: nextApproved })
+          .onConflictDoUpdate({ target: PermissionTable.project_id, set: { data: nextApproved } })
           .run()
       })
+
+      approved.splice(0, approved.length, ...nextApproved)
 
       for (const [id, item] of pending.entries()) {
         if (item.info.sessionID !== existing.info.sessionID) continue
@@ -339,15 +362,69 @@ export const layer = Layer.effect(
       return Array.from(pending.values(), (item) => item.info)
     })
 
-    return Service.of({ ask, reply, list })
+    const listApproved = Effect.fn("Permission.listApproved")(function* () {
+      const { approved } = yield* InstanceState.get(state)
+      return [...approved]
+    })
+
+    const removeApproved = Effect.fn("Permission.removeApproved")(function* (input: RemoveApprovedInput) {
+      const { approved } = yield* InstanceState.get(state)
+      const nextApproved = approved.filter((rule) => {
+        if (rule.permission !== input.permission) return true
+        if (input.pattern !== undefined && rule.pattern !== input.pattern) return true
+        return false
+      })
+      if (nextApproved.length === approved.length) return false
+
+      const ctx = yield* InstanceState.context
+      Database.transaction((db) => {
+        if (nextApproved.length === 0) {
+          db.delete(PermissionTable)
+            .where(eq(PermissionTable.project_id, ctx.project.id))
+            .run()
+        } else {
+          db.insert(PermissionTable)
+            .values({ project_id: ctx.project.id, data: nextApproved })
+            .onConflictDoUpdate({ target: PermissionTable.project_id, set: { data: nextApproved } })
+            .run()
+        }
+      })
+
+      approved.splice(0, approved.length, ...nextApproved)
+      return true
+    })
+
+    const clearApproved = Effect.fn("Permission.clearApproved")(function* () {
+      const { approved } = yield* InstanceState.get(state)
+      if (approved.length === 0) return true
+
+      const ctx = yield* InstanceState.context
+      Database.transaction((db) => {
+        db.delete(PermissionTable)
+          .where(eq(PermissionTable.project_id, ctx.project.id))
+          .run()
+      })
+
+      approved.splice(0, approved.length)
+      return true
+    })
+
+    return Service.of({ ask, reply, list, listApproved, removeApproved, clearApproved })
   }),
 )
 
 function expand(pattern: string): string {
-  if (pattern.startsWith("~/")) return os.homedir() + pattern.slice(1)
-  if (pattern === "~") return os.homedir()
-  if (pattern.startsWith("$HOME/")) return os.homedir() + pattern.slice(5)
-  if (pattern.startsWith("$HOME")) return os.homedir() + pattern.slice(5)
+  const home = os.homedir()
+  const normalized = pattern.replace(/\\/g, "/")
+  if (normalized.startsWith("~/")) return home + normalized.slice(1)
+  if (normalized === "~") return home
+  if (normalized.startsWith("$HOME/")) return home + normalized.slice(5)
+  if (normalized === "$HOME") return home
+  if (process.platform === "win32" && process.env.USERPROFILE) {
+    const userProfile = process.env.USERPROFILE.replace(/\\/g, "/")
+    if (normalized.startsWith("%USERPROFILE%/")) return home + normalized.slice(13)
+    if (normalized === "%USERPROFILE%") return home
+  }
   return pattern
 }
 

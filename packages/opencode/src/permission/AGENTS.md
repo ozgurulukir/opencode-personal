@@ -30,21 +30,21 @@ The fix in `ask()` splits evaluation: (1) deny from `ruleset` wins immediately (
 
 `Permission.layer` uses `InstanceState.make` backed by `ScopedCache`. `disposeAllInstances()` invalidates entries asynchronously (`Effect.runPromise`), so a test that replies `"always"` can leak its `approved` ruleset into subsequent tests that use the same temp directory. This is pre-existing and masked by the old evaluation order (config `ruleset` would override leaked `approved` anyway). When fixing permission logic, verify with `bun test test/permission/ -t "always"` to confirm new tests don't break unrelated ones.
 
-## `reply("always")` persists to database
+## `reply("always")` persists to database before mutating in-memory state
 
-When the user replies with `"always"`, the approved ruleset is persisted to `PermissionTable` (keyed by `project_id`). This means "always allow" decisions survive restarts. The ruleset is loaded from the database on service init via `InstanceState.make()`. The `PermissionTable` is an upsert — each project has at most one row containing the full approved ruleset.
+When the user replies with `"always"`, the candidate ruleset is deduplicated and committed to `PermissionTable` (keyed by `project_id`) before the in-memory `approved` array is mutated in-place via `approved.splice()`. This guarantees that database write errors do not leave the in-memory state out of sync with disk.
 
-## Pre-existing flaky test: `reply - reject cancels all pending for same session`
+## `dedupe()` — O(N) last-match-wins deduplication
 
-The test `reply - reject cancels all pending for same session` (`test/permission/next.test.ts`) fails intermittently in the full suite but passes in isolation. Not caused by recent changes.
+`Permission.dedupe(rules)` deduplicates rules by `permission:pattern` key using reverse iteration + `.reverse()`. It is run on service load (`InstanceState.make`), during `reply("always")`, and during revocation operations to prevent duplicate rules in SQLite and memory.
 
-## Permission snapshot — comment vs reality
+## `ask()` fail-closed guard for empty patterns
 
-The comment in `reply()` says "snapshot prevents race" but the real safety comes from
-JavaScript's single-threaded execution and the synchronous `Database.transaction`.
-Effect's cooperative scheduling can interleave yields between `approved.push()` and
-the upsert, but the snapshot ensures the DB write is atomic regardless. The comment
-has been updated to reflect the actual guarantees.
+When `request.patterns` is empty (`[]`), `Permission.ask()` normalizes it to `["*"]` so that config deny rules (e.g. `bash: "deny"` or Plan Mode `edit: "deny"`) are strictly enforced rather than silently bypassed.
+
+## Revocation APIs — `removeApproved()` and `clearApproved()`
+
+`Permission.Service` exposes `listApproved()`, `removeApproved({ permission, pattern? })`, and `clearApproved()`. Revocation updates both the in-memory `approved` array and the `PermissionTable` database row atomically.
 
 ## Timeout alarm must use `Effect.raceFirst`, not `Effect.race`
 

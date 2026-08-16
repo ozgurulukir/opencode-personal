@@ -1,24 +1,7 @@
-import type { Permission } from "../permission"
+import { Permission } from "../permission"
 import type { Agent } from "./agent"
 
 export const MAX_SUBAGENT_NESTING_LEVELS = 3
-
-/**
- * Deduplicate a permission ruleset by `permission:pattern` key, preserving
- * last-occurrence order (last match wins in Permission.evaluate).
- */
-function dedupe(rules: Permission.Ruleset): Permission.Ruleset {
-  const seen = new Set<string>()
-  const result: Permission.Ruleset = []
-  for (let i = rules.length - 1; i >= 0; i--) {
-    const rule = rules[i]
-    const key = `${rule.permission}:${rule.pattern}`
-    if (seen.has(key)) continue
-    seen.add(key)
-    result.unshift(rule)
-  }
-  return result
-}
 
 /**
  * Build the `permission` ruleset for a subagent's session when it's spawned
@@ -37,7 +20,7 @@ export function deriveSubagentSessionPermission(input: {
   const canTask = input.subagent.permission.some((rule) => rule.permission === "task" && rule.action === "allow")
   const canTodo = input.subagent.permission.some((rule) => rule.permission === "todowrite" && rule.action === "allow")
   const parentAgentDenies = input.parentAgent?.permission.filter((rule) => rule.action === "deny") ?? []
-  return dedupe([
+  return Permission.dedupe([
     ...input.parentSessionPermission,
     ...(canTodo ? [] : [{ permission: "todowrite" as const, pattern: "*" as const, action: "deny" as const }]),
     ...(canTask ? [] : [{ permission: "task" as const, pattern: "*" as const, action: "deny" as const }]),
