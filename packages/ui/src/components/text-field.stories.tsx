@@ -1,6 +1,7 @@
 // @ts-nocheck
 import * as mod from "./text-field"
 import { create } from "../storybook/scaffold"
+import { createSignal } from "solid-js"
 
 const docs = `### Overview
 Text input with label, description, and optional copy-to-clipboard action.
@@ -75,6 +76,23 @@ export const Copyable = {
     defaultValue: "https://example.com/invite/abc",
     copyable: true,
     copyKind: "link",
+  },
+}
+
+export const Clearable = {
+  render: () => {
+    const [val, setVal] = createSignal("Clear me!")
+    return (
+      <div style={{ display: "grid", gap: "12px", width: "320px" }}>
+        <mod.TextField
+          label="Clearable Input"
+          placeholder="Type to clear..."
+          value={val()}
+          onChange={setVal}
+          onClear={() => setVal("")}
+        />
+      </div>
+    )
   },
 }
 

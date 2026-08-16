@@ -67,7 +67,7 @@
         border: 1px solid var(--border-critical-selected);
       }
 
-      &:not(:has([data-slot="input-copy-button"])) {
+      &:not(:has([data-slot="input-copy-button"])):not(:has([data-slot="input-clear-button"])) {
         padding-right: 0;
       }
     }
@@ -109,7 +109,8 @@
       resize: none;
     }
 
-    [data-slot="input-copy-button"] {
+    [data-slot="input-copy-button"],
+    [data-slot="input-clear-button"] {
       flex-shrink: 0;
       margin-top: 4px;
       color: var(--icon-base);

@@ -31,6 +31,7 @@ export interface TextFieldProps
   copyKind?: "clipboard" | "link"
   multiline?: boolean
   autofocus?: boolean
+  onClear?: () => void
 }
 
 export function TextField(props: TextFieldProps) {
@@ -55,8 +56,10 @@ export function TextField(props: TextFieldProps) {
     "copyKind",
     "multiline",
     "autofocus",
+    "onClear",
   ])
   const [copied, setCopied] = createSignal(false)
+  let inputRef: HTMLInputElement | HTMLTextAreaElement | undefined
 
   const label = () => {
     if (copied()) return i18n.t("ui.textField.copied")
@@ -79,6 +82,11 @@ export function TextField(props: TextFieldProps) {
 
   function handleClick() {
     if (local.copyable) void handleCopy()
+  }
+
+  function handleClear() {
+    local.onClear?.()
+    inputRef?.focus()
   }
 
   return (
@@ -105,13 +113,20 @@ export function TextField(props: TextFieldProps) {
         <Show
           when={local.multiline}
           fallback={
-            <Kobalte.Input {...others} autofocus={local.autofocus} data-slot="input-input" class={local.class} />
+            <Kobalte.Input
+              {...others}
+              autofocus={local.autofocus}
+              ref={inputRef as HTMLInputElement}
+              data-slot="input-input"
+              class={local.class}
+            />
           }
         >
           <Kobalte.TextArea
             {...others}
             autoResize
             autofocus={local.autofocus}
+            ref={inputRef as HTMLTextAreaElement}
             data-slot="input-input"
             class={local.class}
           />
@@ -128,6 +143,17 @@ export function TextField(props: TextFieldProps) {
               aria-label={label()}
             />
           </Tooltip>
+        </Show>
+        <Show when={local.onClear && !!local.value}>
+          <IconButton
+            type="button"
+            icon="circle-x"
+            variant="ghost"
+            onClick={handleClear}
+            tabIndex={-1}
+            data-slot="input-clear-button"
+            aria-label={i18n.t("common.clear")}
+          />
         </Show>
       </div>
       <Show when={local.description}>

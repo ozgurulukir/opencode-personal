@@ -69,6 +69,7 @@ export const SettingsModels: Component = () => {
               type="text"
               value={list.filter()}
               onChange={list.onInput}
+              onClear={list.clear}
               placeholder={language.t("dialog.model.search.placeholder")}
               spellcheck={false}
               autocorrect="off"
@@ -76,9 +77,6 @@ export const SettingsModels: Component = () => {
               autocapitalize="off"
               class="flex-1"
             />
-            <Show when={list.filter()}>
-              <IconButton icon="circle-x" variant="ghost" onClick={list.clear} aria-label={language.t("common.clear")} />
-            </Show>
           </div>
         </div>
       </div>
