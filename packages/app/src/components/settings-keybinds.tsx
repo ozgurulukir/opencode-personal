@@ -387,6 +387,7 @@ export const SettingsKeybinds: Component = () => {
               type="text"
               value={store.filter}
               onChange={(v) => setStore("filter", v)}
+              onClear={() => setStore("filter", "")}
               placeholder={language.t("settings.shortcuts.search.placeholder")}
               spellcheck={false}
               autocorrect="off"
@@ -394,9 +395,6 @@ export const SettingsKeybinds: Component = () => {
               autocapitalize="off"
               class="flex-1"
             />
-            <Show when={store.filter}>
-              <IconButton icon="circle-x" variant="ghost" onClick={() => setStore("filter", "")} aria-label={language.t("common.clear")} />
-            </Show>
           </div>
         </div>
       </div>

@@ -299,6 +299,7 @@ export function List<T>(props: ListProps<T> & { ref?: (ref: ListRef) => void }) 
                 }}
                 value={internalFilter()}
                 onChange={(value) => applyFilter(value)}
+                onClear={() => setInternalFilter("")}
                 onKeyDown={handleKey}
                 placeholder={searchProps().placeholder}
                 spellcheck={false}
@@ -307,17 +308,6 @@ export function List<T>(props: ListProps<T> & { ref?: (ref: ListRef) => void }) 
                 autocapitalize="off"
               />
             </div>
-            <Show when={internalFilter()}>
-              <IconButton
-                icon="circle-x"
-                variant="ghost"
-                onClick={() => {
-                  setInternalFilter("")
-                  queueMicrotask(() => inputRef?.focus())
-                }}
-                aria-label={i18n.t("ui.list.clearFilter")}
-              />
-            </Show>
           </div>
           {searchAction()}
         </div>
