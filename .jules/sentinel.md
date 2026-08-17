@@ -15,3 +15,8 @@
 **Vulnerability:** Assigning unsanitized string `content` to `.innerHTML` in unsupported environments acts as an open fallback for XSS.
 **Learning:** Security fixes must fail safely. Using `DOMPurify.isSupported` correctly ensures if not supported, it does not fallback to unsafe rendering. Furthermore, utilizing existing helper methods like `sanitize(content)` avoids duplication and leverages their built-in fallback mechanisms correctly.
 **Prevention:** Always fail safe when parsing potentially malicious input (e.g., return empty string when sanitization library is missing). Ensure helper methods like `sanitize()` are leveraged instead of raw assignments.
+
+## 2024-05-24 - DOM-based XSS in Drag Image Generation
+**Vulnerability:** A DOM-based XSS vulnerability existed in `packages/app/src/components/file-tree.tsx` where file drag images were generated using string concatenation of `outerHTML` and assigning it via `innerHTML` (`image.innerHTML = icon.outerHTML + text.outerHTML`).
+**Learning:** Concatenating `outerHTML` strings and injecting them via `innerHTML` can execute unintended scripts if the source DOM nodes contain unsanitized or unexpectedly manipulated content.
+**Prevention:** Always use safe DOM APIs like `cloneNode(true)` followed by `appendChild()` to copy DOM elements safely without executing embedded scripts or falling back to string parsing.
