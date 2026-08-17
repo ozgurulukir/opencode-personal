@@ -56,6 +56,7 @@ export function SessionRevertDock(props: {
             size="normal"
             variant="ghost"
             tabIndex={-1}
+            aria-label={store.collapsed ? "Expand revert" : "Collapse revert"}
             style={{ transform: `rotate(${store.collapsed ? 180 : 0}deg)` }}
             onMouseDown={(event) => {
               event.preventDefault()

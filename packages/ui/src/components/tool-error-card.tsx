@@ -126,6 +126,7 @@ export function ToolErrorCard(props: ToolErrorCardProps) {
                     icon={copied() ? "check" : "copy"}
                     size="normal"
                     variant="ghost"
+                    aria-label={copied() ? "Copied error" : "Copy error"}
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={(e) => {
                       e.stopPropagation()

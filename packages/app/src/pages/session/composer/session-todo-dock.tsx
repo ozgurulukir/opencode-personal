@@ -183,6 +183,7 @@ export function SessionTodoDock(props: {
               size="normal"
               variant="ghost"
               tabIndex={-1}
+              aria-label={store.collapsed ? "Expand tasks" : "Collapse tasks"}
               style={{ transform: `rotate(${turn() * 180}deg)` }}
               onMouseDown={(event) => {
                 event.preventDefault()
