@@ -218,6 +218,9 @@ export interface Interface {
     model: { providerID: ProviderID; modelID: ModelID }
     auto: boolean
     overflow?: boolean
+    format?: MessageV2.User["format"]
+    tools?: MessageV2.User["tools"]
+    system?: MessageV2.User["system"]
   }) => Effect.Effect<void>
 }
 
@@ -358,11 +361,16 @@ export const layer: Layer.Layer<
 
       log.info("found", { pruned, total })
       if (pruned > cc.pruneMinimumTokens) {
+        const now = Date.now()
+        const updated: MessageV2.ToolPart[] = []
         for (const part of toPrune) {
           if (part.state.status === "completed") {
-            part.state.time.compacted = Date.now()
-            yield* session.updatePart(part)
+            part.state.time.compacted = now
+            updated.push(part)
           }
+        }
+        if (updated.length > 0) {
+          yield* session.updateParts(updated)
         }
         log.info("pruned", { count: toPrune.length })
       }
@@ -523,7 +531,7 @@ export const layer: Layer.Layer<
       }
 
       if (result === "continue" && input.auto) {
-        if (replay) {
+        if (replay && replay.parts.some((p) => p.type !== "compaction")) {
           const original = replay.info
           const replayMsg = yield* session.updateMessage({
             id: MessageID.ascending(),
@@ -581,6 +589,9 @@ export const layer: Layer.Layer<
               time: { created: Date.now() },
               agent: userMessage.agent,
               model: userMessage.model,
+              format: userMessage.format,
+              tools: userMessage.tools,
+              system: userMessage.system,
             })
             const todoBlock = yield* Option.match(todo, {
               onNone: () => Effect.succeed(""),
@@ -594,7 +605,8 @@ export const layer: Layer.Layer<
                       pending
                         .map((t) => {
                           const badge = t.priority === "high" ? "[H] " : t.priority === "low" ? "[L] " : "[M] "
-                          return `- ${badge}${t.content}`
+                          const statusBadge = t.status === "in_progress" ? "[IN PROGRESS] " : ""
+                          return `- ${badge}${statusBadge}${t.content}`
                         })
                         .join("\n")
                     )
@@ -655,6 +667,9 @@ export const layer: Layer.Layer<
       model: { providerID: ProviderID; modelID: ModelID }
       auto: boolean
       overflow?: boolean
+      format?: MessageV2.User["format"]
+      tools?: MessageV2.User["tools"]
+      system?: MessageV2.User["system"]
     }) {
       const msg = yield* session.updateMessage({
         id: MessageID.ascending(),
@@ -663,6 +678,9 @@ export const layer: Layer.Layer<
         sessionID: input.sessionID,
         agent: input.agent,
         time: { created: Date.now() },
+        format: input.format,
+        tools: input.tools,
+        system: input.system,
       })
       yield* session.updatePart({
         id: PartID.ascending(),
