@@ -506,7 +506,7 @@ Bağlam sıkıştırma davranışını `compaction` seçeneği aracılığıyla 
 - `auto` - Bağlam dolduğunda oturumu otomatik olarak sıkıştırır (varsayılan: `true`).
 - `context_limit` - Sıkıştırma eşiği için açık bağlam penceresi. Modelin bağlam limitini geçersiz kılar. Örneğin `200000`, kullanılan tokenlar `reserved` tamponu çıkarıldıktan sonra 200000'e ulaştığında sıkıştırmayı tetikler.
 - `reserved` - Sıkıştırma için belirteç tamponu. Sıkıştırma sırasında taşmayı önlemek için yeterli pencere bırakır. `context_limit` set edildiğinde varsayılan 20000'dir ancak en az modelin `maxOutputTokens` değerine kırpılır — bu, modelin her zaman tam çıktısı için yeterli alana sahip olmasını garanti eder. Örneğin `context_limit: 200000` ve modelin `maxOutputTokens` değeri 8000 ise efektif `reserved` 20000 olur ve sıkıştırma 180000'de tetiklenir. `maxOutputTokens` 128000 ise efektif `reserved` 128000 olur ve sıkıştırma 72000'de tetiklenir.
-- `autocontinue` - Otomatik sıkıştırmadan sonra modelin devam edebilmesi için sentetik bir "Devam et" mesajı ekler (varsayılan: `true`). Sadece auto compaction için geçerlidir, manuel `/compact` için değil.
+- `autocontinue` - Otomatik sıkıştırmadan sonra modelin kesintisiz devam edebilmesi için bekleyen görevleri (öncelik `[H]`/`[M]`/`[L]` ve `[IN PROGRESS]` durum rozetleriyle) ve araç/biçim ayarlarını koruyarak sentetik bir "Devam et" mesajı ekler (varsayılan: `true`). Sadece auto compaction için geçerlidir, manuel `/compact` için değil.
 
 **Paylaşılan** (hem auto hem manuel sıkıştırmayı etkiler):
 

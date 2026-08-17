@@ -168,16 +168,25 @@ export const runLoop: (deps: RunLoopDeps, sessionID: SessionID) => Effect.Effect
       continue
     }
 
+    const lastUserMsg = msgs.findLast((m) => m.info.id === lastUser.id)
+    const isCurrentTurnContinue =
+      lastUserMsg?.parts.some((p) => p.type === "text" && p.metadata?.compaction_continue) ?? false
+
     if (
       lastFinished &&
       lastFinished.summary !== true &&
-      !msgs.some(
-        (m) =>
-          m.info.role === "user" && m.parts.some((p) => p.type === "text" && p.metadata?.compaction_continue),
-      ) &&
+      !isCurrentTurnContinue &&
       (yield* deps.compaction.isOverflow({ tokens: lastFinished.tokens, model }))
     ) {
-      yield* deps.compaction.create({ sessionID, agent: lastUser.agent, model: lastUser.model, auto: true })
+      yield* deps.compaction.create({
+        sessionID,
+        agent: lastUser.agent,
+        model: lastUser.model,
+        auto: true,
+        tools: lastUser.tools,
+        format: lastUser.format,
+        system: lastUser.system,
+      })
       continue
     }
 

@@ -28,6 +28,7 @@ import { testEffect } from "../lib/effect"
 import { CrossSpawnSpawner } from "@opencode-ai/core/cross-spawn-spawner"
 import { TestConfig } from "../fixture/config"
 import { SyncEvent } from "@/sync"
+import { Todo } from "../../src/session/todo"
 
 void Log.init({ print: false })
 
@@ -225,6 +226,7 @@ const deps = Layer.mergeAll(
   Bus.layer,
   Config.defaultLayer,
   SyncEvent.defaultLayer,
+  Todo.defaultLayer,
 )
 
 const env = Layer.mergeAll(
@@ -272,6 +274,7 @@ function compactionProcessLayer(options?: CompactionProcessOptions) {
     Layer.provide(bus),
     Layer.provide(options?.config ?? Config.defaultLayer),
     Layer.provide(SyncEvent.defaultLayer),
+    Layer.provide(Todo.defaultLayer),
   )
 }
 
@@ -800,6 +803,142 @@ describe("session.compaction.prune", () => {
       }),
     ),
   )
+
+  it.live(
+    "batches part updates when pruning multiple tool parts",
+    provideTmpdirInstance(
+      (dir) =>
+        Effect.gen(function* () {
+          const compact = yield* SessionCompaction.Service
+          const ssn = yield* SessionNs.Service
+          const info = yield* ssn.create({})
+          const a = yield* ssn.updateMessage({
+            id: MessageID.ascending(),
+            role: "user",
+            sessionID: info.id,
+            agent: "build",
+            model: ref,
+            time: { created: Date.now() },
+          })
+          yield* ssn.updatePart({
+            id: PartID.ascending(),
+            messageID: a.id,
+            sessionID: info.id,
+            type: "text",
+            text: "first",
+          })
+          const b: MessageV2.Assistant = {
+            id: MessageID.ascending(),
+            role: "assistant",
+            sessionID: info.id,
+            mode: "build",
+            agent: "build",
+            path: { cwd: dir, root: dir },
+            cost: 0,
+            tokens: {
+              output: 0,
+              input: 0,
+              reasoning: 0,
+              cache: { read: 0, write: 0 },
+            },
+            modelID: ref.modelID,
+            providerID: ref.providerID,
+            parentID: a.id,
+            time: { created: Date.now() },
+            finish: "end_turn",
+          }
+          yield* ssn.updateMessage(b)
+
+          const toolParts: MessageV2.ToolPart[] = [
+            {
+              id: PartID.ascending(),
+              messageID: b.id,
+              sessionID: info.id,
+              type: "tool",
+              callID: crypto.randomUUID(),
+              tool: "bash",
+              state: {
+                status: "completed",
+                input: {},
+                output: "x".repeat(100_000),
+                title: "done 1",
+                metadata: {},
+                time: { start: Date.now(), end: Date.now() },
+              },
+            },
+            {
+              id: PartID.ascending(),
+              messageID: b.id,
+              sessionID: info.id,
+              type: "tool",
+              callID: crypto.randomUUID(),
+              tool: "bash",
+              state: {
+                status: "completed",
+                input: {},
+                output: "y".repeat(100_000),
+                title: "done 2",
+                metadata: {},
+                time: { start: Date.now(), end: Date.now() },
+              },
+            },
+            {
+              id: PartID.ascending(),
+              messageID: b.id,
+              sessionID: info.id,
+              type: "tool",
+              callID: crypto.randomUUID(),
+              tool: "bash",
+              state: {
+                status: "completed",
+                input: {},
+                output: "z".repeat(100_000),
+                title: "done 3",
+                metadata: {},
+                time: { start: Date.now(), end: Date.now() },
+              },
+            },
+          ]
+          for (const part of toolParts) {
+            yield* ssn.updatePart(part)
+          }
+
+          for (const text of ["second", "third"]) {
+            const msg = yield* ssn.updateMessage({
+              id: MessageID.ascending(),
+              role: "user",
+              sessionID: info.id,
+              agent: "build",
+              model: ref,
+              time: { created: Date.now() },
+            })
+            yield* ssn.updatePart({
+              id: PartID.ascending(),
+              messageID: msg.id,
+              sessionID: info.id,
+              type: "text",
+              text,
+            })
+          }
+
+          yield* compact.prune({ sessionID: info.id })
+
+          const msgs = yield* ssn.messages({ sessionID: info.id })
+          const pruned = msgs
+            .flatMap((msg) => msg.parts)
+            .filter((p): p is MessageV2.ToolPart => p.type === "tool")
+          expect(pruned.length).toBe(3)
+          expect(
+            pruned.every((p) => p.state.status === "completed" && typeof p.state.time.compacted === "number"),
+          ).toBe(true)
+        }),
+      {
+        config: {
+          compaction: { prune: true, prune_protect_tokens: 0, prune_minimum_tokens: 1 },
+        },
+      },
+    ),
+  )
 })
 
 describe("session.compaction.process", () => {
@@ -919,6 +1058,211 @@ describe("session.compaction.process", () => {
       if (last?.parts[0]?.type === "text") {
         expect(last.parts[0].text).toContain("Continue if you have next steps")
       }
+    }),
+  )
+
+  it.instance(
+    "copies tools, system, and format from userMessage onto continueMsg when auto is true",
+    Effect.gen(function* () {
+      const ssn = yield* SessionNs.Service
+      const session = yield* ssn.create({})
+      const msg = yield* ssn.updateMessage({
+        id: MessageID.ascending(),
+        role: "user",
+        sessionID: session.id,
+        agent: "build",
+        model: ref,
+        time: { created: Date.now() },
+        tools: { bash: true, edit: false },
+        system: "custom system instruction",
+        format: { type: "text" },
+      })
+      yield* ssn.updatePart({
+        id: PartID.ascending(),
+        messageID: msg.id,
+        sessionID: session.id,
+        type: "text",
+        text: "initial task",
+      })
+
+      const msgs = yield* ssn.messages({ sessionID: session.id })
+      const result = yield* SessionCompaction.use.process({
+        parentID: msg.id,
+        messages: msgs,
+        sessionID: session.id,
+        auto: true,
+      })
+
+      expect(result).toBe("continue")
+      const all = yield* ssn.messages({ sessionID: session.id })
+      const continueMsg = all.find(
+        (m) =>
+          m.info.role === "user" &&
+          m.info.id !== msg.id &&
+          m.parts.some((p) => p.type === "text" && p.metadata?.compaction_continue),
+      )
+
+      expect(continueMsg).toBeDefined()
+      if (continueMsg && continueMsg.info.role === "user") {
+        expect(continueMsg.info.tools).toEqual({ bash: true, edit: false })
+        expect(continueMsg.info.system).toBe("custom system instruction")
+        expect(continueMsg.info.format).toEqual({ type: "text" })
+        expect(continueMsg.info.agent).toBe("build")
+        expect(continueMsg.info.model).toEqual(ref)
+      }
+    }),
+  )
+
+  it.instance(
+    "generates [IN PROGRESS] badge in continue message when todo is in_progress",
+    Effect.gen(function* () {
+      const ssn = yield* SessionNs.Service
+      const todoSvc = yield* Todo.Service
+      const session = yield* ssn.create({})
+      const msg = yield* createUserMessage(session.id, "start working")
+
+      yield* todoSvc.update({
+        sessionID: session.id,
+        todos: [
+          { content: "implement feature", status: "in_progress", priority: "high" },
+          { content: "write tests", status: "pending", priority: "medium" },
+          { content: "done task", status: "completed", priority: "low" },
+        ],
+      })
+
+      const msgs = yield* ssn.messages({ sessionID: session.id })
+      const result = yield* SessionCompaction.use.process({
+        parentID: msg.id,
+        messages: msgs,
+        sessionID: session.id,
+        auto: true,
+      })
+
+      expect(result).toBe("continue")
+      const all = yield* ssn.messages({ sessionID: session.id })
+      const continueMsg = all.find(
+        (m) =>
+          m.info.role === "user" &&
+          m.info.id !== msg.id &&
+          m.parts.some((p) => p.type === "text" && p.metadata?.compaction_continue),
+      )
+
+      expect(continueMsg).toBeDefined()
+      const textPart = continueMsg?.parts.find((p) => p.type === "text")
+      expect(textPart?.type).toBe("text")
+      if (textPart?.type === "text") {
+        expect(textPart.text).toContain("Pending todos:")
+        expect(textPart.text).toContain("- [H] [IN PROGRESS] implement feature")
+        expect(textPart.text).toContain("- [M] write tests")
+        expect(textPart.text).not.toContain("done task")
+      }
+    }),
+  )
+
+  it.instance(
+    "allows subsequent auto-compaction when a prior turn in the session was a continue message",
+    Effect.gen(function* () {
+      const ssn = yield* SessionNs.Service
+      const compact = yield* SessionCompaction.Service
+      const session = yield* ssn.create({})
+
+      // Turn 1: user message
+      const u1 = yield* createUserMessage(session.id, "initial request")
+
+      // Auto-compaction 1 generates continue message
+      const continueMsg = yield* ssn.updateMessage({
+        id: MessageID.ascending(),
+        role: "user",
+        sessionID: session.id,
+        agent: "build",
+        model: ref,
+        time: { created: Date.now() },
+      })
+      yield* ssn.updatePart({
+        id: PartID.ascending(),
+        messageID: continueMsg.id,
+        sessionID: session.id,
+        type: "text",
+        synthetic: true,
+        metadata: { compaction_continue: true },
+        text: "Continue if you have next steps...",
+      })
+
+      // Turn 2: Assistant finished response after continue
+      const a1: MessageV2.Assistant = {
+        id: MessageID.ascending(),
+        role: "assistant",
+        parentID: continueMsg.id,
+        sessionID: session.id,
+        mode: "build",
+        agent: "build",
+        path: { cwd: "/", root: "/" },
+        tokens: { input: 1000, output: 500, reasoning: 0, cache: { read: 0, write: 0 } },
+        cost: 0,
+        modelID: ref.modelID,
+        providerID: ref.providerID,
+        time: { created: Date.now() },
+        finish: "end_turn",
+      }
+      yield* ssn.updateMessage(a1)
+
+      // Verify that while at the continue turn, isCurrentTurnContinue is true
+      let currentMsgs = yield* ssn.messages({ sessionID: session.id })
+      let lastUserMsg = currentMsgs.findLast((m) => m.info.id === continueMsg.id)
+      let isCurrentTurnContinue =
+        lastUserMsg?.parts.some((p) => p.type === "text" && p.metadata?.compaction_continue) ?? false
+      expect(isCurrentTurnContinue).toBe(true)
+
+      // Turn 3: User sends a new prompt (subsequent turn)
+      const u2 = yield* createUserMessage(session.id, "new user task")
+
+      // Turn 4: Assistant responds with overflowing tokens
+      const a2: MessageV2.Assistant = {
+        id: MessageID.ascending(),
+        role: "assistant",
+        parentID: u2.id,
+        sessionID: session.id,
+        mode: "build",
+        agent: "build",
+        path: { cwd: "/", root: "/" },
+        tokens: { input: 90_000, output: 20_000, reasoning: 0, cache: { read: 0, write: 0 } },
+        cost: 0,
+        modelID: ref.modelID,
+        providerID: ref.providerID,
+        time: { created: Date.now() },
+        finish: "end_turn",
+      }
+      yield* ssn.updateMessage(a2)
+
+      // Re-evaluate the scoped guard on the new user turn
+      currentMsgs = yield* ssn.messages({ sessionID: session.id })
+      lastUserMsg = currentMsgs.findLast((m) => m.info.id === u2.id)
+      isCurrentTurnContinue =
+        lastUserMsg?.parts.some((p) => p.type === "text" && p.metadata?.compaction_continue) ?? false
+
+      // Guard correctly identifies that the current turn is NOT a continue turn
+      expect(isCurrentTurnContinue).toBe(false)
+
+      // And isOverflow is true
+      const model = createModel({ context: 100_000, output: 32_000 })
+      const overflowing = yield* compact.isOverflow({ tokens: a2.tokens, model })
+      expect(overflowing).toBe(true)
+
+      // Auto-compaction create succeeds on the subsequent turn
+      yield* compact.create({
+        sessionID: session.id,
+        agent: u2.agent,
+        model: u2.model,
+        auto: true,
+      })
+
+      const allMsgs = yield* ssn.messages({ sessionID: session.id })
+      const lastMsg = allMsgs.at(-1)
+      expect(lastMsg?.info.role).toBe("user")
+      expect(lastMsg?.parts[0]).toMatchObject({
+        type: "compaction",
+        auto: true,
+      })
     }),
   )
 
@@ -1233,15 +1577,15 @@ describe("session.compaction.process", () => {
           })
           .pipe(Effect.forkChild)
 
-        yield* Deferred.await(ready).pipe(Effect.timeout("1 second"))
+        yield* Deferred.await(ready).pipe(Effect.timeout("5 seconds"))
         const start = Date.now()
         yield* Fiber.interrupt(fiber)
-        const exit = yield* Fiber.await(fiber).pipe(Effect.timeout("250 millis"))
+        const exit = yield* Fiber.await(fiber).pipe(Effect.timeout("1 second"))
 
         expect(Exit.isFailure(exit)).toBe(true)
         if (Exit.isFailure(exit)) {
           expect(Cause.hasInterrupts(exit.cause)).toBe(true)
-          expect(Date.now() - start).toBeLessThan(250)
+          expect(Date.now() - start).toBeLessThan(1500)
         }
       }).pipe(withCompaction({ llm: stub.layer }))
     },

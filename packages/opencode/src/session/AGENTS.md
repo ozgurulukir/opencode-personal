@@ -91,7 +91,7 @@ When filtering parts with `p is CompactionPart | SubtaskPart`, both types must b
 
 ### `compaction_continue` metadata guard scope
 
-`session/loop/run-loop.ts:171-182` — the double-compaction guard checks ALL visible messages for `compaction_continue` metadata, not just recent ones. This prevents infinite compaction loops but also means a `compaction_continue` marker from an old compaction blocks future auto-compaction. The guard is safe because `filterCompacted` removes old compaction markers from the visible window.
+`session/loop/run-loop.ts:171-182` — the double-compaction guard scopes only to the active user turn (`isCurrentTurnContinue`), checking if `lastUser` contains `compaction_continue` metadata rather than searching all messages in history. This prevents immediate re-compaction loops after an auto-compaction continue turn while ensuring future auto-compactions in the same session are not blocked once new user interactions occur.
 
 ### `processCompaction` history computation is order-dependent
 
@@ -113,9 +113,9 @@ When filtering parts with `p is CompactionPart | SubtaskPart`, both types must b
 
 `compaction.ts:554` — the synthetic "Continue" message after compaction is gated by `input.auto`. Manual `/compact` does NOT inject a continue message. The config key `compaction.autocontinue` (default `true`) and the plugin hook `experimental.compaction.autocontinue` both control this — config must be `true` AND plugin must return `{ enabled: true }` for the continue message to appear.
 
-### Continue message includes pending todos
+### Continue message includes pending todos & metadata preservation
 
-`compaction.ts:585-602` — when `Todo.Service` is available (via `Effect.serviceOption`), the continue message appends a "Pending todos:" block with `[H]`/`[M]`/`[L]` badges. The service is optional — if not provided, the continue message omits the todo block silently. This is a non-breaking enhancement: existing consumers that don't provide `Todo.Service` continue to work.
+`compaction.ts:589-612` — when `Todo.Service` is available (via `Effect.serviceOption`), the continue message appends a "Pending todos:" block with `[H]`/`[M]`/`[L]` priority badges and `[IN PROGRESS]` status badges for active tasks (`status === "in_progress"`). The service is optional — if not provided, the continue message omits the todo block silently. Additionally, `continueMsg` automatically inherits and preserves `tools`, `format`, and `system` metadata from the parent `userMessage` so subagent tool restrictions and output formats remain active after compaction.
 
 ### `summaryBudget` uses model output limit, not a hardcoded ratio
 
