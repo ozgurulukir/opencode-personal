@@ -20,3 +20,8 @@
 **Vulnerability:** A DOM-based XSS vulnerability existed in `packages/app/src/components/file-tree.tsx` where file drag images were generated using string concatenation of `outerHTML` and assigning it via `innerHTML` (`image.innerHTML = icon.outerHTML + text.outerHTML`).
 **Learning:** Concatenating `outerHTML` strings and injecting them via `innerHTML` can execute unintended scripts if the source DOM nodes contain unsanitized or unexpectedly manipulated content.
 **Prevention:** Always use safe DOM APIs like `cloneNode(true)` followed by `appendChild()` to copy DOM elements safely without executing embedded scripts or falling back to string parsing.
+
+## 2026-08-18 - DOM-based XSS vulnerabilities with DOMPurify and Shiki
+**Vulnerability:** Using DOMPurify to sanitize HTML and directly assigning it via `innerHTML` can lead to Mutation XSS (mXSS) vulnerabilities. Furthermore, unnecessarily sanitizing Shiki's `codeToHtml` output (which is already escaped) introduces unnecessary overhead and "security theater".
+**Learning:** For unsafe dynamically generated HTML, sanitize using `DOMPurify` with `RETURN_DOM_FRAGMENT: true` and inject the result using `appendChild` instead of `innerHTML`. Do not use DOMPurify to sanitize Shiki's `codeToHtml` output, as Shiki inherently escapes HTML entities.
+**Prevention:** Always verify if an external library already handles escaping (like Shiki) before adding DOMPurify. When using DOMPurify, prefer injecting the sanitized output as a `DocumentFragment` rather than a raw HTML string.

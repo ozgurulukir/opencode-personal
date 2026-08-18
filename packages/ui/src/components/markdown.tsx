@@ -305,7 +305,8 @@ export function Markdown(
       copied: i18n.t("ui.message.copied"),
     }
     const temp = document.createElement("div")
-    temp.innerHTML = sanitize(content)
+    const fragment = DOMPurify.sanitize(content, { ...config, RETURN_DOM_FRAGMENT: true })
+    temp.appendChild(fragment as Node)
     decorate(temp, labels)
 
     morphdom(container, temp, {
