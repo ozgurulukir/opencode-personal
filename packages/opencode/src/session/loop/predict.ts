@@ -12,7 +12,7 @@ import { Cause, Effect } from "effect"
 import { streamText, wrapLanguageModel } from "ai"
 import * as EffectLogger from "@opencode-ai/core/effect/logger"
 import { InstallationVersion } from "@opencode-ai/core/installation/version"
-import { ProviderTransform } from "@/provider/transform"
+import { ProviderTransform, isQwen3Model } from "@/provider/transform"
 import { Config } from "@/config/config"
 import { Agent } from "@/agent/agent"
 import { Provider } from "@/provider/provider"
@@ -113,12 +113,18 @@ export const predict = Effect.fn("SessionPrompt.predict")(function* (
     ],
   })
 
+  // Qwen3 chat templates require the system message at index 0.
+  const qwen3 = isQwen3Model(model)
+  const predictMessages = qwen3
+    ? [{ role: "system" as const, content: PREDICT_SYSTEM }, ...msgs, { role: "user" as const, content: PREDICT_NUDGE }]
+    : [...msgs, { role: "user" as const, content: PREDICT_NUDGE }]
+
   const text = yield* Effect.tryPromise(() =>
     streamText({
       model: wrapped,
       allowSystemInMessages: true,
-      system: PREDICT_SYSTEM,
-      messages: [...msgs, { role: "user", content: PREDICT_NUDGE }],
+      system: qwen3 ? undefined : PREDICT_SYSTEM,
+      messages: predictMessages,
       maxOutputTokens: ProviderTransform.maxOutputTokens(model),
       temperature: model.capabilities.temperature ? 0.7 : undefined,
       providerOptions: ProviderTransform.providerOptions(model, ProviderTransform.smallOptions(model)),

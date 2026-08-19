@@ -1170,4 +1170,23 @@ export function schema(model: Model, schema: JSONSchema.BaseSchema | JSONSchema7
   return schema as JSONSchema7
 }
 
+/**
+ * Returns true when the model belongs to the Qwen3 family.
+ * Qwen3 chat templates require the system message at index 0 in the messages
+ * array; the AI SDK's separate `system` field is not reliably prepended by
+ * @ai-sdk/openai-compatible for these models.
+ *
+ * Matches on "qwen3" in any identifier field to avoid false positives from
+ * unrelated models that happen to contain "qwen" (e.g. Qwen2 fine-tunes).
+ *
+ * Note that `providerID` participates in the match: a custom provider named
+ * e.g. "qwen3-gateway" opts ALL of its models into the inline-system path,
+ * including non-Qwen ones routed through that gateway.
+ */
+export function isQwen3Model(model: Pick<Model, "id" | "providerID" | "api">): boolean {
+  return [model.id, model.providerID, model.api.id].some((s) =>
+    s.toLowerCase().includes("qwen3"),
+  )
+}
+
 export * as ProviderTransform from "./transform"

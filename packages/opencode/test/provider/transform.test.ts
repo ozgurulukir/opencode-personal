@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
-import { ProviderTransform } from "@/provider/transform"
+import { ProviderTransform, isQwen3Model } from "@/provider/transform"
 import { ModelID, ProviderID } from "../../src/provider/schema"
+import type { Model } from "../../src/provider/model"
 
 describe("ProviderTransform.options - setCacheKey", () => {
   const sessionID = "test-session-123"
@@ -3761,5 +3762,41 @@ describe("ProviderTransform.shouldUseInstructions", () => {
 
   test("returns false for non-openai provider with no auth", () => {
     expect(ProviderTransform.shouldUseInstructions("anthropic", undefined)).toBe(false)
+  })
+})
+
+describe("isQwen3Model", () => {
+  const makeModel = (id: string, providerID: string, apiId: string): Pick<Model, "id" | "providerID" | "api"> => ({
+    id: id as ModelID,
+    providerID: providerID as ProviderID,
+    api: { id: apiId, url: "", npm: "" },
+  })
+
+  test("matches Qwen3 in model.id", () => {
+    expect(isQwen3Model(makeModel("Qwen/Qwen3-235B-A22B", "openrouter", "qwen3"))).toBe(true)
+  })
+
+  test("matches qwen3 lowercase in model.id", () => {
+    expect(isQwen3Model(makeModel("qwen3-8b", "ollama", "qwen3-8b"))).toBe(true)
+  })
+
+  test("matches Qwen3 in providerID", () => {
+    expect(isQwen3Model(makeModel("some-model", "qwen3-provider", "api-id"))).toBe(true)
+  })
+
+  test("matches Qwen3 in api.id", () => {
+    expect(isQwen3Model(makeModel("generic-name", "generic-provider", "qwen3-72b-instruct"))).toBe(true)
+  })
+
+  test("rejects Qwen2 models", () => {
+    expect(isQwen3Model(makeModel("Qwen/Qwen2.5-72B-Instruct", "openrouter", "qwen2.5"))).toBe(false)
+  })
+
+  test("rejects non-Qwen models", () => {
+    expect(isQwen3Model(makeModel("anthropic/claude-sonnet-4", "anthropic", "claude-sonnet-4-20250514"))).toBe(false)
+  })
+
+  test("rejects models with 'qwen' but not 'qwen3'", () => {
+    expect(isQwen3Model(makeModel("qwen-turbo", "dashscope", "qwen-turbo-latest"))).toBe(false)
   })
 })
