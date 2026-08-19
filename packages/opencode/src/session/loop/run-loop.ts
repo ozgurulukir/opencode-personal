@@ -275,16 +275,17 @@ export const runLoop: (deps: RunLoopDeps, sessionID: SessionID) => Effect.Effect
 
       const cfg = yield* deps.config.get()
       // ⚡ Bolt Optimization: Replace chained .filter().map().join(" ") with a single loop to reduce GC pressure and O(N) traversals
-      let userText: string | undefined = undefined
+      let userText: string | undefined
       const parts = lastUserMsg?.parts
       if (parts) {
-        userText = ""
+        const texts: string[] = []
         for (let i = 0; i < parts.length; i++) {
           const p = parts[i]
           if (p.type === "text") {
-            userText += (userText ? " " : "") + p.text
+            texts.push(p.text)
           }
         }
+        userText = texts.join(" ")
       }
       const autoMatchOpts = cfg.skills?.autoMatch
         ? {

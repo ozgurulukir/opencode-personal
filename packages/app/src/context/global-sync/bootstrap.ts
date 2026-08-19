@@ -262,7 +262,7 @@ export async function bootstrapDirectory(input: {
               if (id) ids.push(id)
             }
             const grouped = groupBySession(
-              (x.data ?? []).filter((perm): perm is PermissionRequest => !!perm?.id && !!perm.sessionID),
+              perms.filter((perm): perm is PermissionRequest => !!perm?.id && !!perm.sessionID),
             )
             return warmSessions({ ids, store: input.store, setStore: input.setStore, sdk: input.sdk }).then(() =>
               batch(() => {
@@ -294,7 +294,7 @@ export async function bootstrapDirectory(input: {
               const id = questions[i]?.sessionID
               if (id) ids.push(id)
             }
-            const grouped = groupBySession((x.data ?? []).filter((q): q is QuestionRequest => !!q?.id && !!q.sessionID))
+            const grouped = groupBySession(questions.filter((q): q is QuestionRequest => !!q?.id && !!q.sessionID))
             return warmSessions({ ids, store: input.store, setStore: input.setStore, sdk: input.sdk }).then(() =>
               batch(() => {
                 for (const sessionID of Object.keys(input.store.question)) {
