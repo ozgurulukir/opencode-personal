@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { ProviderTransform, isQwen3Model } from "@/provider/transform"
 import { ModelID, ProviderID } from "../../src/provider/schema"
+import type { Model } from "../../src/provider/model"
 
 describe("ProviderTransform.options - setCacheKey", () => {
   const sessionID = "test-session-123"
@@ -3765,11 +3766,11 @@ describe("ProviderTransform.shouldUseInstructions", () => {
 })
 
 describe("isQwen3Model", () => {
-  const makeModel = (id: string, providerID: string, apiId: string) => ({
-    id,
-    providerID,
+  const makeModel = (id: string, providerID: string, apiId: string): Pick<Model, "id" | "providerID" | "api"> => ({
+    id: id as ModelID,
+    providerID: providerID as ProviderID,
     api: { id: apiId, url: "", npm: "" },
-  } as any)
+  })
 
   test("matches Qwen3 in model.id", () => {
     expect(isQwen3Model(makeModel("Qwen/Qwen3-235B-A22B", "openrouter", "qwen3"))).toBe(true)

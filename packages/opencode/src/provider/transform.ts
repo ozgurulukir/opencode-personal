@@ -1178,6 +1178,10 @@ export function schema(model: Model, schema: JSONSchema.BaseSchema | JSONSchema7
  *
  * Matches on "qwen3" in any identifier field to avoid false positives from
  * unrelated models that happen to contain "qwen" (e.g. Qwen2 fine-tunes).
+ *
+ * Note that `providerID` participates in the match: a custom provider named
+ * e.g. "qwen3-gateway" opts ALL of its models into the inline-system path,
+ * including non-Qwen ones routed through that gateway.
  */
 export function isQwen3Model(model: Pick<Model, "id" | "providerID" | "api">): boolean {
   return [model.id, model.providerID, model.api.id].some((s) =>
