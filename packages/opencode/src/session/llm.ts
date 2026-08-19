@@ -5,7 +5,7 @@ import * as Stream from "effect/Stream"
 import { streamText, wrapLanguageModel, type ModelMessage, type Tool, tool, jsonSchema } from "ai"
 import { MergeOptions } from "./merge-options"
 import { GitLabWorkflowLanguageModel } from "gitlab-ai-provider"
-import { ProviderTransform } from "@/provider/transform"
+import { ProviderTransform, isQwen3Model } from "@/provider/transform"
 import { Config } from "@/config/config"
 import { InstanceState } from "@/effect/instance-state"
 import type { Agent } from "@/agent/agent"
@@ -165,6 +165,14 @@ const live: Layer.Layer<
 
       const isWorkflow = language instanceof GitLabWorkflowLanguageModel
       const messages = input.messages
+
+      // Qwen3 chat templates require the system message at index 0.
+      // Inline it into messages when the SDK won't prepend it reliably.
+      const shouldPrependSystem =
+        isQwen3Model(input.model) && delivery.type === "messages" && !isWorkflow && systemMessages.length > 0
+      const effectiveMessages = shouldPrependSystem
+        ? [...systemMessages.map((x) => ({ role: "system" as const, content: x })), ...messages]
+        : messages
 
       const params = yield* plugin.trigger(
         "chat.params",
@@ -404,8 +412,11 @@ const live: Layer.Layer<
         },
         maxRetries: input.retries ?? 0,
         allowSystemInMessages: true,
-        system: delivery.type !== "messages" || isWorkflow ? undefined : systemMessages.map((x) => ({ role: "system" as const, content: x })),
-        messages,
+        system:
+          delivery.type !== "messages" || isWorkflow || shouldPrependSystem
+            ? undefined
+            : systemMessages.map((x) => ({ role: "system" as const, content: x })),
+        messages: effectiveMessages,
         model: wrapLanguageModel({
           model: language,
           middleware: [
