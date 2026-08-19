@@ -42,9 +42,9 @@ const iconPaths = {
   check: '<path d="M5 11.9657L8.37838 14.7529L15 5.83398" stroke="currentColor" stroke-linecap="square"/>',
 }
 
-function sanitize(html: string) {
-  if (!DOMPurify.isSupported) return ""
-  return DOMPurify.sanitize(html, config)
+function sanitize(html: string, options: any = {}) {
+  if (!DOMPurify.isSupported) return options.RETURN_DOM_FRAGMENT ? document.createDocumentFragment() : ""
+  return DOMPurify.sanitize(html, { ...config, ...options }) as any
 }
 
 function escape(text: string) {
@@ -305,7 +305,7 @@ export function Markdown(
       copied: i18n.t("ui.message.copied"),
     }
     const temp = document.createElement("div")
-    const fragment = DOMPurify.sanitize(content, { ...config, RETURN_DOM_FRAGMENT: true })
+    const fragment = sanitize(content, { RETURN_DOM_FRAGMENT: true })
     temp.appendChild(fragment as Node)
     decorate(temp, labels)
 
