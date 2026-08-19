@@ -823,7 +823,14 @@ function installDetail(err: unknown) {
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter(Boolean)
-  const errs = lines.filter((line) => line.startsWith("error:")).map((line) => line.replace(/^error:\s*/, ""))
+  // ⚡ Bolt Optimization: Replace chained .filter().map() with a single loop to reduce GC pressure and O(N) traversals
+  const errs: string[] = []
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]
+    if (line.startsWith("error:")) {
+      errs.push(line.replace(/^error:\s*/, ""))
+    }
+  }
   return {
     message: errs[0] ?? lines.at(-1) ?? errorMessage(hit),
     missing: lines.some((line) => line.includes("No version matching")),

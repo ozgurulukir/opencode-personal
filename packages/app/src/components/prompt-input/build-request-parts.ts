@@ -97,38 +97,42 @@ export function buildRequestParts(input: BuildRequestPartsInput) {
     },
   ]
 
-  const files = input.prompt.filter(isFileAttachment).map((attachment) => {
-    const path = absolute(input.sessionDirectory, attachment.path)
-    return {
-      id: Identifier.ascending("part"),
-      type: "file",
-      mime: "text/plain",
-      url: `file://${encodeFilePath(path)}${fileQuery(attachment.selection)}`,
-      filename: getFilename(attachment.path),
-      source: {
+  // ⚡ Bolt Optimization: Replace chained .filter().map() with a single loop to reduce GC pressure and O(N) traversals
+  const files: PromptRequestPart[] = []
+  const agents: PromptRequestPart[] = []
+  for (let i = 0; i < input.prompt.length; i++) {
+    const attachment = input.prompt[i]
+    if (isFileAttachment(attachment)) {
+      const path = absolute(input.sessionDirectory, attachment.path)
+      files.push({
+        id: Identifier.ascending("part"),
         type: "file",
-        text: {
+        mime: "text/plain",
+        url: `file://${encodeFilePath(path)}${fileQuery(attachment.selection)}`,
+        filename: getFilename(attachment.path),
+        source: {
+          type: "file",
+          text: {
+            value: attachment.content,
+            start: attachment.start,
+            end: attachment.end,
+          },
+          path,
+        },
+      } satisfies PromptRequestPart)
+    } else if (isAgentAttachment(attachment)) {
+      agents.push({
+        id: Identifier.ascending("part"),
+        type: "agent",
+        name: attachment.name,
+        source: {
           value: attachment.content,
           start: attachment.start,
           end: attachment.end,
         },
-        path,
-      },
-    } satisfies PromptRequestPart
-  })
-
-  const agents = input.prompt.filter(isAgentAttachment).map((attachment) => {
-    return {
-      id: Identifier.ascending("part"),
-      type: "agent",
-      name: attachment.name,
-      source: {
-        value: attachment.content,
-        start: attachment.start,
-        end: attachment.end,
-      },
-    } satisfies PromptRequestPart
-  })
+      } satisfies PromptRequestPart)
+    }
+  }
 
   const used = new Set(files.map((part) => part.url))
   const context = input.context.flatMap((item) => {

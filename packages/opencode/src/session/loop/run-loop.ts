@@ -274,7 +274,18 @@ export const runLoop: (deps: RunLoopDeps, sessionID: SessionID) => Effect.Effect
       yield* deps.plugin.trigger("experimental.chat.messages.transform", {}, { messages: msgs })
 
       const cfg = yield* deps.config.get()
-      const userText = lastUserMsg?.parts.filter((p) => p.type === "text").map((p) => p.text).join(" ")
+      // ⚡ Bolt Optimization: Replace chained .filter().map().join(" ") with a single loop to reduce GC pressure and O(N) traversals
+      let userText: string | undefined = undefined
+      const parts = lastUserMsg?.parts
+      if (parts) {
+        userText = ""
+        for (let i = 0; i < parts.length; i++) {
+          const p = parts[i]
+          if (p.type === "text") {
+            userText += (userText ? " " : "") + p.text
+          }
+        }
+      }
       const autoMatchOpts = cfg.skills?.autoMatch
         ? {
             autoMatch: true,
