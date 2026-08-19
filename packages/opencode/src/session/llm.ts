@@ -5,7 +5,7 @@ import * as Stream from "effect/Stream"
 import { streamText, wrapLanguageModel, type ModelMessage, type Tool, tool, jsonSchema } from "ai"
 import { MergeOptions } from "./merge-options"
 import { GitLabWorkflowLanguageModel } from "gitlab-ai-provider"
-import { ProviderTransform } from "@/provider/transform"
+import { ProviderTransform, isQwen3Model } from "@/provider/transform"
 import { Config } from "@/config/config"
 import { InstanceState } from "@/effect/instance-state"
 import type { Agent } from "@/agent/agent"
@@ -166,18 +166,10 @@ const live: Layer.Layer<
       const isWorkflow = language instanceof GitLabWorkflowLanguageModel
       const messages = input.messages
 
-      // Qwen3 chat templates enforce that the system message must be at index 0
-      // in the messages array. The AI SDK's separate `system` field is not always
-      // reliably prepended by @ai-sdk/openai-compatible for these models, so we
-      // inline the system messages here to guarantee ordering.
-      //
-      // Match on any Qwen identifier because model.id format varies by provider
-      // (e.g. "Qwen/Qwen3.8-27B", "qwen3-8-27b", etc.).
-      const isQwen = [input.model.id, input.model.providerID, input.model.api.id].some((s) =>
-        s.toLowerCase().includes("qwen"),
-      )
+      // Qwen3 chat templates require the system message at index 0.
+      // Inline it into messages when the SDK won't prepend it reliably.
       const shouldPrependSystem =
-        isQwen && delivery.type === "messages" && !isWorkflow && systemMessages.length > 0
+        isQwen3Model(input.model) && delivery.type === "messages" && !isWorkflow && systemMessages.length > 0
       const effectiveMessages = shouldPrependSystem
         ? [...systemMessages.map((x) => ({ role: "system" as const, content: x })), ...messages]
         : messages
@@ -420,7 +412,10 @@ const live: Layer.Layer<
         },
         maxRetries: input.retries ?? 0,
         allowSystemInMessages: true,
-        system: delivery.type !== "messages" || isWorkflow ? undefined : (shouldPrependSystem ? undefined : systemMessages.map((x) => ({ role: "system" as const, content: x }))),
+        system:
+          delivery.type !== "messages" || isWorkflow || shouldPrependSystem
+            ? undefined
+            : systemMessages.map((x) => ({ role: "system" as const, content: x })),
         messages: effectiveMessages,
         model: wrapLanguageModel({
           model: language,
