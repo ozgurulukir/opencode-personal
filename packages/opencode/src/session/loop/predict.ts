@@ -113,12 +113,19 @@ export const predict = Effect.fn("SessionPrompt.predict")(function* (
     ],
   })
 
+  const isQwenPredict = [model.id, model.providerID, model.api.id].some((s) =>
+    s.toLowerCase().includes("qwen"),
+  )
+  const predictMessages = isQwenPredict
+    ? [{ role: "system" as const, content: PREDICT_SYSTEM }, ...msgs, { role: "user" as const, content: PREDICT_NUDGE }]
+    : [...msgs, { role: "user" as const, content: PREDICT_NUDGE }]
+
   const text = yield* Effect.tryPromise(() =>
     streamText({
       model: wrapped,
       allowSystemInMessages: true,
-      system: PREDICT_SYSTEM,
-      messages: [...msgs, { role: "user", content: PREDICT_NUDGE }],
+      ...(isQwenPredict ? {} : { system: PREDICT_SYSTEM }),
+      messages: predictMessages,
       maxOutputTokens: ProviderTransform.maxOutputTokens(model),
       temperature: model.capabilities.temperature ? 0.7 : undefined,
       providerOptions: ProviderTransform.providerOptions(model, ProviderTransform.smallOptions(model)),

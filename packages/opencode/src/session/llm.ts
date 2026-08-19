@@ -166,6 +166,22 @@ const live: Layer.Layer<
       const isWorkflow = language instanceof GitLabWorkflowLanguageModel
       const messages = input.messages
 
+      // Qwen3 chat templates enforce that the system message must be at index 0
+      // in the messages array. The AI SDK's separate `system` field is not always
+      // reliably prepended by @ai-sdk/openai-compatible for these models, so we
+      // inline the system messages here to guarantee ordering.
+      //
+      // Match on any Qwen identifier because model.id format varies by provider
+      // (e.g. "Qwen/Qwen3.8-27B", "qwen3-8-27b", etc.).
+      const isQwen = [input.model.id, input.model.providerID, input.model.api.id].some((s) =>
+        s.toLowerCase().includes("qwen"),
+      )
+      const shouldPrependSystem =
+        isQwen && delivery.type === "messages" && !isWorkflow && systemMessages.length > 0
+      const effectiveMessages = shouldPrependSystem
+        ? [...systemMessages.map((x) => ({ role: "system" as const, content: x })), ...messages]
+        : messages
+
       const params = yield* plugin.trigger(
         "chat.params",
         {
@@ -404,8 +420,8 @@ const live: Layer.Layer<
         },
         maxRetries: input.retries ?? 0,
         allowSystemInMessages: true,
-        system: delivery.type !== "messages" || isWorkflow ? undefined : systemMessages.map((x) => ({ role: "system" as const, content: x })),
-        messages,
+        system: delivery.type !== "messages" || isWorkflow ? undefined : (shouldPrependSystem ? undefined : systemMessages.map((x) => ({ role: "system" as const, content: x }))),
+        messages: effectiveMessages,
         model: wrapLanguageModel({
           model: language,
           middleware: [
