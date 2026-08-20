@@ -283,6 +283,9 @@ interface State {
   status: Record<string, Status>
   clients: Record<string, MCPClient>
   defs: Record<string, MCPToolDef[]>
+  // Pending auto-reconnect timers, so disconnect()/storeClient() can cancel them
+  // instead of letting a fired timer resurrect a disconnected server.
+  reconnects: Map<string, ReturnType<typeof setTimeout>>
 }
 
 export interface Interface {
@@ -594,7 +597,13 @@ export const layer = Layer.effect(
           // Schedule reconnect with exponential backoff
           const reconnect = (attempt: number) => {
             const delay = Math.min(1000 * Math.pow(2, attempt), 30_000)
-            setTimeout(async () => {
+            const existing = s.reconnects.get(name)
+            if (existing) clearTimeout(existing)
+            const timer = setTimeout(async () => {
+              s.reconnects.delete(name)
+              // Guard against resurrecting a server that was disconnected or
+              // manually reconnected while this timer was pending.
+              if (s.clients[name] || s.status[name]?.status === "disabled") return
               log.info("attempting mcp reconnect", { server: name, attempt })
               const mcpConfig = await bridge.promise(getMcpConfig(name))
               if (!mcpConfig) {
@@ -616,6 +625,7 @@ export const layer = Layer.effect(
               )
               log.info("mcp reconnected", { server: name })
             }, delay)
+            s.reconnects.set(name, timer)
           }
           reconnect(0)
         }
@@ -631,6 +641,7 @@ export const layer = Layer.effect(
           status: {},
           clients: {},
           defs: {},
+          reconnects: new Map(),
         }
 
         yield* Effect.forEach(
@@ -662,6 +673,8 @@ export const layer = Layer.effect(
 
         yield* Effect.addFinalizer(() =>
           Effect.gen(function* () {
+            for (const timer of s.reconnects.values()) clearTimeout(timer)
+            s.reconnects.clear()
             yield* Effect.forEach(
               Object.values(s.clients),
               (client) =>
@@ -705,6 +718,13 @@ export const layer = Layer.effect(
       timeout?: number,
     ) {
       const bridge = yield* EffectBridge.make()
+      // Replacing the client: a pending auto-reconnect timer would fire later and
+      // clobber this fresh client with a second connection.
+      const timer = s.reconnects.get(name)
+      if (timer) {
+        clearTimeout(timer)
+        s.reconnects.delete(name)
+      }
       yield* closeClient(s, name)
       s.status[name] = { status: "connected" }
       s.clients[name] = client
@@ -766,6 +786,11 @@ export const layer = Layer.effect(
 
     const disconnect = Effect.fn("MCP.disconnect")(function* (name: string) {
       const s = yield* InstanceState.get(state)
+      const timer = s.reconnects.get(name)
+      if (timer) {
+        clearTimeout(timer)
+        s.reconnects.delete(name)
+      }
       yield* closeClient(s, name)
       delete s.clients[name]
       s.status[name] = { status: "disabled" }

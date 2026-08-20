@@ -24,8 +24,13 @@ export const controlHandlers = HttpApiBuilder.group(RootHttpApi, "control", (han
     })
 
     const log = Effect.fn("ControlHttpApi.log")(function* (ctx: { payload: typeof LogInput.Type }) {
-      const logger = Log.create({ service: ctx.payload.service })
-      logger[ctx.payload.level](ctx.payload.message, ctx.payload.extra)
+      // Remotely reachable endpoint: strip line breaks and control characters so
+      // a crafted payload cannot forge additional lines in the structured log
+      // output (log injection). Newlines in messages are escaped, not dropped.
+      const service = ctx.payload.service.replace(/[^\w.:-]+/g, "-").replace(/^-+|-+$/g, "") || "remote"
+      const message = ctx.payload.message.replace(/\r?\n/g, "\\n")
+      const logger = Log.create({ service })
+      logger[ctx.payload.level](message, ctx.payload.extra)
       return true
     })
 
