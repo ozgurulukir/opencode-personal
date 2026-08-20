@@ -473,7 +473,14 @@ export const layer = Layer.effect(
               content: `Create an agent configuration based on this request: "${input.description}".\n\nIMPORTANT: The following identifiers already exist and must NOT be used: ${existing.map((i) => i.name).join(", ")}\n  Return ONLY the JSON object, no other text, do not wrap in backticks`,
             },
           ],
-          system: delivery.type !== "messages" ? undefined : [system.prefix, system.suffix].filter((x) => x).map((item) => ({ role: "system" as const, content: item })),
+          system: delivery.type !== "messages" ? undefined : (function() {
+            // ⚡ Bolt Optimization: Replace chained .filter().map() with direct push to reduce GC pressure.
+            // An IIFE is used here to avoid polluting the outer scope and strictly type the array.
+            const systemArray: Array<{ role: "system"; content: string }> = []
+            if (system.prefix) systemArray.push({ role: "system" as const, content: system.prefix })
+            if (system.suffix) systemArray.push({ role: "system" as const, content: system.suffix })
+            return systemArray
+          })(),
           model: language,
           schema: z.object({
             identifier: z.string(),
@@ -487,7 +494,8 @@ export const layer = Layer.effect(
             const result = streamObject({
               ...params,
               providerOptions: ProviderTransform.providerOptions(resolved, {
-                instructions: [system.prefix, system.suffix].filter((x) => x).join("\n"),
+                // ⚡ Bolt Optimization: Avoid intermediate array allocation for join
+                instructions: (system.prefix && system.suffix) ? `${system.prefix}\n${system.suffix}` : (system.prefix || system.suffix || ""),
                 store: false,
               }),
               onError: () => {},

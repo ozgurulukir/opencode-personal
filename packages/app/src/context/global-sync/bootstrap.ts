@@ -254,9 +254,15 @@ export async function bootstrapDirectory(input: {
       () =>
         retry(() =>
           input.sdk.permission.list().then((x) => {
-            const ids = (x.data ?? []).map((perm) => perm?.sessionID).filter((id): id is string => !!id)
+            // ⚡ Bolt Optimization: Replace chained .map().filter() with a single loop to reduce GC pressure and O(N) traversals
+            const ids: string[] = []
+            const perms = x.data ?? []
+            for (let i = 0; i < perms.length; i++) {
+              const id = perms[i]?.sessionID
+              if (id) ids.push(id)
+            }
             const grouped = groupBySession(
-              (x.data ?? []).filter((perm): perm is PermissionRequest => !!perm?.id && !!perm.sessionID),
+              perms.filter((perm): perm is PermissionRequest => !!perm?.id && !!perm.sessionID),
             )
             return warmSessions({ ids, store: input.store, setStore: input.setStore, sdk: input.sdk }).then(() =>
               batch(() => {
@@ -281,8 +287,14 @@ export async function bootstrapDirectory(input: {
       () =>
         retry(() =>
           input.sdk.question.list().then((x) => {
-            const ids = (x.data ?? []).map((question) => question?.sessionID).filter((id): id is string => !!id)
-            const grouped = groupBySession((x.data ?? []).filter((q): q is QuestionRequest => !!q?.id && !!q.sessionID))
+            // ⚡ Bolt Optimization: Replace chained .map().filter() with a single loop to reduce GC pressure and O(N) traversals
+            const ids: string[] = []
+            const questions = x.data ?? []
+            for (let i = 0; i < questions.length; i++) {
+              const id = questions[i]?.sessionID
+              if (id) ids.push(id)
+            }
+            const grouped = groupBySession(questions.filter((q): q is QuestionRequest => !!q?.id && !!q.sessionID))
             return warmSessions({ ids, store: input.store, setStore: input.setStore, sdk: input.sdk }).then(() =>
               batch(() => {
                 for (const sessionID of Object.keys(input.store.question)) {
