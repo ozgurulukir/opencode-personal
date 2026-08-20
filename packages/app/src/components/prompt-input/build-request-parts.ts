@@ -98,8 +98,8 @@ export function buildRequestParts(input: BuildRequestPartsInput) {
   ]
 
   // ⚡ Bolt Optimization: Replace chained .filter().map() with a single loop to reduce GC pressure and O(N) traversals
-  const files: PromptRequestPart[] = []
-  const agents: PromptRequestPart[] = []
+  const files: Extract<PromptRequestPart, { type: "file" }>[] = []
+  const agents: Extract<PromptRequestPart, { type: "agent" }>[] = []
   for (let i = 0; i < input.prompt.length; i++) {
     const attachment = input.prompt[i]
     if (isFileAttachment(attachment)) {
