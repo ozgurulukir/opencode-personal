@@ -70,6 +70,19 @@ export interface RunLoopDeps {
   cachedToolSchema: CachedToolSchema
 }
 
+// ⚡ Bolt Optimization: Replace chained .filter().map().join(" ") with a single loop to reduce GC pressure and O(N) traversals
+function extractUserText(parts: MessageV2.Part[] | undefined): string | undefined {
+  if (!parts) return undefined
+  const texts: string[] = []
+  for (let i = 0; i < parts.length; i++) {
+    const p = parts[i]
+    if (p.type === "text") {
+      texts.push(p.text)
+    }
+  }
+  return texts.join(" ")
+}
+
 export const runLoop: (deps: RunLoopDeps, sessionID: SessionID) => Effect.Effect<MessageV2.WithParts> = Effect.fn(
   "SessionPrompt.run",
 )(function* (deps: RunLoopDeps, sessionID: SessionID) {
@@ -274,7 +287,7 @@ export const runLoop: (deps: RunLoopDeps, sessionID: SessionID) => Effect.Effect
       yield* deps.plugin.trigger("experimental.chat.messages.transform", {}, { messages: msgs })
 
       const cfg = yield* deps.config.get()
-      const userText = lastUserMsg?.parts.filter((p) => p.type === "text").map((p) => p.text).join(" ")
+      const userText = extractUserText(lastUserMsg?.parts)
       const autoMatchOpts = cfg.skills?.autoMatch
         ? {
             autoMatch: true,
