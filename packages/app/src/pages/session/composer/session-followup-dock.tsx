@@ -57,7 +57,6 @@ export function SessionFollowupDock(props: {
             size="normal"
             variant="ghost"
             tabIndex={-1}
-            aria-label={store.collapsed ? "Expand follow-ups" : "Collapse follow-ups"}
             style={{ transform: `rotate(${store.collapsed ? 180 : 0}deg)` }}
             onMouseDown={(event) => {
               event.preventDefault()
