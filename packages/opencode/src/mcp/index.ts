@@ -594,6 +594,12 @@ export const layer = Layer.effect(
           delete s.clients[name]
           delete s.defs[name]
 
+          // Live guard against resurrecting a server that was disconnected or
+          // manually reconnected. A closure (not an inline check) so it reads the
+          // current state on every call — TS narrowing of `s.status[name]` must
+          // not carry across the awaits below, where disconnect() may mutate it.
+          const resurrected = () => Boolean(s.clients[name]) || s.status[name]?.status === "disabled"
+
           // Schedule reconnect with exponential backoff
           const reconnect = (attempt: number) => {
             const delay = Math.min(1000 * Math.pow(2, attempt), 30_000)
@@ -601,9 +607,7 @@ export const layer = Layer.effect(
             if (existing) clearTimeout(existing)
             const timer = setTimeout(async () => {
               s.reconnects.delete(name)
-              // Guard against resurrecting a server that was disconnected or
-              // manually reconnected while this timer was pending.
-              if (s.clients[name] || s.status[name]?.status === "disabled") return
+              if (resurrected()) return
               log.info("attempting mcp reconnect", { server: name, attempt })
               const mcpConfig = await bridge.promise(getMcpConfig(name))
               if (!mcpConfig) {
@@ -614,6 +618,13 @@ export const layer = Layer.effect(
               if (!result?.mcpClient) {
                 log.warn("mcp reconnect failed, retrying", { server: name, attempt })
                 reconnect(attempt + 1)
+                return
+              }
+              // Re-check after the async connect: disconnect() may have run while
+              // create() was in flight (this timer already removed itself from
+              // s.reconnects, so the clearTimeout in disconnect() cannot stop us).
+              if (resurrected()) {
+                await result.mcpClient.close().catch(() => {})
                 return
               }
               s.status[name] = result.status
