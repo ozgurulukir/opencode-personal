@@ -129,6 +129,13 @@ export const layer = Layer.effect(
       const cached = toolSchemaCache.get(key)
       if (cached) return cached.schema
       const transformed = ProviderTransform.schema(model, sourceSchema)
+      // Bound the cache: keys embed the full serialized schema, so MCP tool-list
+      // churn creates new entries that would otherwise accumulate forever (same
+      // cap pattern as the caches in server/shared/ui.ts).
+      if (toolSchemaCache.size > 256) {
+        const firstKey = toolSchemaCache.keys().next().value
+        if (firstKey) toolSchemaCache.delete(firstKey)
+      }
       toolSchemaCache.set(key, { schema: transformed })
       return transformed
     })

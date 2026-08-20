@@ -1,4 +1,4 @@
-import { onMount, splitProps, type ComponentProps, Show, mergeProps } from "solid-js"
+import { onMount, onCleanup, splitProps, type ComponentProps, Show, mergeProps } from "solid-js"
 import { createResizeObserver } from "@solid-primitives/resize-observer"
 import { createStore } from "solid-js/store"
 import { useI18n } from "../context/i18n"
@@ -105,6 +105,10 @@ export function ScrollView(props: ScrollViewProps) {
 
   let startY = 0
   let startScrollTop = 0
+  // Set while a thumb drag is active so component disposal can end it; without
+  // this, unmounting the thumb mid-drag leaves isDragging stuck true forever.
+  let stopDrag: (() => void) | undefined
+  onCleanup(() => stopDrag?.())
 
   const onThumbPointerDown = (e: PointerEvent) => {
     e.preventDefault()
@@ -127,15 +131,26 @@ export function ScrollView(props: ScrollViewProps) {
       }
     }
 
-    const onPointerUp = (e: PointerEvent) => {
+    const stop = (e?: PointerEvent) => {
       setState("isDragging", false)
-      thumbRef.releasePointerCapture(e.pointerId)
+      if (e && thumbRef.hasPointerCapture(e.pointerId)) thumbRef.releasePointerCapture(e.pointerId)
       thumbRef.removeEventListener("pointermove", onPointerMove)
       thumbRef.removeEventListener("pointerup", onPointerUp)
+      thumbRef.removeEventListener("lostpointercapture", onLostCapture)
+      stopDrag = undefined
     }
+
+    const onPointerUp = (e: PointerEvent) => stop(e)
+
+    // Fires whenever pointer capture is lost for ANY reason (explicit release,
+    // element unmounted mid-drag, browser taking the pointer away) — the only
+    // reliable way to reset drag state when the thumb disappears under the pointer.
+    const onLostCapture = () => stop()
 
     thumbRef.addEventListener("pointermove", onPointerMove)
     thumbRef.addEventListener("pointerup", onPointerUp)
+    thumbRef.addEventListener("lostpointercapture", onLostCapture)
+    stopDrag = stop
   }
 
   // Keybinds implementation

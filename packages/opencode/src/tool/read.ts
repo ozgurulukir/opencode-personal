@@ -7,6 +7,7 @@ import { LSP } from "@/lsp/lsp"
 import DESCRIPTION from "./read.txt"
 import { InstanceState } from "@/effect/instance-state"
 import { assertExternalDirectoryEffect } from "./external-directory"
+import { resolvePath } from "./file-path"
 import { Instruction } from "../session/instruction"
 import { isPdfAttachment, sniffAttachmentMime } from "@/util/media"
 import { Reference } from "@/reference/reference"
@@ -161,6 +162,10 @@ export const ReadTool = Tool.define(
       if (!path.isAbsolute(filepath)) {
         filepath = path.resolve(instance.directory, filepath)
       }
+      // Symlink-safe resolution (mirrors write/edit): a symlink inside the project
+      // pointing outside must surface its real location so assertExternalDirectoryEffect
+      // can prompt, instead of silently reading through the link.
+      filepath = resolvePath(filepath)
       if (process.platform === "win32") {
         filepath = AppFileSystem.normalizePath(filepath)
       }

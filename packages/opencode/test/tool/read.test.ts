@@ -1,6 +1,7 @@
 import { afterEach, describe, expect } from "bun:test"
 import { Cause, Effect, Exit, Layer } from "effect"
 import path from "path"
+import { symlink } from "node:fs/promises"
 import { Agent } from "../../src/agent/agent"
 import { CrossSpawnSpawner } from "@opencode-ai/core/cross-spawn-spawner"
 import { AppFileSystem } from "@opencode-ai/core/filesystem"
@@ -187,6 +188,28 @@ describe("tool.read external_directory permission", () => {
       expect(ext!.patterns).toContain(glob(path.join(outer, "*")))
     }),
   )
+
+  // Regression: read must resolve symlinks (like write/edit) so a symlink inside
+  // the project pointing outside triggers the external_directory prompt instead
+  // of silently reading through the link.
+  if (process.platform !== "win32") {
+    it.live("asks for external_directory permission when a project symlink points outside", () =>
+      Effect.gen(function* () {
+        const outer = yield* tmpdirScoped()
+        const dir = yield* tmpdirScoped({ git: true })
+        yield* put(path.join(outer, "secret.txt"), "secret data")
+        yield* Effect.promise(() => symlink(path.join(outer, "secret.txt"), path.join(dir, "link.txt")))
+
+        const { items, next } = asks()
+
+        const result = yield* exec(dir, { filePath: path.join(dir, "link.txt") }, next)
+        expect(result.output).toContain("secret data")
+        const ext = items.find((item) => item.permission === "external_directory")
+        expect(ext).toBeDefined()
+        expect(ext!.patterns).toContain(glob(path.join(outer, "*")))
+      }),
+    )
+  }
 
   if (process.platform === "win32") {
     it.live("normalizes read permission paths on Windows", () =>
