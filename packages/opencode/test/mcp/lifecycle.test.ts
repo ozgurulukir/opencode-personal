@@ -973,3 +973,66 @@ test(
       }),
   ),
 )
+
+// ========================================================================
+// Test: auto-reconnect after transport close / disconnect cancels it
+// ========================================================================
+
+test(
+  "transport close triggers auto-reconnect",
+  withInstance(
+    {
+      "auto-reconnect-server": {
+        type: "local",
+        command: ["echo", "test"],
+      },
+    },
+    (mcp) =>
+      Effect.gen(function* () {
+        const client = (yield* mcp.clients())["auto-reconnect-server"] as any
+        expect(client).toBeDefined()
+        const before = clientCreateCount
+
+        client.transport.onclose()
+        expect((yield* mcp.status())["auto-reconnect-server"]?.status).toBe("failed")
+
+        // Reconnect backoff starts at 1000ms
+        yield* Effect.sleep("1400 millis")
+
+        const clients = yield* mcp.clients()
+        expect(clients["auto-reconnect-server"]).toBeDefined()
+        expect((yield* mcp.status())["auto-reconnect-server"]?.status).toBe("connected")
+        expect(clientCreateCount).toBe(before + 1)
+      }),
+  ),
+)
+
+test(
+  "disconnect cancels a pending auto-reconnect",
+  withInstance(
+    {
+      "reconnect-race-server": {
+        type: "local",
+        command: ["echo", "test"],
+      },
+    },
+    (mcp) =>
+      Effect.gen(function* () {
+        const client = (yield* mcp.clients())["reconnect-race-server"] as any
+        expect(client).toBeDefined()
+
+        // Transport close schedules a reconnect timer (1000ms backoff);
+        // disconnecting before it fires must cancel it, not resurrect the server.
+        client.transport.onclose()
+        const afterClose = clientCreateCount
+        yield* mcp.disconnect("reconnect-race-server")
+
+        yield* Effect.sleep("1400 millis")
+
+        const clients = yield* mcp.clients()
+        expect(clients["reconnect-race-server"]).toBeUndefined()
+        expect((yield* mcp.status())["reconnect-race-server"]?.status).toBe("disabled")
+        expect(clientCreateCount).toBe(afterClose)
+      }),
+  ),
+)
