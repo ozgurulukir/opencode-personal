@@ -6,6 +6,8 @@ import { HttpApiBuilder } from "effect/unstable/httpapi"
 import { RootHttpApi } from "../api"
 import { LogInput } from "../groups/control"
 
+const escapeNewlines = (text: string) => text.replace(/\r\n?|\n/g, "\\n")
+
 export const controlHandlers = HttpApiBuilder.group(RootHttpApi, "control", (handlers) =>
   Effect.gen(function* () {
     const auth = yield* Auth.Service
@@ -31,14 +33,16 @@ export const controlHandlers = HttpApiBuilder.group(RootHttpApi, "control", (han
       // (`prefix + value` in core/util/log.ts build()); objects are safe because
       // they go through JSON.stringify.
       const service = ctx.payload.service.replace(/[^\w.:-]+/g, "-").replace(/^-+|-+$/g, "") || "remote"
-      const escape = (text: string) => text.replace(/\r\n?|\n/g, "\\n")
       const extra = ctx.payload.extra
         ? Object.fromEntries(
-            Object.entries(ctx.payload.extra).map(([key, value]) => [key, typeof value === "string" ? escape(value) : value]),
+            Object.entries(ctx.payload.extra).map(([key, value]) => [
+              key,
+              typeof value === "string" ? escapeNewlines(value) : value,
+            ]),
           )
         : undefined
       const logger = Log.create({ service })
-      logger[ctx.payload.level](escape(ctx.payload.message), extra)
+      logger[ctx.payload.level](escapeNewlines(ctx.payload.message), extra)
       return true
     })
 
