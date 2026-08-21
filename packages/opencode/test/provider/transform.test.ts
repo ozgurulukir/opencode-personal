@@ -3800,3 +3800,66 @@ describe("isQwen3Model", () => {
     expect(isQwen3Model(makeModel("qwen-turbo", "dashscope", "qwen-turbo-latest"))).toBe(false)
   })
 })
+
+describe("ProviderTransform.systemMessageMode", () => {
+  const makeModel = (providerID: string, npm: string): Pick<Model, "id" | "providerID" | "api"> => ({
+    id: "some-model" as ModelID,
+    providerID: providerID as ProviderID,
+    api: { id: "api-id", url: "", npm },
+  })
+
+  test("defaults to single for openai-compatible providers", () => {
+    expect(ProviderTransform.systemMessageMode(makeModel("ollama", "@ai-sdk/openai-compatible"))).toBe("single")
+  })
+
+  test("defaults to single for qwen3 via openrouter", () => {
+    expect(ProviderTransform.systemMessageMode(makeModel("openrouter", "@openrouter/ai-sdk-provider"))).toBe("single")
+  })
+
+  test("returns multiple for the anthropic provider", () => {
+    expect(ProviderTransform.systemMessageMode(makeModel("anthropic", "@ai-sdk/anthropic"))).toBe("multiple")
+  })
+
+  test("returns multiple for anthropic-compatible transports by api.npm", () => {
+    expect(ProviderTransform.systemMessageMode(makeModel("some-gateway", "@ai-sdk/google-vertex/anthropic"))).toBe(
+      "multiple",
+    )
+  })
+
+  test("returns multiple for the anthropic providerID regardless of transport", () => {
+    expect(ProviderTransform.systemMessageMode(makeModel("anthropic", "@ai-sdk/openai-compatible"))).toBe("multiple")
+  })
+})
+
+describe("ProviderTransform.systemPromptMessages", () => {
+  const makeModel = (providerID: string, npm: string): Pick<Model, "id" | "providerID" | "api"> => ({
+    id: "some-model" as ModelID,
+    providerID: providerID as ProviderID,
+    api: { id: "api-id", url: "", npm },
+  })
+
+  test("merges multiple parts into one message for single-mode providers", () => {
+    const model = makeModel("ollama", "@ai-sdk/openai-compatible")
+    expect(ProviderTransform.systemPromptMessages(model, ["core prompt", "dynamic suffix"])).toEqual([
+      "core prompt\n\ndynamic suffix",
+    ])
+  })
+
+  test("keeps parts separate for anthropic-family transports", () => {
+    const model = makeModel("anthropic", "@ai-sdk/anthropic")
+    expect(ProviderTransform.systemPromptMessages(model, ["core prompt", "dynamic suffix"])).toEqual([
+      "core prompt",
+      "dynamic suffix",
+    ])
+  })
+
+  test("passes a lone part through unchanged", () => {
+    const model = makeModel("ollama", "@ai-sdk/openai-compatible")
+    expect(ProviderTransform.systemPromptMessages(model, ["only part"])).toEqual(["only part"])
+  })
+
+  test("passes an empty list through unchanged", () => {
+    const model = makeModel("ollama", "@ai-sdk/openai-compatible")
+    expect(ProviderTransform.systemPromptMessages(model, [])).toEqual([])
+  })
+})

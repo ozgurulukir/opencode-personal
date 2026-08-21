@@ -43,6 +43,34 @@ export function shouldUseInstructions(providerID: string, authInfo: Auth.Info | 
   return systemPromptDelivery(providerID, authInfo).type === "instructions"
 }
 
+export type SystemMessageMode = "single" | "multiple"
+
+// Providers whose transports tolerate (or benefit from) multiple leading
+// system messages. Everything else defaults to "single": local chat-template
+// renderers (Qwen3.x, Llama, DeepSeek via Ollama/llama.cpp/vLLM) reject more
+// than one system message with "system message must be at the beginning".
+const SYSTEM_MESSAGE_MODE_DEFAULTS: Record<string, SystemMessageMode> = {
+  anthropic: "multiple",
+}
+
+export function systemMessageMode(model: Pick<Model, "providerID" | "api">): SystemMessageMode {
+  if (model.api.npm === "@ai-sdk/anthropic" || model.api.npm === "@ai-sdk/google-vertex/anthropic") return "multiple"
+  return SYSTEM_MESSAGE_MODE_DEFAULTS[model.providerID] ?? "single"
+}
+
+/**
+ * Shapes system prompt parts into the wire-format message contents for the
+ * model. In "single" mode the parts are joined into one message so chat
+ * templates that only accept a single leading system message keep working.
+ * Anthropic-family transports keep parts separate for cache-friendly system
+ * blocks.
+ */
+export function systemPromptMessages(model: Pick<Model, "providerID" | "api">, parts: string[]): string[] {
+  if (parts.length <= 1) return parts
+  if (systemMessageMode(model) === "multiple") return parts
+  return [parts.join("\n\n")]
+}
+
 // Whether a provider supports media attachments (images, PDFs) inside tool
 // results, or whether they must be extracted into a separate user message.
 export function supportsMediaInToolResult(model: Model, mime: string): boolean {
