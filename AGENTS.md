@@ -276,6 +276,10 @@ const table = sqliteTable("session", {
 - `Agent.Service.get()` is a method on the service interface, not a separate Context tag. Yielding `Agent.Service` gives the service instance directly.
 - `effectCmd` expects CLI handlers to return `Effect<void, CliError, ...>`. Use `fail()` from `effect-cmd` for errors, not `Effect.fail(new Error(...))`.
 - `Skill.Info` requires `description` (enforced by zod) and optionally carries `warnings: string[]` for frontmatter issues. Test fixtures and manual `Info` construction must include `description` or typecheck fails. Use `Skill.allIncludingInvalid()` to see all skills including those with warnings.
+- TUI event loop starvation: `queueMicrotask` in `footer.ts` was replaced with `setTimeout(0)` because microtasks run before I/O events — a burst of microtasks from streaming delays keypress/ESC handling. `setTimeout(0)` lets I/O events drain between flush cycles. This is the general pattern for any TUI callback that coalesces high-frequency events.
+- `runtime.runSync` must NOT be used for TUI transport callbacks (`stream.transport.ts`). Even when the Effect is `Effect.sync()` (truly synchronous), `runSync` blocks the event loop. Use `void runtime.runPromise(...).catch(() => {})` to preserve the `void` return type. The only safe `runSync` calls are in `bus/index.ts` (subscribe chain is entirely synchronous) and `sync/index.ts` (export functions not called in production code paths).
+- `surface.settle()` in `scrollback.surface.ts` triggers tree-sitter re-parse of the **full accumulated content**. Called per-delta, it starves the event loop. Three optimizations: (1) 16ms throttle in `writeStreaming`, (2) content-change check (`lastSettledContent`) in `flushActive`, (3) streaming fallback (row-level commit when `commitMarkdownBlocks` fails). See `packages/opencode/src/cli/cmd/run/AGENTS.md`.
+- Snapshot `track()` is called on every LLM step (`processor.ts:122,500`). Each call spawns 5+ git processes. `lastHash` cache skips `write-tree` when nothing changed. `restore()`/`revert()` invalidate `lastHash`. See `packages/opencode/src/snapshot/AGENTS.md`.
 
 ## Code review: stale "BUG" comments in tests
 

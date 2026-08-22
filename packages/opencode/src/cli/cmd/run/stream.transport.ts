@@ -1058,7 +1058,9 @@ export async function createSessionTransport(input: StreamInput): Promise<Sessio
 
   return {
     runPromptTurn: (next) => runtime.runPromise((svc) => svc.runPromptTurn(next)),
-    selectSubagent: (sessionID) => runtime.runSync((svc) => svc.selectSubagent(sessionID)),
+    selectSubagent: (sessionID) => {
+      void runtime.runPromise((svc) => svc.selectSubagent(sessionID)).catch(() => {})
+    },
     close: () => runtime.runPromise((svc) => svc.close()),
   }
 }
