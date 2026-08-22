@@ -31,6 +31,9 @@ logs/
 *.bun-build
 tsconfig.tsbuildinfo
 
+# Runtime cache (models.dev catalog)
+packages/opencode/models.json
+
 # Personal/local config (not shared)
 .agents/
 opencode.jsonc
