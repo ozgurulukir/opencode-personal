@@ -2,7 +2,6 @@ import style from "./content-bash.module.css"
 import { createResource, createSignal } from "solid-js"
 import { createOverflow, useShareMessages } from "./common"
 import { codeToHtml } from "shiki"
-import DOMPurify from "isomorphic-dompurify"
 
 interface Props {
   command: string
@@ -23,7 +22,7 @@ export function ContentBash(props: Props) {
           dark: "github-dark",
         },
       })
-      return DOMPurify.sanitize(html)
+      return html
     },
   )
 
@@ -37,7 +36,7 @@ export function ContentBash(props: Props) {
           dark: "github-dark",
         },
       })
-      return DOMPurify.sanitize(html)
+      return html
     },
   )
 
