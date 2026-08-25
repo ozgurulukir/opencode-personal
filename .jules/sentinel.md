@@ -29,3 +29,9 @@
 **Vulnerability:** Sending raw DOMPurify sanitized strings over SSR via `innerHTML` is inherently vulnerable to Mutation XSS (mXSS). Even if the string looks safe on the server, the browser's parser can mutate it into an executable script payload upon hydration, before client-side SolidJS code can safely parse or mount it as a `DocumentFragment`.
 **Learning:** Do not render untrusted HTML strings using `innerHTML` on the server (SSR), even if sanitized by a library like DOMPurify. SSR strings are fully evaluated by the browser parser prior to any client-side safe DOM insertion patterns (like `RETURN_DOM_FRAGMENT`).
 **Prevention:** Completely remove `innerHTML` on the server for untrusted markdown (e.g., render an empty `<div>`). Rely exclusively on the client-side `createEffect` and `appendChild` with `DOMPurify.sanitize(..., { RETURN_DOM_FRAGMENT: true })` to safely mount the parsed payload.
+
+## 2026-09-01 - Insecure CORS Origin Validation via startsWith
+
+**Vulnerability:** The CORS origin checking logic used `input.startsWith("http://localhost:")` and `input.startsWith("http://127.0.0.1:")`. This allows malicious actors to host a website on a subdomain like `http://localhost:3000.evil.com` and bypass local CORS security restrictions.
+**Learning:** Using `startsWith` or weak Regex to validate URLs or domains is highly vulnerable to domain prefix/suffix spoofing.
+**Prevention:** When validating CORS origins, avoid vulnerable string-matching like `input.startsWith('http://localhost:')`. Instead, use robust URL parsing (`new URL(input)`) and check `url.hostname` explicitly.
