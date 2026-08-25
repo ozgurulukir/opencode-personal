@@ -50,33 +50,32 @@ export function useFilteredList<T>(props: FilteredListProps<T>) {
     { initialValue: empty },
   )
 
-  // ⚡ Bolt Optimization: Replace chained pipe/flatMap with pre-allocated array and manual loops to reduce GC pressure
-  const flat = createMemo(() => {
+  // ⚡ Bolt Optimization: Consolidate multiple related createMemo instances into one
+  const computed = createMemo(() => {
     const list = grouped.latest || empty
     let count = 0
     for (let i = 0; i < list.length; i++) {
       count += list[i].items.length
     }
-    const result = new Array<T>(count)
+
+    const flatResult = new Array<T>(count)
+    const keysResult = new Array<string>(count)
+
     let index = 0
     for (let i = 0; i < list.length; i++) {
       const items = list[i].items
       for (let j = 0; j < items.length; j++) {
-        result[index++] = items[j]
+        const item = items[j]
+        flatResult[index] = item
+        keysResult[index] = props.key(item)
+        index++
       }
     }
-    return result
+    return { flat: flatResult, keys: keysResult }
   })
 
-  // ⚡ Bolt Optimization: Replace chained .map() with pre-allocated array and manual loop to reduce GC pressure
-  const keys = createMemo(() => {
-    const list = flat()
-    const result = new Array<string>(list.length)
-    for (let i = 0; i < list.length; i++) {
-      result[i] = props.key(list[i])
-    }
-    return result
-  })
+  const flat = () => computed().flat
+  const keys = () => computed().keys
 
   function initialActive() {
     if (props.noInitialSelection) return ""
