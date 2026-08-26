@@ -1082,6 +1082,10 @@ export function maxOutputTokens(model: Model): number {
   return Math.min(model.limit.output, OUTPUT_TOKEN_MAX) || OUTPUT_TOKEN_MAX
 }
 
+export function supportsMaxOutputTokens(model: Pick<Model, "api">): boolean {
+  return model.api.supportsMaxOutputTokens !== false
+}
+
 export function schema(model: Model, schema: JSONSchema.BaseSchema | JSONSchema7): JSONSchema7 {
   /*
   if (["openai", "azure"].includes(providerID)) {

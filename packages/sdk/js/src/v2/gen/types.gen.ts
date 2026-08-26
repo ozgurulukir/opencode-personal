@@ -965,6 +965,7 @@ export type AgentConfig = {
 
 export type ProviderConfig = {
   api?: string
+  supportsMaxOutputTokens?: boolean
   name?: string
   env?: Array<string>
   id?: string
@@ -1021,6 +1022,7 @@ export type ProviderConfig = {
       provider?: {
         npm?: string
         api?: string
+        supportsMaxOutputTokens?: boolean
       }
       options?: {
         [key: string]: unknown
@@ -1273,6 +1275,7 @@ export type Model = {
     id: string
     url: string
     npm: string
+    supportsMaxOutputTokens?: boolean
   }
   name: string
   family?: string
