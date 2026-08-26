@@ -41,6 +41,11 @@ function shouldUseCopilotResponsesApi(modelID: string): boolean {
   return Number(match[1]) >= 5 && !modelID.startsWith("gpt-5-mini")
 }
 
+function defaultSupportsMaxOutputTokens(providerID: string, modelID: string) {
+  if (providerID.includes("github-copilot") && modelID.includes("gpt")) return false
+  return undefined
+}
+
 export const DEFAULT_HTTP_TIMEOUT = 300_000
 export const DEFAULT_CHUNK_TIMEOUT = 60_000
 
@@ -955,6 +960,10 @@ function fromModelsDevModel(provider: ModelsDev.Provider, model: ModelsDev.Model
       id: model.id,
       url: model.provider?.api ?? provider.api ?? "",
       npm: model.provider?.npm ?? provider.npm ?? "@ai-sdk/openai-compatible",
+      supportsMaxOutputTokens:
+        model.provider?.supportsMaxOutputTokens ??
+        provider.supportsMaxOutputTokens ??
+        defaultSupportsMaxOutputTokens(provider.id, model.id),
     },
     status: model.status ?? "active",
     headers: {},
@@ -1166,6 +1175,11 @@ const layer: Layer.Layer<
                 id: apiID,
                 npm: apiNpm,
                 url: model.provider?.api ?? provider?.api ?? existingModel?.api.url ?? modelsDev[providerID]?.api ?? "",
+                supportsMaxOutputTokens:
+                  model.provider?.supportsMaxOutputTokens ??
+                  provider.supportsMaxOutputTokens ??
+                  existingModel?.api.supportsMaxOutputTokens ??
+                  defaultSupportsMaxOutputTokens(providerID, apiID),
               },
               status: model.status ?? existingModel?.status ?? "active",
               name,

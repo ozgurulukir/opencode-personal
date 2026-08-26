@@ -125,7 +125,9 @@ export const predict = Effect.fn("SessionPrompt.predict")(function* (
       allowSystemInMessages: true,
       system: qwen3 ? undefined : PREDICT_SYSTEM,
       messages: predictMessages,
-      maxOutputTokens: ProviderTransform.maxOutputTokens(model),
+      maxOutputTokens: ProviderTransform.supportsMaxOutputTokens(model)
+        ? ProviderTransform.maxOutputTokens(model)
+        : undefined,
       temperature: model.capabilities.temperature ? 0.7 : undefined,
       providerOptions: ProviderTransform.providerOptions(model, ProviderTransform.smallOptions(model)),
       headers: {

@@ -74,13 +74,18 @@ export const Model = Schema.Struct({
   ),
   status: Schema.optional(CatalogModelStatus),
   provider: Schema.optional(
-    Schema.Struct({ npm: Schema.optional(Schema.String), api: Schema.optional(Schema.String) }),
+    Schema.Struct({
+      npm: Schema.optional(Schema.String),
+      api: Schema.optional(Schema.String),
+      supportsMaxOutputTokens: Schema.optional(Schema.Boolean),
+    }),
   ),
 })
 export type Model = Schema.Schema.Type<typeof Model>
 
 export const Provider = Schema.Struct({
   api: Schema.optional(Schema.String),
+  supportsMaxOutputTokens: Schema.optional(Schema.Boolean),
   name: Schema.String,
   env: Schema.Array(Schema.String),
   id: Schema.String,

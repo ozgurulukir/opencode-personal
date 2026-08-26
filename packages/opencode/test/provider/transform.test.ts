@@ -509,6 +509,24 @@ describe("ProviderTransform.providerOptions", () => {
   })
 })
 
+describe("ProviderTransform.supportsMaxOutputTokens", () => {
+  test("supports output token limits by default", () => {
+    const model = {
+      api: { id: "model", url: "https://example.com", npm: "provider", supportsMaxOutputTokens: undefined },
+    }
+
+    expect(ProviderTransform.supportsMaxOutputTokens(model)).toBe(true)
+  })
+
+  test("omits output token limits when the provider rejects the parameter", () => {
+    const model = {
+      api: { id: "model", url: "https://example.com", npm: "provider", supportsMaxOutputTokens: false },
+    }
+
+    expect(ProviderTransform.supportsMaxOutputTokens(model)).toBe(false)
+  })
+})
+
 describe("ProviderTransform.schema - gemini array items", () => {
   test("adds missing items for array properties", () => {
     const geminiModel = {
