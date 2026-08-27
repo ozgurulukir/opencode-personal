@@ -112,3 +112,6 @@
 ## 2024-05-18 - Reduce Callback Overhead in Sizing Loops
 **Learning:** Using nested `.reduce()` to compute aggregate sizes over complex structures (like hunks and lines in patches) incurs significant function allocation and invocation overhead, particularly on operations that block the main thread.
 **Action:** Replace nested array reductions (`reduce`, `map`, `filter`) with manual imperative `for` loops in utility calculations to eliminate intermediate array allocations and closure executions.
+## 2026-08-26 - Optimizing JSON.stringify for Deduplication Keys
+**Learning:** Replacing `JSON.stringify` with a static string (like `""`) when stringifying object properties for deduplication keys will break the uniqueness of the key and cause false positives (e.g., dropping distinct diagnostic messages that happen to share the same location).
+**Action:** When optimizing `JSON.stringify` in deduplication keys, ensure the replacement logic securely tracks the identity or contents of the object (or do not optimize it if the object content defines uniqueness), rather than blindly replacing it with an empty string.
