@@ -26,10 +26,14 @@ function trimGitSuffix(input: string) {
 }
 
 function parts(input: string) {
-  return input
-    .split("/")
-    .map((item) => trimGitSuffix(item.trim()))
-    .filter(Boolean)
+  // ⚡ Bolt Optimization: Replace chained .map().filter() with a single loop to reduce GC pressure
+  const split = input.split("/")
+  const result: string[] = []
+  for (let i = 0; i < split.length; i++) {
+    const item = trimGitSuffix(split[i].trim())
+    if (item) result.push(item)
+  }
+  return result
 }
 
 function safeHost(input: string) {
@@ -55,7 +59,13 @@ function githubRemote(pathname: string) {
 }
 
 function build(input: { host: string; segments: string[]; remote?: string; protocol?: string }) {
-  const segments = input.segments.map(trimGitSuffix).filter(Boolean)
+  // ⚡ Bolt Optimization: Replace chained .map().filter() with a single loop to reduce GC pressure
+  const segments: string[] = []
+  for (let i = 0; i < input.segments.length; i++) {
+    const item = trimGitSuffix(input.segments[i])
+    if (item) segments.push(item)
+  }
+
   if (!safeHost(input.host) || !segments.length || segments.some((segment) => !safeSegment(segment))) return null
   const pathname = segments.join("/")
   const repo = segments[segments.length - 1]
@@ -74,14 +84,25 @@ function build(input: { host: string; segments: string[]; remote?: string; proto
 
 function buildFile(input: { url: URL; remote: string }) {
   const filePath = path.normalize(fileURLToPath(input.url))
-  const segments = filePath.split(/[\\/]+/).filter(Boolean)
+  const split = filePath.split(/[\\/]+/)
+
+  // ⚡ Bolt Optimization: Replace chained .filter() and .map() with a single loop to reduce GC pressure
+  const segments: string[] = []
+  const originalSegments: string[] = [] // maintain original segments for repo extraction logic matching before
+  for (let i = 0; i < split.length; i++) {
+    if (split[i]) {
+      originalSegments.push(split[i])
+      segments.push(split[i].replace(/:$/, ""))
+    }
+  }
+
   if (!segments.length) return null
   return {
     host: "file",
     path: filePath,
-    segments: segments.map((segment) => segment.replace(/:$/, "")),
+    segments,
     owner: undefined,
-    repo: trimGitSuffix(segments[segments.length - 1]),
+    repo: trimGitSuffix(originalSegments[originalSegments.length - 1]),
     remote: input.remote,
     label: filePath,
     protocol: "file:",
