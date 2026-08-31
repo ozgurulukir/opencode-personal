@@ -68,12 +68,24 @@ describe("getUsage — characterization", () => {
     const result = getUsage({
       model: { cost: { input: 3, output: 15 } } as any,
       usage: usage({
+        inputTokenDetails: { noCacheTokens: 1000, cacheReadTokens: 0, cacheWriteTokens: undefined },
+      }),
+      metadata: { anthropic: { cacheCreationInputTokens: 75 } } as any,
+    })
+    // cacheWriteTokens is undefined, so the chain reaches anthropic metadata
+    expect(result.tokens.cache.write).toBe(75)
+  })
+
+  test("zero explicitly provided for cacheWriteTokens is respected", () => {
+    const result = getUsage({
+      model: { cost: { input: 3, output: 15 } } as any,
+      usage: usage({
         inputTokenDetails: { noCacheTokens: 1000, cacheReadTokens: 0, cacheWriteTokens: 0 },
       }),
       metadata: { anthropic: { cacheCreationInputTokens: 75 } } as any,
     })
-    // cacheWriteTokens is 0, so the || chain reaches anthropic metadata
-    expect(result.tokens.cache.write).toBe(75)
+    // cacheWriteTokens is 0, which is not null/undefined, so it overrides anthropic metadata
+    expect(result.tokens.cache.write).toBe(0)
   })
 
   test("over200K pricing triggers when input + cache > 200000", () => {

@@ -13,16 +13,16 @@ export function getUsage(input: { model: Provider.Model; usage: LanguageModelUsa
   const reasoningTokens = safe(input.usage.outputTokenDetails?.reasoningTokens ?? input.usage.reasoningTokens ?? 0)
 
   const cacheReadInputTokens = safe(
-    input.usage.inputTokenDetails?.cacheReadTokens || input.usage.cachedInputTokens || 0,
+    input.usage.inputTokenDetails?.cacheReadTokens ?? input.usage.cachedInputTokens ?? 0,
   )
   const cacheWriteInputTokens = safe(Number(
-    input.usage.inputTokenDetails?.cacheWriteTokens ||
-    input.metadata?.["anthropic"]?.["cacheCreationInputTokens"] ||
-    input.metadata?.["vertex"]?.["cacheCreationInputTokens"] ||
+    input.usage.inputTokenDetails?.cacheWriteTokens ??
+    input.metadata?.["anthropic"]?.["cacheCreationInputTokens"] ??
+    input.metadata?.["vertex"]?.["cacheCreationInputTokens"] ??
     // @ts-expect-error
-    input.metadata?.["bedrock"]?.["usage"]?.["cacheWriteInputTokens"] ||
+    input.metadata?.["bedrock"]?.["usage"]?.["cacheWriteInputTokens"] ??
     // @ts-expect-error
-    input.metadata?.["venice"]?.["usage"]?.["cacheCreationInputTokens"] ||
+    input.metadata?.["venice"]?.["usage"]?.["cacheCreationInputTokens"] ??
     0,
   ))
 
