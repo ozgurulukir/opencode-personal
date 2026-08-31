@@ -111,6 +111,15 @@ function endPosition(text: string) {
   }
 }
 
+// Some servers send MarkupContent ({kind, value}) where LSP requires a string
+// message; key on value so identical text dedupes without stringifying.
+// Other objects keep JSON.stringify: their content defines uniqueness.
+export function diagnosticMessageKey(message: unknown) {
+  if (typeof message === "string") return message
+  if (typeof message === "object" && message !== null && "value" in message) return String(message.value)
+  return JSON.stringify(message)
+}
+
 function dedupeDiagnostics(items: Diagnostic[]) {
   const seen = new Set<string>()
   const result: Diagnostic[] = []
@@ -120,7 +129,7 @@ function dedupeDiagnostics(items: Diagnostic[]) {
     const range = item.range
       ? `${item.range.start.line}:${item.range.start.character}:${item.range.end.line}:${item.range.end.character}`
       : "null"
-    const msg = typeof item.message === "string" ? item.message : JSON.stringify(item.message)
+    const msg = diagnosticMessageKey(item.message)
     const key = `${code}:${item.severity ?? ""}:${item.source ?? ""}:${range}:${msg}`
     if (!seen.has(key)) {
       seen.add(key)
