@@ -22,11 +22,11 @@
 
 ## LSP client `files` record is the SSOT for open document state
 
-`lsp/client.ts:301` — `files: Record<string, { version: number; text: string }>` tracks every file opened via `notify.open()`. The `version` counter increments on each `didChange`. This is separate from the diagnostic maps and must also be cleaned on shutdown. Use `delete` on each key (not reassignment) since the record is a plain object, not a Map.
+`lsp/client.ts:340` — `files: Record<string, { version: number; text: string; lastUsed: number }>` tracks every file opened via `notify.open()`. The `version` counter increments on each `didChange`. This is separate from the diagnostic maps and must also be cleaned on shutdown. Use `delete` on each key (not reassignment) since the record is a plain object, not a Map.
 
 ## `notify.open` deletes the path from all diagnostic maps on open
 
-`lsp/client.ts:689-691` — `notify.open` calls `pushDiagnostics.delete`/`pullDiagnostics.delete`/`published.delete` for the path being opened. So a file opened via `notify.open` is ABSENT from the diagnostic maps until the server pushes diagnostics for it afterward. Tests that assume an opened file is present in `pushDiagnostics`/`published` will fail — you must push diagnostics for it first.
+`lsp/client.ts:704-706` — `notify.open` calls `pushDiagnostics.delete`/`pullDiagnostics.delete`/`published.delete` for the path being opened. So a file opened via `notify.open` is ABSENT from the diagnostic maps until the server pushes diagnostics for it afterward. Tests that assume an opened file is present in `pushDiagnostics`/`published` will fail — you must push diagnostics for it first.
 
 ## Bounding a Map in a handler that then adds an entry: use `>= MAX` and evict to `MAX-1`
 
