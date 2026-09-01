@@ -1467,7 +1467,15 @@ function AssistantMessage(props: { message: AssistantMessage; parts: Part[]; las
           customBorderChars={SplitBorder.customBorderChars}
           borderColor={theme.error}
         >
-          <text fg={theme.textMuted}>{props.message.error?.data.message}</text>
+          <text fg={theme.textMuted}>
+            {props.message.error?.data &&
+            typeof props.message.error.data === "object" &&
+            "message" in props.message.error.data
+              ? String(props.message.error.data.message)
+              : "message" in (props.message.error ?? {})
+                ? String((props.message.error as any).message)
+                : ""}
+          </text>
         </box>
       </Show>
       <Switch>
