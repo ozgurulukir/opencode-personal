@@ -53,6 +53,15 @@ const skipInstall = process.argv.includes("--skip-install")
 const sourcemapsFlag = process.argv.includes("--sourcemaps")
 const solidPlugin = createSolidTransformPlugin()
 const skipEmbedWebUi = process.argv.includes("--skip-embed-web-ui")
+const preserveOpenTuiSolidPlugin = {
+  name: "preserve-opentui-solid-runtime",
+  setup(build: { onLoad: (options: { filter: RegExp }, callback: (args: { path: string }) => Promise<{ contents: string; loader: "js" }>) => void }) {
+    build.onLoad({ filter: /[/\\]node_modules[/\\]@opentui[/\\]solid[/\\].*\.js$/ }, async (args) => ({
+      contents: await Bun.file(args.path).text(),
+      loader: "js",
+    }))
+  },
+}
 
 const createEmbeddedWebUIBundle = async () => {
   console.log(`Building Web UI to embed in the binary`)
@@ -298,7 +307,7 @@ for (const item of targets) {
   await Bun.build({
     conditions: ["bun"],
     tsconfig: "./tsconfig.json",
-    plugins: [solidPlugin, wasmResolver],
+    plugins: [preserveOpenTuiSolidPlugin, solidPlugin, wasmResolver],
     external: ["node-gyp"],
     format: "esm",
     minify: true,
