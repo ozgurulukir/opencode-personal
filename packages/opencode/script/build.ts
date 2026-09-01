@@ -54,6 +54,20 @@ const sourcemapsFlag = process.argv.includes("--sourcemaps")
 const solidPlugin = createSolidTransformPlugin()
 const skipEmbedWebUi = process.argv.includes("--skip-embed-web-ui")
 
+// `@opentui/solid` exposes a Bun-specific entrypoint, but its jsx-runtime
+// imports the package root without a Bun condition. In a compiled bundle that
+// can create two Solid renderer contexts, so JSX components cannot see the
+// renderer created by the app. Keep both imports on the same Bun runtime.
+const solidJsxRuntimePlugin = {
+  name: "opentui-solid-jsx-runtime",
+  setup(build: { onLoad: (options: { filter: RegExp }, callback: (args: { path: string }) => Promise<{ contents: string; loader: "js" }>) => void }) {
+    build.onLoad({ filter: /[\\/]@opentui[\\/]solid[\\/]jsx-runtime\\.js$/ }, async ({ path: file }) => ({
+      contents: (await Bun.file(file).text()).replaceAll('from "@opentui/solid"', 'from "@opentui/solid/index.bun.js"'),
+      loader: "js",
+    }))
+  },
+}
+
 const createEmbeddedWebUIBundle = async () => {
   console.log(`Building Web UI to embed in the binary`)
   const appDir = path.join(import.meta.dirname, "../../app")
@@ -296,9 +310,9 @@ for (const item of targets) {
   const bunfsRoot = item.os === "win32" ? "B:/~BUN/root/" : "/$bunfs/root/"
 
   await Bun.build({
-    conditions: ["bun", "node"],
+    conditions: ["bun"],
     tsconfig: "./tsconfig.json",
-    plugins: [solidPlugin, wasmResolver],
+    plugins: [solidPlugin, solidJsxRuntimePlugin, wasmResolver],
     external: ["node-gyp"],
     format: "esm",
     minify: true,
@@ -352,9 +366,10 @@ for (const item of targets) {
   // OS dynamic linker cannot dlopen. The runtime falls back to this real copy.
   const libExt = item.os === "win32" ? "dll" : item.os === "darwin" ? "dylib" : "so"
   const coreDir = path.dirname(parserWorker)
-  const platformLib = path.join(coreDir, `../core-${item.os}-${item.arch}/libopentui.${libExt}`)
+  const platformLibName = item.os === "win32" ? `opentui.${libExt}` : `libopentui.${libExt}`
+  const platformLib = path.join(coreDir, `../core-${item.os}-${item.arch}/${platformLibName}`)
   if (fs.existsSync(platformLib)) {
-    fs.copyFileSync(platformLib, `dist/${name}/bin/libopentui.${libExt}`)
+    fs.copyFileSync(platformLib, `dist/${name}/bin/${platformLibName}`)
   }
 
   await Bun.file(`dist/${name}/package.json`).write(
