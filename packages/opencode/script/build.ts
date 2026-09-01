@@ -221,18 +221,21 @@ const parserWorker = fs.realpathSync(fs.existsSync(opentuiLocalPath) ? opentuiLo
 const treeSitterWorkerSrc = await Bun.file(parserWorker).text()
 const dynamicWasmImport =
   'let treeWasm = await resolveBundledFilePath(() => import("web-tree-sitter/tree-sitter.wasm", { with: { type: "wasm" } }), () => import.meta.resolve("web-tree-sitter/tree-sitter.wasm"), import.meta.url);'
-if (!treeSitterWorkerSrc.includes(dynamicWasmImport)) {
+const assetWasmImport =
+  'let treeWasm = treeSitterWasmPath ?? resolveAssetPath("web-tree-sitter/tree-sitter.wasm", () => new URL(import.meta.resolve("web-tree-sitter/tree-sitter.wasm")));'
+if (!treeSitterWorkerSrc.includes(dynamicWasmImport) && !treeSitterWorkerSrc.includes(assetWasmImport)) {
   throw new Error(
-    "Cannot patch parser.worker.js: expected dynamic wasm import not found. " +
+    "Cannot patch parser.worker.js: expected WASM asset loading code not found. " +
       "The @opentui/core package may have updated — check parser.worker.js initialize() method.",
   )
 }
 const treeSitterWorker = treeSitterWorkerSrc
   .replace(
-    'import { Parser, Query, Language } from "web-tree-sitter";',
-    'import { Parser, Query, Language } from "web-tree-sitter";\nimport treeWasmUrl from "web-tree-sitter/tree-sitter.wasm" with { type: "file" };',
+    'import { createRequire } from "node:module";',
+    'import { createRequire } from "node:module";\nimport treeWasmUrl from "web-tree-sitter/tree-sitter.wasm" with { type: "file" };',
   )
-  .replace(dynamicWasmImport, "let treeWasm = treeWasmUrl;")
+  .replace(dynamicWasmImport, "let treeWasm = treeSitterWasmPath ?? treeWasmUrl;")
+  .replace(assetWasmImport, "let treeWasm = treeSitterWasmPath ?? treeWasmUrl;")
   .replace(
     "class ParserWorker {",
     `try{

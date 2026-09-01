@@ -1,0 +1,292 @@
+{
+  "nodes": [
+    {
+      "id": "document:packages/web/src/content/docs/acp.mdx",
+      "type": "document",
+      "name": "acp.mdx",
+      "filePath": "packages/web/src/content/docs/acp.mdx",
+      "summary": "Documents OpenCode's Agent Client Protocol (ACP) support for using the agent inside ACP-compatible editors, with setup instructions for Zed, JetBrains IDEs, Avante.nvim, and CodeCompanion.nvim.",
+      "tags": ["documentation", "integration", "editor-integration", "protocol"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "document:packages/web/src/content/docs/agents.mdx",
+      "type": "document",
+      "name": "agents.mdx",
+      "filePath": "packages/web/src/content/docs/agents.mdx",
+      "summary": "Comprehensive guide to OpenCode's agent system, covering primary agents vs. subagents, all built-in agents (build, plan, general, explore, scout, compaction, title, summary), and every configuration option including model, temperature, permissions, mode, and task permissions.",
+      "tags": ["documentation", "agents", "configuration", "subagents"],
+      "complexity": "complex"
+    },
+    {
+      "id": "document:packages/web/src/content/docs/cli.mdx",
+      "type": "document",
+      "name": "cli.mdx",
+      "filePath": "packages/web/src/content/docs/cli.mdx",
+      "summary": "Full command-line reference for the opencode binary, documenting every subcommand (tui, agent, auth, github, mcp, models, run, serve, session, stats, export, import, web, acp, plugin, pr, db, debug, uninstall, upgrade) with flags, global flags, environment variables, and experimental options.",
+      "tags": ["documentation", "cli", "command-reference", "flags"],
+      "complexity": "complex"
+    },
+    {
+      "id": "document:packages/web/src/content/docs/commands.mdx",
+      "type": "document",
+      "name": "commands.mdx",
+      "filePath": "packages/web/src/content/docs/commands.mdx",
+      "summary": "Explains how to create custom slash commands in Markdown or JSON, covering command file locations, template variables, arguments, shell output embedding, file references, and per-command agent, subtask, and model overrides.",
+      "tags": ["documentation", "custom-commands", "configuration", "templates"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "document:packages/web/src/content/docs/config.mdx",
+      "type": "document",
+      "name": "config.mdx",
+      "filePath": "packages/web/src/content/docs/config.mdx",
+      "summary": "Reference for OpenCode's JSON/JSONC configuration, covering config file locations and precedence order (remote, global, per-project, managed), the full schema (TUI, server, shell, models, agents, keybinds, formatters, LSP, permissions, MCP, skills, plugins, providers), and env/file variable interpolation.",
+      "tags": ["documentation", "configuration", "reference", "schema"],
+      "complexity": "complex"
+    },
+    {
+      "id": "document:packages/web/src/content/docs/custom-tools.mdx",
+      "type": "document",
+      "name": "custom-tools.mdx",
+      "filePath": "packages/web/src/content/docs/custom-tools.mdx",
+      "summary": "Guide to writing custom tools the LLM can call as TypeScript or JavaScript files, covering tool file locations, the definition structure, multiple tools per file, name collisions with built-in tools, arguments, context, and a Python-backed tool example.",
+      "tags": ["documentation", "tools", "extensibility", "developer-guide"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "document:packages/web/src/content/docs/ecosystem.mdx",
+      "type": "document",
+      "name": "ecosystem.mdx",
+      "filePath": "packages/web/src/content/docs/ecosystem.mdx",
+      "summary": "Curated list of community plugins, projects, and agents built on OpenCode, linking out to awesome-opencode and the opencode.cafe community hub.",
+      "tags": ["documentation", "community", "integrations", "overview"],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:packages/web/src/content/docs/enterprise.mdx",
+      "type": "document",
+      "name": "enterprise.mdx",
+      "filePath": "packages/web/src/content/docs/enterprise.mdx",
+      "summary": "Overview of OpenCode Enterprise covering data handling guarantees, code ownership, pricing, and deployment options including central config, SSO integration, internal AI gateways, and self-hosting.",
+      "tags": ["documentation", "enterprise", "deployment", "security"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "document:packages/web/src/content/docs/formatters.mdx",
+      "type": "document",
+      "name": "formatters.mdx",
+      "filePath": "packages/web/src/content/docs/formatters.mdx",
+      "summary": "Documents OpenCode's post-edit code formatting, listing built-in language formatters and how to enable, configure, disable, or define custom formatters.",
+      "tags": ["documentation", "formatters", "code-formatting", "configuration"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "document:packages/web/src/content/docs/github.mdx",
+      "type": "document",
+      "name": "github.mdx",
+      "filePath": "packages/web/src/content/docs/github.mdx",
+      "summary": "Guide to the OpenCode GitHub Action, which responds to /opencode mentions in issues and pull requests, with installation, configuration, supported events, and worked workflow examples for triage, scheduled tasks, and PR review.",
+      "tags": ["documentation", "github-action", "ci-cd", "automation"],
+      "complexity": "complex"
+    },
+    {
+      "id": "document:packages/web/src/content/docs/gitlab.mdx",
+      "type": "document",
+      "name": "gitlab.mdx",
+      "filePath": "packages/web/src/content/docs/gitlab.mdx",
+      "summary": "Documents OpenCode's GitLab integration via GitLab CI/CD pipelines and GitLab Duo, including runner setup, configuration, and usage examples for issues and merge requests.",
+      "tags": ["documentation", "gitlab", "ci-cd", "integration"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "document:packages/web/src/content/docs/go.mdx",
+      "type": "document",
+      "name": "go.mdx",
+      "filePath": "packages/web/src/content/docs/go.mdx",
+      "summary": "Product page for the OpenCode Go subscription ($5 first month, then $10/month), covering usage limits, behavior beyond limits, endpoints, available models, and privacy policy.",
+      "tags": ["documentation", "subscription", "pricing", "models"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "document:packages/web/src/content/docs/ide.mdx",
+      "type": "document",
+      "name": "ide.mdx",
+      "filePath": "packages/web/src/content/docs/ide.mdx",
+      "summary": "Short guide to the OpenCode IDE integration for VS Code, Cursor, and other terminal-capable IDEs, covering the Cmd/Ctrl+Esc quick launch, installation, and troubleshooting.",
+      "tags": ["documentation", "ide", "extension", "installation"],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:packages/web/src/content/docs/index.mdx",
+      "type": "document",
+      "name": "index.mdx",
+      "filePath": "packages/web/src/content/docs/index.mdx",
+      "summary": "Getting-started tutorial for OpenCode covering installation across platforms (including Windows prerequisites), initial configuration and model setup, and core workflows like asking questions, adding features, making changes, undoing, and sharing sessions.",
+      "tags": ["documentation", "getting-started", "entry-point", "tutorial"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "document:packages/web/src/content/docs/keybinds.mdx",
+      "type": "document",
+      "name": "keybinds.mdx",
+      "filePath": "packages/web/src/content/docs/keybinds.mdx",
+      "summary": "Reference for customizing TUI keybinds via tui.json, documenting the default binding table, leader key with timeout, binding values, disabling keys, and desktop prompt shortcuts.",
+      "tags": ["documentation", "keybinds", "tui", "customization"],
+      "complexity": "moderate",
+      "languageNotes": "Keybinds are configured in a separate tui.json file with its own JSON schema (opencode.ai/tui.json), not in the main opencode.json config."
+    },
+    {
+      "id": "document:packages/web/src/content/docs/lsp.mdx",
+      "type": "document",
+      "name": "lsp.mdx",
+      "filePath": "packages/web/src/content/docs/lsp.mdx",
+      "summary": "Documents OpenCode's Language Server Protocol integration, which feeds diagnostics back to the LLM, listing built-in LSP servers and covering configuration, environment variables, initialization options, and disabling or adding custom servers.",
+      "tags": ["documentation", "lsp", "language-server", "diagnostics"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "document:packages/web/src/content/docs/mcp-servers.mdx",
+      "type": "document",
+      "name": "mcp-servers.mdx",
+      "filePath": "packages/web/src/content/docs/mcp-servers.mdx",
+      "summary": "Comprehensive guide to adding Model Context Protocol (MCP) servers to OpenCode, covering remote and local server enable/config options, automatic and pre-registered OAuth flows, global and per-agent enablement with glob patterns, and worked examples for Sentry, Context7, and Grep.",
+      "tags": ["documentation", "mcp", "tools", "configuration", "oauth"],
+      "complexity": "complex"
+    },
+    {
+      "id": "document:packages/web/src/content/docs/models.mdx",
+      "type": "document",
+      "name": "models.mdx",
+      "filePath": "packages/web/src/content/docs/models.mdx",
+      "summary": "Guide to configuring LLM providers and models in OpenCode, covering provider credentials via /connect, recommended models, setting defaults, custom model configuration, built-in and custom variants, variant cycling, and how models are loaded.",
+      "tags": ["documentation", "providers", "models", "configuration"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "document:packages/web/src/content/docs/network.mdx",
+      "type": "document",
+      "name": "network.mdx",
+      "filePath": "packages/web/src/content/docs/network.mdx",
+      "summary": "Brief guide to network configuration covering standard proxy environment variables, proxy authentication, and custom certificates for enterprise network environments.",
+      "tags": ["documentation", "proxy", "certificates", "networking"],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:packages/web/src/content/docs/permissions.mdx",
+      "type": "document",
+      "name": "permissions.mdx",
+      "filePath": "packages/web/src/content/docs/permissions.mdx",
+      "summary": "Reference for OpenCode's permission system, covering permission actions (allow/ask/deny), string and granular object rule syntax, wildcards, home directory expansion, external directories, default policies, what ask mode does, and per-agent permissions.",
+      "tags": ["documentation", "permissions", "security", "configuration"],
+      "complexity": "moderate"
+    }
+  ],
+  "edges": [
+    {
+      "source": "document:packages/web/src/content/docs/acp.mdx",
+      "target": "file:packages/opencode/src/cli/cmd/acp.ts",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/web/src/content/docs/agents.mdx",
+      "target": "file:packages/opencode/src/agent/agent.ts",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/web/src/content/docs/cli.mdx",
+      "target": "file:packages/opencode/src/index.ts",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/web/src/content/docs/commands.mdx",
+      "target": "file:packages/opencode/src/command/index.ts",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/web/src/content/docs/config.mdx",
+      "target": "file:packages/opencode/src/config/config.ts",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/web/src/content/docs/custom-tools.mdx",
+      "target": "file:packages/opencode/src/tool/registry.ts",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/web/src/content/docs/formatters.mdx",
+      "target": "file:packages/opencode/src/format/formatter.ts",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/web/src/content/docs/github.mdx",
+      "target": "file:github/index.ts",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/web/src/content/docs/ide.mdx",
+      "target": "file:packages/opencode/src/ide/index.ts",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/web/src/content/docs/index.mdx",
+      "target": "file:packages/opencode/src/index.ts",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/web/src/content/docs/keybinds.mdx",
+      "target": "file:packages/opencode/src/cli/cmd/tui/config/keybind.ts",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/web/src/content/docs/lsp.mdx",
+      "target": "file:packages/opencode/src/lsp/lsp.ts",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/web/src/content/docs/mcp-servers.mdx",
+      "target": "file:packages/opencode/src/mcp/index.ts",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/web/src/content/docs/models.mdx",
+      "target": "file:packages/opencode/src/provider/models.ts",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/web/src/content/docs/permissions.mdx",
+      "target": "file:packages/opencode/src/permission/index.ts",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    }
+  ]
+}

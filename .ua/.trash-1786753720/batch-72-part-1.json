@@ -1,0 +1,449 @@
+{
+  "nodes": [
+    {
+      "id": "file:packages/opencode/src/session/processor.ts",
+      "type": "file",
+      "name": "processor.ts",
+      "filePath": "packages/opencode/src/session/processor.ts",
+      "summary": "SessionProcessor service that drives the per-stream LLM event loop: consumes LLM stream events, materializes text/reasoning/tool parts onto messages, tracks file snapshots, enforces doom-loop protection, wires the retry policy, and flags context overflow for compaction. Also dual-writes V2 SessionEvent projections behind the OPENCODE_EXPERIMENTAL_EVENT_SYSTEM flag.",
+      "tags": ["service", "event-handler", "llm-stream", "session", "orchestrator"],
+      "complexity": "complex",
+      "languageNotes": "Effect service built with Effect.fn closures inside Layer.effect; the Service class is a one-line Context.Service tag (@opencode/SessionProcessor) and all behavior lives in the create() factory returning a Handle interface."
+    },
+    {
+      "id": "function:packages/opencode/src/session/processor.ts:create",
+      "type": "function",
+      "name": "create",
+      "filePath": "packages/opencode/src/session/processor.ts",
+      "lineRange": [118, 816],
+      "summary": "Factory that builds the per-assistant-message processing Handle: pre-captures a snapshot, wires tool-call lifecycle helpers (settle/read/update/complete/fail), the stream event reducer, cleanup, halt, and the process() stream runner.",
+      "tags": ["factory", "event-handler", "tool-lifecycle", "session"],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:packages/opencode/src/session/processor.ts:handleEvent",
+      "type": "function",
+      "name": "handleEvent",
+      "filePath": "packages/opencode/src/session/processor.ts",
+      "lineRange": [226, 646],
+      "summary": "Reducer over LLM stream events: maps start/step/text/reasoning/tool events onto message parts, computes usage via Session.getUsage, emits patch parts from snapshot diffs, kicks off summary, triggers the doom-loop permission ask after 3 identical tool calls, and sets overflow-driven compaction.",
+      "tags": ["event-handler", "reducer", "llm-stream", "parts", "doom-loop"],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:packages/opencode/src/session/processor.ts:process",
+      "type": "function",
+      "name": "process",
+      "filePath": "packages/opencode/src/session/processor.ts",
+      "lineRange": [738, 806],
+      "summary": "Runs the LLM stream with tap-event handling, takeUntil compaction cutoff, interrupt handling, the SessionRetry policy (publishing retry status and SessionEvent.Retried), catch-to-halt, and guaranteed cleanup; returns compact/stop/continue.",
+      "tags": ["stream-runner", "retry", "interruption", "session"],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:packages/opencode/src/session/processor.ts:cleanup",
+      "type": "function",
+      "name": "cleanup",
+      "filePath": "packages/opencode/src/session/processor.ts",
+      "lineRange": [648, 707],
+      "summary": "Finalizer that flushes leftover snapshot patches, closes open text/reasoning parts, waits briefly on in-flight tool calls, and marks any still-running tool parts as aborted with an interrupted metadata flag.",
+      "tags": ["cleanup", "finalizer", "tool-lifecycle", "interruption"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:packages/opencode/src/session/projectors-next.ts",
+      "type": "file",
+      "name": "projectors-next.ts",
+      "filePath": "packages/opencode/src/session/projectors-next.ts",
+      "summary": "V2 event projectors that fold SessionEvent.* sync events (prompted, step, text, tool, reasoning, compaction, retries) into the SessionMessageTable read model via SessionMessageUpdater and a SQLite adapter; delta events are deliberately no-ops.",
+      "tags": ["projector", "event-sourcing", "read-model", "database", "v2"],
+      "complexity": "moderate",
+      "languageNotes": "Exports a default array of SyncEvent.project handlers spread into projectors.ts; DateTime values are recursively encoded to epoch millis before JSON persistence."
+    },
+    {
+      "id": "function:packages/opencode/src/session/projectors-next.ts:sqlite",
+      "type": "function",
+      "name": "sqlite",
+      "filePath": "packages/opencode/src/session/projectors-next.ts",
+      "lineRange": [28, 115],
+      "summary": "Builds the SessionMessageUpdater SQLite adapter for a session: queries current assistant/compaction/shell messages from SessionMessageTable and implements append plus typed update operations that re-encode message data.",
+      "tags": ["adapter", "database", "read-model", "persistence"],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:packages/opencode/src/session/projectors.ts",
+      "type": "file",
+      "name": "projectors.ts",
+      "filePath": "packages/opencode/src/session/projectors.ts",
+      "summary": "V1 projector registry: SyncEvent.project handlers that materialize Session and MessageV2 events into the SessionTable/MessageTable/PartTable Drizzle tables, tolerating late foreign-key-violating updates, and re-exports the V2 projectors-next array.",
+      "tags": ["projector", "event-sourcing", "database", "persistence", "serialization"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/opencode/src/session/projectors.ts:grab",
+      "type": "function",
+      "name": "grab",
+      "filePath": "packages/opencode/src/session/projectors.ts",
+      "lineRange": [23, 40],
+      "summary": "Reads a (possibly nested) field from a partial update object, applying a callback for object values; throws when a present-but-undefined field is passed so callers must use null to clear a column.",
+      "tags": ["utility", "partial-update", "validation"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/session/projectors.ts:toPartialRow",
+      "type": "function",
+      "name": "toPartialRow",
+      "filePath": "packages/opencode/src/session/projectors.ts",
+      "lineRange": [42, 67],
+      "summary": "Maps a DeepPartial Session.Info patch onto a snake_case partial SessionTable row, unwrapping nested share/summary/time objects via grab and dropping undefined keys so Drizzle updates only touched columns.",
+      "tags": ["serialization", "partial-update", "mapping", "persistence"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:packages/opencode/src/session/prompt.ts",
+      "type": "file",
+      "name": "prompt.ts",
+      "filePath": "packages/opencode/src/session/prompt.ts",
+      "summary": "SessionPrompt service exposing prompt/loop/shell/command/predict/cancel entry points; it wires twenty-plus Effect services into the agent run loop, resolves file and agent template parts, merges per-prompt tool permissions, and defines the PromptInput/LoopInput/ShellInput/CommandInput API schemas.",
+      "tags": ["service", "entry-point", "orchestrator", "agent-loop", "schema-definition"],
+      "complexity": "complex",
+      "languageNotes": "Composition root for the session loop: runLoop/shellImpl/command/predict implementations are injected from ./loop/* modules as plain function calls, and the layer's defaultLayer chains 20+ provided layers."
+    },
+    {
+      "id": "function:packages/opencode/src/session/prompt.ts:resolvePromptParts",
+      "type": "function",
+      "name": "resolvePromptParts",
+      "filePath": "packages/opencode/src/session/prompt.ts",
+      "lineRange": [141, 173],
+      "summary": "Expands @-mention markdown templates into prompt parts: resolves each ConfigMarkdown file reference against the worktree (or home dir), attaching file parts or agent parts when the name matches an agent instead of a file.",
+      "tags": ["template-expansion", "file-attachments", "agents", "prompt"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/opencode/src/session/prompt.ts:prompt",
+      "type": "function",
+      "name": "prompt",
+      "filePath": "packages/opencode/src/session/prompt.ts",
+      "lineRange": [191, 213],
+      "summary": "Handles a user prompt: cleans up pending reverts, creates the user message (with attachments/skills), merges per-prompt tool toggles into session permissions, then enters the loop unless noReply is set.",
+      "tags": ["prompt-handling", "permissions", "session", "orchestrator"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/opencode/src/session/prompt.ts:loop",
+      "type": "function",
+      "name": "loop",
+      "filePath": "packages/opencode/src/session/prompt.ts",
+      "lineRange": [215, 249],
+      "summary": "Runs the agent loop for a session through SessionRunState.ensureRunning, injecting the full service bundle (sessions, processor, compaction, registry, MCP, LSP, permission, truncation, runner bridge, cached tool schemas) into runLoop.",
+      "tags": ["agent-loop", "dependency-injection", "session", "orchestrator"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:packages/opencode/src/session/prompt/command-regex.ts",
+      "type": "file",
+      "name": "command-regex.ts",
+      "filePath": "packages/opencode/src/session/prompt/command-regex.ts",
+      "summary": "Regex constants for the slash-command parser: inline bash extraction (!`cmd`), argument tokenization (including [Image N] and quoted strings), positional placeholders, and quote trimming.",
+      "tags": ["utility", "regex", "command-parsing", "constants"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/opencode/src/session/prompt/mcp-patterns.ts",
+      "type": "file",
+      "name": "mcp-patterns.ts",
+      "filePath": "packages/opencode/src/session/prompt/mcp-patterns.ts",
+      "summary": "Derives permission-scoping patterns from MCP tool arguments by probing common path/URL fields, so an \"always allow\" grant covers a specific resource instead of every invocation; falls back to the \"*\" wildcard.",
+      "tags": ["utility", "permissions", "mcp", "pattern-matching"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/session/prompt/mcp-patterns.ts:deriveMcpPatterns",
+      "type": "function",
+      "name": "deriveMcpPatterns",
+      "filePath": "packages/opencode/src/session/prompt/mcp-patterns.ts",
+      "lineRange": [5, 13],
+      "summary": "Returns the first non-empty string among well-known path/URL argument keys (filepath, path, url, directory, file, pattern, repo, repository) as a single-element pattern array, or [\"*\"] when nothing can be derived.",
+      "tags": ["permissions", "mcp", "pattern-matching", "utility"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/opencode/src/session/prompt/predict.ts",
+      "type": "file",
+      "name": "predict.ts",
+      "filePath": "packages/opencode/src/session/prompt/predict.ts",
+      "summary": "Ghost-text next-prompt prediction: system/nudge prompts for the predictor model plus cleanPrediction, which strips think blocks, quotes, and caps output to 120 chars for the TUI's gray inline suggestion.",
+      "tags": ["utility", "prediction", "llm", "text-processing", "tui"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/session/prompt/predict.ts:cleanPrediction",
+      "type": "function",
+      "name": "cleanPrediction",
+      "filePath": "packages/opencode/src/session/prompt/predict.ts",
+      "lineRange": [14, 23],
+      "summary": "Cleans raw predict LLM output: removes <think> blocks, takes the first non-empty trimmed line, strips surrounding quotes/backticks, and truncates to 120 characters with an ellipsis.",
+      "tags": ["text-processing", "prediction", "sanitization"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/opencode/src/session/prompt/structured-output.ts",
+      "type": "file",
+      "name": "structured-output.ts",
+      "filePath": "packages/opencode/src/session/prompt/structured-output.ts",
+      "summary": "Builds the AI SDK StructuredOutput tool used when a zod output schema is requested: forces the model to emit its final answer through one validated tool call and captures the parsed result via an onSuccess callback.",
+      "tags": ["factory", "tool-definition", "structured-output", "validation", "llm"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/session/prompt/structured-output.ts:createStructuredOutputTool",
+      "type": "function",
+      "name": "createStructuredOutputTool",
+      "filePath": "packages/opencode/src/session/prompt/structured-output.ts",
+      "lineRange": [15, 41],
+      "summary": "Creates the StructuredOutput AI SDK tool from a JSON schema (dropping $schema), invoking onSuccess with SDK-validated args and echoing a text model output so the loop terminates cleanly after capture.",
+      "tags": ["factory", "tool-definition", "structured-output", "validation"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/opencode/src/session/retry.ts",
+      "type": "file",
+      "name": "retry.ts",
+      "filePath": "packages/opencode/src/session/retry.ts",
+      "summary": "Retry policy for provider calls: retryable() classifies API errors (5xx, rate limits, OpenCode Go/free-tier limit bodies), delay() honors retry-after headers before falling back to exponential backoff, and policy() wraps both into an Effect Schedule that reports status updates.",
+      "tags": ["retry", "backoff", "error-handling", "rate-limit", "policy"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/opencode/src/session/retry.ts:delay",
+      "type": "function",
+      "name": "delay",
+      "filePath": "packages/opencode/src/session/retry.ts",
+      "lineRange": [33, 64],
+      "summary": "Computes the retry wait: prefers retry-after-ms and retry-after headers (numeric seconds or HTTP date), otherwise exponential backoff (2s base, factor 2) capped at 30s without headers or the 32-bit setTimeout maximum with them.",
+      "tags": ["backoff", "retry", "http-headers", "scheduling"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/opencode/src/session/retry.ts:retryable",
+      "type": "function",
+      "name": "retryable",
+      "filePath": "packages/opencode/src/session/retry.ts",
+      "lineRange": [66, 150],
+      "summary": "Classifies an error into a Retryable verdict: never retries context overflow, retries 5xx and SDK-marked retryable API errors, maps FreeUsageLimit/GoUsageLimit bodies to upsell actions with reset-time hints, and string-matches plain-text and JSON rate-limit payloads.",
+      "tags": ["error-handling", "classification", "rate-limit", "upsell"],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:packages/opencode/src/session/retry.ts:policy",
+      "type": "function",
+      "name": "policy",
+      "filePath": "packages/opencode/src/session/retry.ts",
+      "lineRange": [174, 197],
+      "summary": "Builds the Effect retry Schedule from retryable/delay: parses each failure, stops the schedule on non-retryable errors, and reports attempt, message, optional upsell action, and next-attempt time through the caller's set callback.",
+      "tags": ["policy", "retry", "effect-schedule", "scheduling"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:packages/opencode/src/session/revert.ts",
+      "type": "file",
+      "name": "revert.ts",
+      "filePath": "packages/opencode/src/session/revert.ts",
+      "summary": "SessionRevert service implementing checkpoint/restore over message parts and file snapshots: revert() rewinds to a message/part boundary recording the pre-revert snapshot, unrevert() restores it, and cleanup() deletes the post-revert tail before a new prompt runs.",
+      "tags": ["service", "revert", "snapshot", "version-control", "session"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/opencode/src/session/revert.ts:revert",
+      "type": "function",
+      "name": "revert",
+      "filePath": "packages/opencode/src/session/revert.ts",
+      "lineRange": [43, 93],
+      "summary": "Walks the session's messages to locate the revert boundary, captures or reuses the pre-revert snapshot, undoes accumulated patches, recomputes the diff summary, and persists the revert metadata plus refreshed session diff on the session row.",
+      "tags": ["revert", "snapshot", "diff", "session"],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:packages/opencode/src/session/revert.ts:cleanup",
+      "type": "function",
+      "name": "cleanup",
+      "filePath": "packages/opencode/src/session/revert.ts",
+      "lineRange": [105, 146],
+      "summary": "Removes messages and trailing parts created after a revert point (emitting MessageV2 Removed/PartRemoved sync events) and clears the revert marker so subsequent prompts start from a consistent history.",
+      "tags": ["cleanup", "revert", "messages", "session"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:packages/opencode/src/session/run-state.ts",
+      "type": "file",
+      "name": "run-state.ts",
+      "filePath": "packages/opencode/src/session/run-state.ts",
+      "summary": "SessionRunState service tracking one Runner per session in instance state: enforces busy/idle transitions (publishing status events), rejects concurrent prompts with BusyError, cancels in-flight runs, and hosts ensureRunning/startShell execution modes.",
+      "tags": ["service", "concurrency", "state-management", "lifecycle", "session"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/opencode/src/session/run-state.ts:runner",
+      "type": "function",
+      "name": "runner",
+      "filePath": "packages/opencode/src/session/run-state.ts",
+      "lineRange": [49, 69],
+      "summary": "Lazily creates (or returns the existing) per-session Runner wired to idle/busy status publishing, the interrupt handler for the current assistant message, and a BusyError throw on concurrent use.",
+      "tags": ["concurrency", "runner", "lazy-init", "session"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:packages/opencode/src/session/schema.ts",
+      "type": "file",
+      "name": "schema.ts",
+      "filePath": "packages/opencode/src/session/schema.ts",
+      "summary": "Branded Effect Schema identifiers for the session domain: SessionID (descending ULID-like ids), MessageID and PartID (ascending), each with static make helpers for ordered generation.",
+      "tags": ["type-definition", "schema-definition", "identifiers", "validation"],
+      "complexity": "simple",
+      "languageNotes": "Uses Schema.String.check(Schema.isStartsWith(...)).pipe(Schema.brand(...)) plus withStatics to attach ascending/descending generators to the schema object."
+    },
+    {
+      "id": "file:packages/opencode/src/session/session.sql.ts",
+      "type": "file",
+      "name": "session.sql.ts",
+      "filePath": "packages/opencode/src/session/session.sql.ts",
+      "summary": "Drizzle SQLite schema for the session domain: session, message, part, todo, session_message (V2 read model), and permission tables with cascading foreign keys, JSON-typed payload columns, and covering indexes for the common query paths.",
+      "tags": ["database", "drizzle", "schema-definition", "sqlite", "data-model"],
+      "complexity": "moderate",
+      "languageNotes": "Follows the repo's snake_case column convention so column names never need string overrides; composite payloads (revert, permission, model, diffs) are stored as text JSON via text({ mode: \"json\" }).$type<T>()."
+    },
+    {
+      "id": "table:packages/opencode/src/session/session.sql.ts:session",
+      "type": "table",
+      "name": "session",
+      "filePath": "packages/opencode/src/session/session.sql.ts",
+      "lineRange": [16, 53],
+      "summary": "Core session table: SessionID primary key, project FK with cascade delete, workspace/parent self-reference, slug/directory/path/title/version, share URL, aggregate diff summary columns, JSON revert/permission/model payloads, and compacting/archived timestamps; indexed by project, workspace, and parent.",
+      "tags": ["database", "session", "persistence", "sqlite"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "table:packages/opencode/src/session/session.sql.ts:message",
+      "type": "table",
+      "name": "message",
+      "filePath": "packages/opencode/src/session/session.sql.ts",
+      "lineRange": [55, 67],
+      "summary": "Message table storing one row per MessageV2 message with a JSON data payload minus id/sessionID, cascading from session, and a composite (session_id, time_created, id) index for paged history reads.",
+      "tags": ["database", "messages", "persistence", "sqlite"],
+      "complexity": "simple"
+    },
+    {
+      "id": "table:packages/opencode/src/session/session.sql.ts:part",
+      "type": "table",
+      "name": "part",
+      "filePath": "packages/opencode/src/session/session.sql.ts",
+      "lineRange": [69, 85],
+      "summary": "Message part table (text, reasoning, tool, step, patch parts) keyed by PartID with a message FK cascade, denormalized session_id, JSON part payload, and (message_id, id) plus session indexes.",
+      "tags": ["database", "messages", "parts", "persistence"],
+      "complexity": "simple"
+    },
+    {
+      "id": "table:packages/opencode/src/session/session.sql.ts:todo",
+      "type": "table",
+      "name": "todo",
+      "filePath": "packages/opencode/src/session/session.sql.ts",
+      "lineRange": [87, 104],
+      "summary": "Per-session todo list keyed by (session_id, position) with content, status, and priority columns, cascading from session and indexed for ordered reads.",
+      "tags": ["database", "todos", "persistence", "task-tracking"],
+      "complexity": "simple"
+    },
+    {
+      "id": "table:packages/opencode/src/session/session.sql.ts:session_message",
+      "type": "table",
+      "name": "session_message",
+      "filePath": "packages/opencode/src/session/session.sql.ts",
+      "lineRange": [106, 123],
+      "summary": "V2 read-model table populated by projectors-next: one row per SessionEvent-derived message with a type discriminator (assistant/compaction/shell/prompted/...) and JSON data, indexed by session, session+type, and creation time.",
+      "tags": ["database", "read-model", "event-sourcing", "v2"],
+      "complexity": "simple"
+    },
+    {
+      "id": "table:packages/opencode/src/session/session.sql.ts:permission",
+      "type": "table",
+      "name": "permission",
+      "filePath": "packages/opencode/src/session/session.sql.ts",
+      "lineRange": [125, 131],
+      "summary": "Project-scoped persisted permission ruleset stored as a JSON payload keyed by project_id with cascade delete, backing durable \"always allow/deny\" decisions.",
+      "tags": ["database", "permissions", "persistence", "security"],
+      "complexity": "simple"
+    }
+  ],
+  "edges": [
+    { "source": "file:packages/opencode/src/session/processor.ts", "target": "function:packages/opencode/src/session/processor.ts:create", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:packages/opencode/src/session/processor.ts", "target": "function:packages/opencode/src/session/processor.ts:handleEvent", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:packages/opencode/src/session/processor.ts", "target": "function:packages/opencode/src/session/processor.ts:process", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:packages/opencode/src/session/processor.ts", "target": "function:packages/opencode/src/session/processor.ts:cleanup", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:packages/opencode/src/session/processor.ts", "target": "file:packages/opencode/src/session/session.ts", "type": "depends_on", "direction": "forward", "weight": 0.6 },
+    { "source": "file:packages/opencode/src/session/processor.ts", "target": "file:packages/opencode/src/session/retry.ts", "type": "depends_on", "direction": "forward", "weight": 0.6 },
+    { "source": "file:packages/opencode/src/session/processor.ts", "target": "file:packages/opencode/src/session/status.ts", "type": "depends_on", "direction": "forward", "weight": 0.6 },
+    { "source": "file:packages/opencode/src/session/processor.ts", "target": "file:packages/opencode/src/session/summary.ts", "type": "depends_on", "direction": "forward", "weight": 0.6 },
+    { "source": "file:packages/opencode/src/session/processor.ts", "target": "file:packages/opencode/src/session/schema.ts", "type": "depends_on", "direction": "forward", "weight": 0.6 },
+    { "source": "function:packages/opencode/src/session/processor.ts:handleEvent", "target": "function:packages/opencode/src/session/usage.ts:getUsage", "type": "calls", "direction": "forward", "weight": 0.8 },
+
+    { "source": "file:packages/opencode/src/session/projectors-next.ts", "target": "function:packages/opencode/src/session/projectors-next.ts:sqlite", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:packages/opencode/src/session/projectors-next.ts", "target": "file:packages/opencode/src/session/session.sql.ts", "type": "depends_on", "direction": "forward", "weight": 0.6 },
+    { "source": "file:packages/opencode/src/session/projectors-next.ts", "target": "file:packages/opencode/src/session/schema.ts", "type": "depends_on", "direction": "forward", "weight": 0.6 },
+
+    { "source": "file:packages/opencode/src/session/projectors.ts", "target": "function:packages/opencode/src/session/projectors.ts:grab", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:packages/opencode/src/session/projectors.ts", "target": "function:packages/opencode/src/session/projectors.ts:toPartialRow", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:packages/opencode/src/session/projectors.ts", "target": "function:packages/opencode/src/session/projectors.ts:toPartialRow", "type": "exports", "direction": "forward", "weight": 0.8 },
+    { "source": "file:packages/opencode/src/session/projectors.ts", "target": "file:packages/opencode/src/session/session.ts", "type": "depends_on", "direction": "forward", "weight": 0.6 },
+    { "source": "file:packages/opencode/src/session/projectors.ts", "target": "file:packages/opencode/src/session/session.sql.ts", "type": "depends_on", "direction": "forward", "weight": 0.6 },
+    { "source": "file:packages/opencode/src/session/projectors.ts", "target": "file:packages/opencode/src/session/projectors-next.ts", "type": "depends_on", "direction": "forward", "weight": 0.6 },
+
+    { "source": "file:packages/opencode/src/session/prompt.ts", "target": "function:packages/opencode/src/session/prompt.ts:resolvePromptParts", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:packages/opencode/src/session/prompt.ts", "target": "function:packages/opencode/src/session/prompt.ts:prompt", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:packages/opencode/src/session/prompt.ts", "target": "function:packages/opencode/src/session/prompt.ts:loop", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:packages/opencode/src/session/prompt.ts", "target": "file:packages/opencode/src/session/schema.ts", "type": "depends_on", "direction": "forward", "weight": 0.6 },
+    { "source": "file:packages/opencode/src/session/prompt.ts", "target": "file:packages/opencode/src/session/session.ts", "type": "depends_on", "direction": "forward", "weight": 0.6 },
+    { "source": "file:packages/opencode/src/session/prompt.ts", "target": "file:packages/opencode/src/session/revert.ts", "type": "depends_on", "direction": "forward", "weight": 0.6 },
+    { "source": "file:packages/opencode/src/session/prompt.ts", "target": "file:packages/opencode/src/session/system.ts", "type": "depends_on", "direction": "forward", "weight": 0.6 },
+    { "source": "file:packages/opencode/src/session/prompt.ts", "target": "file:packages/opencode/src/session/summary.ts", "type": "depends_on", "direction": "forward", "weight": 0.6 },
+    { "source": "file:packages/opencode/src/session/prompt.ts", "target": "file:packages/opencode/src/session/processor.ts", "type": "depends_on", "direction": "forward", "weight": 0.6 },
+    { "source": "file:packages/opencode/src/session/prompt.ts", "target": "file:packages/opencode/src/session/status.ts", "type": "depends_on", "direction": "forward", "weight": 0.6 },
+    { "source": "file:packages/opencode/src/session/prompt.ts", "target": "file:packages/opencode/src/session/run-state.ts", "type": "depends_on", "direction": "forward", "weight": 0.6 },
+    { "source": "file:packages/opencode/src/session/prompt.ts", "target": "file:packages/opencode/src/session/session.sql.ts", "type": "depends_on", "direction": "forward", "weight": 0.6 },
+    { "source": "file:packages/opencode/src/session/prompt.ts", "target": "file:packages/opencode/src/session/prompt/predict.ts", "type": "depends_on", "direction": "forward", "weight": 0.6 },
+    { "source": "file:packages/opencode/src/session/prompt.ts", "target": "file:packages/opencode/src/session/prompt/structured-output.ts", "type": "depends_on", "direction": "forward", "weight": 0.6 },
+
+    { "source": "file:packages/opencode/src/session/prompt/mcp-patterns.ts", "target": "function:packages/opencode/src/session/prompt/mcp-patterns.ts:deriveMcpPatterns", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:packages/opencode/src/session/prompt/mcp-patterns.ts", "target": "function:packages/opencode/src/session/prompt/mcp-patterns.ts:deriveMcpPatterns", "type": "exports", "direction": "forward", "weight": 0.8 },
+
+    { "source": "file:packages/opencode/src/session/prompt/predict.ts", "target": "function:packages/opencode/src/session/prompt/predict.ts:cleanPrediction", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:packages/opencode/src/session/prompt/predict.ts", "target": "function:packages/opencode/src/session/prompt/predict.ts:cleanPrediction", "type": "exports", "direction": "forward", "weight": 0.8 },
+
+    { "source": "file:packages/opencode/src/session/prompt/structured-output.ts", "target": "function:packages/opencode/src/session/prompt/structured-output.ts:createStructuredOutputTool", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:packages/opencode/src/session/prompt/structured-output.ts", "target": "function:packages/opencode/src/session/prompt/structured-output.ts:createStructuredOutputTool", "type": "exports", "direction": "forward", "weight": 0.8 },
+
+    { "source": "file:packages/opencode/src/session/retry.ts", "target": "function:packages/opencode/src/session/retry.ts:delay", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:packages/opencode/src/session/retry.ts", "target": "function:packages/opencode/src/session/retry.ts:retryable", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:packages/opencode/src/session/retry.ts", "target": "function:packages/opencode/src/session/retry.ts:policy", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:packages/opencode/src/session/retry.ts", "target": "function:packages/opencode/src/session/retry.ts:delay", "type": "exports", "direction": "forward", "weight": 0.8 },
+    { "source": "file:packages/opencode/src/session/retry.ts", "target": "function:packages/opencode/src/session/retry.ts:retryable", "type": "exports", "direction": "forward", "weight": 0.8 },
+    { "source": "file:packages/opencode/src/session/retry.ts", "target": "function:packages/opencode/src/session/retry.ts:policy", "type": "exports", "direction": "forward", "weight": 0.8 },
+
+    { "source": "file:packages/opencode/src/session/revert.ts", "target": "function:packages/opencode/src/session/revert.ts:revert", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:packages/opencode/src/session/revert.ts", "target": "function:packages/opencode/src/session/revert.ts:cleanup", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:packages/opencode/src/session/revert.ts", "target": "file:packages/opencode/src/session/session.ts", "type": "depends_on", "direction": "forward", "weight": 0.6 },
+    { "source": "file:packages/opencode/src/session/revert.ts", "target": "file:packages/opencode/src/session/schema.ts", "type": "depends_on", "direction": "forward", "weight": 0.6 },
+    { "source": "file:packages/opencode/src/session/revert.ts", "target": "file:packages/opencode/src/session/run-state.ts", "type": "depends_on", "direction": "forward", "weight": 0.6 },
+    { "source": "file:packages/opencode/src/session/revert.ts", "target": "file:packages/opencode/src/session/summary.ts", "type": "depends_on", "direction": "forward", "weight": 0.6 },
+
+    { "source": "file:packages/opencode/src/session/run-state.ts", "target": "function:packages/opencode/src/session/run-state.ts:runner", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:packages/opencode/src/session/run-state.ts", "target": "file:packages/opencode/src/session/session.ts", "type": "depends_on", "direction": "forward", "weight": 0.6 },
+    { "source": "file:packages/opencode/src/session/run-state.ts", "target": "file:packages/opencode/src/session/schema.ts", "type": "depends_on", "direction": "forward", "weight": 0.6 },
+    { "source": "file:packages/opencode/src/session/run-state.ts", "target": "file:packages/opencode/src/session/status.ts", "type": "depends_on", "direction": "forward", "weight": 0.6 },
+
+    { "source": "file:packages/opencode/src/session/session.sql.ts", "target": "table:packages/opencode/src/session/session.sql.ts:session", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:packages/opencode/src/session/session.sql.ts", "target": "table:packages/opencode/src/session/session.sql.ts:message", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:packages/opencode/src/session/session.sql.ts", "target": "table:packages/opencode/src/session/session.sql.ts:part", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:packages/opencode/src/session/session.sql.ts", "target": "table:packages/opencode/src/session/session.sql.ts:todo", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:packages/opencode/src/session/session.sql.ts", "target": "table:packages/opencode/src/session/session.sql.ts:session_message", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:packages/opencode/src/session/session.sql.ts", "target": "table:packages/opencode/src/session/session.sql.ts:permission", "type": "contains", "direction": "forward", "weight": 1.0 }
+  ]
+}

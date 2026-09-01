@@ -1,0 +1,377 @@
+{
+  "nodes": [
+    {
+      "id": "config:packages/web/src/content/i18n/ar.json",
+      "type": "config",
+      "name": "ar.json",
+      "filePath": "packages/web/src/content/i18n/ar.json",
+      "summary": "Arabic translations of the Starlight docs site UI strings, covering the landing page (hero, feature cards, image captions) and the share-link viewer (statuses, token/cost labels, plan states).",
+      "tags": [
+        "i18n",
+        "docs-site",
+        "starlight",
+        "locale-ar"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:packages/web/src/content/i18n/bs.json",
+      "type": "config",
+      "name": "bs.json",
+      "filePath": "packages/web/src/content/i18n/bs.json",
+      "summary": "Bosnian translations of the Starlight docs site UI strings, covering the landing page (hero, feature cards, image captions) and the share-link viewer (statuses, token/cost labels, plan states).",
+      "tags": [
+        "i18n",
+        "docs-site",
+        "starlight",
+        "locale-bs"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:packages/web/src/content/i18n/da.json",
+      "type": "config",
+      "name": "da.json",
+      "filePath": "packages/web/src/content/i18n/da.json",
+      "summary": "Danish translations of the Starlight docs site UI strings, covering the landing page (hero, feature cards, image captions) and the share-link viewer (statuses, token/cost labels, plan states).",
+      "tags": [
+        "i18n",
+        "docs-site",
+        "starlight",
+        "locale-da"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:packages/web/src/content/i18n/de.json",
+      "type": "config",
+      "name": "de.json",
+      "filePath": "packages/web/src/content/i18n/de.json",
+      "summary": "German translations of the Starlight docs site UI strings, covering the landing page (hero, feature cards, image captions) and the share-link viewer (statuses, token/cost labels, plan states).",
+      "tags": [
+        "i18n",
+        "docs-site",
+        "starlight",
+        "locale-de"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:packages/web/src/content/i18n/en.json",
+      "type": "config",
+      "name": "en.json",
+      "filePath": "packages/web/src/content/i18n/en.json",
+      "summary": "Base English UI-string dictionary for the Starlight docs site, defining the canonical keys (landing-page hero, feature cards, and share-link viewer labels) that every other locale file translates.",
+      "tags": [
+        "i18n",
+        "docs-site",
+        "starlight",
+        "locale-en"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:packages/web/src/content/i18n/es.json",
+      "type": "config",
+      "name": "es.json",
+      "filePath": "packages/web/src/content/i18n/es.json",
+      "summary": "Spanish translations of the Starlight docs site UI strings, covering the landing page (hero, feature cards, image captions) and the share-link viewer (statuses, token/cost labels, plan states).",
+      "tags": [
+        "i18n",
+        "docs-site",
+        "starlight",
+        "locale-es"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:packages/web/src/content/i18n/fr.json",
+      "type": "config",
+      "name": "fr.json",
+      "filePath": "packages/web/src/content/i18n/fr.json",
+      "summary": "French translations of the Starlight docs site UI strings, covering the landing page (hero, feature cards, image captions) and the share-link viewer (statuses, token/cost labels, plan states).",
+      "tags": [
+        "i18n",
+        "docs-site",
+        "starlight",
+        "locale-fr"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:packages/web/src/content/i18n/it.json",
+      "type": "config",
+      "name": "it.json",
+      "filePath": "packages/web/src/content/i18n/it.json",
+      "summary": "Italian translations of the Starlight docs site UI strings, covering the landing page (hero, feature cards, image captions) and the share-link viewer (statuses, token/cost labels, plan states).",
+      "tags": [
+        "i18n",
+        "docs-site",
+        "starlight",
+        "locale-it"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:packages/web/src/content/i18n/ja.json",
+      "type": "config",
+      "name": "ja.json",
+      "filePath": "packages/web/src/content/i18n/ja.json",
+      "summary": "Japanese translations of the Starlight docs site UI strings, covering the landing page (hero, feature cards, image captions) and the share-link viewer (statuses, token/cost labels, plan states).",
+      "tags": [
+        "i18n",
+        "docs-site",
+        "starlight",
+        "locale-ja"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:packages/web/src/content/i18n/ko.json",
+      "type": "config",
+      "name": "ko.json",
+      "filePath": "packages/web/src/content/i18n/ko.json",
+      "summary": "Korean translations of the Starlight docs site UI strings, covering the landing page (hero, feature cards, image captions) and the share-link viewer (statuses, token/cost labels, plan states).",
+      "tags": [
+        "i18n",
+        "docs-site",
+        "starlight",
+        "locale-ko"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:packages/web/src/content/i18n/nb.json",
+      "type": "config",
+      "name": "nb.json",
+      "filePath": "packages/web/src/content/i18n/nb.json",
+      "summary": "Norwegian Bokmål translations of the Starlight docs site UI strings, covering the landing page (hero, feature cards, image captions) and the share-link viewer (statuses, token/cost labels, plan states).",
+      "tags": [
+        "i18n",
+        "docs-site",
+        "starlight",
+        "locale-nb"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:packages/web/src/content/i18n/pl.json",
+      "type": "config",
+      "name": "pl.json",
+      "filePath": "packages/web/src/content/i18n/pl.json",
+      "summary": "Polish translations of the Starlight docs site UI strings, covering the landing page (hero, feature cards, image captions) and the share-link viewer (statuses, token/cost labels, plan states).",
+      "tags": [
+        "i18n",
+        "docs-site",
+        "starlight",
+        "locale-pl"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:packages/web/src/content/i18n/pt-BR.json",
+      "type": "config",
+      "name": "pt-BR.json",
+      "filePath": "packages/web/src/content/i18n/pt-BR.json",
+      "summary": "Brazilian Portuguese translations of the Starlight docs site UI strings, covering the landing page (hero, feature cards, image captions) and the share-link viewer (statuses, token/cost labels, plan states).",
+      "tags": [
+        "i18n",
+        "docs-site",
+        "starlight",
+        "locale-pt-br"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:packages/web/src/content/i18n/ru.json",
+      "type": "config",
+      "name": "ru.json",
+      "filePath": "packages/web/src/content/i18n/ru.json",
+      "summary": "Russian translations of the Starlight docs site UI strings, covering the landing page (hero, feature cards, image captions) and the share-link viewer (statuses, token/cost labels, plan states).",
+      "tags": [
+        "i18n",
+        "docs-site",
+        "starlight",
+        "locale-ru"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:packages/web/src/content/i18n/th.json",
+      "type": "config",
+      "name": "th.json",
+      "filePath": "packages/web/src/content/i18n/th.json",
+      "summary": "Thai translations of the Starlight docs site UI strings, covering the landing page (hero, feature cards, image captions) and the share-link viewer (statuses, token/cost labels, plan states).",
+      "tags": [
+        "i18n",
+        "docs-site",
+        "starlight",
+        "locale-th"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:packages/web/src/content/i18n/tr.json",
+      "type": "config",
+      "name": "tr.json",
+      "filePath": "packages/web/src/content/i18n/tr.json",
+      "summary": "Turkish translations of the Starlight docs site UI strings, covering the landing page (hero, feature cards, image captions) and the share-link viewer (statuses, token/cost labels, plan states).",
+      "tags": [
+        "i18n",
+        "docs-site",
+        "starlight",
+        "locale-tr"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:packages/web/src/content/i18n/zh-CN.json",
+      "type": "config",
+      "name": "zh-CN.json",
+      "filePath": "packages/web/src/content/i18n/zh-CN.json",
+      "summary": "Simplified Chinese translations of the Starlight docs site UI strings, covering the landing page (hero, feature cards, image captions) and the share-link viewer (statuses, token/cost labels, plan states).",
+      "tags": [
+        "i18n",
+        "docs-site",
+        "starlight",
+        "locale-zh-cn"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:packages/web/src/content/i18n/zh-TW.json",
+      "type": "config",
+      "name": "zh-TW.json",
+      "filePath": "packages/web/src/content/i18n/zh-TW.json",
+      "summary": "Traditional Chinese translations of the Starlight docs site UI strings, covering the landing page (hero, feature cards, image captions) and the share-link viewer (statuses, token/cost labels, plan states).",
+      "tags": [
+        "i18n",
+        "docs-site",
+        "starlight",
+        "locale-zh-tw"
+      ],
+      "complexity": "simple"
+    }
+  ],
+  "edges": [
+    {
+      "source": "config:packages/web/src/content/i18n/ar.json",
+      "target": "config:packages/web/src/content/i18n/en.json",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "config:packages/web/src/content/i18n/bs.json",
+      "target": "config:packages/web/src/content/i18n/en.json",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "config:packages/web/src/content/i18n/da.json",
+      "target": "config:packages/web/src/content/i18n/en.json",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "config:packages/web/src/content/i18n/de.json",
+      "target": "config:packages/web/src/content/i18n/en.json",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "config:packages/web/src/content/i18n/es.json",
+      "target": "config:packages/web/src/content/i18n/en.json",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "config:packages/web/src/content/i18n/fr.json",
+      "target": "config:packages/web/src/content/i18n/en.json",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "config:packages/web/src/content/i18n/it.json",
+      "target": "config:packages/web/src/content/i18n/en.json",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "config:packages/web/src/content/i18n/ja.json",
+      "target": "config:packages/web/src/content/i18n/en.json",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "config:packages/web/src/content/i18n/ko.json",
+      "target": "config:packages/web/src/content/i18n/en.json",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "config:packages/web/src/content/i18n/nb.json",
+      "target": "config:packages/web/src/content/i18n/en.json",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "config:packages/web/src/content/i18n/pl.json",
+      "target": "config:packages/web/src/content/i18n/en.json",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "config:packages/web/src/content/i18n/pt-BR.json",
+      "target": "config:packages/web/src/content/i18n/en.json",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "config:packages/web/src/content/i18n/ru.json",
+      "target": "config:packages/web/src/content/i18n/en.json",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "config:packages/web/src/content/i18n/th.json",
+      "target": "config:packages/web/src/content/i18n/en.json",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "config:packages/web/src/content/i18n/tr.json",
+      "target": "config:packages/web/src/content/i18n/en.json",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "config:packages/web/src/content/i18n/zh-CN.json",
+      "target": "config:packages/web/src/content/i18n/en.json",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "config:packages/web/src/content/i18n/zh-TW.json",
+      "target": "config:packages/web/src/content/i18n/en.json",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    }
+  ]
+}

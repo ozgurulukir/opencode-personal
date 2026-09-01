@@ -1,0 +1,469 @@
+{
+ "nodes": [
+  {
+   "id": "config:packages/opencode/src/cli/cmd/tui/context/theme/aura.json",
+   "type": "config",
+   "name": "aura.json",
+   "filePath": "packages/opencode/src/cli/cmd/tui/context/theme/aura.json",
+   "summary": "Defines the Aura theme — a near-black (#0f0f0f) dark palette with soft pastel purple and pink accents — for the TUI's semantic color slots.",
+   "tags": [
+    "tui",
+    "theme",
+    "color-palette",
+    "dark-mode"
+   ],
+   "complexity": "simple",
+   "languageNotes": "Dark-only: every theme slot is a single defs alias rather than a {dark, light} pair."
+  },
+  {
+   "id": "config:packages/opencode/src/cli/cmd/tui/context/theme/ayu.json",
+   "type": "config",
+   "name": "ayu.json",
+   "filePath": "packages/opencode/src/cli/cmd/tui/context/theme/ayu.json",
+   "summary": "Defines the Ayu dark theme — a #0b0e14 blue-gray base with blue entity colors and the signature gold (#e6b450) accent — for the TUI's semantic color slots.",
+   "tags": [
+    "tui",
+    "theme",
+    "color-palette",
+    "dark-mode"
+   ],
+   "complexity": "simple",
+   "languageNotes": "Dark-only: single-value theme slots resolved through the defs alias map."
+  },
+  {
+   "id": "config:packages/opencode/src/cli/cmd/tui/context/theme/carbonfox.json",
+   "type": "config",
+   "name": "carbonfox.json",
+   "filePath": "packages/opencode/src/cli/cmd/tui/context/theme/carbonfox.json",
+   "summary": "Defines the Carbonfox theme from the Nightfox family — an IBM Carbon-inspired palette with cyan primaries and magenta accents — with dark and light variants for the TUI's semantic color slots.",
+   "tags": [
+    "tui",
+    "theme",
+    "color-palette",
+    "dual-mode"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "config:packages/opencode/src/cli/cmd/tui/context/theme/catppuccin-frappe.json",
+   "type": "config",
+   "name": "catppuccin-frappe.json",
+   "filePath": "packages/opencode/src/cli/cmd/tui/context/theme/catppuccin-frappe.json",
+   "summary": "Defines the Catppuccin Frappé theme — the warm mid-dark pastel variant on a #303446 base — for the TUI's semantic color slots.",
+   "tags": [
+    "tui",
+    "theme",
+    "color-palette",
+    "pastel",
+    "catppuccin"
+   ],
+   "complexity": "moderate",
+   "languageNotes": "Dark and light slots both resolve to the same Frappé palette; the variant ships no separate light ramp."
+  },
+  {
+   "id": "config:packages/opencode/src/cli/cmd/tui/context/theme/catppuccin-macchiato.json",
+   "type": "config",
+   "name": "catppuccin-macchiato.json",
+   "filePath": "packages/opencode/src/cli/cmd/tui/context/theme/catppuccin-macchiato.json",
+   "summary": "Defines the Catppuccin Macchiato theme — the medium-dark pastel variant on a #24273a base — for the TUI's semantic color slots.",
+   "tags": [
+    "tui",
+    "theme",
+    "color-palette",
+    "pastel",
+    "catppuccin"
+   ],
+   "complexity": "moderate",
+   "languageNotes": "Dark and light slots both resolve to the same Macchiato palette; the variant ships no separate light ramp."
+  },
+  {
+   "id": "config:packages/opencode/src/cli/cmd/tui/context/theme/catppuccin.json",
+   "type": "config",
+   "name": "catppuccin.json",
+   "filePath": "packages/opencode/src/cli/cmd/tui/context/theme/catppuccin.json",
+   "summary": "Defines the flagship Catppuccin theme — Mocha (#1e1e2e) for dark mode and Latte (#eff1f5) for light mode — for the TUI's semantic color slots.",
+   "tags": [
+    "tui",
+    "theme",
+    "color-palette",
+    "pastel",
+    "catppuccin"
+   ],
+   "complexity": "moderate",
+   "languageNotes": "Pairs the Mocha (dark) and Latte (light) palettes via {dark, light} slot objects over a shared defs alias map."
+  },
+  {
+   "id": "config:packages/opencode/src/cli/cmd/tui/context/theme/cobalt2.json",
+   "type": "config",
+   "name": "cobalt2.json",
+   "filePath": "packages/opencode/src/cli/cmd/tui/context/theme/cobalt2.json",
+   "summary": "Defines the Cobalt2 theme — a deep navy (#193549) base with electric blue primaries and aqua accents — with dark and light variants for the TUI's semantic color slots.",
+   "tags": [
+    "tui",
+    "theme",
+    "color-palette",
+    "dual-mode"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "config:packages/opencode/src/cli/cmd/tui/context/theme/cursor.json",
+   "type": "config",
+   "name": "cursor.json",
+   "filePath": "packages/opencode/src/cli/cmd/tui/context/theme/cursor.json",
+   "summary": "Defines the Cursor editor's default theme — neutral grays (#181818 dark / #fcfcfc light) with a muted slate-blue accent — for the TUI's semantic color slots.",
+   "tags": [
+    "tui",
+    "theme",
+    "color-palette",
+    "dual-mode",
+    "editor-theme"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "config:packages/opencode/src/cli/cmd/tui/context/theme/dracula.json",
+   "type": "config",
+   "name": "dracula.json",
+   "filePath": "packages/opencode/src/cli/cmd/tui/context/theme/dracula.json",
+   "summary": "Defines the Dracula theme — the classic purple (#282a36) dark palette with lavender, cyan, and green accents — with a light variant for the TUI's semantic color slots.",
+   "tags": [
+    "tui",
+    "theme",
+    "color-palette",
+    "dual-mode",
+    "dark-mode"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "config:packages/opencode/src/cli/cmd/tui/context/theme/everforest.json",
+   "type": "config",
+   "name": "everforest.json",
+   "filePath": "packages/opencode/src/cli/cmd/tui/context/theme/everforest.json",
+   "summary": "Defines the Everforest theme — a comfortable green-toned palette with sage-green primaries and soft pink accents — with dark and light variants for the TUI's semantic color slots.",
+   "tags": [
+    "tui",
+    "theme",
+    "color-palette",
+    "dual-mode",
+    "green"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "config:packages/opencode/src/cli/cmd/tui/context/theme/flexoki.json",
+   "type": "config",
+   "name": "flexoki.json",
+   "filePath": "packages/opencode/src/cli/cmd/tui/context/theme/flexoki.json",
+   "summary": "Defines the Flexoki theme — an ink-on-paper warm grayscale with a 16-color accent set (#100f0f dark / #fffcf0 light) — for the TUI's semantic color slots.",
+   "tags": [
+    "tui",
+    "theme",
+    "color-palette",
+    "dual-mode",
+    "grayscale"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "config:packages/opencode/src/cli/cmd/tui/context/theme/github.json",
+   "type": "config",
+   "name": "github.json",
+   "filePath": "packages/opencode/src/cli/cmd/tui/context/theme/github.json",
+   "summary": "Defines the GitHub theme — GitHub's Primer colors with #0d1117 dark and white light variants, blue link primaries and teal accents — for the TUI's semantic color slots.",
+   "tags": [
+    "tui",
+    "theme",
+    "color-palette",
+    "dual-mode",
+    "brand-theme"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "config:packages/opencode/src/cli/cmd/tui/context/theme/gruvbox.json",
+   "type": "config",
+   "name": "gruvbox.json",
+   "filePath": "packages/opencode/src/cli/cmd/tui/context/theme/gruvbox.json",
+   "summary": "Defines the Gruvbox theme — the retro-groove earthy palette of warm browns, beiges, and muted greens (#282828 dark / #fbf1c7 light) — for the TUI's semantic color slots.",
+   "tags": [
+    "tui",
+    "theme",
+    "color-palette",
+    "dual-mode",
+    "retro"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "config:packages/opencode/src/cli/cmd/tui/context/theme/kanagawa.json",
+   "type": "config",
+   "name": "kanagawa.json",
+   "filePath": "packages/opencode/src/cli/cmd/tui/context/theme/kanagawa.json",
+   "summary": "Defines the Kanagawa theme — a palette inspired by The Great Wave off Kanagawa, with sumi-ink dark (#1f1f28) and warm washi light (#f2e9de) bases — for the TUI's semantic color slots.",
+   "tags": [
+    "tui",
+    "theme",
+    "color-palette",
+    "dual-mode",
+    "japanese"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "config:packages/opencode/src/cli/cmd/tui/context/theme/lucent-orng.json",
+   "type": "config",
+   "name": "lucent-orng.json",
+   "filePath": "packages/opencode/src/cli/cmd/tui/context/theme/lucent-orng.json",
+   "summary": "Defines the Lucent variant of the ORNG theme — a transparent-background take on the vivid-orange (#ec5b2b) brand palette — for the TUI's semantic color slots.",
+   "tags": [
+    "tui",
+    "theme",
+    "color-palette",
+    "dual-mode",
+    "translucent"
+   ],
+   "complexity": "moderate",
+   "languageNotes": "Background resolves to the literal 'transparent', relying on terminal window transparency instead of a solid color."
+  },
+  {
+   "id": "config:packages/opencode/src/cli/cmd/tui/context/theme/material.json",
+   "type": "config",
+   "name": "material.json",
+   "filePath": "packages/opencode/src/cli/cmd/tui/context/theme/material.json",
+   "summary": "Defines the Material theme — Google's Material Design palette with a blue-gray #263238 dark base and near-white light variant, periwinkle-blue primaries — for the TUI's semantic color slots.",
+   "tags": [
+    "tui",
+    "theme",
+    "color-palette",
+    "dual-mode",
+    "material-design"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "config:packages/opencode/src/cli/cmd/tui/context/theme/matrix.json",
+   "type": "config",
+   "name": "matrix.json",
+   "filePath": "packages/opencode/src/cli/cmd/tui/context/theme/matrix.json",
+   "summary": "Defines the Matrix theme — a green-on-black terminal aesthetic (#0a0e0a base with neon #2eff6a primaries and purple accents) — with a light variant for the TUI's semantic color slots.",
+   "tags": [
+    "tui",
+    "theme",
+    "color-palette",
+    "dual-mode",
+    "terminal-aesthetic"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "config:packages/opencode/src/cli/cmd/tui/context/theme/mercury.json",
+   "type": "config",
+   "name": "mercury.json",
+   "filePath": "packages/opencode/src/cli/cmd/tui/context/theme/mercury.json",
+   "summary": "Defines the Mercury theme — a deep navy-indigo (#171721) dark base with white light variant and periwinkle-blue primaries — for the TUI's semantic color slots.",
+   "tags": [
+    "tui",
+    "theme",
+    "color-palette",
+    "dual-mode"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "config:packages/opencode/src/cli/cmd/tui/context/theme/monokai.json",
+   "type": "config",
+   "name": "monokai.json",
+   "filePath": "packages/opencode/src/cli/cmd/tui/context/theme/monokai.json",
+   "summary": "Defines the Monokai theme — the classic #272822 dark editor palette with cyan primaries and lime-green accents — with a light variant for the TUI's semantic color slots.",
+   "tags": [
+    "tui",
+    "theme",
+    "color-palette",
+    "dual-mode",
+    "editor-theme"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "config:packages/opencode/src/cli/cmd/tui/context/theme/nightowl.json",
+   "type": "config",
+   "name": "nightowl.json",
+   "filePath": "packages/opencode/src/cli/cmd/tui/context/theme/nightowl.json",
+   "summary": "Defines the Night Owl theme — a deep navy #011627 base with periwinkle-blue primaries and purple accents, optimized for night coding — for the TUI's semantic color slots.",
+   "tags": [
+    "tui",
+    "theme",
+    "color-palette",
+    "dark-mode",
+    "editor-theme"
+   ],
+   "complexity": "moderate",
+   "languageNotes": "Dark and light slots resolve to the same Night Owl palette; no separate light ramp is defined."
+  }
+ ],
+ "edges": [
+  {
+   "source": "config:packages/opencode/src/cli/cmd/tui/context/theme/aura.json",
+   "target": "file:packages/opencode/src/cli/cmd/tui/context/theme.tsx",
+   "type": "configures",
+   "direction": "forward",
+   "weight": 0.6
+  },
+  {
+   "source": "config:packages/opencode/src/cli/cmd/tui/context/theme/ayu.json",
+   "target": "file:packages/opencode/src/cli/cmd/tui/context/theme.tsx",
+   "type": "configures",
+   "direction": "forward",
+   "weight": 0.6
+  },
+  {
+   "source": "config:packages/opencode/src/cli/cmd/tui/context/theme/carbonfox.json",
+   "target": "file:packages/opencode/src/cli/cmd/tui/context/theme.tsx",
+   "type": "configures",
+   "direction": "forward",
+   "weight": 0.6
+  },
+  {
+   "source": "config:packages/opencode/src/cli/cmd/tui/context/theme/catppuccin-frappe.json",
+   "target": "file:packages/opencode/src/cli/cmd/tui/context/theme.tsx",
+   "type": "configures",
+   "direction": "forward",
+   "weight": 0.6
+  },
+  {
+   "source": "config:packages/opencode/src/cli/cmd/tui/context/theme/catppuccin-macchiato.json",
+   "target": "file:packages/opencode/src/cli/cmd/tui/context/theme.tsx",
+   "type": "configures",
+   "direction": "forward",
+   "weight": 0.6
+  },
+  {
+   "source": "config:packages/opencode/src/cli/cmd/tui/context/theme/catppuccin.json",
+   "target": "file:packages/opencode/src/cli/cmd/tui/context/theme.tsx",
+   "type": "configures",
+   "direction": "forward",
+   "weight": 0.6
+  },
+  {
+   "source": "config:packages/opencode/src/cli/cmd/tui/context/theme/cobalt2.json",
+   "target": "file:packages/opencode/src/cli/cmd/tui/context/theme.tsx",
+   "type": "configures",
+   "direction": "forward",
+   "weight": 0.6
+  },
+  {
+   "source": "config:packages/opencode/src/cli/cmd/tui/context/theme/cursor.json",
+   "target": "file:packages/opencode/src/cli/cmd/tui/context/theme.tsx",
+   "type": "configures",
+   "direction": "forward",
+   "weight": 0.6
+  },
+  {
+   "source": "config:packages/opencode/src/cli/cmd/tui/context/theme/dracula.json",
+   "target": "file:packages/opencode/src/cli/cmd/tui/context/theme.tsx",
+   "type": "configures",
+   "direction": "forward",
+   "weight": 0.6
+  },
+  {
+   "source": "config:packages/opencode/src/cli/cmd/tui/context/theme/everforest.json",
+   "target": "file:packages/opencode/src/cli/cmd/tui/context/theme.tsx",
+   "type": "configures",
+   "direction": "forward",
+   "weight": 0.6
+  },
+  {
+   "source": "config:packages/opencode/src/cli/cmd/tui/context/theme/flexoki.json",
+   "target": "file:packages/opencode/src/cli/cmd/tui/context/theme.tsx",
+   "type": "configures",
+   "direction": "forward",
+   "weight": 0.6
+  },
+  {
+   "source": "config:packages/opencode/src/cli/cmd/tui/context/theme/github.json",
+   "target": "file:packages/opencode/src/cli/cmd/tui/context/theme.tsx",
+   "type": "configures",
+   "direction": "forward",
+   "weight": 0.6
+  },
+  {
+   "source": "config:packages/opencode/src/cli/cmd/tui/context/theme/gruvbox.json",
+   "target": "file:packages/opencode/src/cli/cmd/tui/context/theme.tsx",
+   "type": "configures",
+   "direction": "forward",
+   "weight": 0.6
+  },
+  {
+   "source": "config:packages/opencode/src/cli/cmd/tui/context/theme/kanagawa.json",
+   "target": "file:packages/opencode/src/cli/cmd/tui/context/theme.tsx",
+   "type": "configures",
+   "direction": "forward",
+   "weight": 0.6
+  },
+  {
+   "source": "config:packages/opencode/src/cli/cmd/tui/context/theme/lucent-orng.json",
+   "target": "file:packages/opencode/src/cli/cmd/tui/context/theme.tsx",
+   "type": "configures",
+   "direction": "forward",
+   "weight": 0.6
+  },
+  {
+   "source": "config:packages/opencode/src/cli/cmd/tui/context/theme/material.json",
+   "target": "file:packages/opencode/src/cli/cmd/tui/context/theme.tsx",
+   "type": "configures",
+   "direction": "forward",
+   "weight": 0.6
+  },
+  {
+   "source": "config:packages/opencode/src/cli/cmd/tui/context/theme/matrix.json",
+   "target": "file:packages/opencode/src/cli/cmd/tui/context/theme.tsx",
+   "type": "configures",
+   "direction": "forward",
+   "weight": 0.6
+  },
+  {
+   "source": "config:packages/opencode/src/cli/cmd/tui/context/theme/mercury.json",
+   "target": "file:packages/opencode/src/cli/cmd/tui/context/theme.tsx",
+   "type": "configures",
+   "direction": "forward",
+   "weight": 0.6
+  },
+  {
+   "source": "config:packages/opencode/src/cli/cmd/tui/context/theme/monokai.json",
+   "target": "file:packages/opencode/src/cli/cmd/tui/context/theme.tsx",
+   "type": "configures",
+   "direction": "forward",
+   "weight": 0.6
+  },
+  {
+   "source": "config:packages/opencode/src/cli/cmd/tui/context/theme/nightowl.json",
+   "target": "file:packages/opencode/src/cli/cmd/tui/context/theme.tsx",
+   "type": "configures",
+   "direction": "forward",
+   "weight": 0.6
+  },
+  {
+   "source": "config:packages/opencode/src/cli/cmd/tui/context/theme/catppuccin.json",
+   "target": "config:packages/opencode/src/cli/cmd/tui/context/theme/catppuccin-frappe.json",
+   "type": "related",
+   "direction": "forward",
+   "weight": 0.5
+  },
+  {
+   "source": "config:packages/opencode/src/cli/cmd/tui/context/theme/catppuccin.json",
+   "target": "config:packages/opencode/src/cli/cmd/tui/context/theme/catppuccin-macchiato.json",
+   "type": "related",
+   "direction": "forward",
+   "weight": 0.5
+  },
+  {
+   "source": "config:packages/opencode/src/cli/cmd/tui/context/theme/lucent-orng.json",
+   "target": "config:packages/opencode/src/cli/cmd/tui/context/theme/orng.json",
+   "type": "related",
+   "direction": "forward",
+   "weight": 0.5
+  }
+ ]
+}

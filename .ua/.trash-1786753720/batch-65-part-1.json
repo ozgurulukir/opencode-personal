@@ -1,0 +1,922 @@
+{
+  "nodes": [
+    {
+      "id": "file:packages/opencode/src/plugin/loader.ts",
+      "type": "file",
+      "name": "loader.ts",
+      "filePath": "packages/opencode/src/plugin/loader.ts",
+      "summary": "PluginLoader namespace implementing the staged plugin loading pipeline: normalize config specs into plans, resolve install/target/entrypoint, check version compatibility, dynamically import the module, and retry file-based plugins once after dependency preparation.",
+      "tags": ["plugin-system", "dynamic-import", "loader", "npm", "validation"],
+      "complexity": "complex",
+      "languageNotes": "Uses a TypeScript namespace (PluginLoader) as the module's public surface, with typed result objects ({ok: true/false, stage}) instead of exceptions for per-stage failure reporting."
+    },
+    {
+      "id": "function:packages/opencode/src/plugin/loader.ts:resolve",
+      "type": "function",
+      "name": "resolve",
+      "filePath": "packages/opencode/src/plugin/loader.ts",
+      "lineRange": [69, 116],
+      "summary": "Resolves a planned plugin spec to a concrete entrypoint in three gated stages (install, entry detection, semver compatibility), returning a typed ok/missing/error result so callers can report exactly why a plugin was skipped.",
+      "tags": ["plugin-system", "resolution", "npm", "result-type"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/opencode/src/plugin/loader.ts:load",
+      "type": "function",
+      "name": "load",
+      "filePath": "packages/opencode/src/plugin/loader.ts",
+      "lineRange": [119, 128],
+      "summary": "Dynamically imports a resolved plugin entrypoint module, failing softly with a typed error instead of throwing when the import fails or yields an empty module.",
+      "tags": ["plugin-system", "dynamic-import"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/plugin/loader.ts:attempt",
+      "type": "function",
+      "name": "attempt",
+      "filePath": "packages/opencode/src/plugin/loader.ts",
+      "lineRange": [132, 173],
+      "summary": "Runs one candidate through the full resolve/load pipeline, silently skipping deprecated plugins, routing missing-entrypoint results to a separate callback (for theme-only packages), and adapting loaded modules via a caller-supplied finisher.",
+      "tags": ["plugin-system", "orchestration", "callbacks"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/opencode/src/plugin/loader.ts:loadExternal",
+      "type": "function",
+      "name": "loadExternal",
+      "filePath": "packages/opencode/src/plugin/loader.ts",
+      "lineRange": [189, 215],
+      "summary": "Resolves and loads all configured plugins in parallel, retrying failed file-based plugins once after an optional wait() dependency-preparation hook while preserving result order.",
+      "tags": ["plugin-system", "parallel", "retry", "entry-point"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:packages/opencode/src/plugin/meta.ts",
+      "type": "file",
+      "name": "meta.ts",
+      "filePath": "packages/opencode/src/plugin/meta.ts",
+      "summary": "Persistent plugin metadata store (plugin-meta.json) tracking load counts, first/last seen timestamps, fingerprints, and theme files per plugin, guarded by cross-process file locks.",
+      "tags": ["plugin-system", "persistence", "metadata", "file-lock"],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:packages/opencode/src/plugin/meta.ts:entryCore",
+      "type": "function",
+      "name": "entryCore",
+      "filePath": "packages/opencode/src/plugin/meta.ts",
+      "lineRange": [83, 106],
+      "summary": "Builds the core metadata fields for a plugin touch record by resolving its file target, modification time, parsed specifier, and npm version.",
+      "tags": ["plugin-system", "metadata", "utility"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/opencode/src/plugin/meta.ts:next",
+      "type": "function",
+      "name": "next",
+      "filePath": "packages/opencode/src/plugin/meta.ts",
+      "lineRange": [124, 140],
+      "summary": "Merges a new core record into a previous store entry using fingerprints, returning a first/updated/same state plus timestamps and an incremented load count.",
+      "tags": ["plugin-system", "state-machine", "merge"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/opencode/src/plugin/meta.ts:touchMany",
+      "type": "function",
+      "name": "touchMany",
+      "filePath": "packages/opencode/src/plugin/meta.ts",
+      "lineRange": [142, 159],
+      "summary": "Records many plugin loads atomically: acquires a file lock, reads the store, merges each row via fingerprint comparison, and writes the updated JSON back.",
+      "tags": ["plugin-system", "persistence", "file-lock", "batch"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/opencode/src/plugin/meta.ts:touch",
+      "type": "function",
+      "name": "touch",
+      "filePath": "packages/opencode/src/plugin/meta.ts",
+      "lineRange": [161, 167],
+      "summary": "Single-plugin convenience wrapper around touchMany that records one spec/target/id triple.",
+      "tags": ["plugin-system", "persistence", "utility"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/plugin/meta.ts:setTheme",
+      "type": "function",
+      "name": "setTheme",
+      "filePath": "packages/opencode/src/plugin/meta.ts",
+      "lineRange": [169, 181],
+      "summary": "Attaches or replaces a theme definition on a plugin's store entry under a file lock so the TUI can resolve theme files shipped by plugins.",
+      "tags": ["plugin-system", "theming", "persistence"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/plugin/meta.ts:list",
+      "type": "function",
+      "name": "list",
+      "filePath": "packages/opencode/src/plugin/meta.ts",
+      "lineRange": [183, 186],
+      "summary": "Lists all plugin metadata entries by reading the store under a shared file lock.",
+      "tags": ["plugin-system", "query", "utility"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/opencode/src/plugin/shared.ts",
+      "type": "file",
+      "name": "shared.ts",
+      "filePath": "packages/opencode/src/plugin/shared.ts",
+      "summary": "Shared plugin resolution primitives used by both the loader and metadata store: spec parsing (npm/folder/file URLs), entrypoint detection from package exports, semver compatibility checks, theme extraction, and V1 plugin module reading.",
+      "tags": ["plugin-system", "resolution", "npm", "utility", "shared"],
+      "complexity": "complex",
+      "languageNotes": "Uses npm-package-arg (npa) for spec parsing and handles Windows drive-letter absolute paths with a dedicated regex guard alongside path.isAbsolute."
+    },
+    {
+      "id": "function:packages/opencode/src/plugin/shared.ts:parsePluginSpecifier",
+      "type": "function",
+      "name": "parsePluginSpecifier",
+      "filePath": "packages/opencode/src/plugin/shared.ts",
+      "lineRange": [22, 34],
+      "summary": "Parses a raw plugin specifier into a structured form (name/version/source), falling back to the raw string when npm-package-arg cannot classify it.",
+      "tags": ["plugin-system", "parsing", "npm"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/plugin/shared.ts:resolvePluginEntrypoint",
+      "type": "function",
+      "name": "resolvePluginEntrypoint",
+      "filePath": "packages/opencode/src/plugin/shared.ts",
+      "lineRange": [136, 169],
+      "summary": "Resolves a plugin target to a loadable file URL by consulting package.json exports for the requested kind, then falling back to directory index files and legacy package layouts.",
+      "tags": ["plugin-system", "resolution", "package-exports"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/opencode/src/plugin/shared.ts:resolvePathPluginTarget",
+      "type": "function",
+      "name": "resolvePathPluginTarget",
+      "filePath": "packages/opencode/src/plugin/shared.ts",
+      "lineRange": [175, 192],
+      "summary": "Resolves file:// and absolute-path plugin specs to on-disk targets, picking an index file when the target is a directory.",
+      "tags": ["plugin-system", "resolution", "filesystem"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/opencode/src/plugin/shared.ts:resolvePluginTarget",
+      "type": "function",
+      "name": "resolvePluginTarget",
+      "filePath": "packages/opencode/src/plugin/shared.ts",
+      "lineRange": [207, 213],
+      "summary": "Resolves a plugin spec to an on-disk target: path specs go through resolvePathPluginTarget, npm specs are installed on demand via Npm.add and located in the plugin cache.",
+      "tags": ["plugin-system", "resolution", "npm", "entry-point"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/plugin/shared.ts:checkPluginCompatibility",
+      "type": "function",
+      "name": "checkPluginCompatibility",
+      "filePath": "packages/opencode/src/plugin/shared.ts",
+      "lineRange": [194, 205],
+      "summary": "Validates an npm plugin's declared engines/opencode semver range against the running installation version, skipping the gate for malformed or missing declarations.",
+      "tags": ["plugin-system", "semver", "validation"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/plugin/shared.ts:createPluginEntry",
+      "type": "function",
+      "name": "createPluginEntry",
+      "filePath": "packages/opencode/src/plugin/shared.ts",
+      "lineRange": [224, 236],
+      "summary": "Creates the base plugin entry (source, target, optional entrypoint and package.json) for a resolved target, the shared building block for loader Resolved/Missing results.",
+      "tags": ["plugin-system", "factory", "resolution"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/plugin/shared.ts:readPackageThemes",
+      "type": "function",
+      "name": "readPackageThemes",
+      "filePath": "packages/opencode/src/plugin/shared.ts",
+      "lineRange": [238, 262],
+      "summary": "Extracts theme file declarations from a plugin package.json, accepting either an array of paths or a path map, and resolving each against the package root.",
+      "tags": ["plugin-system", "theming", "parsing"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/opencode/src/plugin/shared.ts:readV1Plugin",
+      "type": "function",
+      "name": "readV1Plugin",
+      "filePath": "packages/opencode/src/plugin/shared.ts",
+      "lineRange": [272, 304],
+      "summary": "Adapts a legacy V1 plugin module (function or config-object form) into the current plugin entry shape, extracting hooks, inits, and auth handlers.",
+      "tags": ["plugin-system", "legacy", "adapter"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/opencode/src/plugin/shared.ts:resolvePluginId",
+      "type": "function",
+      "name": "resolvePluginId",
+      "filePath": "packages/opencode/src/plugin/shared.ts",
+      "lineRange": [306, 323],
+      "summary": "Determines a stable plugin id from an explicit id, module export, or the installed package.json name.",
+      "tags": ["plugin-system", "identity", "resolution"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/opencode/src/project/bootstrap-service.ts",
+      "type": "file",
+      "name": "bootstrap-service.ts",
+      "filePath": "packages/opencode/src/project/bootstrap-service.ts",
+      "summary": "Defines the InstanceBootstrap Context.Service tag and Interface separately from its implementation so InstanceStore can depend on the bootstrap without importing the heavy implementation dependency graph.",
+      "tags": ["service", "effect", "type-definition", "decoupling"],
+      "complexity": "simple",
+      "languageNotes": "Illustrates the tag/implementation split pattern for Effect services: a lightweight tag file breaks what would otherwise be a circular layer dependency."
+    },
+    {
+      "id": "class:packages/opencode/src/project/bootstrap-service.ts:Service",
+      "type": "class",
+      "name": "Service",
+      "filePath": "packages/opencode/src/project/bootstrap-service.ts",
+      "lineRange": [7, 7],
+      "summary": "Context.Service tag (@opencode/InstanceBootstrap) exposing a single run effect that materializes all per-instance services.",
+      "tags": ["service", "effect", "context-tag"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/opencode/src/project/bootstrap.ts",
+      "type": "file",
+      "name": "bootstrap.ts",
+      "filePath": "packages/opencode/src/project/bootstrap.ts",
+      "summary": "Instance bootstrap layer that eagerly yields eleven core services (config, file, watcher, format, LSP, plugin, project, reference, share, snapshot, VCS) at layer init, then runs plugin init first followed by concurrent service init on each instance boot.",
+      "tags": ["service", "effect", "bootstrap", "orchestration", "layer"],
+      "complexity": "moderate",
+      "languageNotes": "Dependences are captured in the Layer generator so the returned run effect has R = never; per-service slow work is delegated to each service's own forkScoped init."
+    },
+    {
+      "id": "file:packages/opencode/src/project/instance-context.ts",
+      "type": "file",
+      "name": "instance-context.ts",
+      "filePath": "packages/opencode/src/project/instance-context.ts",
+      "summary": "Defines the InstanceContext shape (directory, worktree, project) and the async-local-storage context that carries it, plus containsPath for project-boundary permission checks.",
+      "tags": ["context", "type-definition", "permissions", "async-local-storage"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/project/instance-context.ts:containsPath",
+      "type": "function",
+      "name": "containsPath",
+      "filePath": "packages/opencode/src/project/instance-context.ts",
+      "lineRange": [18, 24],
+      "summary": "Checks whether a path lies inside the working directory or the enclosing worktree, skipping the worktree check for non-git projects where worktree is '/' so external_directory permissions still apply.",
+      "tags": ["permissions", "filesystem", "boundary-check"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/opencode/src/project/instance-layer.ts",
+      "type": "file",
+      "name": "instance-layer.ts",
+      "filePath": "packages/opencode/src/project/instance-layer.ts",
+      "summary": "Compose-only layer that lazily imports the bootstrap implementation at layer construction time and wires InstanceStore.defaultLayer on top of it, keeping the heavy bootstrap graph out of static import order.",
+      "tags": ["effect", "layer", "lazy-loading", "wiring"],
+      "complexity": "simple",
+      "languageNotes": "Layer.unwrap + dynamic import defers the bootstrap module graph until the layer is actually built, a common trick to break init-time dependency cycles."
+    },
+    {
+      "id": "file:packages/opencode/src/project/instance-runtime.ts",
+      "type": "file",
+      "name": "instance-runtime.ts",
+      "filePath": "packages/opencode/src/project/instance-runtime.ts",
+      "summary": "Promise-style bridge exposing InstanceStore load/dispose/disposeAll/reload operations to non-Effect callers via AppRuntime.runPromise.",
+      "tags": ["bridge", "effect", "runtime", "utility"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/opencode/src/project/instance-store.ts",
+      "type": "file",
+      "name": "instance-store.ts",
+      "filePath": "packages/opencode/src/project/instance-store.ts",
+      "summary": "Per-directory instance cache built on Effect Deferreds: concurrent loads share a single boot future, reload swaps the entry after running disposers and emitting server.instance.disposed, and layer finalization disposes all instances.",
+      "tags": ["service", "effect", "cache", "lifecycle", "concurrency"],
+      "complexity": "complex",
+      "languageNotes": "Uses Effect.uninterruptibleMask with restore() around Deferred.await so callers remain interruptible while cache entry creation is not; disposeAll is memoized via Effect.cachedWithTTL(Duration.zero)."
+    },
+    {
+      "id": "class:packages/opencode/src/project/instance-store.ts:Service",
+      "type": "class",
+      "name": "Service",
+      "filePath": "packages/opencode/src/project/instance-store.ts",
+      "lineRange": [25, 25],
+      "summary": "Context.Service tag (@opencode/InstanceStore) exposing load, reload, dispose, disposeAll, and provide for instance lifecycle management.",
+      "tags": ["service", "effect", "context-tag", "lifecycle"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/project/instance-store.ts:load",
+      "type": "function",
+      "name": "load",
+      "filePath": "packages/opencode/src/project/instance-store.ts",
+      "lineRange": [102, 118],
+      "summary": "Returns the InstanceContext for a directory, deduplicating concurrent loads through a cached Deferred entry that is removed again if boot fails.",
+      "tags": ["cache", "concurrency", "effect", "deduplication"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/opencode/src/project/instance-store.ts:reload",
+      "type": "function",
+      "name": "reload",
+      "filePath": "packages/opencode/src/project/instance-store.ts",
+      "lineRange": [120, 139],
+      "summary": "Replaces the cached instance for a directory: waits out the previous load, runs its disposers, emits server.instance.disposed, then boots a fresh instance into a new Deferred entry.",
+      "tags": ["lifecycle", "effect", "reload", "event-handler"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:packages/opencode/src/project/instance.ts",
+      "type": "file",
+      "name": "instance.ts",
+      "filePath": "packages/opencode/src/project/instance.ts",
+      "summary": "Instance facade reading directory/worktree/project from the async-local instance context, with bind() to re-capture context for external callbacks and restore() to bridge from Effect's InstanceRef back into sync ALS code.",
+      "tags": ["context", "facade", "async-local-storage", "utility"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/opencode/src/project/project.sql.ts",
+      "type": "file",
+      "name": "project.sql.ts",
+      "filePath": "packages/opencode/src/project/project.sql.ts",
+      "summary": "Drizzle ORM definition of the project table: branded ProjectID primary key, worktree, VCS/icon metadata, JSON sandboxes and commands columns, plus shared timestamps and time_initialized.",
+      "tags": ["database", "drizzle", "data-model", "schema-definition"],
+      "complexity": "simple",
+      "languageNotes": "Follows the repo's snake_case field convention so column names never need string overrides; JSON columns use text({ mode: \"json\" }) with $type<> casts."
+    },
+    {
+      "id": "table:packages/opencode/src/project/project.sql.ts:project",
+      "type": "table",
+      "name": "project",
+      "filePath": "packages/opencode/src/project/project.sql.ts",
+      "lineRange": [5, 17],
+      "summary": "SQLite project table storing one row per discovered repository: id (root commit hash or 'global'), worktree, vcs, display metadata, sandboxes list, commands, and lifecycle timestamps.",
+      "tags": ["database", "sqlite", "data-model"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/opencode/src/project/project.ts",
+      "type": "file",
+      "name": "project.ts",
+      "filePath": "packages/opencode/src/project/project.ts",
+      "summary": "Project service: derives a stable project identity from the git worktree (root-commit id cached in .git/opencode), upserts rows with sandbox tracking, and exposes list/get/update/initGit/sandboxes operations plus the /init command subscription.",
+      "tags": ["service", "effect", "git", "data-model", "persistence"],
+      "complexity": "complex",
+      "languageNotes": "Project identity uses the sorted first root commit (rev-list --max-parents=0) as ID so linked worktrees share one project; falls back to the 'global' project id when git metadata is unavailable."
+    },
+    {
+      "id": "function:packages/opencode/src/project/project.ts:fromRow",
+      "type": "function",
+      "name": "fromRow",
+      "filePath": "packages/opencode/src/project/project.ts",
+      "lineRange": [68, 91],
+      "summary": "Converts a Drizzle project row into the public Project.Info shape, decoding the vcs literal and collapsing nullable icon columns into an optional icon object.",
+      "tags": ["serialization", "data-model", "utility"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/project/project.ts:fromDirectory",
+      "type": "function",
+      "name": "fromDirectory",
+      "filePath": "packages/opencode/src/project/project.ts",
+      "lineRange": [182, 343],
+      "summary": "Core discovery routine: walks up to .git, resolves worktree vs bare-repo vs sandbox paths, derives or caches the project id, then upserts the row, prunes vanished sandboxes, and reassigns orphaned global sessions to the project.",
+      "tags": ["git", "discovery", "upsert", "filesystem"],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:packages/opencode/src/project/project.ts:list",
+      "type": "function",
+      "name": "list",
+      "filePath": "packages/opencode/src/project/project.ts",
+      "lineRange": [511, 519],
+      "summary": "Lists all known projects from the database mapped through fromRow.",
+      "tags": ["query", "database"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/project/project.ts:get",
+      "type": "function",
+      "name": "get",
+      "filePath": "packages/opencode/src/project/project.ts",
+      "lineRange": [521, 525],
+      "summary": "Fetches a single project by id from the database.",
+      "tags": ["query", "database"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/project/project.ts:setInitialized",
+      "type": "function",
+      "name": "setInitialized",
+      "filePath": "packages/opencode/src/project/project.ts",
+      "lineRange": [527, 531],
+      "summary": "Stamps time_initialized on a project row, marking that the user completed the /init flow for it.",
+      "tags": ["database", "update"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/opencode/src/project/schema.ts",
+      "type": "file",
+      "name": "schema.ts",
+      "filePath": "packages/opencode/src/project/schema.ts",
+      "summary": "Defines the branded ProjectID schema with a pre-made 'global' constant and a zod bridge for use at SDK/config boundaries.",
+      "tags": ["type-definition", "schema", "branded-type"],
+      "complexity": "simple",
+      "languageNotes": "Schema.String.pipe(Schema.brand(\"ProjectID\")) gives a nominal type over string without runtime overhead; withStatics attaches both zod and constants to the schema object."
+    }
+  ],
+  "edges": [
+    {
+      "source": "file:packages/opencode/src/plugin/loader.ts",
+      "target": "function:packages/opencode/src/plugin/loader.ts:resolve",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/src/plugin/loader.ts",
+      "target": "function:packages/opencode/src/plugin/loader.ts:load",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/src/plugin/loader.ts",
+      "target": "function:packages/opencode/src/plugin/loader.ts:attempt",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/src/plugin/loader.ts",
+      "target": "function:packages/opencode/src/plugin/loader.ts:loadExternal",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/src/plugin/loader.ts",
+      "target": "function:packages/opencode/src/plugin/loader.ts:resolve",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/plugin/loader.ts",
+      "target": "function:packages/opencode/src/plugin/loader.ts:load",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/plugin/loader.ts",
+      "target": "function:packages/opencode/src/plugin/loader.ts:loadExternal",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/plugin/loader.ts",
+      "target": "file:packages/opencode/src/plugin/shared.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "function:packages/opencode/src/plugin/loader.ts:resolve",
+      "target": "function:packages/opencode/src/plugin/shared.ts:resolvePluginTarget",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:packages/opencode/src/plugin/loader.ts:resolve",
+      "target": "function:packages/opencode/src/plugin/shared.ts:createPluginEntry",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:packages/opencode/src/plugin/loader.ts:resolve",
+      "target": "function:packages/opencode/src/plugin/shared.ts:checkPluginCompatibility",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/plugin/meta.ts",
+      "target": "function:packages/opencode/src/plugin/meta.ts:entryCore",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/src/plugin/meta.ts",
+      "target": "function:packages/opencode/src/plugin/meta.ts:next",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/src/plugin/meta.ts",
+      "target": "function:packages/opencode/src/plugin/meta.ts:touchMany",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/src/plugin/meta.ts",
+      "target": "function:packages/opencode/src/plugin/meta.ts:touch",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/src/plugin/meta.ts",
+      "target": "function:packages/opencode/src/plugin/meta.ts:setTheme",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/src/plugin/meta.ts",
+      "target": "function:packages/opencode/src/plugin/meta.ts:list",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/src/plugin/meta.ts",
+      "target": "function:packages/opencode/src/plugin/meta.ts:touchMany",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/plugin/meta.ts",
+      "target": "function:packages/opencode/src/plugin/meta.ts:touch",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/plugin/meta.ts",
+      "target": "function:packages/opencode/src/plugin/meta.ts:setTheme",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/plugin/meta.ts",
+      "target": "function:packages/opencode/src/plugin/meta.ts:list",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/plugin/meta.ts",
+      "target": "file:packages/opencode/src/plugin/shared.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "function:packages/opencode/src/plugin/meta.ts:entryCore",
+      "target": "function:packages/opencode/src/plugin/shared.ts:parsePluginSpecifier",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/plugin/shared.ts",
+      "target": "function:packages/opencode/src/plugin/shared.ts:parsePluginSpecifier",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/src/plugin/shared.ts",
+      "target": "function:packages/opencode/src/plugin/shared.ts:resolvePluginEntrypoint",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/src/plugin/shared.ts",
+      "target": "function:packages/opencode/src/plugin/shared.ts:resolvePathPluginTarget",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/src/plugin/shared.ts",
+      "target": "function:packages/opencode/src/plugin/shared.ts:resolvePluginTarget",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/src/plugin/shared.ts",
+      "target": "function:packages/opencode/src/plugin/shared.ts:resolvePluginTarget",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/plugin/shared.ts",
+      "target": "function:packages/opencode/src/plugin/shared.ts:checkPluginCompatibility",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/src/plugin/shared.ts",
+      "target": "function:packages/opencode/src/plugin/shared.ts:createPluginEntry",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/src/plugin/shared.ts",
+      "target": "function:packages/opencode/src/plugin/shared.ts:readPackageThemes",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/src/plugin/shared.ts",
+      "target": "function:packages/opencode/src/plugin/shared.ts:readV1Plugin",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/src/plugin/shared.ts",
+      "target": "function:packages/opencode/src/plugin/shared.ts:resolvePluginId",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/src/plugin/shared.ts",
+      "target": "function:packages/opencode/src/plugin/shared.ts:parsePluginSpecifier",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/plugin/shared.ts",
+      "target": "function:packages/opencode/src/plugin/shared.ts:resolvePathPluginTarget",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/plugin/shared.ts",
+      "target": "function:packages/opencode/src/plugin/shared.ts:checkPluginCompatibility",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/plugin/shared.ts",
+      "target": "function:packages/opencode/src/plugin/shared.ts:createPluginEntry",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/plugin/shared.ts",
+      "target": "function:packages/opencode/src/plugin/shared.ts:readPackageThemes",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/plugin/shared.ts",
+      "target": "function:packages/opencode/src/plugin/shared.ts:readV1Plugin",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/plugin/shared.ts",
+      "target": "function:packages/opencode/src/plugin/shared.ts:resolvePluginId",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/project/bootstrap-service.ts",
+      "target": "class:packages/opencode/src/project/bootstrap-service.ts:Service",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/src/project/bootstrap-service.ts",
+      "target": "class:packages/opencode/src/project/bootstrap-service.ts:Service",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/project/bootstrap.ts",
+      "target": "file:packages/opencode/src/project/project.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/opencode/src/project/bootstrap.ts",
+      "target": "file:packages/opencode/src/project/vcs.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/opencode/src/project/bootstrap.ts",
+      "target": "file:packages/opencode/src/project/bootstrap-service.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/opencode/src/project/instance-context.ts",
+      "target": "function:packages/opencode/src/project/instance-context.ts:containsPath",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/src/project/instance-context.ts",
+      "target": "function:packages/opencode/src/project/instance-context.ts:containsPath",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/project/instance-layer.ts",
+      "target": "file:packages/opencode/src/project/instance-store.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/opencode/src/project/instance-layer.ts",
+      "target": "file:packages/opencode/src/project/bootstrap.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/opencode/src/project/instance-runtime.ts",
+      "target": "file:packages/opencode/src/project/instance-store.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/opencode/src/project/instance-store.ts",
+      "target": "class:packages/opencode/src/project/instance-store.ts:Service",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/src/project/instance-store.ts",
+      "target": "function:packages/opencode/src/project/instance-store.ts:load",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/src/project/instance-store.ts",
+      "target": "function:packages/opencode/src/project/instance-store.ts:reload",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/src/project/instance-store.ts",
+      "target": "class:packages/opencode/src/project/instance-store.ts:Service",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/project/instance-store.ts",
+      "target": "file:packages/opencode/src/project/project.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/opencode/src/project/instance-store.ts",
+      "target": "file:packages/opencode/src/project/bootstrap-service.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/opencode/src/project/instance.ts",
+      "target": "file:packages/opencode/src/project/instance-context.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/opencode/src/project/project.sql.ts",
+      "target": "table:packages/opencode/src/project/project.sql.ts:project",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/src/project/project.sql.ts",
+      "target": "table:packages/opencode/src/project/project.sql.ts:project",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/project/project.ts",
+      "target": "function:packages/opencode/src/project/project.ts:fromRow",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/src/project/project.ts",
+      "target": "function:packages/opencode/src/project/project.ts:fromDirectory",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/src/project/project.ts",
+      "target": "function:packages/opencode/src/project/project.ts:list",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/src/project/project.ts",
+      "target": "function:packages/opencode/src/project/project.ts:get",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/src/project/project.ts",
+      "target": "function:packages/opencode/src/project/project.ts:setInitialized",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/src/project/project.ts",
+      "target": "function:packages/opencode/src/project/project.ts:fromRow",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/project/project.ts",
+      "target": "function:packages/opencode/src/project/project.ts:list",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/project/project.ts",
+      "target": "function:packages/opencode/src/project/project.ts:get",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/project/project.ts",
+      "target": "function:packages/opencode/src/project/project.ts:setInitialized",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/project/project.ts",
+      "target": "file:packages/opencode/src/project/project.sql.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/opencode/src/project/project.ts",
+      "target": "file:packages/opencode/src/project/schema.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    }
+  ]
+}
