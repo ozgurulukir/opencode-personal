@@ -1,0 +1,706 @@
+{
+  "nodes": [
+    {
+      "id": "file:packages/ui/src/components/tool-status-title.tsx",
+      "type": "file",
+      "name": "tool-status-title.tsx",
+      "filePath": "packages/ui/src/components/tool-status-title.tsx",
+      "summary": "Animates the transition between a tool call's active and done status titles, splitting the shared text prefix so only the differing tail swaps, with measured width transitions and shimmer styling.",
+      "tags": ["component", "animation", "tool-status", "solidjs"],
+      "complexity": "moderate",
+      "languageNotes": "Uses a first-render/last-render width measurement around a requestAnimationFrame flip to animate the swap via an inline width style rather than CSS keyframes."
+    },
+    {
+      "id": "function:packages/ui/src/components/tool-status-title.tsx:common",
+      "type": "function",
+      "name": "common",
+      "filePath": "packages/ui/src/components/tool-status-title.tsx",
+      "lineRange": [5, 15],
+      "summary": "Computes the longest shared prefix between the active and done status texts, returning the prefix plus the diverging active and done tails so only the differing tail animates.",
+      "tags": ["utility", "string", "prefix-diff"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/ui/src/components/tool-status-title.tsx:ToolStatusTitle",
+      "type": "function",
+      "name": "ToolStatusTitle",
+      "filePath": "packages/ui/src/components/tool-status-title.tsx",
+      "lineRange": [22, 136],
+      "summary": "Renders the tool status label that cross-fades between active and done states, choosing between suffix-split mode and full swap mode, and animating width changes with requestAnimationFrame so the shimmer text doesn't jump.",
+      "tags": ["component", "animation", "status-indicator", "solidjs"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:packages/ui/src/components/tooltip.tsx",
+      "type": "file",
+      "name": "tooltip.tsx",
+      "filePath": "packages/ui/src/components/tooltip.tsx",
+      "summary": "Tooltip components wrapping Kobalte's tooltip with interaction suppression - tooltips stay closed while clicking, keyboard-activating, or when the trigger hosts an expanded popover tracked via MutationObserver.",
+      "tags": ["component", "tooltip", "overlay", "solidjs"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/ui/src/components/tooltip.tsx:TooltipKeybind",
+      "type": "function",
+      "name": "TooltipKeybind",
+      "filePath": "packages/ui/src/components/tooltip.tsx",
+      "lineRange": [20, 33],
+      "summary": "Convenience wrapper that renders a Tooltip whose content pairs a title with a highlighted keyboard shortcut chip.",
+      "tags": ["component", "tooltip", "keybind"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/ui/src/components/tooltip.tsx:Tooltip",
+      "type": "function",
+      "name": "Tooltip",
+      "filePath": "packages/ui/src/components/tooltip.tsx",
+      "lineRange": [35, 161],
+      "summary": "Wraps Kobalte's tooltip with trigger-interaction state: arms a block on pointer-down or Enter/Space activation, suppresses re-open after trigger clicks, and stays closed while the trigger contains an expanded element observed for aria-expanded/data-expanded changes.",
+      "tags": ["component", "tooltip", "event-handler", "overlay"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:packages/ui/src/components/typewriter.tsx",
+      "type": "file",
+      "name": "typewriter.tsx",
+      "filePath": "packages/ui/src/components/typewriter.tsx",
+      "summary": "Typewriter effect component that reveals text with randomized per-character delays (with occasional long pauses) and a blinking cursor, rendered through a configurable dynamic element tag.",
+      "tags": ["component", "animation", "effect", "solidjs"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/ui/src/components/typewriter.tsx:Typewriter",
+      "type": "function",
+      "name": "Typewriter",
+      "filePath": "packages/ui/src/components/typewriter.tsx",
+      "lineRange": [5, 55],
+      "summary": "Reveals text character by character with randomized keystroke delays, showing a blinking cursor that disappears two seconds after typing completes; all pending timeouts are cleared on cleanup.",
+      "tags": ["component", "animation", "typewriter"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/ui/src/context/data.tsx",
+      "type": "file",
+      "name": "data.tsx",
+      "filePath": "packages/ui/src/context/data.tsx",
+      "summary": "Defines the shared Data context exposing the SDK-backed store of sessions, messages, and parts (plus directory and session-navigation callbacks) consumed across UI components.",
+      "tags": ["context", "data-model", "solidjs", "state"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/ui/src/context/dialog.tsx",
+      "type": "file",
+      "name": "dialog.tsx",
+      "filePath": "packages/ui/src/context/dialog.tsx",
+      "summary": "Implements the modal dialog context: a single active Kobalte dialog rendered in a stack, with capture-phase Escape handling, a re-entrancy lock, a 100ms closing delay before root disposal, and owner-aware dialog creation.",
+      "tags": ["context", "dialog", "overlay", "solidjs"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/ui/src/context/dialog.tsx:init",
+      "type": "function",
+      "name": "init",
+      "filePath": "packages/ui/src/context/dialog.tsx",
+      "lineRange": [30, 128],
+      "summary": "Builds the dialog context value: a single active-dialog signal with Escape-to-close capture listener, re-entrancy locking, and immediate disposal of any prior dialog when a new one is shown.",
+      "tags": ["context", "dialog", "lifecycle"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/ui/src/context/dialog.tsx:DialogProvider",
+      "type": "function",
+      "name": "DialogProvider",
+      "filePath": "packages/ui/src/context/dialog.tsx",
+      "lineRange": [130, 138],
+      "summary": "Provides the dialog context and renders the active dialog node inside a `dialog-stack` container beneath the children.",
+      "tags": ["component", "provider", "dialog"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/ui/src/context/dialog.tsx:useDialog",
+      "type": "function",
+      "name": "useDialog",
+      "filePath": "packages/ui/src/context/dialog.tsx",
+      "lineRange": [140, 163],
+      "summary": "Consumes the dialog context, capturing the caller's SolidJS owner so dialogs render under the invoking component's reactive root and chain ownership when a dialog is already active.",
+      "tags": ["hook", "context", "dialog"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/ui/src/context/file.tsx",
+      "type": "file",
+      "name": "file.tsx",
+      "filePath": "packages/ui/src/context/file.tsx",
+      "summary": "Tiny context allowing hosts to override which ValidComponent is used to render files in the UI.",
+      "tags": ["context", "dependency-injection", "solidjs"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/ui/src/context/helper.tsx",
+      "type": "file",
+      "name": "helper.tsx",
+      "filePath": "packages/ui/src/context/helper.tsx",
+      "summary": "Provides createSimpleContext, the factory every UI context uses to build typed provider/use pairs with optional readiness gating before children render.",
+      "tags": ["context", "factory", "utility", "solidjs"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/ui/src/context/helper.tsx:createSimpleContext",
+      "type": "function",
+      "name": "createSimpleContext",
+      "filePath": "packages/ui/src/context/helper.tsx",
+      "lineRange": [3, 37],
+      "summary": "Factory that builds a typed provider/use context pair from an init function; gates children rendering on the context value's reactive `ready` flag and throws a named error when `use` runs outside a provider.",
+      "tags": ["factory", "context", "utility", "solidjs"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:packages/ui/src/context/i18n.tsx",
+      "type": "file",
+      "name": "i18n.tsx",
+      "filePath": "packages/ui/src/context/i18n.tsx",
+      "summary": "Defines the UI i18n context with an English-dictionary fallback and `{{param}}` template interpolation, exposed through I18nProvider and useI18n; UiI18nKey is derived from the English dictionary's shape.",
+      "tags": ["context", "i18n", "internationalization", "solidjs"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/ui/src/context/i18n.tsx:I18nProvider",
+      "type": "function",
+      "name": "I18nProvider",
+      "filePath": "packages/ui/src/context/i18n.tsx",
+      "lineRange": [32, 34],
+      "summary": "Provides the UiI18n value (locale accessor plus `t` translation function) to the component tree.",
+      "tags": ["component", "provider", "i18n"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/ui/src/context/i18n.tsx:useI18n",
+      "type": "function",
+      "name": "useI18n",
+      "filePath": "packages/ui/src/context/i18n.tsx",
+      "lineRange": [36, 38],
+      "summary": "Returns the nearest UiI18n context, falling back to English-dictionary translation when no provider is mounted.",
+      "tags": ["hook", "context", "i18n"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/ui/src/context/index.ts",
+      "type": "file",
+      "name": "index.ts",
+      "filePath": "packages/ui/src/context/index.ts",
+      "summary": "Barrel re-exporting the context modules (helper, data, file, dialog, i18n).",
+      "tags": ["barrel", "entry-point", "context"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/ui/src/context/marked.tsx",
+      "type": "file",
+      "name": "marked.tsx",
+      "filePath": "packages/ui/src/context/marked.tsx",
+      "summary": "Markdown rendering context: registers the custom OpenCode Shiki theme (CSS-variable syntax colors), wires marked with KaTeX math and Shiki highlighting extensions, and when a native parser is supplied post-processes its HTML with math rendering and code-block highlighting.",
+      "tags": ["context", "markdown", "syntax-highlighting", "katex", "shiki"],
+      "complexity": "complex",
+      "languageNotes": "The OpenCode theme maps TextMate scopes to CSS custom properties (var(--syntax-*)) so highlighting follows runtime theme changes without re-instantiating Shiki; ~370 of the 519 lines are the theme registration."
+    },
+    {
+      "id": "function:packages/ui/src/context/marked.tsx:renderMathInText",
+      "type": "function",
+      "name": "renderMathInText",
+      "filePath": "packages/ui/src/context/marked.tsx",
+      "lineRange": [379, 409],
+      "summary": "Renders `$$...$$` display and `$...$` inline LaTeX in a text string to KaTeX HTML, falling back to the raw delimiter-wrapped text on render errors.",
+      "tags": ["utility", "latex", "katex", "regex"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/ui/src/context/marked.tsx:renderMathExpressions",
+      "type": "function",
+      "name": "renderMathExpressions",
+      "filePath": "packages/ui/src/context/marked.tsx",
+      "lineRange": [411, 424],
+      "summary": "Applies math rendering to rendered HTML while leaving pre/code/kbd contents untouched by splitting on code-block boundaries and only processing the non-code parts.",
+      "tags": ["utility", "latex", "html-processing"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/ui/src/context/marked.tsx:highlightCodeBlocks",
+      "type": "function",
+      "name": "highlightCodeBlocks",
+      "filePath": "packages/ui/src/context/marked.tsx",
+      "lineRange": [426, 464],
+      "summary": "Post-processes rendered markdown HTML by unescaping and re-highlighting each fenced code block through the shared Shiki highlighter with the OpenCode theme, lazily loading languages and defaulting unknown ones to plain text.",
+      "tags": ["utility", "syntax-highlighting", "shiki", "async"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:packages/ui/src/context/worker-pool.tsx",
+      "type": "file",
+      "name": "worker-pool.tsx",
+      "filePath": "packages/ui/src/context/worker-pool.tsx",
+      "summary": "Context providing the shared diff-rendering worker pools (unified and split) and a hook that selects the pool matching the requested diff style.",
+      "tags": ["context", "worker", "diff", "solidjs"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/ui/src/context/worker-pool.tsx:useWorkerPool",
+      "type": "function",
+      "name": "useWorkerPool",
+      "filePath": "packages/ui/src/context/worker-pool.tsx",
+      "lineRange": [16, 20],
+      "summary": "Returns the diff WorkerPoolManager matching the requested diff style, choosing the split pool only for \"split\" and the unified pool otherwise.",
+      "tags": ["hook", "context", "diff"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/ui/src/custom-elements.d.ts",
+      "type": "file",
+      "name": "custom-elements.d.ts",
+      "filePath": "packages/ui/src/custom-elements.d.ts",
+      "summary": "Ambient JSX declaration registering the @pierre/diffs `<diffs-container>` custom element on SolidJS's IntrinsicElements so the web component typechecks in .tsx files.",
+      "tags": ["type-definition", "web-component", "jsx", "declarations"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/ui/src/hooks/create-auto-scroll.tsx",
+      "type": "file",
+      "name": "create-auto-scroll.tsx",
+      "filePath": "packages/ui/src/hooks/create-auto-scroll.tsx",
+      "summary": "Auto-scroll hook implementing bottom-follow behavior for streaming UIs: distinguishes programmatic scrolls from user scrolls via a timestamped mark, pauses on upward wheel or text selection, stays aware of nested scrollable regions, and manages overflow-anchor dynamically.",
+      "tags": ["hook", "scroll", "primitive", "solidjs"],
+      "complexity": "complex",
+      "languageNotes": "A `markAuto` timestamp+scrollTop snapshot lets the scroll handler recognize async-dispatched scroll events caused by its own scrollTo calls, preventing false user-scroll detection while content streams in."
+    },
+    {
+      "id": "function:packages/ui/src/hooks/create-auto-scroll.tsx:createAutoScroll",
+      "type": "function",
+      "name": "createAutoScroll",
+      "filePath": "packages/ui/src/hooks/create-auto-scroll.tsx",
+      "lineRange": [13, 237],
+      "summary": "Keeps a scroll container pinned to the bottom while `working()` is true or content is settling: tracks user scrolls, ignores self-initiated scrolls, resumes following when the user returns near the bottom, and exposes ref setters plus scroll/pause/resume controls.",
+      "tags": ["hook", "scroll", "reactive", "primitive"],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:packages/ui/src/hooks/index.ts",
+      "type": "file",
+      "name": "index.ts",
+      "filePath": "packages/ui/src/hooks/index.ts",
+      "summary": "Barrel re-exporting the hooks modules (use-filtered-list, create-auto-scroll).",
+      "tags": ["barrel", "entry-point", "hooks"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/ui/src/hooks/use-filtered-list.tsx",
+      "type": "file",
+      "name": "use-filtered-list.tsx",
+      "filePath": "packages/ui/src/hooks/use-filtered-list.tsx",
+      "summary": "Fuzzy-filterable list hook combining fuzzysort search, Remeda grouping/sorting pipelines, and solid-list keyboard navigation for select-style dialogs; supports both static arrays and async filter functions.",
+      "tags": ["hook", "fuzzy-search", "keyboard-navigation", "list"],
+      "complexity": "moderate",
+      "languageNotes": "Filtering runs inside a createResource so function-valued (async) item sources stay reactive with grouped output - replacing it with createMemo previously broke List-based dialogs; the flat/keys memos use manual pre-allocated loops to reduce GC pressure."
+    },
+    {
+      "id": "function:packages/ui/src/hooks/use-filtered-list.tsx:useFilteredList",
+      "type": "function",
+      "name": "useFilteredList",
+      "filePath": "packages/ui/src/hooks/use-filtered-list.tsx",
+      "lineRange": [19, 150],
+      "summary": "Builds a resource-backed list controller: filters items with fuzzysort (string arrays or keyed objects), groups and sorts the results, wires solid-list active-item tracking, and handles Enter-to-select plus ctrl+n/ctrl+p navigation while skipping macOS text-editing shortcuts.",
+      "tags": ["hook", "fuzzy-search", "keyboard-navigation", "list"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:packages/ui/src/i18n/en.ts",
+      "type": "file",
+      "name": "en.ts",
+      "filePath": "packages/ui/src/i18n/en.ts",
+      "summary": "English translation dictionary serving as the source of truth for all `ui.*` keys; UiI18nKey is derived from its shape and other locales fall back to these strings for untranslated keys.",
+      "tags": ["i18n", "translation", "localization", "english"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/ui/src/i18n/ar.ts",
+      "type": "file",
+      "name": "ar.ts",
+      "filePath": "packages/ui/src/i18n/ar.ts",
+      "summary": "Arabic translation dictionary providing localized strings for the shared UI (`ui.*` keys), falling back to English for untranslated keys.",
+      "tags": ["i18n", "translation", "localization", "arabic"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/ui/src/i18n/br.ts",
+      "type": "file",
+      "name": "br.ts",
+      "filePath": "packages/ui/src/i18n/br.ts",
+      "summary": "Brazilian Portuguese translation dictionary providing localized strings for the shared UI (`ui.*` keys), falling back to English for untranslated keys.",
+      "tags": ["i18n", "translation", "localization", "portuguese"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/ui/src/i18n/bs.ts",
+      "type": "file",
+      "name": "bs.ts",
+      "filePath": "packages/ui/src/i18n/bs.ts",
+      "summary": "Bosnian translation dictionary typed against the English dictionary's keys, providing localized strings for the shared UI with English fallback for untranslated keys.",
+      "tags": ["i18n", "translation", "localization", "bosnian"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/ui/src/i18n/da.ts",
+      "type": "file",
+      "name": "da.ts",
+      "filePath": "packages/ui/src/i18n/da.ts",
+      "summary": "Danish translation dictionary providing localized strings for the shared UI (`ui.*` keys), falling back to English for untranslated keys.",
+      "tags": ["i18n", "translation", "localization", "danish"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/ui/src/i18n/de.ts",
+      "type": "file",
+      "name": "de.ts",
+      "filePath": "packages/ui/src/i18n/de.ts",
+      "summary": "German translation dictionary typed against the English dictionary's keys, providing localized strings for the shared UI with English fallback for untranslated keys.",
+      "tags": ["i18n", "translation", "localization", "german"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/ui/src/i18n/es.ts",
+      "type": "file",
+      "name": "es.ts",
+      "filePath": "packages/ui/src/i18n/es.ts",
+      "summary": "Spanish translation dictionary providing localized strings for the shared UI (`ui.*` keys), falling back to English for untranslated keys.",
+      "tags": ["i18n", "translation", "localization", "spanish"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/ui/src/i18n/fr.ts",
+      "type": "file",
+      "name": "fr.ts",
+      "filePath": "packages/ui/src/i18n/fr.ts",
+      "summary": "French translation dictionary providing localized strings for the shared UI (`ui.*` keys), falling back to English for untranslated keys.",
+      "tags": ["i18n", "translation", "localization", "french"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/ui/src/i18n/ja.ts",
+      "type": "file",
+      "name": "ja.ts",
+      "filePath": "packages/ui/src/i18n/ja.ts",
+      "summary": "Japanese translation dictionary providing localized strings for the shared UI (`ui.*` keys), falling back to English for untranslated keys.",
+      "tags": ["i18n", "translation", "localization", "japanese"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/ui/src/i18n/ko.ts",
+      "type": "file",
+      "name": "ko.ts",
+      "filePath": "packages/ui/src/i18n/ko.ts",
+      "summary": "Korean translation dictionary providing localized strings for the shared UI (`ui.*` keys), falling back to English for untranslated keys.",
+      "tags": ["i18n", "translation", "localization", "korean"],
+      "complexity": "simple"
+    }
+  ],
+  "edges": [
+    {
+      "source": "file:packages/ui/src/components/tool-status-title.tsx",
+      "target": "function:packages/ui/src/components/tool-status-title.tsx:common",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/ui/src/components/tool-status-title.tsx",
+      "target": "function:packages/ui/src/components/tool-status-title.tsx:ToolStatusTitle",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/ui/src/components/tool-status-title.tsx",
+      "target": "function:packages/ui/src/components/tool-status-title.tsx:ToolStatusTitle",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/ui/src/components/tooltip.tsx",
+      "target": "function:packages/ui/src/components/tooltip.tsx:TooltipKeybind",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/ui/src/components/tooltip.tsx",
+      "target": "function:packages/ui/src/components/tooltip.tsx:Tooltip",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/ui/src/components/tooltip.tsx",
+      "target": "function:packages/ui/src/components/tooltip.tsx:TooltipKeybind",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/ui/src/components/tooltip.tsx",
+      "target": "function:packages/ui/src/components/tooltip.tsx:Tooltip",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/ui/src/components/typewriter.tsx",
+      "target": "function:packages/ui/src/components/typewriter.tsx:Typewriter",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/ui/src/components/typewriter.tsx",
+      "target": "function:packages/ui/src/components/typewriter.tsx:Typewriter",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/ui/src/context/dialog.tsx",
+      "target": "function:packages/ui/src/context/dialog.tsx:init",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/ui/src/context/dialog.tsx",
+      "target": "function:packages/ui/src/context/dialog.tsx:DialogProvider",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/ui/src/context/dialog.tsx",
+      "target": "function:packages/ui/src/context/dialog.tsx:useDialog",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/ui/src/context/dialog.tsx",
+      "target": "function:packages/ui/src/context/dialog.tsx:DialogProvider",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/ui/src/context/dialog.tsx",
+      "target": "function:packages/ui/src/context/dialog.tsx:useDialog",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/ui/src/context/helper.tsx",
+      "target": "function:packages/ui/src/context/helper.tsx:createSimpleContext",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/ui/src/context/helper.tsx",
+      "target": "function:packages/ui/src/context/helper.tsx:createSimpleContext",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/ui/src/context/i18n.tsx",
+      "target": "function:packages/ui/src/context/i18n.tsx:I18nProvider",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/ui/src/context/i18n.tsx",
+      "target": "function:packages/ui/src/context/i18n.tsx:useI18n",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/ui/src/context/i18n.tsx",
+      "target": "function:packages/ui/src/context/i18n.tsx:I18nProvider",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/ui/src/context/i18n.tsx",
+      "target": "function:packages/ui/src/context/i18n.tsx:useI18n",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/ui/src/context/marked.tsx",
+      "target": "function:packages/ui/src/context/marked.tsx:renderMathInText",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/ui/src/context/marked.tsx",
+      "target": "function:packages/ui/src/context/marked.tsx:renderMathExpressions",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/ui/src/context/marked.tsx",
+      "target": "function:packages/ui/src/context/marked.tsx:highlightCodeBlocks",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/ui/src/context/worker-pool.tsx",
+      "target": "function:packages/ui/src/context/worker-pool.tsx:useWorkerPool",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/ui/src/context/worker-pool.tsx",
+      "target": "function:packages/ui/src/context/worker-pool.tsx:useWorkerPool",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/ui/src/hooks/create-auto-scroll.tsx",
+      "target": "function:packages/ui/src/hooks/create-auto-scroll.tsx:createAutoScroll",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/ui/src/hooks/create-auto-scroll.tsx",
+      "target": "function:packages/ui/src/hooks/create-auto-scroll.tsx:createAutoScroll",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/ui/src/hooks/use-filtered-list.tsx",
+      "target": "function:packages/ui/src/hooks/use-filtered-list.tsx:useFilteredList",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/ui/src/hooks/use-filtered-list.tsx",
+      "target": "function:packages/ui/src/hooks/use-filtered-list.tsx:useFilteredList",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/ui/src/context/data.tsx",
+      "target": "file:packages/ui/src/context/helper.tsx",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/ui/src/context/file.tsx",
+      "target": "file:packages/ui/src/context/helper.tsx",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/ui/src/context/worker-pool.tsx",
+      "target": "file:packages/ui/src/context/helper.tsx",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/ui/src/context/marked.tsx",
+      "target": "file:packages/ui/src/context/helper.tsx",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/ui/src/context/i18n.tsx",
+      "target": "file:packages/ui/src/i18n/en.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/ui/src/i18n/ar.ts",
+      "target": "file:packages/ui/src/i18n/en.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/ui/src/i18n/br.ts",
+      "target": "file:packages/ui/src/i18n/en.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/ui/src/i18n/bs.ts",
+      "target": "file:packages/ui/src/i18n/en.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/ui/src/i18n/da.ts",
+      "target": "file:packages/ui/src/i18n/en.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/ui/src/i18n/de.ts",
+      "target": "file:packages/ui/src/i18n/en.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/ui/src/i18n/es.ts",
+      "target": "file:packages/ui/src/i18n/en.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/ui/src/i18n/fr.ts",
+      "target": "file:packages/ui/src/i18n/en.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/ui/src/i18n/ja.ts",
+      "target": "file:packages/ui/src/i18n/en.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/ui/src/i18n/ko.ts",
+      "target": "file:packages/ui/src/i18n/en.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    }
+  ]
+}

@@ -1,0 +1,94 @@
+{
+  "nodes": [
+    {
+      "id": "document:packages/docs/README.md",
+      "type": "document",
+      "name": "README.md",
+      "filePath": "packages/docs/README.md",
+      "summary": "Mintlify starter-kit README for the docs package, covering local preview via the `mint` CLI, GitHub-app-driven publishing to production, and troubleshooting; still largely carries upstream Mintlify template content rather than opencode-specific material.",
+      "tags": ["documentation", "overview", "mintlify", "development"],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:packages/docs/development.mdx",
+      "type": "document",
+      "name": "development.mdx",
+      "filePath": "packages/docs/development.mdx",
+      "summary": "Mintlify development guide for the opencode SDK docs site: installing the `mint` CLI, running local previews with custom ports, validating broken links, deployment verification, MDX code formatting, and troubleshooting accordion items.",
+      "tags": ["documentation", "mintlify", "development-workflow", "troubleshooting"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "config:packages/docs/docs.json",
+      "type": "config",
+      "name": "docs.json",
+      "filePath": "packages/docs/docs.json",
+      "summary": "Mintlify site configuration for `@opencode-ai/docs`, defining the green brand colors, logo/favicon, navbar, contextual AI options, and the SDK tab navigation that registers the index, quickstart, and development pages plus an OpenAPI-powered API reference (backed by the local `openapi.json` published at opencode.ai).",
+      "tags": ["configuration", "mintlify", "navigation", "documentation", "theming"],
+      "complexity": "moderate",
+      "languageNotes": "The navigation group's `openapi` key makes Mintlify auto-generate the API reference section from the published spec, separate from hand-written MDX pages."
+    },
+    {
+      "id": "document:packages/docs/index.mdx",
+      "type": "document",
+      "name": "index.mdx",
+      "filePath": "packages/docs/index.mdx",
+      "summary": "Landing page of the Mintlify docs site, presenting card layouts that route readers to the quickstart, local development, site customization, and OpenAPI-generated API reference sections.",
+      "tags": ["documentation", "introduction", "mintlify", "navigation"],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:packages/docs/quickstart.mdx",
+      "type": "document",
+      "name": "quickstart.mdx",
+      "filePath": "packages/docs/quickstart.mdx",
+      "summary": "Three-step Mintlify quickstart for the docs site: clone the docs repo and start `mint dev`, deploy through the Mintlify GitHub app while making a first branding edit to `docs.json`, then publish by pushing to the default branch.",
+      "tags": ["documentation", "quickstart", "mintlify", "onboarding"],
+      "complexity": "moderate"
+    }
+  ],
+  "edges": [
+    {
+      "source": "config:packages/docs/docs.json",
+      "target": "document:packages/docs/index.mdx",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "config:packages/docs/docs.json",
+      "target": "document:packages/docs/quickstart.mdx",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "config:packages/docs/docs.json",
+      "target": "document:packages/docs/development.mdx",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "document:packages/docs/README.md",
+      "target": "config:packages/docs/docs.json",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/docs/quickstart.mdx",
+      "target": "config:packages/docs/docs.json",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/docs/index.mdx",
+      "target": "document:packages/docs/quickstart.mdx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    }
+  ]
+}

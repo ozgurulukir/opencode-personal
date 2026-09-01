@@ -1,0 +1,292 @@
+{
+  "nodes": [
+    {
+      "id": "file:packages/app/src/i18n/ru.ts",
+      "type": "file",
+      "name": "ru.ts",
+      "filePath": "packages/app/src/i18n/ru.ts",
+      "summary": "Russian translation dictionary exporting the `dict` string table that backs the ru locale for every UI surface in the app.",
+      "tags": ["i18n", "localization", "translations", "russian"],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:packages/app/src/i18n/th.ts",
+      "type": "file",
+      "name": "th.ts",
+      "filePath": "packages/app/src/i18n/th.ts",
+      "summary": "Thai translation dictionary exporting the `dict` string table that backs the th locale for the app UI.",
+      "tags": ["i18n", "localization", "translations", "thai"],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:packages/app/src/i18n/tr.ts",
+      "type": "file",
+      "name": "tr.ts",
+      "filePath": "packages/app/src/i18n/tr.ts",
+      "summary": "Turkish translation dictionary exporting the `dict` string table for the tr locale, keyed to match the English dictionary's keys.",
+      "tags": ["i18n", "localization", "translations", "turkish"],
+      "complexity": "complex",
+      "languageNotes": "Imports `dict as en` from en.ts solely for typing (`type Keys = keyof typeof en`), so missing translations surface as type errors."
+    },
+    {
+      "id": "file:packages/app/src/i18n/zh.ts",
+      "type": "file",
+      "name": "zh.ts",
+      "filePath": "packages/app/src/i18n/zh.ts",
+      "summary": "Simplified Chinese translation dictionary exporting the `dict` string table for the zh locale, keyed to match the English dictionary.",
+      "tags": ["i18n", "localization", "translations", "chinese"],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:packages/app/src/i18n/zht.ts",
+      "type": "file",
+      "name": "zht.ts",
+      "filePath": "packages/app/src/i18n/zht.ts",
+      "summary": "Traditional Chinese translation dictionary exporting the `dict` string table for the zht locale, keyed to match the English dictionary.",
+      "tags": ["i18n", "localization", "translations", "chinese"],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:packages/app/src/index.css",
+      "type": "file",
+      "name": "index.css",
+      "filePath": "packages/app/src/index.css",
+      "summary": "Global stylesheet importing the shared Tailwind layer from @opencode-ai/ui, registering the JetBrainsMono Nerd Font face, and defining component-level CSS: the session-progress whip animation, getting-started container queries, and fade-in keyframes.",
+      "tags": ["css", "global-styles", "animation", "design-system"],
+      "complexity": "moderate",
+      "languageNotes": "Uses `@layer components` with data-attribute selectors and CSS container queries (`@container getting-started`) for layout adaptation."
+    },
+    {
+      "id": "file:packages/app/src/index.ts",
+      "type": "file",
+      "name": "index.ts",
+      "filePath": "packages/app/src/index.ts",
+      "summary": "Public API barrel for the app package, re-exporting app providers (AppBaseProviders, PlatformProvider, ServerConnection), file-picker constants, command and locale hooks, and notification-click handling.",
+      "tags": ["barrel", "entry-point", "public-api", "exports"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/app/src/pages/directory-layout.tsx",
+      "type": "file",
+      "name": "directory-layout.tsx",
+      "filePath": "packages/app/src/pages/directory-layout.tsx",
+      "summary": "Route layout for /:dir URLs that decodes the base64 directory parameter, redirects with an error toast when invalid, and mounts SDK/Sync providers plus a directory-scoped DataProvider for child routes.",
+      "tags": ["route-layout", "component", "provider", "solidjs", "navigation"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/app/src/pages/directory-layout.tsx:DirectoryDataProvider",
+      "type": "function",
+      "name": "DirectoryDataProvider",
+      "filePath": "packages/app/src/pages/directory-layout.tsx",
+      "lineRange": [12, 41],
+      "summary": "Wraps children in a directory-scoped DataProvider and LocalProvider, keeps the URL slug in sync when the sync layer reports a different directory, and triggers session sync for the route's session id.",
+      "tags": ["component", "provider", "data-context", "solidjs"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/app/src/pages/directory-layout.tsx:Layout",
+      "type": "function",
+      "name": "Layout",
+      "filePath": "packages/app/src/pages/directory-layout.tsx",
+      "lineRange": [43, 82],
+      "summary": "Default-exported route layout: resolves the base64 :dir param, shows an error toast and navigates home when it cannot be decoded, and renders SDKProvider/SyncProvider/DirectoryDataProvider once resolved.",
+      "tags": ["component", "route-layout", "entry-point", "validation"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:packages/app/src/pages/error.tsx",
+      "type": "file",
+      "name": "error.tsx",
+      "filePath": "packages/app/src/pages/error.tsx",
+      "summary": "App-level error boundary page: recursively formats error and cause chains into readable localized text, special-cases SDK init errors, and offers check-for-updates / install-update recovery actions.",
+      "tags": ["error-handling", "component", "recovery", "formatting"],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:packages/app/src/pages/error.tsx:safeJson",
+      "type": "function",
+      "name": "safeJson",
+      "filePath": "packages/app/src/pages/error.tsx",
+      "lineRange": [39, 54],
+      "summary": "Safely serializes an unknown value to JSON, falling back to a localized placeholder when the value is circular or not serializable.",
+      "tags": ["utility", "serialization", "error-handling"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/app/src/pages/error.tsx:formatInitError",
+      "type": "function",
+      "name": "formatInitError",
+      "filePath": "packages/app/src/pages/error.tsx",
+      "lineRange": [56, 145],
+      "summary": "Formats structured SDK/server initialization errors into localized multiline messages, branching on error kind to extract status, URL, and response details.",
+      "tags": ["error-handling", "formatting", "i18n"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/app/src/pages/error.tsx:formatErrorChain",
+      "type": "function",
+      "name": "formatErrorChain",
+      "filePath": "packages/app/src/pages/error.tsx",
+      "lineRange": [147, 211],
+      "summary": "Recursively formats an error plus its `cause` chain, deduplicating repeated messages and stack headers and joining segments with a localized 'caused by' separator.",
+      "tags": ["error-handling", "formatting", "recursion"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/app/src/pages/error.tsx:ErrorPage",
+      "type": "function",
+      "name": "ErrorPage",
+      "filePath": "packages/app/src/pages/error.tsx",
+      "lineRange": [221, 336],
+      "summary": "Exported full-screen error page component that renders the formatted error chain and exposes check-for-update and update-and-restart recovery actions via the platform layer.",
+      "tags": ["component", "error-handling", "ui", "recovery"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:packages/app/src/pages/home.tsx",
+      "type": "file",
+      "name": "home.tsx",
+      "filePath": "packages/app/src/pages/home.tsx",
+      "summary": "Landing page shown outside any project: logo, server health indicator with server-switcher dialog, five most recently updated projects, and open-project flows using the native directory picker or a fallback dialog.",
+      "tags": ["component", "page", "navigation", "project-management"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/app/src/pages/home.tsx:Home",
+      "type": "function",
+      "name": "Home",
+      "filePath": "packages/app/src/pages/home.tsx",
+      "lineRange": [17, 139],
+      "summary": "Default-exported Home component computing recent projects from global sync data, switching between recent-projects, loading, and empty states, and opening selected directories via the layout project registry.",
+      "tags": ["component", "page", "solidjs", "navigation"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:packages/app/src/pages/layout.tsx",
+      "type": "file",
+      "name": "layout.tsx",
+      "filePath": "packages/app/src/pages/layout.tsx",
+      "summary": "The main authenticated app shell: a single ~2,400-line Layout component rendering the drag-sortable project/workspace sidebar, per-directory session prefetch queues with concurrency limits, opencode:// deep-link handling, inline rename editing, notification sounds, command palette wiring, theme/titlebar/debug overlays, and resize handles.",
+      "tags": ["component", "app-shell", "sidebar", "prefetching", "deep-links"],
+      "complexity": "complex",
+      "languageNotes": "One giant SolidJS component owns global app state via ~90 imports; the prefetch-queue lifecycle and sidebar subtrees are extracted into sibling modules under pages/layout/ for testability."
+    },
+    {
+      "id": "function:packages/app/src/pages/layout.tsx:Layout",
+      "type": "function",
+      "name": "Layout",
+      "filePath": "packages/app/src/pages/layout.tsx",
+      "lineRange": [92, 2486],
+      "summary": "Default-exported app shell component orchestrating workspace/session sidebar state (DnD ordering, hover previews, inline renames), session prefetch scheduling through createPrefetchQueues, deep-link draining, permission/notification/sound effects, global commands, and the Titlebar/SidebarContent/DebugBar composition.",
+      "tags": ["component", "app-shell", "orchestrator", "solidjs", "drag-and-drop"],
+      "complexity": "complex"
+    },
+    {
+      "id": "document:packages/app/src/pages/layout/AGENTS.md",
+      "type": "document",
+      "name": "AGENTS.md",
+      "filePath": "packages/app/src/pages/layout/AGENTS.md",
+      "summary": "Agent instructions documenting the prefetch-queue lifecycle invariants: cleanup must run in the prefetch finally block (not only the reactive effect), and queue state lives in prefetch-queue.ts so it stays unit-testable without mounting the Layout component.",
+      "tags": ["documentation", "architecture", "testing", "prefetching"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/app/src/pages/layout/deep-links.ts",
+      "type": "file",
+      "name": "deep-links.ts",
+      "filePath": "packages/app/src/pages/layout/deep-links.ts",
+      "summary": "Pure helpers for opencode:// deep links: parsing open-project and new-session URLs (with optional prompt), bulk-collecting valid links from URL lists, and draining pending links stashed on the window object.",
+      "tags": ["utility", "deep-links", "parsing", "navigation"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/app/src/pages/layout/deep-links.ts:parseDeepLink",
+      "type": "function",
+      "name": "parseDeepLink",
+      "filePath": "packages/app/src/pages/layout/deep-links.ts",
+      "lineRange": [13, 20],
+      "summary": "Parses an opencode://open-project URL and returns its directory parameter, or undefined for any other host or missing directory.",
+      "tags": ["utility", "parsing", "deep-links"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/app/src/pages/layout/deep-links.ts:parseNewSessionDeepLink",
+      "type": "function",
+      "name": "parseNewSessionDeepLink",
+      "filePath": "packages/app/src/pages/layout/deep-links.ts",
+      "lineRange": [22, 31],
+      "summary": "Parses an opencode://new-session URL, returning the target directory and optional prompt text, or undefined when the link is invalid.",
+      "tags": ["utility", "parsing", "deep-links"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/app/src/pages/layout/deep-links.ts:collectOpenProjectDeepLinks",
+      "type": "function",
+      "name": "collectOpenProjectDeepLinks",
+      "filePath": "packages/app/src/pages/layout/deep-links.ts",
+      "lineRange": [33, 34],
+      "summary": "Maps a list of URLs through parseDeepLink and filters out invalid entries, yielding the directories to open.",
+      "tags": ["utility", "deep-links", "filtering"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/app/src/pages/layout/deep-links.ts:collectNewSessionDeepLinks",
+      "type": "function",
+      "name": "collectNewSessionDeepLinks",
+      "filePath": "packages/app/src/pages/layout/deep-links.ts",
+      "lineRange": [36, 37],
+      "summary": "Maps a list of URLs through parseNewSessionDeepLink and filters out invalid entries, yielding new-session targets with optional prompts.",
+      "tags": ["utility", "deep-links", "filtering"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/app/src/pages/layout/deep-links.ts:drainPendingDeepLinks",
+      "type": "function",
+      "name": "drainPendingDeepLinks",
+      "filePath": "packages/app/src/pages/layout/deep-links.ts",
+      "lineRange": [45, 50],
+      "summary": "Atomically drains and clears the pending deep-link list stashed on window.__OPENCODE__ so each link is handled exactly once.",
+      "tags": ["utility", "deep-links", "queue-drain"],
+      "complexity": "simple"
+    }
+  ],
+  "edges": [
+    { "source": "file:packages/app/src/pages/directory-layout.tsx", "target": "function:packages/app/src/pages/directory-layout.tsx:DirectoryDataProvider", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:packages/app/src/pages/directory-layout.tsx", "target": "function:packages/app/src/pages/directory-layout.tsx:Layout", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:packages/app/src/pages/directory-layout.tsx", "target": "function:packages/app/src/pages/directory-layout.tsx:Layout", "type": "exports", "direction": "forward", "weight": 0.8 },
+    { "source": "file:packages/app/src/pages/error.tsx", "target": "function:packages/app/src/pages/error.tsx:safeJson", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:packages/app/src/pages/error.tsx", "target": "function:packages/app/src/pages/error.tsx:formatInitError", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:packages/app/src/pages/error.tsx", "target": "function:packages/app/src/pages/error.tsx:formatErrorChain", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:packages/app/src/pages/error.tsx", "target": "function:packages/app/src/pages/error.tsx:ErrorPage", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:packages/app/src/pages/error.tsx", "target": "function:packages/app/src/pages/error.tsx:ErrorPage", "type": "exports", "direction": "forward", "weight": 0.8 },
+    { "source": "file:packages/app/src/pages/home.tsx", "target": "function:packages/app/src/pages/home.tsx:Home", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:packages/app/src/pages/home.tsx", "target": "function:packages/app/src/pages/home.tsx:Home", "type": "exports", "direction": "forward", "weight": 0.8 },
+    { "source": "file:packages/app/src/pages/layout.tsx", "target": "function:packages/app/src/pages/layout.tsx:Layout", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:packages/app/src/pages/layout.tsx", "target": "function:packages/app/src/pages/layout.tsx:Layout", "type": "exports", "direction": "forward", "weight": 0.8 },
+    { "source": "file:packages/app/src/pages/layout/deep-links.ts", "target": "function:packages/app/src/pages/layout/deep-links.ts:parseDeepLink", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:packages/app/src/pages/layout/deep-links.ts", "target": "function:packages/app/src/pages/layout/deep-links.ts:parseNewSessionDeepLink", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:packages/app/src/pages/layout/deep-links.ts", "target": "function:packages/app/src/pages/layout/deep-links.ts:collectOpenProjectDeepLinks", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:packages/app/src/pages/layout/deep-links.ts", "target": "function:packages/app/src/pages/layout/deep-links.ts:collectNewSessionDeepLinks", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:packages/app/src/pages/layout/deep-links.ts", "target": "function:packages/app/src/pages/layout/deep-links.ts:drainPendingDeepLinks", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:packages/app/src/pages/layout/deep-links.ts", "target": "function:packages/app/src/pages/layout/deep-links.ts:parseDeepLink", "type": "exports", "direction": "forward", "weight": 0.8 },
+    { "source": "file:packages/app/src/pages/layout/deep-links.ts", "target": "function:packages/app/src/pages/layout/deep-links.ts:parseNewSessionDeepLink", "type": "exports", "direction": "forward", "weight": 0.8 },
+    { "source": "file:packages/app/src/pages/layout/deep-links.ts", "target": "function:packages/app/src/pages/layout/deep-links.ts:collectOpenProjectDeepLinks", "type": "exports", "direction": "forward", "weight": 0.8 },
+    { "source": "file:packages/app/src/pages/layout/deep-links.ts", "target": "function:packages/app/src/pages/layout/deep-links.ts:collectNewSessionDeepLinks", "type": "exports", "direction": "forward", "weight": 0.8 },
+    { "source": "file:packages/app/src/pages/layout/deep-links.ts", "target": "function:packages/app/src/pages/layout/deep-links.ts:drainPendingDeepLinks", "type": "exports", "direction": "forward", "weight": 0.8 },
+    { "source": "file:packages/app/src/i18n/ru.ts", "target": "file:packages/app/src/i18n/en.ts", "type": "related", "direction": "forward", "weight": 0.5 },
+    { "source": "file:packages/app/src/i18n/th.ts", "target": "file:packages/app/src/i18n/en.ts", "type": "related", "direction": "forward", "weight": 0.5 },
+    { "source": "file:packages/app/src/i18n/tr.ts", "target": "file:packages/app/src/i18n/en.ts", "type": "related", "direction": "forward", "weight": 0.5 },
+    { "source": "file:packages/app/src/i18n/zh.ts", "target": "file:packages/app/src/i18n/en.ts", "type": "related", "direction": "forward", "weight": 0.5 },
+    { "source": "file:packages/app/src/i18n/zht.ts", "target": "file:packages/app/src/i18n/en.ts", "type": "related", "direction": "forward", "weight": 0.5 },
+    { "source": "document:packages/app/src/pages/layout/AGENTS.md", "target": "file:packages/app/src/pages/layout.tsx", "type": "documents", "direction": "forward", "weight": 0.5 },
+    { "source": "document:packages/app/src/pages/layout/AGENTS.md", "target": "file:packages/app/src/pages/layout/prefetch-queue.ts", "type": "documents", "direction": "forward", "weight": 0.5 },
+    { "source": "file:packages/app/src/pages/layout.tsx", "target": "file:packages/app/src/pages/layout/helpers.ts", "type": "depends_on", "direction": "forward", "weight": 0.6 },
+    { "source": "file:packages/app/src/pages/layout.tsx", "target": "file:packages/app/src/pages/layout/deep-links.ts", "type": "depends_on", "direction": "forward", "weight": 0.6 },
+    { "source": "file:packages/app/src/pages/layout.tsx", "target": "file:packages/app/src/pages/layout/inline-editor.tsx", "type": "depends_on", "direction": "forward", "weight": 0.6 },
+    { "source": "file:packages/app/src/pages/layout.tsx", "target": "file:packages/app/src/pages/layout/prefetch-queue.ts", "type": "depends_on", "direction": "forward", "weight": 0.6 },
+    { "source": "file:packages/app/src/pages/layout.tsx", "target": "file:packages/app/src/pages/layout/sidebar-workspace.tsx", "type": "depends_on", "direction": "forward", "weight": 0.6 },
+    { "source": "file:packages/app/src/pages/layout.tsx", "target": "file:packages/app/src/pages/layout/sidebar-project.tsx", "type": "depends_on", "direction": "forward", "weight": 0.6 },
+    { "source": "file:packages/app/src/pages/layout.tsx", "target": "file:packages/app/src/pages/layout/sidebar-shell.tsx", "type": "depends_on", "direction": "forward", "weight": 0.6 }
+  ]
+}

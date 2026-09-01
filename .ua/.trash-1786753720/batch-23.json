@@ -1,0 +1,420 @@
+{
+  "nodes": [
+    {
+      "id": "document:packages/opencode/src/tool/AGENTS.md",
+      "type": "document",
+      "name": "AGENTS.md",
+      "filePath": "packages/opencode/src/tool/AGENTS.md",
+      "summary": "Architecture notes for the built-in tool layer: documents the typed ToolContextExtra boundary contract, permission-gate semantics (bypassAgentCheck vs deny evaluation, assertExternalDirectoryEffect as the real gate), the todo-autoclose pattern for file-mutating tools, framework-level output truncation in Tool.define, ripgrep exit-code-2 error surfacing, symlink path-traversal risks, and the SSRF DNS-rebinding fix in webfetch.",
+      "tags": ["documentation", "architecture", "tool-system", "security", "permissions"],
+      "complexity": "moderate",
+      "languageNotes": "Each of the 13 sections is a self-contained invariant or gotcha anchored to concrete file:line references, written to be re-read by agents before modifying the tool layer."
+    },
+    {
+      "id": "document:packages/opencode/src/tool/apply_patch.txt",
+      "type": "document",
+      "name": "apply_patch.txt",
+      "filePath": "packages/opencode/src/tool/apply_patch.txt",
+      "summary": "LLM prompt template teaching the apply_patch diff language: the Begin/End Patch envelope, Add/Delete/Update File operation headers, rename via 'Move to', and self-healing hunk semantics where failed hunks are skipped and reported while clean hunks still apply.",
+      "tags": ["prompt-template", "tool-description", "patch-format", "file-editing", "llm-guidance"],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:packages/opencode/src/tool/codesearch.txt",
+      "type": "document",
+      "name": "codesearch.txt",
+      "filePath": "packages/opencode/src/tool/codesearch.txt",
+      "summary": "LLM prompt template for the codesearch tool backed by the Exa Code API, positioning it as the default tool for any programming research question with an adjustable 1000-50000 token budget (default 5000) for focused or comprehensive results.",
+      "tags": ["prompt-template", "tool-description", "code-search", "api-integration", "llm-guidance"],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:packages/opencode/src/tool/edit.txt",
+      "type": "document",
+      "name": "edit.txt",
+      "filePath": "packages/opencode/src/tool/edit.txt",
+      "summary": "LLM prompt template for the edit tool's exact string-replacement rules: mandatory prior Read, preserving indentation after the line-number prefix, oldString uniqueness failure modes, replaceAll for renames, and routing multi-file edits to apply_patch.",
+      "tags": ["prompt-template", "tool-description", "file-editing", "validation", "llm-guidance"],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:packages/opencode/src/tool/glob.txt",
+      "type": "document",
+      "name": "glob.txt",
+      "filePath": "packages/opencode/src/tool/glob.txt",
+      "summary": "LLM prompt template for the glob file-pattern matcher: results sorted by modification time, batching multiple speculative searches in one response, and preferring the Task tool for open-ended multi-round exploration.",
+      "tags": ["prompt-template", "tool-description", "file-search", "glob-pattern", "llm-guidance"],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:packages/opencode/src/tool/grep.txt",
+      "type": "document",
+      "name": "grep.txt",
+      "filePath": "packages/opencode/src/tool/grep.txt",
+      "summary": "LLM prompt template for the regex content-search tool: include-pattern file filtering, path-and-line-number results sorted by modification time, delegating match counting to Bash rg, and routing open-ended searches to the Task tool.",
+      "tags": ["prompt-template", "tool-description", "regex-search", "content-search", "llm-guidance"],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:packages/opencode/src/tool/index-workspace.txt",
+      "type": "document",
+      "name": "index-workspace.txt",
+      "filePath": "packages/opencode/src/tool/index-workspace.txt",
+      "summary": "LLM prompt template for index_workspace, which chunks workspace source files and generates vector embeddings (local model by default, OpenAI when configured) as the prerequisite step before semantic search; takes 10-60 seconds depending on workspace size.",
+      "tags": ["prompt-template", "tool-description", "embeddings", "semantic-search", "indexing"],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:packages/opencode/src/tool/lsp.txt",
+      "type": "document",
+      "name": "lsp.txt",
+      "filePath": "packages/opencode/src/tool/lsp.txt",
+      "summary": "LLM prompt template for the LSP tool enumerating nine code-intelligence operations (goToDefinition, findReferences, hover, documentSymbol, workspaceSymbol, goToImplementation, and the call-hierarchy trio) with their 1-based line/character parameter requirements.",
+      "tags": ["prompt-template", "tool-description", "lsp", "code-intelligence", "llm-guidance"],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:packages/opencode/src/tool/plan-enter.txt",
+      "type": "document",
+      "name": "plan-enter.txt",
+      "filePath": "packages/opencode/src/tool/plan-enter.txt",
+      "summary": "LLM prompt template for the plan_enter tool, which suggests switching to the plan agent when a complex request would benefit from planning first, with explicit guidance on when to call and when not to call it.",
+      "tags": ["prompt-template", "tool-description", "planning", "agent-mode-switch", "llm-guidance"],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:packages/opencode/src/tool/plan-exit.txt",
+      "type": "document",
+      "name": "plan-exit.txt",
+      "filePath": "packages/opencode/src/tool/plan-exit.txt",
+      "summary": "LLM prompt template for the plan_exit tool, which asks the user to switch from the plan agent to the build agent once a complete plan has been written to the plan file and all clarifying questions are resolved.",
+      "tags": ["prompt-template", "tool-description", "planning", "agent-mode-switch", "llm-guidance"],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:packages/opencode/src/tool/question.txt",
+      "type": "document",
+      "name": "question.txt",
+      "filePath": "packages/opencode/src/tool/question.txt",
+      "summary": "LLM prompt template for the question tool's structured user Q&A: an automatic 'type your own answer' option when custom is enabled, multiple-select answers returned as label arrays, and the recommended-option-first labeling convention.",
+      "tags": ["prompt-template", "tool-description", "user-interaction", "clarification", "llm-guidance"],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:packages/opencode/src/tool/read.txt",
+      "type": "document",
+      "name": "read.txt",
+      "filePath": "packages/opencode/src/tool/read.txt",
+      "summary": "LLM prompt template for the read tool's file and directory semantics: 2000-line default window, 1-indexed offset paging, the 'line: content' prefix contract, parallel reads for multiple files, image/PDF attachment support, and onlyHunks for reading only git-modified ranges with 3 context lines.",
+      "tags": ["prompt-template", "tool-description", "file-reading", "filesystem", "llm-guidance"],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:packages/opencode/src/tool/repo_clone.txt",
+      "type": "document",
+      "name": "repo_clone.txt",
+      "filePath": "packages/opencode/src/tool/repo_clone.txt",
+      "summary": "LLM prompt template for repo_clone, which clones or refreshes external repositories into OpenCode's managed cache from git URLs, forge host/path references, or GitHub owner/repo shorthand, returning the cached local path for dependency and documentation research.",
+      "tags": ["prompt-template", "tool-description", "git", "repository-cache", "research-workflow"],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:packages/opencode/src/tool/repo_overview.txt",
+      "type": "document",
+      "name": "repo_overview.txt",
+      "filePath": "packages/opencode/src/tool/repo_overview.txt",
+      "summary": "LLM prompt template for repo_overview, which summarizes a cloned repository's detected ecosystems, dependency files, package manager, likely entrypoints, and a compact structure tree so the agent can orient quickly after repo_clone.",
+      "tags": ["prompt-template", "tool-description", "repository", "structure-analysis", "research-workflow"],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:packages/opencode/src/tool/semantic-search.txt",
+      "type": "document",
+      "name": "semantic-search.txt",
+      "filePath": "packages/opencode/src/tool/semantic-search.txt",
+      "summary": "LLM prompt template for semantic_search: vector-embedding search that finds conceptually similar code and returns ranked snippets with relevance scores, requires a prior index_workspace run, and includes routing guidance versus grep for exact patterns.",
+      "tags": ["prompt-template", "tool-description", "semantic-search", "embeddings", "llm-guidance"],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:packages/opencode/src/tool/skill.txt",
+      "type": "document",
+      "name": "skill.txt",
+      "filePath": "packages/opencode/src/tool/skill.txt",
+      "summary": "LLM prompt template for the skill tool, which loads a specialized skill matching one listed in the system prompt and injects its instructions and directory resources (scripts, files) into the current conversation.",
+      "tags": ["prompt-template", "tool-description", "skills", "instruction-injection", "llm-guidance"],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:packages/opencode/src/tool/task.txt",
+      "type": "document",
+      "name": "task.txt",
+      "filePath": "packages/opencode/src/tool/task.txt",
+      "summary": "LLM prompt template for the Task subagent launcher: subagent_type selection, launching multiple agents concurrently in a single message, task_id session resume, fresh-context briefing requirements, slash-command delegation, and when to prefer Read/Glob instead.",
+      "tags": ["prompt-template", "tool-description", "subagent", "task-delegation", "llm-guidance"],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:packages/opencode/src/tool/todowrite.txt",
+      "type": "document",
+      "name": "todowrite.txt",
+      "filePath": "packages/opencode/src/tool/todowrite.txt",
+      "summary": "LLM prompt template for TodoWrite, the largest template in the tool layer: when-to-use and when-not-to-use guidance illustrated with four positive and four negative worked examples (each with a reasoning block), task states (pending, in_progress, completed, cancelled), and single-in-progress management rules.",
+      "tags": ["prompt-template", "tool-description", "task-management", "todo-list", "few-shot-examples"],
+      "complexity": "moderate",
+      "languageNotes": "Uses few-shot <example>/<reasoning> block structure mirroring Anthropic's TodoWrite prompt conventions to teach proactive task tracking behavior."
+    },
+    {
+      "id": "document:packages/opencode/src/tool/webfetch.txt",
+      "type": "document",
+      "name": "webfetch.txt",
+      "filePath": "packages/opencode/src/tool/webfetch.txt",
+      "summary": "LLM prompt template for webfetch: URL content fetching with markdown/text/html format conversion, automatic HTTP-to-HTTPS upgrade, read-only semantics, summarization of large content, and deferring to better-suited fetching tools when available.",
+      "tags": ["prompt-template", "tool-description", "web-fetching", "http", "llm-guidance"],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:packages/opencode/src/tool/websearch.txt",
+      "type": "document",
+      "name": "websearch.txt",
+      "filePath": "packages/opencode/src/tool/websearch.txt",
+      "summary": "LLM prompt template for websearch: real-time web search via the session's configured provider with live-crawling modes (fallback/preferred), search types (auto/fast/deep), domain filtering, and a {{year}} placeholder that must be filled with the current year for recency-sensitive queries.",
+      "tags": ["prompt-template", "tool-description", "web-search", "provider-configuration", "template-variable"],
+      "complexity": "simple",
+      "languageNotes": "Contains a {{year}} placeholder substituted at prompt-render time so generated search queries include the current year."
+    }
+  ],
+  "edges": [
+    {
+      "source": "document:packages/opencode/src/tool/apply_patch.txt",
+      "target": "file:packages/opencode/src/tool/apply_patch.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/opencode/src/tool/codesearch.txt",
+      "target": "file:packages/opencode/src/tool/codesearch.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/opencode/src/tool/edit.txt",
+      "target": "file:packages/opencode/src/tool/edit.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/opencode/src/tool/glob.txt",
+      "target": "file:packages/opencode/src/tool/glob.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/opencode/src/tool/grep.txt",
+      "target": "file:packages/opencode/src/tool/grep.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/opencode/src/tool/index-workspace.txt",
+      "target": "file:packages/opencode/src/tool/index-workspace.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/opencode/src/tool/lsp.txt",
+      "target": "file:packages/opencode/src/tool/lsp.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/opencode/src/tool/plan-enter.txt",
+      "target": "file:packages/opencode/src/tool/plan.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/opencode/src/tool/plan-exit.txt",
+      "target": "file:packages/opencode/src/tool/plan.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/opencode/src/tool/question.txt",
+      "target": "file:packages/opencode/src/tool/question.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/opencode/src/tool/read.txt",
+      "target": "file:packages/opencode/src/tool/read.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/opencode/src/tool/repo_clone.txt",
+      "target": "file:packages/opencode/src/tool/repo_clone.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/opencode/src/tool/repo_overview.txt",
+      "target": "file:packages/opencode/src/tool/repo_overview.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/opencode/src/tool/semantic-search.txt",
+      "target": "file:packages/opencode/src/tool/semantic-search.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/opencode/src/tool/skill.txt",
+      "target": "file:packages/opencode/src/tool/skill.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/opencode/src/tool/task.txt",
+      "target": "file:packages/opencode/src/tool/task.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/opencode/src/tool/todowrite.txt",
+      "target": "file:packages/opencode/src/tool/todo.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/opencode/src/tool/webfetch.txt",
+      "target": "file:packages/opencode/src/tool/webfetch.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/opencode/src/tool/websearch.txt",
+      "target": "file:packages/opencode/src/tool/websearch.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/opencode/src/tool/AGENTS.md",
+      "target": "file:packages/opencode/src/tool/tool.ts",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/opencode/src/tool/AGENTS.md",
+      "target": "file:packages/opencode/src/session/prompt.ts",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/opencode/src/tool/AGENTS.md",
+      "target": "file:packages/opencode/src/tool/task.ts",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/opencode/src/tool/AGENTS.md",
+      "target": "file:packages/opencode/src/tool/read.ts",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/opencode/src/tool/AGENTS.md",
+      "target": "file:packages/opencode/src/tool/websearch.ts",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/opencode/src/tool/AGENTS.md",
+      "target": "file:packages/opencode/src/tool/apply_patch.ts",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/opencode/src/tool/AGENTS.md",
+      "target": "file:packages/opencode/src/tool/write.ts",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/opencode/src/tool/AGENTS.md",
+      "target": "file:packages/opencode/src/tool/edit.ts",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/opencode/src/tool/AGENTS.md",
+      "target": "file:packages/opencode/src/tool/skill.ts",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/opencode/src/tool/AGENTS.md",
+      "target": "file:packages/opencode/src/tool/todo.ts",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/opencode/src/tool/AGENTS.md",
+      "target": "file:packages/opencode/src/tool/grep.ts",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/opencode/src/tool/AGENTS.md",
+      "target": "file:packages/opencode/src/tool/glob.ts",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/opencode/src/tool/AGENTS.md",
+      "target": "file:packages/opencode/src/tool/webfetch.ts",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/opencode/src/tool/AGENTS.md",
+      "target": "file:packages/opencode/src/file/ripgrep.ts",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    }
+  ]
+}

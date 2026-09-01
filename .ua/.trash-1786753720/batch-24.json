@@ -1,0 +1,48 @@
+{
+  "nodes": [
+    {
+      "id": "document:packages/sdk/js/AGENTS.md",
+      "type": "document",
+      "name": "AGENTS.md",
+      "filePath": "packages/sdk/js/AGENTS.md",
+      "summary": "Contributor guide for the @opencode-ai/sdk package: documents the parallel v1/v2 generated client structure, the responseStyle/throwOnError error-handling contract, generator limitations that force post-generation patching in script/build.ts, the downstream typecheck gate to run after regeneration, and test conventions in packages/opencode/test/server/.",
+      "tags": ["documentation", "sdk", "code-generation", "error-handling", "contributing"],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:packages/sdk/js/package.json",
+      "type": "config",
+      "name": "package.json",
+      "filePath": "packages/sdk/js/package.json",
+      "summary": "Package manifest for @opencode-ai/sdk defining the export map (root, client, server, v2, v2/client, v2/gen/client), the @hey-api/openapi-ts dev dependency for client generation, a cross-spawn runtime dependency, and build/typecheck scripts that run script/build.ts and tsgo.",
+      "tags": ["configuration", "package-manifest", "sdk", "build-system"],
+      "complexity": "simple",
+      "languageNotes": "The exports map points at raw TypeScript sources (src/index.ts, src/v2/index.ts) rather than dist output — the workspace symlink makes src edits live for in-repo consumers without a build step, while the files field publishes only dist to npm."
+    },
+    {
+      "id": "config:packages/sdk/js/tsconfig.json",
+      "type": "config",
+      "name": "tsconfig.json",
+      "filePath": "packages/sdk/js/tsconfig.json",
+      "summary": "TypeScript configuration for the SDK package extending @tsconfig/node22 with nodenext module resolution, composite project references, declaration emit to dist, and DOM libs required by the generated fetch-based client types.",
+      "tags": ["configuration", "typescript", "build-system"],
+      "complexity": "simple"
+    }
+  ],
+  "edges": [
+    {
+      "source": "config:packages/sdk/js/tsconfig.json",
+      "target": "config:packages/sdk/js/package.json",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/sdk/js/AGENTS.md",
+      "target": "config:packages/sdk/js/package.json",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    }
+  ]
+}

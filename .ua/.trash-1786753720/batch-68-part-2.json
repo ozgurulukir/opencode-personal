@@ -1,0 +1,507 @@
+{
+  "nodes": [
+    {
+      "id": "file:packages/opencode/src/server/httpapi-server.ts",
+      "type": "file",
+      "name": "httpapi-server.ts",
+      "filePath": "packages/opencode/src/server/httpapi-server.ts",
+      "summary": "Declares the HttpApiServer Service context tag and its Interface (closeAll) that platform-specific layers such as httpapi-server.node.ts implement for forced connection shutdown.",
+      "tags": ["type-definition", "service", "effect", "server"],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:packages/opencode/src/server/httpapi-server.ts:Service",
+      "type": "class",
+      "name": "Service",
+      "filePath": "packages/opencode/src/server/httpapi-server.ts",
+      "lineRange": [7, 7],
+      "summary": "Context.Service tag for the HttpApiServer, exposing closeAll as an Effect so callers can force-close all active HTTP connections.",
+      "tags": ["service", "effect", "type-definition"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/opencode/src/server/mdns.ts",
+      "type": "file",
+      "name": "mdns.ts",
+      "filePath": "packages/opencode/src/server/mdns.ts",
+      "summary": "Publishes the opencode HTTP server over mDNS/Bonjour as `opencode-{port}` (type http, host opencode.local or a custom domain) with exponential-backoff retry up to 3 attempts, and unpublishes/destroys the advertiser on shutdown.",
+      "tags": ["networking", "mdns", "service-discovery", "retry", "server"],
+      "complexity": "moderate",
+      "languageNotes": "Uses `InstanceType<typeof Bonjour>` for type annotations because bonjour-service's CommonJS `export =` cannot be used as a type under esModuleInterop."
+    },
+    {
+      "id": "function:packages/opencode/src/server/mdns.ts:publish",
+      "type": "function",
+      "name": "publish",
+      "filePath": "packages/opencode/src/server/mdns.ts",
+      "lineRange": [12, 56],
+      "summary": "Publishes the opencode mDNS service (name `opencode-{port}`, txt path=/), no-op when the port is unchanged, with exponential backoff (500ms base, doubling) across at most 3 retry attempts before giving up permanently.",
+      "tags": ["networking", "mdns", "retry", "service-discovery"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/opencode/src/server/mdns.ts:unpublish",
+      "type": "function",
+      "name": "unpublish",
+      "filePath": "packages/opencode/src/server/mdns.ts",
+      "lineRange": [58, 70],
+      "summary": "Unpublishes all mDNS services, destroys the Bonjour advertiser, and resets the module-level port/state tracking.",
+      "tags": ["networking", "mdns", "cleanup"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/opencode/src/server/projectors.ts",
+      "type": "file",
+      "name": "projectors.ts",
+      "filePath": "packages/opencode/src/server/projectors.ts",
+      "summary": "Initializes the SyncEvent projector pipeline: registers the session projectors and a convertEvent hook that rehydrates `session.updated` payloads with full Session info read from SessionTable via Drizzle.",
+      "tags": ["event-handler", "data-pipeline", "database", "session", "initialization"],
+      "complexity": "simple",
+      "languageNotes": "Side-effectful module: initProjectors() runs at import time, so merely importing the file wires the projector pipeline."
+    },
+    {
+      "id": "function:packages/opencode/src/server/projectors.ts:initProjectors",
+      "type": "function",
+      "name": "initProjectors",
+      "filePath": "packages/opencode/src/server/projectors.ts",
+      "lineRange": [8, 26],
+      "summary": "Configures SyncEvent with the session projectors and a converter that looks up the SessionTable row for `session.updated` events and substitutes a hydrated `{ sessionID, info }` payload.",
+      "tags": ["event-handler", "data-pipeline", "database", "initialization"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/opencode/src/server/proxy-util.ts",
+      "type": "file",
+      "name": "proxy-util.ts",
+      "filePath": "packages/opencode/src/server/proxy-util.ts",
+      "summary": "Header-sanitization and WebSocket helpers for the reverse-proxy server: strips hop-by-hop and security-sensitive headers (set-cookie, x-forwarded-*, forwarded, x-real-ip) plus internal x-opencode-* routing headers, parses Sec-WebSocket-Protocol, and converts http(s) URLs to ws(s) targets.",
+      "tags": ["utility", "http", "proxy", "security", "websocket"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/server/proxy-util.ts:headers",
+      "type": "function",
+      "name": "headers",
+      "filePath": "packages/opencode/src/server/proxy-util.ts",
+      "lineRange": [32, 41],
+      "summary": "Builds a sanitized Headers copy of the incoming request headers, removing hop-by-hop, spoofable, and internal routing headers, then merging any extra headers on top.",
+      "tags": ["http", "proxy", "security", "utility"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/server/proxy-util.ts:websocketProtocols",
+      "type": "function",
+      "name": "websocketProtocols",
+      "filePath": "packages/opencode/src/server/proxy-util.ts",
+      "lineRange": [43, 50],
+      "summary": "Parses the Sec-WebSocket-Protocol header (from a Request or a plain header record) into a trimmed list of requested subprotocols.",
+      "tags": ["websocket", "http", "utility"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/server/proxy-util.ts:websocketTargetURL",
+      "type": "function",
+      "name": "websocketTargetURL",
+      "filePath": "packages/opencode/src/server/proxy-util.ts",
+      "lineRange": [52, 57],
+      "summary": "Converts an http/https URL to its ws/wss counterpart for WebSocket proxy targeting.",
+      "tags": ["websocket", "url", "utility"],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:packages/opencode/src/server/routes/instance/httpapi/AGENTS.md",
+      "type": "document",
+      "name": "AGENTS.md",
+      "filePath": "packages/opencode/src/server/routes/instance/httpapi/AGENTS.md",
+      "summary": "Route-authoring conventions for the Effect HttpApi layer: HttpApiBuilder.group patterns, SSE handling via handleRaw, the three-file endpoint wiring (groups/handlers/server.ts), request-scoped vs stable services, the OpenAPI self-referencing component workaround, and the differing envelopes of the /global/event and /event SSE endpoints.",
+      "tags": ["documentation", "httpapi", "conventions", "api-design", "effect"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:packages/opencode/src/server/routes/instance/httpapi/api.ts",
+      "type": "file",
+      "name": "api.ts",
+      "filePath": "packages/opencode/src/server/routes/instance/httpapi/api.ts",
+      "summary": "Composition root of the HttpApi surface: assembles RootHttpApi (control + global groups with auth and schema-error middleware), InstanceHttpApi (15 instance-scoped route groups), and OpenCodeHttpApi, and registers the SSE event schemas derived from the BusEvent/SyncEvent registries as additional OpenAPI schemas.",
+      "tags": ["api-handler", "entry-point", "httpapi", "effect", "composition"],
+      "complexity": "moderate",
+      "languageNotes": "Purely declarative assembly: HttpApi.make(...).addHttpApi(...) chains compose the route tree, and the OpenAPI Event union schema is generated at build time from the BusEvent registry rather than hand-written."
+    },
+    {
+      "id": "file:packages/opencode/src/server/routes/instance/httpapi/errors.ts",
+      "type": "file",
+      "name": "errors.ts",
+      "filePath": "packages/opencode/src/server/routes/instance/httpapi/errors.ts",
+      "summary": "Defines the SDK-visible 404 error contract (ApiNotFoundError Schema.ErrorClass with a message payload) and a notFound() constructor used by HttpApi handlers for expected not-found failures.",
+      "tags": ["error-handling", "api-schema", "httpapi", "utility"],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:packages/opencode/src/server/routes/instance/httpapi/errors.ts:ApiNotFoundError",
+      "type": "class",
+      "name": "ApiNotFoundError",
+      "filePath": "packages/opencode/src/server/routes/instance/httpapi/errors.ts",
+      "lineRange": [3, 11],
+      "summary": "Schema.ErrorClass mapping to HTTP 404, carrying a message in its data payload so SDK clients receive structured not-found errors.",
+      "tags": ["error-handling", "api-schema", "httpapi"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/server/routes/instance/httpapi/errors.ts:notFound",
+      "type": "function",
+      "name": "notFound",
+      "filePath": "packages/opencode/src/server/routes/instance/httpapi/errors.ts",
+      "lineRange": [13, 18],
+      "summary": "Constructor helper that instantiates ApiNotFoundError with a human-readable message.",
+      "tags": ["error-handling", "utility", "factory"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/opencode/src/server/routes/instance/httpapi/event.ts",
+      "type": "file",
+      "name": "event.ts",
+      "filePath": "packages/opencode/src/server/routes/instance/httpapi/event.ts",
+      "summary": "Per-instance SSE endpoint (GET /event): declares the EventApi group and implements its handler, streaming raw Bus events (id/type/properties) plus synthetic server.connected and 10-second heartbeat events through the SSE encoder with no-cache/nosniff headers.",
+      "tags": ["api-handler", "sse", "streaming", "event-handler", "httpapi"],
+      "complexity": "moderate",
+      "languageNotes": "Uses handlers.handleRaw because the SSE response bypasses the schema-typed success channel; the stream terminates when the Bus emits InstanceDisposed."
+    },
+    {
+      "id": "function:packages/opencode/src/server/routes/instance/httpapi/event.ts:eventResponse",
+      "type": "function",
+      "name": "eventResponse",
+      "filePath": "packages/opencode/src/server/routes/instance/httpapi/event.ts",
+      "lineRange": [42, 67],
+      "summary": "Builds the SSE HttpServerResponse: merges the Bus event stream (halted on InstanceDisposed) with 10s heartbeats, prefixes a server.connected event, encodes through the Sse channel, and sets Cache-Control/no-buffering/nosniff headers.",
+      "tags": ["sse", "streaming", "event-handler", "http"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/opencode/src/server/routes/instance/httpapi/event.ts:eventHandlers",
+      "type": "function",
+      "name": "eventHandlers",
+      "filePath": "packages/opencode/src/server/routes/instance/httpapi/event.ts",
+      "lineRange": [69, 79],
+      "summary": "HttpApiBuilder group wiring for EventApi: yields Bus.Service once at layer construction and registers the raw `subscribe` handler that returns the SSE stream response.",
+      "tags": ["api-handler", "httpapi", "sse", "effect"],
+      "complexity": "simple"
+    },
+    {
+      "id": "endpoint:packages/opencode/src/server/routes/instance/httpapi/event.ts:GET /event",
+      "type": "endpoint",
+      "name": "GET /event",
+      "filePath": "packages/opencode/src/server/routes/instance/httpapi/event.ts",
+      "lineRange": [19, 28],
+      "summary": "Subscribes to the per-instance event stream over SSE, delivering Bus events directly (unwrapped id/type/properties) for per-project consumers such as the TUI and web UI.",
+      "tags": ["api", "httpapi", "sse", "streaming"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/opencode/src/server/routes/instance/httpapi/groups/config.ts",
+      "type": "file",
+      "name": "config.ts",
+      "filePath": "packages/opencode/src/server/routes/instance/httpapi/groups/config.ts",
+      "summary": "HttpApi route group for configuration: GET/PATCH /config and GET /config/providers, workspace-routed through the instance-context and workspace-routing middleware with full OpenAPI annotations.",
+      "tags": ["api-handler", "httpapi", "configuration", "effect", "schema-definition"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "endpoint:packages/opencode/src/server/routes/instance/httpapi/groups/config.ts:GET /config",
+      "type": "endpoint",
+      "name": "GET /config",
+      "filePath": "packages/opencode/src/server/routes/instance/httpapi/groups/config.ts",
+      "lineRange": [15, 24],
+      "summary": "Retrieves the current OpenCode configuration settings and preferences for the routed workspace.",
+      "tags": ["api", "httpapi", "configuration"],
+      "complexity": "simple"
+    },
+    {
+      "id": "endpoint:packages/opencode/src/server/routes/instance/httpapi/groups/config.ts:PATCH /config",
+      "type": "endpoint",
+      "name": "PATCH /config",
+      "filePath": "packages/opencode/src/server/routes/instance/httpapi/groups/config.ts",
+      "lineRange": [25, 36],
+      "summary": "Updates workspace configuration settings and preferences, returning the resulting config; rejects invalid payloads with 400.",
+      "tags": ["api", "httpapi", "configuration", "mutation"],
+      "complexity": "simple"
+    },
+    {
+      "id": "endpoint:packages/opencode/src/server/routes/instance/httpapi/groups/config.ts:GET /config/providers",
+      "type": "endpoint",
+      "name": "GET /config/providers",
+      "filePath": "packages/opencode/src/server/routes/instance/httpapi/groups/config.ts",
+      "lineRange": [37, 46],
+      "summary": "Lists all configured AI providers and their default models.",
+      "tags": ["api", "httpapi", "provider", "configuration"],
+      "complexity": "simple"
+    }
+  ],
+  "edges": [
+    {
+      "source": "file:packages/opencode/src/server/httpapi-server.ts",
+      "target": "class:packages/opencode/src/server/httpapi-server.ts:Service",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/src/server/httpapi-server.ts",
+      "target": "class:packages/opencode/src/server/httpapi-server.ts:Service",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/server/mdns.ts",
+      "target": "function:packages/opencode/src/server/mdns.ts:publish",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/src/server/mdns.ts",
+      "target": "function:packages/opencode/src/server/mdns.ts:unpublish",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/src/server/mdns.ts",
+      "target": "function:packages/opencode/src/server/mdns.ts:publish",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/server/mdns.ts",
+      "target": "function:packages/opencode/src/server/mdns.ts:unpublish",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/server/projectors.ts",
+      "target": "function:packages/opencode/src/server/projectors.ts:initProjectors",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/src/server/projectors.ts",
+      "target": "function:packages/opencode/src/server/projectors.ts:initProjectors",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/server/proxy-util.ts",
+      "target": "function:packages/opencode/src/server/proxy-util.ts:headers",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/src/server/proxy-util.ts",
+      "target": "function:packages/opencode/src/server/proxy-util.ts:websocketProtocols",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/src/server/proxy-util.ts",
+      "target": "function:packages/opencode/src/server/proxy-util.ts:websocketTargetURL",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/src/server/proxy-util.ts",
+      "target": "function:packages/opencode/src/server/proxy-util.ts:headers",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/server/proxy-util.ts",
+      "target": "function:packages/opencode/src/server/proxy-util.ts:websocketProtocols",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/server/proxy-util.ts",
+      "target": "function:packages/opencode/src/server/proxy-util.ts:websocketTargetURL",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/server/routes/instance/httpapi/errors.ts",
+      "target": "class:packages/opencode/src/server/routes/instance/httpapi/errors.ts:ApiNotFoundError",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/src/server/routes/instance/httpapi/errors.ts",
+      "target": "function:packages/opencode/src/server/routes/instance/httpapi/errors.ts:notFound",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/src/server/routes/instance/httpapi/errors.ts",
+      "target": "class:packages/opencode/src/server/routes/instance/httpapi/errors.ts:ApiNotFoundError",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/server/routes/instance/httpapi/errors.ts",
+      "target": "function:packages/opencode/src/server/routes/instance/httpapi/errors.ts:notFound",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/server/routes/instance/httpapi/event.ts",
+      "target": "function:packages/opencode/src/server/routes/instance/httpapi/event.ts:eventResponse",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/src/server/routes/instance/httpapi/event.ts",
+      "target": "function:packages/opencode/src/server/routes/instance/httpapi/event.ts:eventHandlers",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/src/server/routes/instance/httpapi/event.ts",
+      "target": "endpoint:packages/opencode/src/server/routes/instance/httpapi/event.ts:GET /event",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/src/server/routes/instance/httpapi/event.ts",
+      "target": "function:packages/opencode/src/server/routes/instance/httpapi/event.ts:eventHandlers",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/server/routes/instance/httpapi/groups/config.ts",
+      "target": "endpoint:packages/opencode/src/server/routes/instance/httpapi/groups/config.ts:GET /config",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/src/server/routes/instance/httpapi/groups/config.ts",
+      "target": "endpoint:packages/opencode/src/server/routes/instance/httpapi/groups/config.ts:PATCH /config",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/src/server/routes/instance/httpapi/groups/config.ts",
+      "target": "endpoint:packages/opencode/src/server/routes/instance/httpapi/groups/config.ts:GET /config/providers",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/src/server/routes/instance/httpapi/groups/config.ts",
+      "target": "file:packages/opencode/src/server/routes/instance/httpapi/groups/metadata.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/opencode/src/server/routes/instance/httpapi/api.ts",
+      "target": "file:packages/opencode/src/server/routes/instance/httpapi/event.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/opencode/src/server/routes/instance/httpapi/api.ts",
+      "target": "file:packages/opencode/src/server/routes/instance/httpapi/groups/config.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/opencode/src/server/routes/instance/httpapi/api.ts",
+      "target": "file:packages/opencode/src/server/routes/instance/httpapi/groups/control.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/opencode/src/server/routes/instance/httpapi/api.ts",
+      "target": "file:packages/opencode/src/server/routes/instance/httpapi/groups/experimental.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/opencode/src/server/routes/instance/httpapi/api.ts",
+      "target": "file:packages/opencode/src/server/routes/instance/httpapi/groups/file.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/opencode/src/server/routes/instance/httpapi/api.ts",
+      "target": "file:packages/opencode/src/server/routes/instance/httpapi/groups/global.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/opencode/src/server/routes/instance/httpapi/api.ts",
+      "target": "file:packages/opencode/src/server/routes/instance/httpapi/groups/instance.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/opencode/src/server/routes/instance/httpapi/api.ts",
+      "target": "file:packages/opencode/src/server/routes/instance/httpapi/groups/mcp.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "document:packages/opencode/src/server/routes/instance/httpapi/AGENTS.md",
+      "target": "file:packages/opencode/src/server/routes/instance/httpapi/api.ts",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/opencode/src/server/routes/instance/httpapi/AGENTS.md",
+      "target": "file:packages/opencode/src/server/routes/instance/httpapi/errors.ts",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/opencode/src/server/routes/instance/httpapi/AGENTS.md",
+      "target": "file:packages/opencode/src/server/routes/instance/httpapi/event.ts",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/opencode/src/server/routes/instance/httpapi/AGENTS.md",
+      "target": "file:packages/opencode/src/server/routes/instance/httpapi/groups/config.ts",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    }
+  ]
+}

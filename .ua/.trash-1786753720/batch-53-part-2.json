@@ -1,0 +1,1625 @@
+{
+  "nodes": [
+    {
+      "id": "file:packages/opencode/src/cli/cmd/run/footer.ts",
+      "type": "file",
+      "name": "footer.ts",
+      "filePath": "packages/opencode/src/cli/cmd/run/footer.ts",
+      "summary": "RunFooter — the mutable control surface of direct interactive mode, owning the boundary between append-only scrollback (queued StreamCommit flushes) and the repaintable SolidJS footer region, plus lifecycle (close/destroy), view routing, and interrupt/exit double-press timers.",
+      "tags": [
+        "service",
+        "footer-ui",
+        "lifecycle",
+        "orchestrator"
+      ],
+      "complexity": "complex",
+      "languageNotes": "Scrollback commits coalesce in a microtask queue; footer state lives in a SolidJS store reconciled via minimal FooterPatch objects."
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/run/footer.ts:eventPatch",
+      "type": "function",
+      "name": "eventPatch",
+      "filePath": "packages/opencode/src/cli/cmd/run/footer.ts",
+      "lineRange": [
+        108,
+        153
+      ],
+      "summary": "Computes the minimal FooterPatch from a footer event for store reconciliation.",
+      "tags": [
+        "utility",
+        "diffing",
+        "footer-ui",
+        "state-sync"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:packages/opencode/src/cli/cmd/run/footer.ts:RunFooter",
+      "type": "class",
+      "name": "RunFooter",
+      "filePath": "packages/opencode/src/cli/cmd/run/footer.ts",
+      "lineRange": [
+        155,
+        847
+      ],
+      "summary": "Mutable footer controller owning scrollback commit queues, SolidJS footer state, view presentation and height management, prompt/close listeners, and interrupt/exit double-press timers wired to the renderer lifecycle.",
+      "tags": [
+        "service",
+        "footer-ui",
+        "lifecycle",
+        "orchestrator"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:packages/opencode/src/cli/cmd/run/footer.view.tsx",
+      "type": "file",
+      "name": "footer.view.tsx",
+      "filePath": "packages/opencode/src/cli/cmd/run/footer.view.tsx",
+      "summary": "Top-level footer layout for direct interactive mode, stacking the composer frame (prompt/permission/question bodies via Switch/Match), meta row with agent and model labels, and a status row with spinner, interrupt hint, duration, and usage.",
+      "tags": [
+        "component",
+        "layout",
+        "footer-ui"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/run/footer.view.tsx:RunFooterView",
+      "type": "function",
+      "name": "RunFooterView",
+      "filePath": "packages/opencode/src/cli/cmd/run/footer.view.tsx",
+      "lineRange": [
+        115,
+        705
+      ],
+      "summary": "Stateless top-level footer layout switching between prompt, permission, and question composer bodies with meta and status rows; all state arrives from the parent RunFooter via SolidJS signals.",
+      "tags": [
+        "component",
+        "layout",
+        "footer-ui"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:packages/opencode/src/cli/cmd/run/keymap.shared.ts",
+      "type": "file",
+      "name": "keymap.shared.ts",
+      "filePath": "packages/opencode/src/cli/cmd/run/keymap.shared.ts",
+      "summary": "Pure keymap helpers that parse configured key bindings into OpenTUI key sequences with alias normalization (delete to del, meta to alt) and format them back into printable binding strings.",
+      "tags": [
+        "utility",
+        "keybinding",
+        "pure-functions",
+        "normalization"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/run/keymap.shared.ts:createParser",
+      "type": "function",
+      "name": "createParser",
+      "filePath": "packages/opencode/src/cli/cmd/run/keymap.shared.ts",
+      "lineRange": [
+        56,
+        106
+      ],
+      "summary": "Builds an OpenTUI keymap parser with alias normalization and leader-key registration for binding parsing.",
+      "tags": [
+        "keybinding",
+        "factory",
+        "pure-functions"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/run/keymap.shared.ts:parseBindings",
+      "type": "function",
+      "name": "parseBindings",
+      "filePath": "packages/opencode/src/cli/cmd/run/keymap.shared.ts",
+      "lineRange": [
+        133,
+        146
+      ],
+      "summary": "Parses configured key binding strings into normalized key sequence parts.",
+      "tags": [
+        "keybinding",
+        "parsing",
+        "pure-functions"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/opencode/src/cli/cmd/run/otel.ts",
+      "type": "file",
+      "name": "otel.ts",
+      "filePath": "packages/opencode/src/cli/cmd/run/otel.ts",
+      "summary": "OpenTelemetry span helpers for the run command, wrapping footer and loop operations in traced spans with attribute and error recording over a lazily initialized observability runtime.",
+      "tags": [
+        "observability",
+        "tracing",
+        "utility",
+        "middleware"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/run/otel.ts:withRunSpan",
+      "type": "function",
+      "name": "withRunSpan",
+      "filePath": "packages/opencode/src/cli/cmd/run/otel.ts",
+      "lineRange": [
+        91,
+        117
+      ],
+      "summary": "Wraps an Effect operation in an OpenTelemetry span with run attributes and automatic error recording, falling back to a no-op span when tracing is unavailable.",
+      "tags": [
+        "tracing",
+        "observability",
+        "middleware"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:packages/opencode/src/cli/cmd/run/permission.shared.ts",
+      "type": "file",
+      "name": "permission.shared.ts",
+      "filePath": "packages/opencode/src/cli/cmd/run/permission.shared.ts",
+      "summary": "Pure three-stage state machine for the permission UI (permission, always-confirmation, reject text) that returns new state plus optional PermissionReply payloads; kept side-effect free for independent testing.",
+      "tags": [
+        "pure-functions",
+        "state-machine",
+        "permission",
+        "validation"
+      ],
+      "complexity": "moderate",
+      "languageNotes": "Follows the .shared.ts convention: pure functions take state in and return new state out, with no IO or TUI dependencies."
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/run/permission.shared.ts:createPermissionBodyState",
+      "type": "function",
+      "name": "createPermissionBodyState",
+      "filePath": "packages/opencode/src/cli/cmd/run/permission.shared.ts",
+      "lineRange": [
+        70,
+        78
+      ],
+      "summary": "Creates the initial permission body state for a request ID with the permission stage selected.",
+      "tags": [
+        "state-machine",
+        "factory",
+        "permission"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/run/permission.shared.ts:permissionOptions",
+      "type": "function",
+      "name": "permissionOptions",
+      "filePath": "packages/opencode/src/cli/cmd/run/permission.shared.ts",
+      "lineRange": [
+        80,
+        90
+      ],
+      "summary": "Returns the selectable options (allow once, always, reject) for the current permission stage.",
+      "tags": [
+        "state-machine",
+        "utility",
+        "permission",
+        "options"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/run/permission.shared.ts:permissionInfo",
+      "type": "function",
+      "name": "permissionInfo",
+      "filePath": "packages/opencode/src/cli/cmd/run/permission.shared.ts",
+      "lineRange": [
+        92,
+        124
+      ],
+      "summary": "Extracts display info — icon, title, detail lines, and diff — from a permission request.",
+      "tags": [
+        "state-machine",
+        "formatting",
+        "permission",
+        "display"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/run/permission.shared.ts:permissionAlwaysLines",
+      "type": "function",
+      "name": "permissionAlwaysLines",
+      "filePath": "packages/opencode/src/cli/cmd/run/permission.shared.ts",
+      "lineRange": [
+        126,
+        135
+      ],
+      "summary": "Builds the confirmation lines shown in the always-grant stage.",
+      "tags": [
+        "state-machine",
+        "formatting",
+        "permission",
+        "confirmation"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/run/permission.shared.ts:permissionShift",
+      "type": "function",
+      "name": "permissionShift",
+      "filePath": "packages/opencode/src/cli/cmd/run/permission.shared.ts",
+      "lineRange": [
+        153,
+        165
+      ],
+      "summary": "Moves the selected option horizontally with clamping at both ends.",
+      "tags": [
+        "state-machine",
+        "navigation",
+        "permission"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/run/permission.shared.ts:permissionRun",
+      "type": "function",
+      "name": "permissionRun",
+      "filePath": "packages/opencode/src/cli/cmd/run/permission.shared.ts",
+      "lineRange": [
+        174,
+        224
+      ],
+      "summary": "Main state transition: applies the selected option, advancing stages or emitting a PermissionReply to send to the SDK.",
+      "tags": [
+        "state-machine",
+        "transition",
+        "permission"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/run/permission.shared.ts:permissionEscape",
+      "type": "function",
+      "name": "permissionEscape",
+      "filePath": "packages/opencode/src/cli/cmd/run/permission.shared.ts",
+      "lineRange": [
+        242,
+        256
+      ],
+      "summary": "Handles escape per stage — cancels confirmation, clears reject text, or rejects the request outright.",
+      "tags": [
+        "state-machine",
+        "transition",
+        "permission",
+        "keyboard-navigation"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/opencode/src/cli/cmd/run/prompt.shared.ts",
+      "type": "file",
+      "name": "prompt.shared.ts",
+      "filePath": "packages/opencode/src/cli/cmd/run/prompt.shared.ts",
+      "summary": "Pure state machine for the prompt input: keybind parsing, leader-key variant cycling with two-step arming, and a bounded 200-entry history ring that saves the draft when browsing and restores it past the newest entry.",
+      "tags": [
+        "pure-functions",
+        "state-machine",
+        "keybinding",
+        "history"
+      ],
+      "complexity": "complex",
+      "languageNotes": "Exemplar of the .shared.ts pattern: pure computation extracted from the reactive UI component and pinned by characterization tests."
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/run/prompt.shared.ts:promptInfo",
+      "type": "function",
+      "name": "promptInfo",
+      "filePath": "packages/opencode/src/cli/cmd/run/prompt.shared.ts",
+      "lineRange": [
+        26,
+        35
+      ],
+      "summary": "Extracts the prompt display info (mode icon, agent label) for the footer meta row.",
+      "tags": [
+        "utility",
+        "formatting",
+        "prompt",
+        "footer-ui"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/run/prompt.shared.ts:promptKey",
+      "type": "function",
+      "name": "promptKey",
+      "filePath": "packages/opencode/src/cli/cmd/run/prompt.shared.ts",
+      "lineRange": [
+        74,
+        111
+      ],
+      "summary": "Normalizes a key event into a canonical binding key string with alias mapping.",
+      "tags": [
+        "keybinding",
+        "normalization",
+        "key-normalization"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/run/prompt.shared.ts:mapInputBindings",
+      "type": "function",
+      "name": "mapInputBindings",
+      "filePath": "packages/opencode/src/cli/cmd/run/prompt.shared.ts",
+      "lineRange": [
+        120,
+        141
+      ],
+      "summary": "Maps configured bindings through an action transform for textarea input handling.",
+      "tags": [
+        "keybinding",
+        "utility",
+        "textarea"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/run/prompt.shared.ts:promptKeys",
+      "type": "function",
+      "name": "promptKeys",
+      "filePath": "packages/opencode/src/cli/cmd/run/prompt.shared.ts",
+      "lineRange": [
+        150,
+        160
+      ],
+      "summary": "Derives the printable hint keys for the prompt footer from the configured keybinds.",
+      "tags": [
+        "keybinding",
+        "formatting",
+        "hints"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/run/prompt.shared.ts:promptHit",
+      "type": "function",
+      "name": "promptHit",
+      "filePath": "packages/opencode/src/cli/cmd/run/prompt.shared.ts",
+      "lineRange": [
+        175,
+        185
+      ],
+      "summary": "Tests whether a key event matches any of the given parsed bindings.",
+      "tags": [
+        "keybinding",
+        "utility",
+        "matching"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/run/prompt.shared.ts:promptCycle",
+      "type": "function",
+      "name": "promptCycle",
+      "filePath": "packages/opencode/src/cli/cmd/run/prompt.shared.ts",
+      "lineRange": [
+        187,
+        226
+      ],
+      "summary": "Two-step leader-key cycle: the first press arms the leader and the second press within the timeout fires variant or command actions.",
+      "tags": [
+        "state-machine",
+        "keybinding",
+        "leader-key"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/run/prompt.shared.ts:createPromptHistory",
+      "type": "function",
+      "name": "createPromptHistory",
+      "filePath": "packages/opencode/src/cli/cmd/run/prompt.shared.ts",
+      "lineRange": [
+        228,
+        244
+      ],
+      "summary": "Creates the bounded prompt history ring with a draft slot and browse position.",
+      "tags": [
+        "history",
+        "factory",
+        "ring-buffer"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/run/prompt.shared.ts:pushPromptHistory",
+      "type": "function",
+      "name": "pushPromptHistory",
+      "filePath": "packages/opencode/src/cli/cmd/run/prompt.shared.ts",
+      "lineRange": [
+        246,
+        267
+      ],
+      "summary": "Commits a submitted prompt into the history ring, evicting entries past the 200-item limit.",
+      "tags": [
+        "history",
+        "utility",
+        "ring-buffer"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/run/prompt.shared.ts:movePromptHistory",
+      "type": "function",
+      "name": "movePromptHistory",
+      "filePath": "packages/opencode/src/cli/cmd/run/prompt.shared.ts",
+      "lineRange": [
+        269,
+        326
+      ],
+      "summary": "Navigates history up and down — saving the draft on first entry and restoring it when moving past the newest entry — returning text and cursor adjustments for the caller to apply.",
+      "tags": [
+        "history",
+        "state-machine",
+        "navigation"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:packages/opencode/src/cli/cmd/run/prompt/autocomplete.ts",
+      "type": "file",
+      "name": "autocomplete.ts",
+      "filePath": "packages/opencode/src/cli/cmd/run/prompt/autocomplete.ts",
+      "summary": "Pure autocomplete logic for the prompt textarea — mention (@) and slash (/) head detection, line-range extraction for file mentions, and cursor-aware query parsing with no TUI or SolidJS dependencies.",
+      "tags": [
+        "utility",
+        "autocomplete",
+        "pure-functions",
+        "parsing"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/run/prompt/autocomplete.ts:extractLineRange",
+      "type": "function",
+      "name": "extractLineRange",
+      "filePath": "packages/opencode/src/cli/cmd/run/prompt/autocomplete.ts",
+      "lineRange": [
+        23,
+        39
+      ],
+      "summary": "Parses a mention token into its base path plus an optional line range suffix (:10 or :10-20).",
+      "tags": [
+        "parsing",
+        "mentions",
+        "file-paths"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/run/prompt/autocomplete.ts:slashHead",
+      "type": "function",
+      "name": "slashHead",
+      "filePath": "packages/opencode/src/cli/cmd/run/prompt/autocomplete.ts",
+      "lineRange": [
+        41,
+        56
+      ],
+      "summary": "Extracts the slash command head (name and argument offset) from a text line.",
+      "tags": [
+        "parsing",
+        "slash-command",
+        "prompt"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/run/prompt/autocomplete.ts:slashQuery",
+      "type": "function",
+      "name": "slashQuery",
+      "filePath": "packages/opencode/src/cli/cmd/run/prompt/autocomplete.ts",
+      "lineRange": [
+        58,
+        65
+      ],
+      "summary": "Computes the active slash-command query from the current text and cursor position.",
+      "tags": [
+        "parsing",
+        "autocomplete",
+        "cursor"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/opencode/src/cli/cmd/run/prompt/parts.ts",
+      "type": "file",
+      "name": "parts.ts",
+      "filePath": "packages/opencode/src/cli/cmd/run/prompt/parts.ts",
+      "summary": "Mention part manager for the prompt textarea, tracking @mention parts (files and agents) and syncing extmarks against textarea edits so highlights survive restores and insertions.",
+      "tags": [
+        "utility",
+        "state-management",
+        "textarea",
+        "mentions"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/run/prompt/parts.ts:syncParts",
+      "type": "function",
+      "name": "syncParts",
+      "filePath": "packages/opencode/src/cli/cmd/run/prompt/parts.ts",
+      "lineRange": [
+        38,
+        90
+      ],
+      "summary": "Recomputes mention extmark ranges after textarea edits using tracked line and column deltas.",
+      "tags": [
+        "state-management",
+        "mentions",
+        "diffing"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/run/prompt/parts.ts:restoreParts",
+      "type": "function",
+      "name": "restoreParts",
+      "filePath": "packages/opencode/src/cli/cmd/run/prompt/parts.ts",
+      "lineRange": [
+        92,
+        121
+      ],
+      "summary": "Reapplies saved mention marks to a freshly restored textarea value.",
+      "tags": [
+        "state-management",
+        "mentions",
+        "extmarks"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/run/prompt/parts.ts:insertMention",
+      "type": "function",
+      "name": "insertMention",
+      "filePath": "packages/opencode/src/cli/cmd/run/prompt/parts.ts",
+      "lineRange": [
+        123,
+        178
+      ],
+      "summary": "Inserts an @mention at the cursor, replacing the query text and registering its extmark.",
+      "tags": [
+        "mentions",
+        "textarea",
+        "editing"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:packages/opencode/src/cli/cmd/run/prompt/prompt-state.tsx",
+      "type": "file",
+      "name": "prompt-state.tsx",
+      "filePath": "packages/opencode/src/cli/cmd/run/prompt/prompt-state.tsx",
+      "summary": "The prompt textarea state machine and component: wires keybinds, history navigation, leader-key sequences, @-mention autocomplete over files/subagents/MCP resources, and slash command handling into the PromptState consumed by RunPromptBody.",
+      "tags": [
+        "component",
+        "state-machine",
+        "autocomplete",
+        "footer-ui"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/run/prompt/prompt-state.tsx:RunPromptBody",
+      "type": "function",
+      "name": "RunPromptBody",
+      "filePath": "packages/opencode/src/cli/cmd/run/prompt/prompt-state.tsx",
+      "lineRange": [
+        124,
+        170
+      ],
+      "summary": "Renders the prompt textarea with hint rows and the autocomplete menu below it.",
+      "tags": [
+        "component",
+        "textarea",
+        "footer-ui"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/run/prompt/prompt-state.tsx:createPromptState",
+      "type": "function",
+      "name": "createPromptState",
+      "filePath": "packages/opencode/src/cli/cmd/run/prompt/prompt-state.tsx",
+      "lineRange": [
+        172,
+        935
+      ],
+      "summary": "Builds the full prompt state machine — keybind wiring, history navigation, leader sequences, @-mention autocomplete over files/subagents/resources, mention part management, and slash command validation.",
+      "tags": [
+        "state-machine",
+        "factory",
+        "autocomplete"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:packages/opencode/src/cli/cmd/run/prompt/submit.ts",
+      "type": "file",
+      "name": "submit.ts",
+      "filePath": "packages/opencode/src/cli/cmd/run/prompt/submit.ts",
+      "summary": "Pure submit validation for the prompt textarea: parses slash commands, detects exit commands, and validates prompts before dispatch.",
+      "tags": [
+        "validation",
+        "pure-functions",
+        "parsing"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/run/prompt/submit.ts:parseSlashCommand",
+      "type": "function",
+      "name": "parseSlashCommand",
+      "filePath": "packages/opencode/src/cli/cmd/run/prompt/submit.ts",
+      "lineRange": [
+        25,
+        40
+      ],
+      "summary": "Parses prompt text into a slash command name plus arguments when the input is a command.",
+      "tags": [
+        "parsing",
+        "slash-command",
+        "prompt"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/run/prompt/submit.ts:validateSubmit",
+      "type": "function",
+      "name": "validateSubmit",
+      "filePath": "packages/opencode/src/cli/cmd/run/prompt/submit.ts",
+      "lineRange": [
+        46,
+        61
+      ],
+      "summary": "Validates a prompt before dispatch, rejecting empty input and unknown slash commands.",
+      "tags": [
+        "validation",
+        "prompt",
+        "submit"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/opencode/src/cli/cmd/run/question.shared.ts",
+      "type": "file",
+      "name": "question.shared.ts",
+      "filePath": "packages/opencode/src/cli/cmd/run/question.shared.ts",
+      "summary": "Pure state machine for the question UI covering single- and multi-question flows — option picking, tab navigation, custom text answers, and final QuestionReply assembly — with no TUI dependencies.",
+      "tags": [
+        "pure-functions",
+        "state-machine",
+        "question-ui",
+        "validation"
+      ],
+      "complexity": "complex",
+      "languageNotes": "Single questions submit immediately on selection; multi-question flows use tabs plus a final confirmation step."
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/run/question.shared.ts:createQuestionBodyState",
+      "type": "function",
+      "name": "createQuestionBodyState",
+      "filePath": "packages/opencode/src/cli/cmd/run/question.shared.ts",
+      "lineRange": [
+        34,
+        44
+      ],
+      "summary": "Creates the initial question body state for a request with tab and selection defaults.",
+      "tags": [
+        "state-machine",
+        "factory",
+        "question-ui"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/run/question.shared.ts:questionPick",
+      "type": "function",
+      "name": "questionPick",
+      "filePath": "packages/opencode/src/cli/cmd/run/question.shared.ts",
+      "lineRange": [
+        157,
+        193
+      ],
+      "summary": "Picks an answer — submitting immediately for single questions or toggling and advancing for multi-question flows.",
+      "tags": [
+        "state-machine",
+        "transition",
+        "question-ui",
+        "selection"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/run/question.shared.ts:questionToggle",
+      "type": "function",
+      "name": "questionToggle",
+      "filePath": "packages/opencode/src/cli/cmd/run/question.shared.ts",
+      "lineRange": [
+        195,
+        205
+      ],
+      "summary": "Toggles a multi-select answer in a question's picked set.",
+      "tags": [
+        "state-machine",
+        "toggle",
+        "question-ui",
+        "multi-select"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/run/question.shared.ts:questionMove",
+      "type": "function",
+      "name": "questionMove",
+      "filePath": "packages/opencode/src/cli/cmd/run/question.shared.ts",
+      "lineRange": [
+        207,
+        217
+      ],
+      "summary": "Moves the selected option up and down with clamping and custom-input handling.",
+      "tags": [
+        "state-machine",
+        "navigation",
+        "question-ui",
+        "keyboard-navigation"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/run/question.shared.ts:questionSelect",
+      "type": "function",
+      "name": "questionSelect",
+      "filePath": "packages/opencode/src/cli/cmd/run/question.shared.ts",
+      "lineRange": [
+        219,
+        256
+      ],
+      "summary": "Digit-shortcut selection handler that picks an option by index.",
+      "tags": [
+        "state-machine",
+        "transition",
+        "question-ui",
+        "digit-shortcut"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/run/question.shared.ts:questionSave",
+      "type": "function",
+      "name": "questionSave",
+      "filePath": "packages/opencode/src/cli/cmd/run/question.shared.ts",
+      "lineRange": [
+        258,
+        306
+      ],
+      "summary": "Saves custom text input for the active question tab, validating and storing the answer.",
+      "tags": [
+        "state-machine",
+        "form-input",
+        "question-ui",
+        "custom-input"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/run/question.shared.ts:questionHint",
+      "type": "function",
+      "name": "questionHint",
+      "filePath": "packages/opencode/src/cli/cmd/run/question.shared.ts",
+      "lineRange": [
+        321,
+        340
+      ],
+      "summary": "Builds the footer hint line describing the available keys for the current question state.",
+      "tags": [
+        "formatting",
+        "utility",
+        "question-ui",
+        "hints"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/opencode/src/cli/cmd/run/runtime.boot.ts",
+      "type": "file",
+      "name": "runtime.boot.ts",
+      "filePath": "packages/opencode/src/cli/cmd/run/runtime.boot.ts",
+      "summary": "Boot-time resolution for direct interactive mode, concurrently fetching footer keybinds from TUI config, diff display style, model variant lists with context limits, and session history before the first frame renders.",
+      "tags": [
+        "bootstrap",
+        "configuration",
+        "async",
+        "startup"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/run/runtime.boot.ts:footerKeybinds",
+      "type": "function",
+      "name": "footerKeybinds",
+      "filePath": "packages/opencode/src/cli/cmd/run/runtime.boot.ts",
+      "lineRange": [
+        89,
+        106
+      ],
+      "summary": "Maps TUI keybind configuration into the footer's keybinding structure with leader defaults.",
+      "tags": [
+        "configuration",
+        "keybinding",
+        "startup"
+      ],
+      "complexity": "simple"
+    }
+  ],
+  "edges": [
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/footer.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/footer.ts:eventPatch",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/footer.ts",
+      "target": "class:packages/opencode/src/cli/cmd/run/footer.ts:RunFooter",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/footer.ts",
+      "target": "class:packages/opencode/src/cli/cmd/run/footer.ts:RunFooter",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/footer.ts",
+      "target": "file:packages/opencode/src/cli/cmd/run/otel.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/footer.ts",
+      "target": "file:packages/opencode/src/cli/cmd/run/footer.command.tsx",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/footer.ts",
+      "target": "file:packages/opencode/src/cli/cmd/run/footer.subagent.tsx",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/footer.ts",
+      "target": "file:packages/opencode/src/cli/cmd/run/footer.prompt.tsx",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/footer.ts",
+      "target": "file:packages/opencode/src/cli/cmd/run/prompt.shared.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/footer.ts",
+      "target": "file:packages/opencode/src/cli/cmd/run/footer.shared.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/footer.ts",
+      "target": "file:packages/opencode/src/cli/cmd/run/footer.view.tsx",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/footer.view.tsx",
+      "target": "function:packages/opencode/src/cli/cmd/run/footer.view.tsx:RunFooterView",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/footer.view.tsx",
+      "target": "function:packages/opencode/src/cli/cmd/run/footer.view.tsx:RunFooterView",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/footer.view.tsx",
+      "target": "file:packages/opencode/src/cli/cmd/run/footer.command.tsx",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/footer.view.tsx",
+      "target": "file:packages/opencode/src/cli/cmd/run/footer.menu.tsx",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/footer.view.tsx",
+      "target": "file:packages/opencode/src/cli/cmd/run/footer.subagent.tsx",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/footer.view.tsx",
+      "target": "file:packages/opencode/src/cli/cmd/run/footer.prompt.tsx",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/footer.view.tsx",
+      "target": "file:packages/opencode/src/cli/cmd/run/footer.permission.tsx",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/footer.view.tsx",
+      "target": "file:packages/opencode/src/cli/cmd/run/footer.question.tsx",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/footer.view.tsx",
+      "target": "file:packages/opencode/src/cli/cmd/run/prompt.shared.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "function:packages/opencode/src/cli/cmd/run/footer.view.tsx:RunFooterView",
+      "target": "function:packages/opencode/src/cli/cmd/run/footer.command.tsx:RunCommandMenuBody",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "function:packages/opencode/src/cli/cmd/run/footer.view.tsx:RunFooterView",
+      "target": "function:packages/opencode/src/cli/cmd/run/footer.command.tsx:RunVariantSelectBody",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "function:packages/opencode/src/cli/cmd/run/footer.view.tsx:RunFooterView",
+      "target": "function:packages/opencode/src/cli/cmd/run/footer.command.tsx:RunModelSelectBody",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "function:packages/opencode/src/cli/cmd/run/footer.view.tsx:RunFooterView",
+      "target": "function:packages/opencode/src/cli/cmd/run/footer.menu.tsx:RunFooterMenu",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "function:packages/opencode/src/cli/cmd/run/footer.view.tsx:RunFooterView",
+      "target": "function:packages/opencode/src/cli/cmd/run/footer.subagent.tsx:RunFooterSubagentTabs",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "function:packages/opencode/src/cli/cmd/run/footer.view.tsx:RunFooterView",
+      "target": "function:packages/opencode/src/cli/cmd/run/footer.subagent.tsx:RunFooterSubagentBody",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "function:packages/opencode/src/cli/cmd/run/footer.view.tsx:RunFooterView",
+      "target": "function:packages/opencode/src/cli/cmd/run/prompt/prompt-state.tsx:RunPromptBody",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "function:packages/opencode/src/cli/cmd/run/footer.view.tsx:RunFooterView",
+      "target": "function:packages/opencode/src/cli/cmd/run/footer.permission.tsx:RunPermissionBody",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "function:packages/opencode/src/cli/cmd/run/footer.view.tsx:RunFooterView",
+      "target": "function:packages/opencode/src/cli/cmd/run/footer.question.tsx:RunQuestionBody",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/keymap.shared.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/keymap.shared.ts:createParser",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/keymap.shared.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/keymap.shared.ts:parseBindings",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/keymap.shared.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/keymap.shared.ts:parseBindings",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/otel.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/otel.ts:withRunSpan",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/otel.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/otel.ts:withRunSpan",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/permission.shared.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/permission.shared.ts:createPermissionBodyState",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/permission.shared.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/permission.shared.ts:permissionOptions",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/permission.shared.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/permission.shared.ts:permissionInfo",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/permission.shared.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/permission.shared.ts:permissionAlwaysLines",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/permission.shared.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/permission.shared.ts:permissionShift",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/permission.shared.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/permission.shared.ts:permissionRun",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/permission.shared.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/permission.shared.ts:permissionEscape",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/permission.shared.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/permission.shared.ts:createPermissionBodyState",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/permission.shared.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/permission.shared.ts:permissionOptions",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/permission.shared.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/permission.shared.ts:permissionInfo",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/permission.shared.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/permission.shared.ts:permissionAlwaysLines",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/permission.shared.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/permission.shared.ts:permissionShift",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/permission.shared.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/permission.shared.ts:permissionRun",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/permission.shared.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/permission.shared.ts:permissionEscape",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/prompt.shared.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/prompt.shared.ts:promptInfo",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/prompt.shared.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/prompt.shared.ts:promptKey",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/prompt.shared.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/prompt.shared.ts:mapInputBindings",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/prompt.shared.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/prompt.shared.ts:promptKeys",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/prompt.shared.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/prompt.shared.ts:promptHit",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/prompt.shared.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/prompt.shared.ts:promptCycle",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/prompt.shared.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/prompt.shared.ts:createPromptHistory",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/prompt.shared.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/prompt.shared.ts:pushPromptHistory",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/prompt.shared.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/prompt.shared.ts:movePromptHistory",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/prompt.shared.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/prompt.shared.ts:promptInfo",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/prompt.shared.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/prompt.shared.ts:promptKeys",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/prompt.shared.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/prompt.shared.ts:promptHit",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/prompt.shared.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/prompt.shared.ts:promptCycle",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/prompt.shared.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/prompt.shared.ts:createPromptHistory",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/prompt.shared.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/prompt.shared.ts:pushPromptHistory",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/prompt.shared.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/prompt.shared.ts:movePromptHistory",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/prompt.shared.ts",
+      "target": "file:packages/opencode/src/cli/cmd/run/keymap.shared.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/prompt/autocomplete.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/prompt/autocomplete.ts:extractLineRange",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/prompt/autocomplete.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/prompt/autocomplete.ts:slashHead",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/prompt/autocomplete.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/prompt/autocomplete.ts:slashQuery",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/prompt/autocomplete.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/prompt/autocomplete.ts:extractLineRange",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/prompt/autocomplete.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/prompt/autocomplete.ts:slashHead",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/prompt/autocomplete.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/prompt/autocomplete.ts:slashQuery",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/prompt/parts.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/prompt/parts.ts:syncParts",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/prompt/parts.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/prompt/parts.ts:restoreParts",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/prompt/parts.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/prompt/parts.ts:insertMention",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/prompt/parts.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/prompt/parts.ts:syncParts",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/prompt/parts.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/prompt/parts.ts:restoreParts",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/prompt/parts.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/prompt/parts.ts:insertMention",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/prompt/prompt-state.tsx",
+      "target": "function:packages/opencode/src/cli/cmd/run/prompt/prompt-state.tsx:RunPromptBody",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/prompt/prompt-state.tsx",
+      "target": "function:packages/opencode/src/cli/cmd/run/prompt/prompt-state.tsx:createPromptState",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/prompt/prompt-state.tsx",
+      "target": "function:packages/opencode/src/cli/cmd/run/prompt/prompt-state.tsx:RunPromptBody",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/prompt/prompt-state.tsx",
+      "target": "function:packages/opencode/src/cli/cmd/run/prompt/prompt-state.tsx:createPromptState",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/prompt/prompt-state.tsx",
+      "target": "file:packages/opencode/src/cli/cmd/run/footer.menu.tsx",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/prompt/prompt-state.tsx",
+      "target": "file:packages/opencode/src/cli/cmd/run/prompt.shared.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/prompt/prompt-state.tsx",
+      "target": "file:packages/opencode/src/cli/cmd/run/prompt/autocomplete.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/prompt/prompt-state.tsx",
+      "target": "file:packages/opencode/src/cli/cmd/run/prompt/submit.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/prompt/prompt-state.tsx",
+      "target": "file:packages/opencode/src/cli/cmd/run/prompt/parts.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/prompt/submit.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/prompt/submit.ts:parseSlashCommand",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/prompt/submit.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/prompt/submit.ts:validateSubmit",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/prompt/submit.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/prompt/submit.ts:parseSlashCommand",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/prompt/submit.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/prompt/submit.ts:validateSubmit",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/prompt/submit.ts",
+      "target": "file:packages/opencode/src/cli/cmd/run/prompt.shared.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/prompt/submit.ts",
+      "target": "file:packages/opencode/src/cli/cmd/run/prompt/autocomplete.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/question.shared.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/question.shared.ts:createQuestionBodyState",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/question.shared.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/question.shared.ts:questionPick",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/question.shared.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/question.shared.ts:questionToggle",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/question.shared.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/question.shared.ts:questionMove",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/question.shared.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/question.shared.ts:questionSelect",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/question.shared.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/question.shared.ts:questionSave",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/question.shared.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/question.shared.ts:questionHint",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/question.shared.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/question.shared.ts:createQuestionBodyState",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/question.shared.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/question.shared.ts:questionPick",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/question.shared.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/question.shared.ts:questionToggle",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/question.shared.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/question.shared.ts:questionMove",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/question.shared.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/question.shared.ts:questionSelect",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/question.shared.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/question.shared.ts:questionSave",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/question.shared.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/question.shared.ts:questionHint",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:packages/opencode/src/cli/cmd/run/footer.question.tsx:RunQuestionBody",
+      "target": "function:packages/opencode/src/cli/cmd/run/question.shared.ts:questionSelect",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/runtime.boot.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/runtime.boot.ts:footerKeybinds",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/footer.prompt.tsx",
+      "target": "file:packages/opencode/src/cli/cmd/run/prompt/prompt-state.tsx",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    }
+  ]
+}

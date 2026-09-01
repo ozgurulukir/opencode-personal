@@ -1,0 +1,64 @@
+{
+  "nodes": [
+    {
+      "id": "document:packages/diff-wasm/AGENTS.md",
+      "type": "document",
+      "name": "AGENTS.md",
+      "filePath": "packages/diff-wasm/AGENTS.md",
+      "summary": "Agent instructions for the diff-wasm package, codifying the WASM fallback retry pattern (a permanent `wasmFailed` flag so failed imports skip straight to the JS fallback instead of resetting `wasmReady`) and the `as unknown as` type-cast convention used at the `formatPatch`/`applyPatch` boundaries with the `diff` library.",
+      "tags": ["documentation", "ai-instructions", "wasm", "coding-standards", "fallback-pattern"],
+      "complexity": "simple",
+      "languageNotes": "Illustrates the memoized-promise-with-permanent-failure-flag idiom: caching the rejected `wasmReady` promise prevents re-attempting a failed dynamic WASM import on every call."
+    },
+    {
+      "id": "config:packages/diff-wasm/Cargo.toml",
+      "type": "config",
+      "name": "Cargo.toml",
+      "filePath": "packages/diff-wasm/Cargo.toml",
+      "summary": "Rust crate manifest for `opencode-diff-rs` (the WASM diff engine behind the package), declaring dual `cdylib`/`rlib` crate types and the `similar`, `wasm-bindgen`, `serde`, and `serde-wasm-bindgen` dependencies used by the wasm-pack web build of `src/lib.rs`.",
+      "tags": ["configuration", "rust", "wasm", "build-system", "dependencies"],
+      "complexity": "simple",
+      "languageNotes": "crate-type = [\"cdylib\", \"rlib\"] lets the same crate compile to a loadable WASM module for wasm-pack and a plain Rust library for native builds and tests."
+    },
+    {
+      "id": "config:packages/diff-wasm/package.json",
+      "type": "config",
+      "name": "package.json",
+      "filePath": "packages/diff-wasm/package.json",
+      "summary": "Package manifest for `@opencode-ai/diff-wasm`, exposing `src/index.ts` directly as main/module/types entry, and providing the `build:wasm` wasm-pack script that generates the gitignored `pkg/` artifacts the bridge imports at runtime.",
+      "tags": ["configuration", "wasm", "build-system", "package-manifest"],
+      "complexity": "simple",
+      "languageNotes": "Exports raw `.ts` source (no build step) so workspace consumers resolve the live file, while the compiled output lives entirely in the gitignored `pkg/` directory."
+    }
+  ],
+  "edges": [
+    {
+      "source": "document:packages/diff-wasm/AGENTS.md",
+      "target": "file:packages/diff-wasm/src/index.ts",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "config:packages/diff-wasm/package.json",
+      "target": "file:packages/diff-wasm/src/index.ts",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "config:packages/diff-wasm/package.json",
+      "target": "config:packages/diff-wasm/Cargo.toml",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "config:packages/diff-wasm/Cargo.toml",
+      "target": "file:packages/diff-wasm/src/lib.rs",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    }
+  ]
+}

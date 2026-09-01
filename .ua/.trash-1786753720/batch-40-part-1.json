@@ -1,0 +1,1236 @@
+{
+ "nodes": [
+  {
+   "id": "file:packages/app/src/components/dialog-select-model.tsx",
+   "type": "file",
+   "name": "dialog-select-model.tsx",
+   "filePath": "packages/app/src/components/dialog-select-model.tsx",
+   "summary": "Model selection UI exporting both a DialogSelectModel dialog and a reusable ModelSelectorPopover, listing visible models grouped by popular providers with free-tier badges and shortcuts to connect a provider or manage models.",
+   "tags": [
+    "component",
+    "dialog",
+    "model-selection",
+    "solidjs"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:packages/app/src/components/dialog-select-model.tsx:ModelList",
+   "type": "function",
+   "name": "ModelList",
+   "filePath": "packages/app/src/components/dialog-select-model.tsx",
+   "lineRange": [
+    21,
+    86
+   ],
+   "summary": "Renders the filterable list of visible models, sorted by provider popularity and name, marking free models and highlighting the current selection.",
+   "tags": [
+    "component",
+    "list",
+    "model-selection"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:packages/app/src/components/dialog-select-model.tsx:ModelSelectorPopover",
+   "type": "function",
+   "name": "ModelSelectorPopover",
+   "filePath": "packages/app/src/components/dialog-select-model.tsx",
+   "lineRange": [
+    91,
+    197
+   ],
+   "summary": "Popover variant of the model picker that manages its own open/close store and routes to the manage-models and connect-provider dialogs via lazy dynamic imports.",
+   "tags": [
+    "component",
+    "popover",
+    "model-selection"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:packages/app/src/components/dialog-select-model.tsx:DialogSelectModel",
+   "type": "function",
+   "name": "DialogSelectModel",
+   "filePath": "packages/app/src/components/dialog-select-model.tsx",
+   "lineRange": [
+    199,
+    230
+   ],
+   "summary": "Dialog wrapper around the model list with actions to connect a provider and manage models via lazily imported dialogs.",
+   "tags": [
+    "component",
+    "dialog",
+    "model-selection"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "file:packages/app/src/components/dialog-select-provider.tsx",
+   "type": "file",
+   "name": "dialog-select-provider.tsx",
+   "filePath": "packages/app/src/components/dialog-select-provider.tsx",
+   "summary": "Provider selection dialog that lists configured and available providers split into popular and other groups, with entry points to connect a provider or configure a custom one.",
+   "tags": [
+    "component",
+    "dialog",
+    "provider-selection"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:packages/app/src/components/dialog-select-provider.tsx:DialogSelectProvider",
+   "type": "function",
+   "name": "DialogSelectProvider",
+   "filePath": "packages/app/src/components/dialog-select-provider.tsx",
+   "lineRange": [
+    14,
+    86
+   ],
+   "summary": "Renders the grouped provider list with localized labels and launches the connect-provider and custom-provider dialogs on selection.",
+   "tags": [
+    "component",
+    "dialog",
+    "provider-selection"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "file:packages/app/src/components/dialog-select-server.tsx",
+   "type": "file",
+   "name": "dialog-select-server.tsx",
+   "filePath": "packages/app/src/components/dialog-select-server.tsx",
+   "summary": "Self-hosted server manager dialog: lists configured server connections with live health polling, and provides add/edit forms with URL normalization, health preview, default-server selection, and removal — composed from local hooks (useDefaultServer, useServerPreview, useServerFormState, useServerMutations).",
+   "tags": [
+    "component",
+    "dialog",
+    "server-management",
+    "health-check",
+    "form"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "function:packages/app/src/components/dialog-select-server.tsx:useDefaultServer",
+   "type": "function",
+   "name": "useDefaultServer",
+   "filePath": "packages/app/src/components/dialog-select-server.tsx",
+   "lineRange": [
+    48,
+    76
+   ],
+   "summary": "Loads the platform's default server URL as a resource and exposes a setter that persists the default via platform.setDefaultServer.",
+   "tags": [
+    "hook",
+    "server-management",
+    "async"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "function:packages/app/src/components/dialog-select-server.tsx:useServerPreview",
+   "type": "function",
+   "name": "useServerPreview",
+   "filePath": "packages/app/src/components/dialog-select-server.tsx",
+   "lineRange": [
+    78,
+    108
+   ],
+   "summary": "Feeds the URL input through a health-check query, exposing a status signal (idle/checking/online/offline) for the form preview.",
+   "tags": [
+    "hook",
+    "health-check",
+    "validation"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:packages/app/src/components/dialog-select-server.tsx:useServerFormState",
+   "type": "function",
+   "name": "useServerFormState",
+   "filePath": "packages/app/src/components/dialog-select-server.tsx",
+   "lineRange": [
+    110,
+    282
+   ],
+   "summary": "Owns the add/edit form store with per-field change handlers, mode switching (view/add/edit), and derived form titles and labels for the server dialog.",
+   "tags": [
+    "hook",
+    "form",
+    "state-management"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "function:packages/app/src/components/dialog-select-server.tsx:useServerMutations",
+   "type": "function",
+   "name": "useServerMutations",
+   "filePath": "packages/app/src/components/dialog-select-server.tsx",
+   "lineRange": [
+    284,
+    407
+   ],
+   "summary": "Wraps add/edit/remove server operations in mutations, validating names, health-checking before submit, and swapping the active connection key atomically when editing.",
+   "tags": [
+    "hook",
+    "mutations",
+    "server-management"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "function:packages/app/src/components/dialog-select-server.tsx:ServerForm",
+   "type": "function",
+   "name": "ServerForm",
+   "filePath": "packages/app/src/components/dialog-select-server.tsx",
+   "lineRange": [
+    409,
+    472
+   ],
+   "summary": "Controlled add/edit form UI for a server connection with Escape/Enter keyboard handling and localized field labels.",
+   "tags": [
+    "component",
+    "form"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:packages/app/src/components/dialog-select-server.tsx:DialogSelectServer",
+   "type": "function",
+   "name": "DialogSelectServer",
+   "filePath": "packages/app/src/components/dialog-select-server.tsx",
+   "lineRange": [
+    474,
+    733
+   ],
+   "summary": "Main server-selection dialog: ranks and sorts connections, polls health on an interval, reconciles status results, and wires select/edit/remove/set-default actions.",
+   "tags": [
+    "component",
+    "dialog",
+    "server-management"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "file:packages/app/src/components/dialog-settings.tsx",
+   "type": "file",
+   "name": "dialog-settings.tsx",
+   "filePath": "packages/app/src/components/dialog-settings.tsx",
+   "summary": "Settings dialog shell that hosts tabbed settings pages (general, keybinds, providers, models) delegated to sibling settings-* components.",
+   "tags": [
+    "component",
+    "dialog",
+    "settings",
+    "tabs"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:packages/app/src/components/dialog-settings.tsx:DialogSettings",
+   "type": "function",
+   "name": "DialogSettings",
+   "filePath": "packages/app/src/components/dialog-settings.tsx",
+   "lineRange": [
+    12,
+    73
+   ],
+   "summary": "Renders the tabbed settings dialog, delegating each tab to a dedicated settings pane component.",
+   "tags": [
+    "component",
+    "settings",
+    "tabs"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "file:packages/app/src/components/file-tree.tsx",
+   "type": "file",
+   "name": "file-tree.tsx",
+   "filePath": "packages/app/src/components/file-tree.tsx",
+   "summary": "File tree explorer over the file store's tree state, supporting filter-driven expansion effects, deduped/sorted node assembly, drag-and-drop of files with custom drag images, and per-node change-kind badges.",
+   "tags": [
+    "component",
+    "file-tree",
+    "drag-and-drop",
+    "explorer"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "function:packages/app/src/components/file-tree.tsx:normalizePath",
+   "type": "function",
+   "name": "normalizePath",
+   "filePath": "packages/app/src/components/file-tree.tsx",
+   "lineRange": [
+    29,
+    31
+   ],
+   "summary": "Normalizes a path with the file context's normalize helper, stripping trailing separators and swapping backslashes for forward slashes.",
+   "tags": [
+    "utility",
+    "path"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "function:packages/app/src/components/file-tree.tsx:buildFilter",
+   "type": "function",
+   "name": "buildFilter",
+   "filePath": "packages/app/src/components/file-tree.tsx",
+   "lineRange": [
+    37,
+    59
+   ],
+   "summary": "Computes the visible file/dir sets for a filter key, including ancestor directories of allowed files so they remain reachable in the tree.",
+   "tags": [
+    "utility",
+    "filter",
+    "file-tree"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:packages/app/src/components/file-tree.tsx:shouldListRoot",
+   "type": "function",
+   "name": "shouldListRoot",
+   "filePath": "packages/app/src/components/file-tree.tsx",
+   "lineRange": [
+    68,
+    73
+   ],
+   "summary": "Decides whether the root directory should be listed given the active filter.",
+   "tags": [
+    "utility",
+    "predicate"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "function:packages/app/src/components/file-tree.tsx:shouldListExpanded",
+   "type": "function",
+   "name": "shouldListExpanded",
+   "filePath": "packages/app/src/components/file-tree.tsx",
+   "lineRange": [
+    75,
+    84
+   ],
+   "summary": "Decides whether expanded directories should be listed given the active filter.",
+   "tags": [
+    "utility",
+    "predicate"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "function:packages/app/src/components/file-tree.tsx:dirsToExpand",
+   "type": "function",
+   "name": "dirsToExpand",
+   "filePath": "packages/app/src/components/file-tree.tsx",
+   "lineRange": [
+    86,
+    94
+   ],
+   "summary": "Derives the set of directories that must be expanded to reveal filtered files, excluding those already expanded.",
+   "tags": [
+    "utility",
+    "file-tree"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "function:packages/app/src/components/file-tree.tsx:buildDragImage",
+   "type": "function",
+   "name": "buildDragImage",
+   "filePath": "packages/app/src/components/file-tree.tsx",
+   "lineRange": [
+    121,
+    133
+   ],
+   "summary": "Clones the node's icon and label into an offscreen element to use as a custom drag image.",
+   "tags": [
+    "utility",
+    "drag-and-drop",
+    "dom"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:packages/app/src/components/file-tree.tsx:FileTreeNode",
+   "type": "function",
+   "name": "FileTreeNode",
+   "filePath": "packages/app/src/components/file-tree.tsx",
+   "lineRange": [
+    143,
+    224
+   ],
+   "summary": "Recursive tree row rendering indentation, kind badge or dot, active state, and wiring drag start with the file:// data-transfer payload.",
+   "tags": [
+    "component",
+    "tree",
+    "drag-and-drop"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:packages/app/src/components/file-tree.tsx:FileTree",
+   "type": "function",
+   "name": "FileTree",
+   "filePath": "packages/app/src/components/file-tree.tsx",
+   "lineRange": [
+    226,
+    532
+   ],
+   "summary": "Root component wiring the file store, filter expansion effects, filtered node-list assembly with dedupe and sorting, and rendering of the recursive node tree.",
+   "tags": [
+    "component",
+    "file-tree",
+    "explorer"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "file:packages/app/src/components/link.tsx",
+   "type": "file",
+   "name": "link.tsx",
+   "filePath": "packages/app/src/components/link.tsx",
+   "summary": "Anchor component for external links that intercepts clicks and delegates opening to the platform layer (platform.openLink) instead of native browser navigation.",
+   "tags": [
+    "component",
+    "link",
+    "platform"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "function:packages/app/src/components/link.tsx:Link",
+   "type": "function",
+   "name": "Link",
+   "filePath": "packages/app/src/components/link.tsx",
+   "lineRange": [
+    8,
+    26
+   ],
+   "summary": "Renders an anchor that preventDefaults clicks and forwards the URL to platform.openLink for OS-level opening.",
+   "tags": [
+    "component",
+    "link"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "file:packages/app/src/components/model-tooltip.tsx",
+   "type": "file",
+   "name": "model-tooltip.tsx",
+   "filePath": "packages/app/src/components/model-tooltip.tsx",
+   "summary": "Tooltip showing model metadata — context window limit, heuristic provider attribution via name regexes (Claude/GPT/Gemini/Grok/Llama), and other formatted model fields.",
+   "tags": [
+    "component",
+    "tooltip",
+    "model-metadata"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:packages/app/src/components/model-tooltip.tsx:ModelTooltip",
+   "type": "function",
+   "name": "ModelTooltip",
+   "filePath": "packages/app/src/components/model-tooltip.tsx",
+   "lineRange": [
+    26,
+    91
+   ],
+   "summary": "Builds the tooltip content: detects the model family by regex over the model id/name and lists the context limit plus other non-empty metadata fields.",
+   "tags": [
+    "component",
+    "tooltip"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "file:packages/app/src/components/prompt-input.tsx",
+   "type": "file",
+   "name": "prompt-input.tsx",
+   "filePath": "packages/app/src/components/prompt-input.tsx",
+   "summary": "The central message composer (~1600 lines): a contenteditable prompt editor with attachment and paste handling, slash-command and @-mention popovers, image previews, prompt history navigation, model/agent selectors, comment mentions, and submit wiring — composed from the prompt-input/* helper modules.",
+   "tags": [
+    "component",
+    "composer",
+    "prompt-input",
+    "editor"
+   ],
+   "complexity": "complex",
+   "languageNotes": "A single giant SolidJS component (PromptInput spans ~1500 lines) that delegates concerns to sibling modules in prompt-input/ via factory functions (createPromptAttachments, createPromptSubmit) — an extraction-ready orchestrator pattern."
+  },
+  {
+   "id": "function:packages/app/src/components/prompt-input.tsx:PromptInput",
+   "type": "function",
+   "name": "PromptInput",
+   "filePath": "packages/app/src/components/prompt-input.tsx",
+   "lineRange": [
+    105,
+    1623
+   ],
+   "summary": "Monolithic composer component managing the contenteditable editor, cursor scrolling, keyboard routing, context items, attachments, history navigation, autocomplete popovers, and the send/abort controls.",
+   "tags": [
+    "component",
+    "composer",
+    "editor"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "file:packages/app/src/components/prompt-input/attachments.ts",
+   "type": "file",
+   "name": "attachments.ts",
+   "filePath": "packages/app/src/components/prompt-input/attachments.ts",
+   "summary": "Factory (createPromptAttachments) building the composer's attachment subsystem: converts files to data URLs, validates MIME types, handles clipboard paste and drag-drop of files/text/opencode URLs, and inserts attachment parts at the editor cursor.",
+   "tags": [
+    "utility",
+    "attachments",
+    "clipboard",
+    "drag-and-drop",
+    "factory"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:packages/app/src/components/prompt-input/attachments.ts:dataUrl",
+   "type": "function",
+   "name": "dataUrl",
+   "filePath": "packages/app/src/components/prompt-input/attachments.ts",
+   "lineRange": [
+    11,
+    26
+   ],
+   "summary": "Reads a File as a data URL via FileReader, returning only the base64 payload.",
+   "tags": [
+    "utility",
+    "file",
+    "serialization"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "function:packages/app/src/components/prompt-input/attachments.ts:createPromptAttachments",
+   "type": "function",
+   "name": "createPromptAttachments",
+   "filePath": "packages/app/src/components/prompt-input/attachments.ts",
+   "lineRange": [
+    37,
+    196
+   ],
+   "summary": "Creates the attachment controller: add/remove attachment parts, a paste listener with clipboard image extraction, drag-state handling, and editor insertion with focus restoration.",
+   "tags": [
+    "factory",
+    "attachments",
+    "event-handler"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "file:packages/app/src/components/prompt-input/build-request-parts.ts",
+   "type": "file",
+   "name": "build-request-parts.ts",
+   "filePath": "packages/app/src/components/prompt-input/build-request-parts.ts",
+   "summary": "Transforms prompt state into SDK request parts: file and agent attachments become file parts, comment mentions are parsed into metadata, images become image parts, and optimistic mirror parts are built for immediate UI echo.",
+   "tags": [
+    "utility",
+    "serialization",
+    "request-building",
+    "prompt-input"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:packages/app/src/components/prompt-input/build-request-parts.ts:toOptimisticPart",
+   "type": "function",
+   "name": "toOptimisticPart",
+   "filePath": "packages/app/src/components/prompt-input/build-request-parts.ts",
+   "lineRange": [
+    55,
+    89
+   ],
+   "summary": "Converts a request part into its optimistic UI counterpart with a synthetic message id and timestamp.",
+   "tags": [
+    "utility",
+    "serialization",
+    "optimistic-ui"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:packages/app/src/components/prompt-input/build-request-parts.ts:buildRequestParts",
+   "type": "function",
+   "name": "buildRequestParts",
+   "filePath": "packages/app/src/components/prompt-input/build-request-parts.ts",
+   "lineRange": [
+    91,
+    201
+   ],
+   "summary": "Assembles the ordered request part array (file parts, agent parts, comment mentions, text, images) from prompt and context state.",
+   "tags": [
+    "utility",
+    "request-building",
+    "serialization"
+   ],
+   "complexity": "complex"
+  },
+  {
+   "id": "file:packages/app/src/components/prompt-input/context-items.tsx",
+   "type": "file",
+   "name": "context-items.tsx",
+   "filePath": "packages/app/src/components/prompt-input/context-items.tsx",
+   "summary": "Renders the removable chips above the composer for attached context items (files, directories, agents, comments) with file icons and tooltips.",
+   "tags": [
+    "component",
+    "context-items",
+    "chips"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "function:packages/app/src/components/prompt-input/context-items.tsx:PromptContextItems",
+   "type": "function",
+   "name": "PromptContextItems",
+   "filePath": "packages/app/src/components/prompt-input/context-items.tsx",
+   "lineRange": [
+    18,
+    88
+   ],
+   "summary": "Maps prompt context entries to chip rows with icon, truncated filename or directory label, and a remove button that stops event propagation.",
+   "tags": [
+    "component",
+    "chips"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "file:packages/app/src/components/prompt-input/detectCommand.ts",
+   "type": "file",
+   "name": "detectCommand.ts",
+   "filePath": "packages/app/src/components/prompt-input/detectCommand.ts",
+   "summary": "Detects a slash command at the start of prompt text, returning its name, raw text, and remaining arguments when the command exists in the known command list.",
+   "tags": [
+    "utility",
+    "command",
+    "parsing"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "function:packages/app/src/components/prompt-input/detectCommand.ts:detectCommand",
+   "type": "function",
+   "name": "detectCommand",
+   "filePath": "packages/app/src/components/prompt-input/detectCommand.ts",
+   "lineRange": [
+    7,
+    13
+   ],
+   "summary": "Parses leading /command syntax and matches it against the known commands, returning name/arguments/raw or undefined.",
+   "tags": [
+    "utility",
+    "parsing",
+    "command"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "file:packages/app/src/components/prompt-input/drag-overlay.tsx",
+   "type": "file",
+   "name": "drag-overlay.tsx",
+   "filePath": "packages/app/src/components/prompt-input/drag-overlay.tsx",
+   "summary": "Overlay shown while dragging files over the composer, indicating the active drop zone.",
+   "tags": [
+    "component",
+    "drag-and-drop",
+    "overlay"
+   ],
+   "complexity": "simple"
+  },
+  {
+   "id": "function:packages/app/src/components/prompt-input/drag-overlay.tsx:PromptDragOverlay",
+   "type": "function",
+   "name": "PromptDragOverlay",
+   "filePath": "packages/app/src/components/prompt-input/drag-overlay.tsx",
+   "lineRange": [
+    14,
+    25
+   ],
+   "summary": "Renders the drop-zone overlay element for the prompt input.",
+   "tags": [
+    "component",
+    "overlay"
+   ],
+   "complexity": "simple"
+  }
+ ],
+ "edges": [
+  {
+   "source": "file:packages/app/src/components/dialog-select-model.tsx",
+   "target": "function:packages/app/src/components/dialog-select-model.tsx:ModelList",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1
+  },
+  {
+   "source": "file:packages/app/src/components/dialog-select-model.tsx",
+   "target": "function:packages/app/src/components/dialog-select-model.tsx:ModelSelectorPopover",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1
+  },
+  {
+   "source": "file:packages/app/src/components/dialog-select-model.tsx",
+   "target": "function:packages/app/src/components/dialog-select-model.tsx:DialogSelectModel",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1
+  },
+  {
+   "source": "file:packages/app/src/components/dialog-select-provider.tsx",
+   "target": "function:packages/app/src/components/dialog-select-provider.tsx:DialogSelectProvider",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1
+  },
+  {
+   "source": "file:packages/app/src/components/dialog-select-server.tsx",
+   "target": "function:packages/app/src/components/dialog-select-server.tsx:useDefaultServer",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1
+  },
+  {
+   "source": "file:packages/app/src/components/dialog-select-server.tsx",
+   "target": "function:packages/app/src/components/dialog-select-server.tsx:useServerPreview",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1
+  },
+  {
+   "source": "file:packages/app/src/components/dialog-select-server.tsx",
+   "target": "function:packages/app/src/components/dialog-select-server.tsx:useServerFormState",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1
+  },
+  {
+   "source": "file:packages/app/src/components/dialog-select-server.tsx",
+   "target": "function:packages/app/src/components/dialog-select-server.tsx:useServerMutations",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1
+  },
+  {
+   "source": "file:packages/app/src/components/dialog-select-server.tsx",
+   "target": "function:packages/app/src/components/dialog-select-server.tsx:ServerForm",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1
+  },
+  {
+   "source": "file:packages/app/src/components/dialog-select-server.tsx",
+   "target": "function:packages/app/src/components/dialog-select-server.tsx:DialogSelectServer",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1
+  },
+  {
+   "source": "file:packages/app/src/components/dialog-settings.tsx",
+   "target": "function:packages/app/src/components/dialog-settings.tsx:DialogSettings",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1
+  },
+  {
+   "source": "file:packages/app/src/components/file-tree.tsx",
+   "target": "function:packages/app/src/components/file-tree.tsx:normalizePath",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1
+  },
+  {
+   "source": "file:packages/app/src/components/file-tree.tsx",
+   "target": "function:packages/app/src/components/file-tree.tsx:buildFilter",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1
+  },
+  {
+   "source": "file:packages/app/src/components/file-tree.tsx",
+   "target": "function:packages/app/src/components/file-tree.tsx:shouldListRoot",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1
+  },
+  {
+   "source": "file:packages/app/src/components/file-tree.tsx",
+   "target": "function:packages/app/src/components/file-tree.tsx:shouldListExpanded",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1
+  },
+  {
+   "source": "file:packages/app/src/components/file-tree.tsx",
+   "target": "function:packages/app/src/components/file-tree.tsx:dirsToExpand",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1
+  },
+  {
+   "source": "file:packages/app/src/components/file-tree.tsx",
+   "target": "function:packages/app/src/components/file-tree.tsx:buildDragImage",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1
+  },
+  {
+   "source": "file:packages/app/src/components/file-tree.tsx",
+   "target": "function:packages/app/src/components/file-tree.tsx:FileTreeNode",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1
+  },
+  {
+   "source": "file:packages/app/src/components/file-tree.tsx",
+   "target": "function:packages/app/src/components/file-tree.tsx:FileTree",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1
+  },
+  {
+   "source": "file:packages/app/src/components/link.tsx",
+   "target": "function:packages/app/src/components/link.tsx:Link",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1
+  },
+  {
+   "source": "file:packages/app/src/components/model-tooltip.tsx",
+   "target": "function:packages/app/src/components/model-tooltip.tsx:ModelTooltip",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1
+  },
+  {
+   "source": "file:packages/app/src/components/prompt-input.tsx",
+   "target": "function:packages/app/src/components/prompt-input.tsx:PromptInput",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1
+  },
+  {
+   "source": "file:packages/app/src/components/prompt-input/attachments.ts",
+   "target": "function:packages/app/src/components/prompt-input/attachments.ts:dataUrl",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1
+  },
+  {
+   "source": "file:packages/app/src/components/prompt-input/attachments.ts",
+   "target": "function:packages/app/src/components/prompt-input/attachments.ts:createPromptAttachments",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1
+  },
+  {
+   "source": "file:packages/app/src/components/prompt-input/build-request-parts.ts",
+   "target": "function:packages/app/src/components/prompt-input/build-request-parts.ts:toOptimisticPart",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1
+  },
+  {
+   "source": "file:packages/app/src/components/prompt-input/build-request-parts.ts",
+   "target": "function:packages/app/src/components/prompt-input/build-request-parts.ts:buildRequestParts",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1
+  },
+  {
+   "source": "file:packages/app/src/components/prompt-input/context-items.tsx",
+   "target": "function:packages/app/src/components/prompt-input/context-items.tsx:PromptContextItems",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1
+  },
+  {
+   "source": "file:packages/app/src/components/prompt-input/detectCommand.ts",
+   "target": "function:packages/app/src/components/prompt-input/detectCommand.ts:detectCommand",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1
+  },
+  {
+   "source": "file:packages/app/src/components/prompt-input/drag-overlay.tsx",
+   "target": "function:packages/app/src/components/prompt-input/drag-overlay.tsx:PromptDragOverlay",
+   "type": "contains",
+   "direction": "forward",
+   "weight": 1
+  },
+  {
+   "source": "file:packages/app/src/components/dialog-select-model.tsx",
+   "target": "function:packages/app/src/components/dialog-select-model.tsx:ModelSelectorPopover",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:packages/app/src/components/dialog-select-model.tsx",
+   "target": "function:packages/app/src/components/dialog-select-model.tsx:DialogSelectModel",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:packages/app/src/components/dialog-select-provider.tsx",
+   "target": "function:packages/app/src/components/dialog-select-provider.tsx:DialogSelectProvider",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:packages/app/src/components/dialog-select-server.tsx",
+   "target": "function:packages/app/src/components/dialog-select-server.tsx:DialogSelectServer",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:packages/app/src/components/dialog-settings.tsx",
+   "target": "function:packages/app/src/components/dialog-settings.tsx:DialogSettings",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:packages/app/src/components/file-tree.tsx",
+   "target": "function:packages/app/src/components/file-tree.tsx:normalizePath",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:packages/app/src/components/file-tree.tsx",
+   "target": "function:packages/app/src/components/file-tree.tsx:buildFilter",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:packages/app/src/components/file-tree.tsx",
+   "target": "function:packages/app/src/components/file-tree.tsx:shouldListRoot",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:packages/app/src/components/file-tree.tsx",
+   "target": "function:packages/app/src/components/file-tree.tsx:shouldListExpanded",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:packages/app/src/components/file-tree.tsx",
+   "target": "function:packages/app/src/components/file-tree.tsx:dirsToExpand",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:packages/app/src/components/file-tree.tsx",
+   "target": "function:packages/app/src/components/file-tree.tsx:FileTree",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:packages/app/src/components/link.tsx",
+   "target": "function:packages/app/src/components/link.tsx:Link",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:packages/app/src/components/model-tooltip.tsx",
+   "target": "function:packages/app/src/components/model-tooltip.tsx:ModelTooltip",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:packages/app/src/components/prompt-input.tsx",
+   "target": "function:packages/app/src/components/prompt-input.tsx:PromptInput",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:packages/app/src/components/prompt-input/attachments.ts",
+   "target": "function:packages/app/src/components/prompt-input/attachments.ts:createPromptAttachments",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:packages/app/src/components/prompt-input/build-request-parts.ts",
+   "target": "function:packages/app/src/components/prompt-input/build-request-parts.ts:buildRequestParts",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:packages/app/src/components/prompt-input/context-items.tsx",
+   "target": "function:packages/app/src/components/prompt-input/context-items.tsx:PromptContextItems",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:packages/app/src/components/prompt-input/detectCommand.ts",
+   "target": "function:packages/app/src/components/prompt-input/detectCommand.ts:detectCommand",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:packages/app/src/components/prompt-input/drag-overlay.tsx",
+   "target": "function:packages/app/src/components/prompt-input/drag-overlay.tsx:PromptDragOverlay",
+   "type": "exports",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "file:packages/app/src/components/prompt-input.tsx",
+   "target": "file:packages/app/src/components/dialog-select-model.tsx",
+   "type": "depends_on",
+   "direction": "forward",
+   "weight": 0.6
+  },
+  {
+   "source": "file:packages/app/src/components/prompt-input.tsx",
+   "target": "file:packages/app/src/components/prompt-input/attachments.ts",
+   "type": "depends_on",
+   "direction": "forward",
+   "weight": 0.6
+  },
+  {
+   "source": "file:packages/app/src/components/prompt-input.tsx",
+   "target": "file:packages/app/src/components/prompt-input/context-items.tsx",
+   "type": "depends_on",
+   "direction": "forward",
+   "weight": 0.6
+  },
+  {
+   "source": "file:packages/app/src/components/prompt-input.tsx",
+   "target": "file:packages/app/src/components/prompt-input/drag-overlay.tsx",
+   "type": "depends_on",
+   "direction": "forward",
+   "weight": 0.6
+  },
+  {
+   "source": "file:packages/app/src/components/prompt-input.tsx",
+   "target": "file:packages/app/src/components/prompt-input/editor-dom.ts",
+   "type": "depends_on",
+   "direction": "forward",
+   "weight": 0.6
+  },
+  {
+   "source": "file:packages/app/src/components/prompt-input.tsx",
+   "target": "file:packages/app/src/components/prompt-input/files.ts",
+   "type": "depends_on",
+   "direction": "forward",
+   "weight": 0.6
+  },
+  {
+   "source": "file:packages/app/src/components/prompt-input.tsx",
+   "target": "file:packages/app/src/components/prompt-input/history.ts",
+   "type": "depends_on",
+   "direction": "forward",
+   "weight": 0.6
+  },
+  {
+   "source": "file:packages/app/src/components/prompt-input.tsx",
+   "target": "file:packages/app/src/components/prompt-input/image-attachments.tsx",
+   "type": "depends_on",
+   "direction": "forward",
+   "weight": 0.6
+  },
+  {
+   "source": "file:packages/app/src/components/prompt-input.tsx",
+   "target": "file:packages/app/src/components/prompt-input/placeholder.ts",
+   "type": "depends_on",
+   "direction": "forward",
+   "weight": 0.6
+  },
+  {
+   "source": "file:packages/app/src/components/prompt-input.tsx",
+   "target": "file:packages/app/src/components/prompt-input/sendFollowupDraft.ts",
+   "type": "depends_on",
+   "direction": "forward",
+   "weight": 0.6
+  },
+  {
+   "source": "file:packages/app/src/components/prompt-input.tsx",
+   "target": "file:packages/app/src/components/prompt-input/slash-popover.tsx",
+   "type": "depends_on",
+   "direction": "forward",
+   "weight": 0.6
+  },
+  {
+   "source": "file:packages/app/src/components/prompt-input.tsx",
+   "target": "file:packages/app/src/components/prompt-input/submit.ts",
+   "type": "depends_on",
+   "direction": "forward",
+   "weight": 0.6
+  },
+  {
+   "source": "file:packages/app/src/components/prompt-input/attachments.ts",
+   "target": "file:packages/app/src/components/prompt-input/editor-dom.ts",
+   "type": "depends_on",
+   "direction": "forward",
+   "weight": 0.6
+  },
+  {
+   "source": "file:packages/app/src/components/prompt-input/attachments.ts",
+   "target": "file:packages/app/src/components/prompt-input/files.ts",
+   "type": "depends_on",
+   "direction": "forward",
+   "weight": 0.6
+  },
+  {
+   "source": "file:packages/app/src/components/prompt-input/attachments.ts",
+   "target": "file:packages/app/src/components/prompt-input/paste.ts",
+   "type": "depends_on",
+   "direction": "forward",
+   "weight": 0.6
+  },
+  {
+   "source": "file:packages/app/src/components/dialog-select-model.tsx",
+   "target": "file:packages/app/src/components/model-tooltip.tsx",
+   "type": "depends_on",
+   "direction": "forward",
+   "weight": 0.6
+  },
+  {
+   "source": "function:packages/app/src/components/prompt-input.tsx:PromptInput",
+   "target": "function:packages/app/src/components/dialog-select-model.tsx:ModelSelectorPopover",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "function:packages/app/src/components/prompt-input.tsx:PromptInput",
+   "target": "function:packages/app/src/components/prompt-input/attachments.ts:createPromptAttachments",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "function:packages/app/src/components/prompt-input.tsx:PromptInput",
+   "target": "function:packages/app/src/components/prompt-input/submit.ts:createPromptSubmit",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "function:packages/app/src/components/prompt-input.tsx:PromptInput",
+   "target": "function:packages/app/src/components/prompt-input/history.ts:navigatePromptHistory",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "function:packages/app/src/components/prompt-input.tsx:PromptInput",
+   "target": "function:packages/app/src/components/prompt-input/history.ts:prependHistoryEntry",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "function:packages/app/src/components/prompt-input.tsx:PromptInput",
+   "target": "function:packages/app/src/components/prompt-input/placeholder.ts:promptPlaceholder",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "function:packages/app/src/components/prompt-input.tsx:PromptInput",
+   "target": "function:packages/app/src/components/prompt-input/editor-dom.ts:getCursorPosition",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "function:packages/app/src/components/prompt-input.tsx:PromptInput",
+   "target": "function:packages/app/src/components/prompt-input/editor-dom.ts:setCursorPosition",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "function:packages/app/src/components/prompt-input.tsx:PromptInput",
+   "target": "function:packages/app/src/components/prompt-input/context-items.tsx:PromptContextItems",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "function:packages/app/src/components/prompt-input.tsx:PromptInput",
+   "target": "function:packages/app/src/components/prompt-input/image-attachments.tsx:PromptImageAttachments",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "function:packages/app/src/components/prompt-input.tsx:PromptInput",
+   "target": "function:packages/app/src/components/prompt-input/drag-overlay.tsx:PromptDragOverlay",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "function:packages/app/src/components/prompt-input.tsx:PromptInput",
+   "target": "function:packages/app/src/components/prompt-input/slash-popover.tsx:PromptPopover",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "function:packages/app/src/components/dialog-select-model.tsx:ModelList",
+   "target": "function:packages/app/src/components/model-tooltip.tsx:ModelTooltip",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "function:packages/app/src/components/prompt-input/attachments.ts:createPromptAttachments",
+   "target": "function:packages/app/src/components/prompt-input/editor-dom.ts:getCursorPosition",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "function:packages/app/src/components/prompt-input/attachments.ts:createPromptAttachments",
+   "target": "function:packages/app/src/components/prompt-input/files.ts:attachmentMime",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "function:packages/app/src/components/prompt-input/attachments.ts:createPromptAttachments",
+   "target": "function:packages/app/src/components/prompt-input/paste.ts:normalizePaste",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  },
+  {
+   "source": "function:packages/app/src/components/prompt-input/attachments.ts:createPromptAttachments",
+   "target": "function:packages/app/src/components/prompt-input/paste.ts:pasteMode",
+   "type": "calls",
+   "direction": "forward",
+   "weight": 0.8
+  }
+ ]
+}
