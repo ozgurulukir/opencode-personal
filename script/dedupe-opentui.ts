@@ -12,20 +12,18 @@ const packages = ["core", "keymap", "solid"]
 
 async function relink(target: string, linkPath: string) {
   try {
-    await readlink(target)
-  } catch {
-    // Root link doesn't exist; nothing to dedupe to.
-    return
+    const current = await readlink(linkPath)
+    const resolvedCurrent = path.resolve(path.dirname(linkPath), current)
+    if (resolvedCurrent === path.resolve(target)) return
+    await unlink(linkPath)
+  } catch (error) {
+    // Leave real directories/files untouched. Only a missing link may be
+    // replaced; this script must never remove an installed package tree.
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") return
   }
 
-  const relativeTarget = path.relative(path.dirname(linkPath), target)
-
-  try {
-    await unlink(linkPath)
-  } catch {}
-
   await mkdir(path.dirname(linkPath), { recursive: true })
-  await symlink(relativeTarget, linkPath)
+  await symlink(path.relative(path.dirname(linkPath), target), linkPath)
 }
 
 // Find all package subdirectories under packages/ that contain node_modules/@opentui
