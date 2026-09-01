@@ -210,7 +210,7 @@ try {
       show(out)
     })
   } else {
-    await cli.parse()
+    await cli.parseAsync()
   }
 } catch (e) {
   let data: Record<string, any> = {}
