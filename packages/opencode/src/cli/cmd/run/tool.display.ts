@@ -12,6 +12,9 @@ import { dict, fallbackFinal, fallbackInline, fallbackStart, props, text } from 
 import { rule, taskResult } from "./tool.rules"
 import path from "path"
 import { LANGUAGE_EXTENSIONS } from "@/lsp/language"
+import * as Log from "@opencode-ai/core/util/log"
+
+const log = Log.create({ service: "tool.display" })
 
 function toolFrame(commit: StreamCommit, raw: string): ToolFrame {
   const state = dict(commit.part?.state)
@@ -66,7 +69,7 @@ export function toolInlineInfo(part: ToolPart): ToolInline {
       return draw(props(ctx))
     }
   } catch (err) {
-    console.error("[tool] toolInlineInfo failed for", ctx.name, err)
+    log.error("[tool] toolInlineInfo failed for", { tool: ctx.name, error: err })
     return fallbackInline(ctx)
   }
 
@@ -80,7 +83,7 @@ export function toolScroll(phase: "start" | "progress" | "final", ctx: ToolFrame
       return draw(props(ctx))
     }
   } catch (err) {
-    console.error("[tool] toolScroll failed for", ctx.name, phase, err)
+    log.error("[tool] toolScroll failed for", { tool: ctx.name, phase, error: err })
     if (phase === "start") {
       return fallbackStart(ctx)
     }
@@ -115,7 +118,7 @@ export function toolPermissionInfo(
   try {
     return draw({ input, metadata: meta, patterns } as ToolPermissionProps)
   } catch (err) {
-    console.error("[tool] toolPermissionInfo failed for", name, err)
+    log.error("[tool] toolPermissionInfo failed for", { tool: name, error: err })
     return undefined
   }
 }
@@ -130,7 +133,7 @@ export function toolSnapshot(commit: StreamCommit, raw: string): ToolSnapshot | 
   try {
     return draw(props(ctx))
   } catch (err) {
-    console.error("[tool] toolSnapshot failed for", ctx.name, err)
+    log.error("[tool] toolSnapshot failed for", { tool: ctx.name, error: err })
     return undefined
   }
 }
