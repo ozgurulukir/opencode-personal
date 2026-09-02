@@ -1,5 +1,7 @@
 import style from "./content-bash.module.css"
-import { createResource, createSignal } from "solid-js"
+import { createResource, createSignal, createEffect } from "solid-js"
+import { isServer } from "solid-js/web"
+import DOMPurify from "isomorphic-dompurify"
 import { createOverflow, useShareMessages } from "./common"
 import { codeToHtml } from "shiki"
 
@@ -12,6 +14,9 @@ interface Props {
 
 export function ContentBash(props: Props) {
   const messages = useShareMessages()
+  let commandRef: HTMLDivElement | undefined
+  let outputRef: HTMLDivElement | undefined
+
   const [commandHtml] = createResource(
     () => props.command,
     async (command) => {
@@ -43,6 +48,22 @@ export function ContentBash(props: Props) {
   const [expanded, setExpanded] = createSignal(false)
   const overflow = createOverflow()
 
+  createEffect(() => {
+    const content = commandHtml()
+    if (!isServer && commandRef && content) {
+      commandRef.innerHTML = ""
+      commandRef.appendChild(DOMPurify.sanitize(content, { RETURN_DOM_FRAGMENT: true }) as Node)
+    }
+  })
+
+  createEffect(() => {
+    const content = outputHtml()
+    if (!isServer && outputRef && content) {
+      outputRef.innerHTML = ""
+      outputRef.appendChild(DOMPurify.sanitize(content, { RETURN_DOM_FRAGMENT: true }) as Node)
+    }
+  })
+
   return (
     <div class={style.root} data-expanded={expanded() || props.expand === true ? true : undefined}>
       <div data-slot="body">
@@ -50,8 +71,8 @@ export function ContentBash(props: Props) {
           <span>{props.description}</span>
         </div>
         <div data-slot="content">
-          <div innerHTML={commandHtml()} />
-          <div data-slot="output" ref={overflow.ref} innerHTML={outputHtml()} />
+          <div ref={commandRef} />
+          <div data-slot="output" ref={(el) => { outputRef = el; overflow.ref(el) }} />
         </div>
       </div>
 
