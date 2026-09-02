@@ -17,8 +17,16 @@ describe("diagnosticMessageKey", () => {
   })
 
   test("keeps content-based discrimination for other objects", () => {
-    expect(diagnosticMessageKey({ foo: 1 })).toBe("foo:1,")
+    expect(diagnosticMessageKey({ foo: 1 })).toBe("object:{foo:number:1}")
     expect(diagnosticMessageKey({ foo: 1 })).not.toBe(diagnosticMessageKey({ foo: 2 }))
+  })
+
+  test("preserves type and nested-value discrimination", () => {
+    expect(diagnosticMessageKey({ foo: 1 })).not.toBe(diagnosticMessageKey({ foo: "1" }))
+    expect(diagnosticMessageKey({ foo: { bar: 1 } })).not.toBe(diagnosticMessageKey({ foo: { bar: 2 } }))
+    expect(diagnosticMessageKey({ foo: { bar: { baz: { qux: { deep: { value: 1 } } } } } })).not.toBe(
+      diagnosticMessageKey({ foo: { bar: { baz: { qux: { deep: { value: 2 } } } } } }),
+    )
   })
 
   test("stringifies null", () => {
