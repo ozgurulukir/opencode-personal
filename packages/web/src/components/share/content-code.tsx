@@ -36,6 +36,9 @@ export function ContentCode(props: Props) {
   return (
     <Suspense>
       <div ref={ref} class={style.root} data-flush={props.flush === true ? true : undefined} />
+      <noscript>
+        <pre>{props.code}</pre>
+      </noscript>
     </Suspense>
   )
 }
