@@ -62,3 +62,17 @@ WebUI is UX-ready
 
 **Lessons Learned:**
 - Proper focus management is critical for accessibility. When an action originates from within or conceptually adjacent to an input (like clearing it), focus *must* be returned to that input to preserve the user's interactive context.
+## 2026-09-02 - [WebUI Polish Audit - TextField Focus]
+
+**Major Findings:**
+- When clearing text using the internal clear button inside `<TextField>`, the focus was lost, forcing keyboard users to manually tab or click back into the input field to resume typing.
+
+**Patterns to Repeat:**
+- Using functional callbacks for refs (`ref={(el) => (refVariable = el)}`) ensures elements are reliably assigned in SolidJS components, allowing programmatic focus restoration.
+- Adding visually clear and accessible UI components for quick tasks like clearing input values.
+
+**Patterns to Avoid:**
+- Using inline type casting for JSX `ref` attributes (e.g., `ref={inputRef as HTMLInputElement}`). This can prevent the internal ref from actually being assigned to the DOM node in some setups, causing features like `handleClear()` to fail silently since `inputRef` is undefined.
+
+**Lessons Learned:**
+- Simple interactions like "Clear" often break keyboard focus state if not explicitly managed. Whenever implementing action buttons inside input components, always verify focus is returned to the primary interactive element.
