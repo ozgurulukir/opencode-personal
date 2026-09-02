@@ -1,5 +1,5 @@
 import style from "./content-bash.module.css"
-import { createResource, createSignal } from "solid-js"
+import { createResource, createSignal, createEffect } from "solid-js"
 import { createOverflow, useShareMessages } from "./common"
 import { codeToHtml } from "shiki"
 import DOMPurify from "isomorphic-dompurify"
@@ -23,7 +23,7 @@ export function ContentBash(props: Props) {
           dark: "github-dark",
         },
       })
-      return DOMPurify.sanitize(html)
+      return html
     },
   )
 
@@ -37,12 +37,39 @@ export function ContentBash(props: Props) {
           dark: "github-dark",
         },
       })
-      return DOMPurify.sanitize(html)
+      return html
     },
   )
 
   const [expanded, setExpanded] = createSignal(false)
   const overflow = createOverflow()
+
+  let commandRef!: HTMLDivElement
+  let outputRef!: HTMLDivElement
+
+  createEffect(() => {
+    const content = commandHtml()
+    if (content && commandRef) {
+      commandRef.innerHTML = ""
+      if (!DOMPurify.isSupported) {
+        return
+      }
+      const fragment = DOMPurify.sanitize(content, { RETURN_DOM_FRAGMENT: true }) as unknown as DocumentFragment
+      commandRef.appendChild(fragment.cloneNode(true))
+    }
+  })
+
+  createEffect(() => {
+    const content = outputHtml()
+    if (content && outputRef) {
+      outputRef.innerHTML = ""
+      if (!DOMPurify.isSupported) {
+        return
+      }
+      const fragment = DOMPurify.sanitize(content, { RETURN_DOM_FRAGMENT: true }) as unknown as DocumentFragment
+      outputRef.appendChild(fragment.cloneNode(true))
+    }
+  })
 
   return (
     <div class={style.root} data-expanded={expanded() || props.expand === true ? true : undefined}>
@@ -51,8 +78,8 @@ export function ContentBash(props: Props) {
           <span>{props.description}</span>
         </div>
         <div data-slot="content">
-          <div innerHTML={commandHtml()} />
-          <div data-slot="output" ref={overflow.ref} innerHTML={outputHtml()} />
+          <div ref={commandRef} />
+          <div data-slot="output" ref={(el) => { overflow.ref(el); outputRef = el; }} />
         </div>
       </div>
 
