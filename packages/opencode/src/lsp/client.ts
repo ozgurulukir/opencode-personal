@@ -113,23 +113,17 @@ function endPosition(text: string) {
 
 // Some servers send MarkupContent ({kind, value}) where LSP requires a string
 // message; key on value so identical text dedupes without stringifying.
-// Other objects are stringified using lightweight string concatenation to avoid
-// high GC pressure from JSON.stringify in hot dedupe paths.
+// Other objects use a lightweight serializer in the common case. Keep the
+// JSON.stringify fallback at the depth limit so bounded traversal does not
+// collapse distinct diagnostics into the same key.
 function buildDiagnosticKey(obj: unknown, depth = 0): string {
-  if (depth > 5) return ""
-  if (typeof obj === "string" || typeof obj === "number" || typeof obj === "boolean") {
-    return String(obj)
-  }
-  if (typeof obj !== "object" || obj === null) {
-    return ""
-  }
-  let key = ""
-  for (const k in obj) {
-    if (Object.prototype.hasOwnProperty.call(obj, k)) {
-      key += k + ":" + buildDiagnosticKey((obj as Record<string, unknown>)[k], depth + 1) + ","
-    }
-  }
-  return key
+  if (depth > 5) return JSON.stringify(obj) ?? "undefined"
+  if (obj === null) return "null:"
+  if (typeof obj !== "object") return `${typeof obj}:${String(obj)}`
+  if (Array.isArray(obj)) return `array:[${obj.map((value) => buildDiagnosticKey(value, depth + 1)).join(",")}]`
+  return `object:{${Object.keys(obj)
+    .map((key) => `${key}:${buildDiagnosticKey((obj as Record<string, unknown>)[key], depth + 1)}`)
+    .join(",")}}`
 }
 
 export function diagnosticMessageKey(message: unknown) {
