@@ -53,6 +53,15 @@ const skipInstall = process.argv.includes("--skip-install")
 const sourcemapsFlag = process.argv.includes("--sourcemaps")
 const solidPlugin = createSolidTransformPlugin()
 const skipEmbedWebUi = process.argv.includes("--skip-embed-web-ui")
+const preserveOpenTuiSolidPlugin = {
+  name: "preserve-opentui-solid-runtime",
+  setup(build: { onLoad: (options: { filter: RegExp }, callback: (args: { path: string }) => Promise<{ contents: string; loader: "js" }>) => void }) {
+    build.onLoad({ filter: /[/\\]node_modules[/\\]@opentui[/\\]solid[/\\].*\.js$/ }, async (args) => ({
+      contents: await Bun.file(args.path).text(),
+      loader: "js",
+    }))
+  },
+}
 
 const createEmbeddedWebUIBundle = async () => {
   console.log(`Building Web UI to embed in the binary`)
@@ -221,18 +230,21 @@ const parserWorker = fs.realpathSync(fs.existsSync(opentuiLocalPath) ? opentuiLo
 const treeSitterWorkerSrc = await Bun.file(parserWorker).text()
 const dynamicWasmImport =
   'let treeWasm = await resolveBundledFilePath(() => import("web-tree-sitter/tree-sitter.wasm", { with: { type: "wasm" } }), () => import.meta.resolve("web-tree-sitter/tree-sitter.wasm"), import.meta.url);'
-if (!treeSitterWorkerSrc.includes(dynamicWasmImport)) {
+const assetWasmImport =
+  'let treeWasm = treeSitterWasmPath ?? resolveAssetPath("web-tree-sitter/tree-sitter.wasm", () => new URL(import.meta.resolve("web-tree-sitter/tree-sitter.wasm")));'
+if (!treeSitterWorkerSrc.includes(dynamicWasmImport) && !treeSitterWorkerSrc.includes(assetWasmImport)) {
   throw new Error(
-    "Cannot patch parser.worker.js: expected dynamic wasm import not found. " +
+    "Cannot patch parser.worker.js: expected WASM asset loading code not found. " +
       "The @opentui/core package may have updated — check parser.worker.js initialize() method.",
   )
 }
 const treeSitterWorker = treeSitterWorkerSrc
   .replace(
-    'import { Parser, Query, Language } from "web-tree-sitter";',
-    'import { Parser, Query, Language } from "web-tree-sitter";\nimport treeWasmUrl from "web-tree-sitter/tree-sitter.wasm" with { type: "file" };',
+    'import { createRequire } from "node:module";',
+    'import { createRequire } from "node:module";\nimport treeWasmUrl from "web-tree-sitter/tree-sitter.wasm" with { type: "file" };',
   )
-  .replace(dynamicWasmImport, "let treeWasm = treeWasmUrl;")
+  .replace(dynamicWasmImport, "let treeWasm = treeSitterWasmPath ?? treeWasmUrl;")
+  .replace(assetWasmImport, "let treeWasm = treeSitterWasmPath ?? treeWasmUrl;")
   .replace(
     "class ParserWorker {",
     `try{
@@ -293,9 +305,9 @@ for (const item of targets) {
   const bunfsRoot = item.os === "win32" ? "B:/~BUN/root/" : "/$bunfs/root/"
 
   await Bun.build({
-    conditions: ["bun", "node"],
+    conditions: ["bun"],
     tsconfig: "./tsconfig.json",
-    plugins: [solidPlugin, wasmResolver],
+    plugins: [preserveOpenTuiSolidPlugin, solidPlugin, wasmResolver],
     external: ["node-gyp"],
     format: "esm",
     minify: true,
@@ -349,9 +361,10 @@ for (const item of targets) {
   // OS dynamic linker cannot dlopen. The runtime falls back to this real copy.
   const libExt = item.os === "win32" ? "dll" : item.os === "darwin" ? "dylib" : "so"
   const coreDir = path.dirname(parserWorker)
-  const platformLib = path.join(coreDir, `../core-${item.os}-${item.arch}/libopentui.${libExt}`)
+  const platformLibName = item.os === "win32" ? `opentui.${libExt}` : `libopentui.${libExt}`
+  const platformLib = path.join(coreDir, `../core-${item.os}-${item.arch}/${platformLibName}`)
   if (fs.existsSync(platformLib)) {
-    fs.copyFileSync(platformLib, `dist/${name}/bin/libopentui.${libExt}`)
+    fs.copyFileSync(platformLib, `dist/${name}/bin/${platformLibName}`)
   }
 
   await Bun.file(`dist/${name}/package.json`).write(

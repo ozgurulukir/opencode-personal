@@ -1,0 +1,312 @@
+{
+  "nodes": [
+    {
+      "id": "file:packages/opencode/src/session/loop/run-loop.ts",
+      "type": "file",
+      "name": "run-loop.ts",
+      "filePath": "packages/opencode/src/session/loop/run-loop.ts",
+      "summary": "The agent loop — per step it filters compacted history, dispatches subtask and compaction task parts, triggers auto-compaction on overflow, resolves tools, assembles the system prompt suffix with skills/environment/instructions, streams the assistant turn, and exits when the assistant finishes without pending tool calls.",
+      "tags": ["agent-loop", "orchestrator", "core", "streaming", "effect"],
+      "complexity": "complex",
+      "languageNotes": "A ~280-line Effect.fn(\"SessionPrompt.run\") generator with an explicit while(true) loop and a RunLoopDeps deps-object; all sibling helpers (title, getModel, handleSubtask, resolveTools, insertReminders) are imported from this directory and called with forwarded deps."
+    },
+    {
+      "id": "file:packages/opencode/src/session/loop/shell.ts",
+      "type": "file",
+      "name": "shell.ts",
+      "filePath": "packages/opencode/src/session/loop/shell.ts",
+      "summary": "User-initiated shell command execution — materializes user/assistant messages and a running shell tool part, spawns the child process with streamed output persisted into the part, finalizes abort/error states, and emits v2 sync events.",
+      "tags": ["shell-execution", "child-process", "streaming", "persistence"],
+      "complexity": "moderate",
+      "languageNotes": "Uses Effect.uninterruptibleMask with restore() around the spawn so setup is atomic while the wait remains interruptible; a Latch signals readiness to callers."
+    },
+    {
+      "id": "file:packages/opencode/src/session/loop/subtask.ts",
+      "type": "file",
+      "name": "subtask.ts",
+      "filePath": "packages/opencode/src/session/loop/subtask.ts",
+      "summary": "Handles a subtask (task-tool) step in the agent loop — materializes the assistant message and running tool part, invokes the TaskTool with the parent's merged permission ruleset, finalizes success/error/cancelled states, and appends a synthetic summary user message for command subtasks.",
+      "tags": ["subagent", "task-tool", "tool-execution", "persistence"],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:packages/opencode/src/session/loop/title.ts",
+      "type": "file",
+      "name": "title.ts",
+      "filePath": "packages/opencode/src/session/loop/title.ts",
+      "summary": "Generates a short session title from the first real user turn using the small title model via LLM.stream, stripping think tags and truncating to 100 characters.",
+      "tags": ["title-generation", "llm", "session", "utility"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:packages/opencode/src/session/loop/tools.ts",
+      "type": "file",
+      "name": "tools.ts",
+      "filePath": "packages/opencode/src/session/loop/tools.ts",
+      "summary": "Resolves registry and MCP tools into an AI-SDK tool map for a single model turn — wiring permission asks, plugin before/after triggers, cached schema transforms, MCP content-to-attachment conversion, and output truncation through an EffectBridge-backed runner.",
+      "tags": ["tool-registry", "mcp", "permissions", "ai-sdk", "effect"],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:packages/opencode/src/session/merge-options.ts",
+      "type": "file",
+      "name": "merge-options.ts",
+      "filePath": "packages/opencode/src/session/merge-options.ts",
+      "summary": "Single deep-merge helper (remeda mergeDeep) with per-layer debug logging, extracted from llm.ts so the provider/model/agent/variant option-merge chain is independently testable.",
+      "tags": ["utility", "options-merging", "hot-path"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/opencode/src/session/message-continuation.ts",
+      "type": "file",
+      "name": "message-continuation.ts",
+      "filePath": "packages/opencode/src/session/message-continuation.ts",
+      "summary": "Pure function that wraps user-message text parts arriving after the last finished assistant turn in <system-reminder> blocks so the model addresses them and continues its tasks.",
+      "tags": ["utility", "message-wrapping", "system-reminder"],
+      "complexity": "simple",
+      "languageNotes": "Mutates parts in place on the passed array — callers must operate on a copy (per repo AGENTS.md)."
+    },
+    {
+      "id": "file:packages/opencode/src/session/message-v2.ts",
+      "type": "file",
+      "name": "message-v2.ts",
+      "filePath": "packages/opencode/src/session/message-v2.ts",
+      "summary": "V2 message read/write layer — hydrates MessageTable/PartTable rows into WithParts, converts history to AI SDK model messages (media stripping, tool-output truncation), cursor-paginates history, filters compacted spans, and maps provider/AI-SDK errors to named error objects.",
+      "tags": ["data-model", "persistence", "serialization", "pagination", "error-mapping"],
+      "complexity": "complex",
+      "languageNotes": "Mixes Drizzle SQL (JSON extraction via `data->>'$.snapshot'` for boundary snapshots) with Effect; re-exports everything from message.schema.ts so consumers see one surface."
+    },
+    {
+      "id": "file:packages/opencode/src/session/message.schema.ts",
+      "type": "file",
+      "name": "message.schema.ts",
+      "filePath": "packages/opencode/src/session/message.schema.ts",
+      "summary": "Effect Schema definitions for V2 messages and parts — named schema errors (APIError, ContextOverflowError, AuthError, ...), output formats, the full Part union (text, reasoning, tool with state variants, subtask, compaction, snapshot, patch), and User/Assistant/Info schemas with zod mirrors.",
+      "tags": ["schema-definition", "type-definition", "effect-schema", "data-model"],
+      "complexity": "complex",
+      "languageNotes": "`.zod` bridges are attached only to union schemas (Format, Part, Info), not individual members — a documented convention in the session AGENTS.md; schema types are kept in the consuming module due to Effect Schema cross-file identity issues."
+    },
+    {
+      "id": "file:packages/opencode/src/session/message.ts",
+      "type": "file",
+      "name": "message.ts",
+      "filePath": "packages/opencode/src/session/message.ts",
+      "summary": "V1 message type definitions — ToolCall/ToolResult/ToolInvocation shapes, the legacy message part union (text, reasoning, tool invocation, source URL, file, step start), and message Info, re-exporting shared named errors.",
+      "tags": ["type-definition", "data-model", "legacy-types"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:packages/opencode/src/session/overflow.ts",
+      "type": "file",
+      "name": "overflow.ts",
+      "filePath": "packages/opencode/src/session/overflow.ts",
+      "summary": "Thin async wrappers exposing ContextBudget.usable/isOverflow through the compaction service's standalone runtime.",
+      "tags": ["utility", "context-window", "wrapper"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/opencode/src/session/plan.ts",
+      "type": "file",
+      "name": "plan.ts",
+      "filePath": "packages/opencode/src/session/plan.ts",
+      "summary": "Computes the plan-file path for a session — the instance storage plans directory plus created-time and slug segments.",
+      "tags": ["utility", "plan-mode", "path-resolution"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/session/loop/run-loop.ts:runLoop",
+      "type": "function",
+      "name": "runLoop",
+      "filePath": "packages/opencode/src/session/loop/run-loop.ts",
+      "lineRange": [73, 351],
+      "summary": "The core agent loop generator: each iteration filters compacted history, checks finish/tool-call state, forks title generation on step 1, dispatches subtask and compaction task parts, auto-compacts on overflow, resolves tools and system suffix, processes the assistant turn with structured-output handling, and applies message continuation wrapping.",
+      "tags": ["agent-loop", "orchestrator", "streaming", "effect"],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:packages/opencode/src/session/loop/shell.ts:shellImpl",
+      "type": "function",
+      "name": "shellImpl",
+      "filePath": "packages/opencode/src/session/loop/shell.ts",
+      "lineRange": [44, 204],
+      "summary": "Executes a user shell command end-to-end: materializes user/assistant messages and a running tool part, applies plugin-provided env, spawns the child process with output streamed into the part, handles interrupt-based abort, and finalizes part and message state.",
+      "tags": ["shell-execution", "child-process", "streaming", "uninterruptible"],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:packages/opencode/src/session/loop/subtask.ts:handleSubtask",
+      "type": "function",
+      "name": "handleSubtask",
+      "filePath": "packages/opencode/src/session/loop/subtask.ts",
+      "lineRange": [38, 235],
+      "summary": "Executes a subtask via the TaskTool: materializes the assistant message and running part, merges parent agent permission with session permission for the ruleset, finalizes completed/error/cancelled states with interruption handling, and appends the synthetic summarize-and-continue user message for command subtasks.",
+      "tags": ["subagent", "task-tool", "permissions", "state-management"],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:packages/opencode/src/session/loop/title.ts:title",
+      "type": "function",
+      "name": "title",
+      "filePath": "packages/opencode/src/session/loop/title.ts",
+      "lineRange": [23, 86],
+      "summary": "Generates and persists a session title from the first real (non-synthetic) user turn when only one exists — streams from the title agent's model (falling back to the provider's small model), strips think tags, and truncates to 100 characters.",
+      "tags": ["title-generation", "llm-streaming", "session"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/opencode/src/session/loop/tools.ts:resolveTools",
+      "type": "function",
+      "name": "resolveTools",
+      "filePath": "packages/opencode/src/session/loop/tools.ts",
+      "lineRange": [53, 260],
+      "summary": "Builds the AI-SDK tool map from registry and MCP tools with cached schema transforms, a permission-wired ask/updateToolCall context, plugin before/after triggers, MCP content-to-attachment conversion, structuredContent inclusion, and output truncation.",
+      "tags": ["tool-registry", "mcp", "permissions", "truncation"],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:packages/opencode/src/session/merge-options.ts:mergeOptions",
+      "type": "function",
+      "name": "mergeOptions",
+      "filePath": "packages/opencode/src/session/merge-options.ts",
+      "lineRange": [8, 18],
+      "summary": "Deep-merges a source options object into a target via remeda mergeDeep, logging which layer contributed which keys when a layer name is supplied.",
+      "tags": ["utility", "options-merging", "deep-merge"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/session/message-continuation.ts:wrapMessageContinuation",
+      "type": "function",
+      "name": "wrapMessageContinuation",
+      "filePath": "packages/opencode/src/session/message-continuation.ts",
+      "lineRange": [1, 27],
+      "summary": "Mutates message parts in place so user text parts after the last finished assistant turn are wrapped in a <system-reminder> asking the model to address them and continue — callers must pass a copy.",
+      "tags": ["utility", "message-wrapping", "in-place-mutation"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/session/message-v2.ts:hydrate",
+      "type": "function",
+      "name": "hydrate",
+      "filePath": "packages/opencode/src/session/message-v2.ts",
+      "lineRange": [187, 211],
+      "summary": "Loads parts for the given message rows from PartTable (batched inArray query) and assembles WithParts objects preserving row order.",
+      "tags": ["persistence", "hydration", "drizzle"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/opencode/src/session/message-v2.ts:toModelMessagesEffect",
+      "type": "function",
+      "name": "toModelMessagesEffect",
+      "filePath": "packages/opencode/src/session/message-v2.ts",
+      "lineRange": [219, 500],
+      "summary": "Converts WithParts history into AI SDK ModelMessages — per-provider media support checks, tool-output truncation for compaction, synthetic attachment prompts for unsupported media, tool-state to tool-result mapping, and reasoning part handling.",
+      "tags": ["serialization", "model-messages", "provider-transform"],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:packages/opencode/src/session/message-v2.ts:page",
+      "type": "function",
+      "name": "page",
+      "filePath": "packages/opencode/src/session/message-v2.ts",
+      "lineRange": [509, 544],
+      "summary": "Cursor-paginates a session's messages in descending order (limit+1 probe), verifies the session exists, hydrates items, and returns ascending items with the next-page cursor.",
+      "tags": ["pagination", "cursor", "database-query"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/opencode/src/session/message-v2.ts:boundarySnapshots",
+      "type": "function",
+      "name": "boundarySnapshots",
+      "filePath": "packages/opencode/src/session/message-v2.ts",
+      "lineRange": [585, 605],
+      "summary": "Picks the earliest and latest snapshot/patch JSON payloads for a session by part type using SQL JSON extraction on PartTable.data.",
+      "tags": ["database-query", "snapshot", "json-extraction"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/session/message-v2.ts:messagesForSummary",
+      "type": "function",
+      "name": "messagesForSummary",
+      "filePath": "packages/opencode/src/session/message-v2.ts",
+      "lineRange": [609, 630],
+      "summary": "Loads a target message plus its child assistant messages (matched by parentID via JSON extraction) in chronological order, for summary regeneration.",
+      "tags": ["database-query", "summary", "hydration"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/session/message-v2.ts:filterCompacted",
+      "type": "function",
+      "name": "filterCompacted",
+      "filePath": "packages/opencode/src/session/message-v2.ts",
+      "lineRange": [647, 696],
+      "summary": "Removes compacted history spans from a message list while keeping summary messages and honoring tail_start_id boundaries — the reverse-then-rescan implementation is documented as order-sensitive.",
+      "tags": ["compaction", "filtering", "history-analysis"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/opencode/src/session/message-v2.ts:latest",
+      "type": "function",
+      "name": "latest",
+      "filePath": "packages/opencode/src/session/message-v2.ts",
+      "lineRange": [709, 733],
+      "summary": "Extracts the latest user, assistant, and last-finished messages plus pending compaction/subtask task parts from a message list — the anchor state for each agent-loop iteration.",
+      "tags": ["utility", "history-analysis", "agent-loop"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/opencode/src/session/message-v2.ts:fromError",
+      "type": "function",
+      "name": "fromError",
+      "filePath": "packages/opencode/src/session/message-v2.ts",
+      "lineRange": [864, 878],
+      "summary": "Dispatches an unknown error through typed handlers — abort, output length, API key load, ECONNRESET, zlib decompression, invalid response, API call, and generic — producing named error objects for message persistence.",
+      "tags": ["error-mapping", "error-handling", "dispatch"],
+      "complexity": "moderate"
+    }
+  ],
+  "edges": [
+    { "source": "file:packages/opencode/src/session/loop/run-loop.ts", "target": "function:packages/opencode/src/session/loop/run-loop.ts:runLoop", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:packages/opencode/src/session/loop/run-loop.ts", "target": "function:packages/opencode/src/session/loop/run-loop.ts:runLoop", "type": "exports", "direction": "forward", "weight": 0.8 },
+    { "source": "file:packages/opencode/src/session/loop/run-loop.ts", "target": "file:packages/opencode/src/session/message-v2.ts", "type": "depends_on", "direction": "forward", "weight": 0.6 },
+    { "source": "function:packages/opencode/src/session/loop/run-loop.ts:runLoop", "target": "function:packages/opencode/src/session/loop/title.ts:title", "type": "calls", "direction": "forward", "weight": 0.8 },
+    { "source": "function:packages/opencode/src/session/loop/run-loop.ts:runLoop", "target": "function:packages/opencode/src/session/loop/model.ts:getModel", "type": "calls", "direction": "forward", "weight": 0.8 },
+    { "source": "function:packages/opencode/src/session/loop/run-loop.ts:runLoop", "target": "function:packages/opencode/src/session/loop/subtask.ts:handleSubtask", "type": "calls", "direction": "forward", "weight": 0.8 },
+    { "source": "function:packages/opencode/src/session/loop/run-loop.ts:runLoop", "target": "function:packages/opencode/src/session/loop/tools.ts:resolveTools", "type": "calls", "direction": "forward", "weight": 0.8 },
+    { "source": "function:packages/opencode/src/session/loop/run-loop.ts:runLoop", "target": "function:packages/opencode/src/session/loop/reminders.ts:insertReminders", "type": "calls", "direction": "forward", "weight": 0.8 },
+    { "source": "function:packages/opencode/src/session/loop/run-loop.ts:runLoop", "target": "function:packages/opencode/src/session/message-continuation.ts:wrapMessageContinuation", "type": "calls", "direction": "forward", "weight": 0.8 },
+    { "source": "function:packages/opencode/src/session/loop/run-loop.ts:runLoop", "target": "function:packages/opencode/src/session/message-v2.ts:toModelMessagesEffect", "type": "calls", "direction": "forward", "weight": 0.8 },
+    { "source": "file:packages/opencode/src/session/loop/shell.ts", "target": "function:packages/opencode/src/session/loop/shell.ts:shellImpl", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:packages/opencode/src/session/loop/shell.ts", "target": "function:packages/opencode/src/session/loop/shell.ts:shellImpl", "type": "exports", "direction": "forward", "weight": 0.8 },
+    { "source": "function:packages/opencode/src/session/loop/shell.ts:shellImpl", "target": "function:packages/opencode/src/session/loop/model.ts:currentModel", "type": "calls", "direction": "forward", "weight": 0.8 },
+    { "source": "file:packages/opencode/src/session/loop/subtask.ts", "target": "function:packages/opencode/src/session/loop/subtask.ts:handleSubtask", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:packages/opencode/src/session/loop/subtask.ts", "target": "function:packages/opencode/src/session/loop/subtask.ts:handleSubtask", "type": "exports", "direction": "forward", "weight": 0.8 },
+    { "source": "function:packages/opencode/src/session/loop/subtask.ts:handleSubtask", "target": "function:packages/opencode/src/session/loop/model.ts:getModel", "type": "calls", "direction": "forward", "weight": 0.8 },
+    { "source": "file:packages/opencode/src/session/loop/title.ts", "target": "function:packages/opencode/src/session/loop/title.ts:title", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:packages/opencode/src/session/loop/title.ts", "target": "function:packages/opencode/src/session/loop/title.ts:title", "type": "exports", "direction": "forward", "weight": 0.8 },
+    { "source": "file:packages/opencode/src/session/loop/title.ts", "target": "file:packages/opencode/src/session/llm.ts", "type": "depends_on", "direction": "forward", "weight": 0.6 },
+    { "source": "file:packages/opencode/src/session/loop/tools.ts", "target": "function:packages/opencode/src/session/loop/tools.ts:resolveTools", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:packages/opencode/src/session/loop/tools.ts", "target": "function:packages/opencode/src/session/loop/tools.ts:resolveTools", "type": "exports", "direction": "forward", "weight": 0.8 },
+    { "source": "file:packages/opencode/src/session/merge-options.ts", "target": "function:packages/opencode/src/session/merge-options.ts:mergeOptions", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:packages/opencode/src/session/merge-options.ts", "target": "function:packages/opencode/src/session/merge-options.ts:mergeOptions", "type": "exports", "direction": "forward", "weight": 0.8 },
+    { "source": "file:packages/opencode/src/session/message-continuation.ts", "target": "function:packages/opencode/src/session/message-continuation.ts:wrapMessageContinuation", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:packages/opencode/src/session/message-continuation.ts", "target": "function:packages/opencode/src/session/message-continuation.ts:wrapMessageContinuation", "type": "exports", "direction": "forward", "weight": 0.8 },
+    { "source": "file:packages/opencode/src/session/message-v2.ts", "target": "function:packages/opencode/src/session/message-v2.ts:hydrate", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:packages/opencode/src/session/message-v2.ts", "target": "function:packages/opencode/src/session/message-v2.ts:toModelMessagesEffect", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:packages/opencode/src/session/message-v2.ts", "target": "function:packages/opencode/src/session/message-v2.ts:page", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:packages/opencode/src/session/message-v2.ts", "target": "function:packages/opencode/src/session/message-v2.ts:boundarySnapshots", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:packages/opencode/src/session/message-v2.ts", "target": "function:packages/opencode/src/session/message-v2.ts:messagesForSummary", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:packages/opencode/src/session/message-v2.ts", "target": "function:packages/opencode/src/session/message-v2.ts:filterCompacted", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:packages/opencode/src/session/message-v2.ts", "target": "function:packages/opencode/src/session/message-v2.ts:latest", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:packages/opencode/src/session/message-v2.ts", "target": "function:packages/opencode/src/session/message-v2.ts:fromError", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:packages/opencode/src/session/message-v2.ts", "target": "function:packages/opencode/src/session/message-v2.ts:toModelMessagesEffect", "type": "exports", "direction": "forward", "weight": 0.8 },
+    { "source": "file:packages/opencode/src/session/message-v2.ts", "target": "function:packages/opencode/src/session/message-v2.ts:page", "type": "exports", "direction": "forward", "weight": 0.8 },
+    { "source": "file:packages/opencode/src/session/message-v2.ts", "target": "function:packages/opencode/src/session/message-v2.ts:boundarySnapshots", "type": "exports", "direction": "forward", "weight": 0.8 },
+    { "source": "file:packages/opencode/src/session/message-v2.ts", "target": "function:packages/opencode/src/session/message-v2.ts:messagesForSummary", "type": "exports", "direction": "forward", "weight": 0.8 },
+    { "source": "file:packages/opencode/src/session/message-v2.ts", "target": "function:packages/opencode/src/session/message-v2.ts:filterCompacted", "type": "exports", "direction": "forward", "weight": 0.8 },
+    { "source": "file:packages/opencode/src/session/message-v2.ts", "target": "function:packages/opencode/src/session/message-v2.ts:latest", "type": "exports", "direction": "forward", "weight": 0.8 },
+    { "source": "file:packages/opencode/src/session/message-v2.ts", "target": "function:packages/opencode/src/session/message-v2.ts:fromError", "type": "exports", "direction": "forward", "weight": 0.8 },
+    { "source": "file:packages/opencode/src/session/message-v2.ts", "target": "file:packages/opencode/src/session/message.schema.ts", "type": "depends_on", "direction": "forward", "weight": 0.6 },
+    { "source": "file:packages/opencode/src/session/message.ts", "target": "file:packages/opencode/src/session/message.schema.ts", "type": "depends_on", "direction": "forward", "weight": 0.6 },
+    { "source": "file:packages/opencode/src/session/overflow.ts", "target": "file:packages/opencode/src/session/context-budget.ts", "type": "depends_on", "direction": "forward", "weight": 0.6 }
+  ]
+}

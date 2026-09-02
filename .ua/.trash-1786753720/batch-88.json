@@ -1,0 +1,595 @@
+{
+  "nodes": [
+    {
+      "id": "file:patches/@silvia-odwyer%2Fphoton-node@0.3.4.patch",
+      "type": "file",
+      "name": "@silvia-odwyer%2Fphoton-node@0.3.4.patch",
+      "filePath": "patches/@silvia-odwyer%2Fphoton-node@0.3.4.patch",
+      "summary": "Bun patch for photon-node 0.3.4 that lets opencode's compiled binary redirect the image-processing WASM asset via globalThis.__OPENCODE_PHOTON_WASM_PATH instead of the module-relative path.",
+      "tags": ["patch", "bun", "wasm", "image-processing", "build-system"],
+      "complexity": "simple",
+      "languageNotes": "Bun patchedDependencies apply unified diffs to node_modules at install time; this one patches the wasm-bindgen loader to accept an injected path."
+    },
+    {
+      "id": "file:patches/@standard-community%2Fstandard-openapi@0.2.9.patch",
+      "type": "file",
+      "name": "@standard-community%2Fstandard-openapi@0.2.9.patch",
+      "filePath": "patches/@standard-community%2Fstandard-openapi@0.2.9.patch",
+      "summary": "Bun patch for standard-openapi 0.2.9 making convertToOpenAPISchema tolerate external URL $refs by falling back to the remaining schema properties or a plain string type.",
+      "tags": ["patch", "openapi", "json-schema", "sdk-generation"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:patches/install-korean-ime-fix.sh",
+      "type": "file",
+      "name": "install-korean-ime-fix.sh",
+      "filePath": "patches/install-korean-ime-fix.sh",
+      "summary": "User-facing installer that clones the patched opencode fork and builds a binary fixing Korean/CJK IME last-character truncation on Enter in Kitty and other terminals (issue #14371).",
+      "tags": ["installer", "shell", "ime-fix", "build-from-source", "distribution"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:patches/solid-js@1.9.10.patch",
+      "type": "file",
+      "name": "solid-js@1.9.10.patch",
+      "filePath": "patches/solid-js@1.9.10.patch",
+      "summary": "Bun patch applying the upstream Solid.js fix #2046 so the first computation during a transition also sets the committed signal value, replicated across all four dist bundles (dev/prod, ESM/CJS).",
+      "tags": ["patch", "solidjs", "reactivity", "bugfix", "bun"],
+      "complexity": "simple",
+      "languageNotes": "The same two-line runComputation fix is duplicated in dist/dev.js, dist/dev.cjs, dist/solid.js and dist/solid.cjs because the package ships prebuilt bundles."
+    },
+    {
+      "id": "file:script/beta.ts",
+      "type": "file",
+      "name": "beta.ts",
+      "filePath": "script/beta.ts",
+      "summary": "Beta-branch merge orchestrator that lists PRs labeled beta, merges them sequentially into the beta branch, and delegates conflict resolution to an AI agent (opencode run with gpt-5.3-codex) before validating with typecheck and the single-file compiled build.",
+      "tags": ["release-automation", "agent-orchestration", "git-merge", "ci-cd", "cli-script"],
+      "complexity": "complex",
+      "languageNotes": "Uses Bun's tagged-template shell ($`...`) for subprocess control, and verifies pushes by comparing git tree hashes of beta against origin/dev rather than trusting exit codes."
+    },
+    {
+      "id": "function:script/beta.ts:commentOnPR",
+      "type": "function",
+      "name": "commentOnPR",
+      "filePath": "script/beta.ts",
+      "lineRange": [21, 34],
+      "summary": "Posts a formatted failure comment on a PR via gh pr comment explaining why it was excluded from or failed during the beta merge batch.",
+      "tags": ["github-cli", "reporting", "utility"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:script/beta.ts:cleanup",
+      "type": "function",
+      "name": "cleanup",
+      "filePath": "script/beta.ts",
+      "lineRange": [44, 54],
+      "summary": "Aborts any in-progress merge and hard-resets the local beta branch back to origin/beta before retrying a PR merge.",
+      "tags": ["git", "error-recovery", "utility"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:script/beta.ts:typecheck",
+      "type": "function",
+      "name": "typecheck",
+      "filePath": "script/beta.ts",
+      "lineRange": [73, 83],
+      "summary": "Runs bun typecheck inside packages/opencode, returning whether it succeeded while streaming its output.",
+      "tags": ["typecheck", "validation", "build-system"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:script/beta.ts:build",
+      "type": "function",
+      "name": "build",
+      "filePath": "script/beta.ts",
+      "lineRange": [85, 95],
+      "summary": "Runs the self-contained single-file compiled build (script/build.ts --single) in packages/opencode as a beta-branch smoke gate.",
+      "tags": ["build-system", "validation", "compile"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:script/beta.ts:commitSmokeChanges",
+      "type": "function",
+      "name": "commitSmokeChanges",
+      "filePath": "script/beta.ts",
+      "lineRange": [103, 128],
+      "summary": "Commits any working-tree changes left behind by agent-driven fixes during smoke validation, then re-runs typecheck and build to confirm the committed state is clean.",
+      "tags": ["git", "validation", "error-recovery"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:script/beta.ts:install",
+      "type": "function",
+      "name": "install",
+      "filePath": "script/beta.ts",
+      "lineRange": [130, 142],
+      "summary": "Regenerates dependency state by removing bun.lock and node_modules then running bun install, used when bun.lock conflicts must not be hand-merged.",
+      "tags": ["bun", "dependencies", "recovery"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:script/beta.ts:fix",
+      "type": "function",
+      "name": "fix",
+      "filePath": "script/beta.ts",
+      "lineRange": [144, 189],
+      "summary": "Builds a detailed conflict-resolution prompt (merged/pending PR context, bun.lock and deletion rules, typecheck instructions) and spawns opencode run to resolve the in-progress merge, then verifies no unmerged files remain.",
+      "tags": ["agent-orchestration", "merge-conflict", "prompting", "automation"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:script/beta.ts:smoke",
+      "type": "function",
+      "name": "smoke",
+      "filePath": "script/beta.ts",
+      "lineRange": [191, 217],
+      "summary": "Final deterministic smoke gate: runs typecheck and the single-file build after the whole batch, and on failure spawns an agent run instructed to fix merge-caused issues without committing.",
+      "tags": ["validation", "agent-orchestration", "smoke-test"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:script/beta.ts:main",
+      "type": "function",
+      "name": "main",
+      "filePath": "script/beta.ts",
+      "lineRange": [219, 355],
+      "summary": "Orchestrates the full beta batch: fetch open beta-labeled PRs via gh, merge each into beta (routing conflicts to fix/cleanup/commentOnPR), push, verify remote tree hashes, run the smoke gate, and push again if the agent changed anything.",
+      "tags": ["orchestration", "release-automation", "git", "cli-script"],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:script/changelog.ts",
+      "type": "file",
+      "name": "changelog.ts",
+      "filePath": "script/changelog.ts",
+      "summary": "CLI wrapper that regenerates UPCOMING_CHANGELOG.md by spawning opencode run --command changelog with from/to/variant arguments, optionally reprinting the result or suppressing output unless the run fails.",
+      "tags": ["changelog", "release-tooling", "cli-wrapper", "automation"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:script/check-updates.ts",
+      "type": "file",
+      "name": "check-updates.ts",
+      "filePath": "script/check-updates.ts",
+      "summary": "Monorepo-wide dependency update scanner: discovers every workspace package.json, filters pinned versions, queries the npm registry for the latest same-major release, and reports or applies (--apply, --apply --install) available minor/patch upgrades.",
+      "tags": ["dependency-management", "npm", "maintenance", "cli-script"],
+      "complexity": "complex",
+      "languageNotes": "Deliberately skips non-pinned specifiers (catalog:, workspace:, ^, ~, github:, npm:, file:) so only exact-pin dependencies are rewritten."
+    },
+    {
+      "id": "function:script/check-updates.ts:findPackageJsonFiles",
+      "type": "function",
+      "name": "findPackageJsonFiles",
+      "filePath": "script/check-updates.ts",
+      "lineRange": [28, 38],
+      "summary": "Recursively collects all package.json files under the repo while skipping node_modules, dist, .git and other noise directories.",
+      "tags": ["filesystem", "traversal", "utility"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:script/check-updates.ts:fetchLatestVersion",
+      "type": "function",
+      "name": "fetchLatestVersion",
+      "filePath": "script/check-updates.ts",
+      "lineRange": [58, 69],
+      "summary": "Fetches a package's dist-tags from the npm registry with a timeout, returning the latest tag or null on failure.",
+      "tags": ["npm", "registry-api", "network"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:script/check-updates.ts:fetchVersionsInRange",
+      "type": "function",
+      "name": "fetchVersionsInRange",
+      "filePath": "script/check-updates.ts",
+      "lineRange": [72, 96],
+      "summary": "Fetches the full npm version list for a package and returns the newest non-prerelease release within the given major, used to propose safe minor/patch bumps.",
+      "tags": ["npm", "semver", "registry-api"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:script/dedupe-opentui.ts",
+      "type": "file",
+      "name": "dedupe-opentui.ts",
+      "filePath": "script/dedupe-opentui.ts",
+      "summary": "Maintenance script that re-points package-local @opentui symlinks (including inside opentui-spinner's .bun entries) at the root hoisted copies so Bun resolves a single module instance across the workspace.",
+      "tags": ["maintenance", "bun", "symlink", "monorepo", "node-modules"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:script/dedupe-opentui.ts:relink",
+      "type": "function",
+      "name": "relink",
+      "filePath": "script/dedupe-opentui.ts",
+      "lineRange": [13, 29],
+      "summary": "Replaces a package-local symlink with a fresh relative symlink targeting the root hoisted copy, skipping silently when no root link exists.",
+      "tags": ["symlink", "filesystem", "utility"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:script/duplicate-pr.ts",
+      "type": "file",
+      "name": "duplicate-pr.ts",
+      "filePath": "script/duplicate-pr.ts",
+      "summary": "Boots an embedded opencode server via the SDK's createOpencode and prompts the duplicate-pr agent with a message plus an optional attached file, printing the agent's final text response.",
+      "tags": ["automation", "sdk-client", "agent-orchestration", "cli-script"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:script/duplicate-pr.ts:main",
+      "type": "function",
+      "name": "main",
+      "filePath": "script/duplicate-pr.ts",
+      "lineRange": [8, 77],
+      "summary": "Parses CLI args, assembles text/file prompt parts, creates a session on the embedded server, sends the duplicate-pr agent prompt with a 2-minute timeout, and prints the returned text part.",
+      "tags": ["cli-script", "sdk-client", "orchestration"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:script/format.ts",
+      "type": "file",
+      "name": "format.ts",
+      "filePath": "script/format.ts",
+      "summary": "One-liner developer script that runs Prettier with --ignore-unknown --write across the whole repository.",
+      "tags": ["formatting", "prettier", "developer-tooling"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:script/generate.ts",
+      "type": "file",
+      "name": "generate.ts",
+      "filePath": "script/generate.ts",
+      "summary": "SDK regeneration pipeline: runs the sdk/js build script, dumps the openapi.json schema from the dev server, and formats the result via script/format.ts.",
+      "tags": ["code-generation", "sdk", "openapi", "developer-tooling"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:script/github/close-issues.ts",
+      "type": "file",
+      "name": "close-issues.ts",
+      "filePath": "script/github/close-issues.ts",
+      "summary": "GitHub maintenance job that finds issues in anomalyco/opencode with no activity for 60 days and closes them via the REST API, first posting an explanatory comment with reopen guidance.",
+      "tags": ["github-api", "issue-triage", "automation", "ci-cd"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:script/github/close-issues.ts:close",
+      "type": "function",
+      "name": "close",
+      "filePath": "script/github/close-issues.ts",
+      "lineRange": [27, 45],
+      "summary": "Posts the stale-issue notice comment and then closes a single issue through the GitHub REST API.",
+      "tags": ["github-api", "rest", "utility"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:script/github/close-issues.ts:main",
+      "type": "function",
+      "name": "main",
+      "filePath": "script/github/close-issues.ts",
+      "lineRange": [47, 91],
+      "summary": "Searches for open issues updated before the 60-day cutoff and invokes close on each one, logging progress.",
+      "tags": ["github-api", "search", "orchestration"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:script/hooks",
+      "type": "file",
+      "name": "hooks",
+      "filePath": "script/hooks",
+      "summary": "POSIX shell installer that writes a .git/hooks/pre-push hook running bun install (best-effort) followed by bun run typecheck so pushes are blocked on type errors.",
+      "tags": ["git-hooks", "typecheck", "developer-tooling", "shell"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:script/publish.ts",
+      "type": "file",
+      "name": "publish.ts",
+      "filePath": "script/publish.ts",
+      "summary": "Root release publisher: rewrites the version field in every workspace package.json, rebuilds the SDK, delegates to the per-package publish scripts, then commits/tags/pushes the release, syncs versions back to dev, and un-drafts the GitHub release.",
+      "tags": ["release-automation", "npm-publish", "versioning", "ci-cd"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:script/publish.ts:prepareReleaseFiles",
+      "type": "function",
+      "name": "prepareReleaseFiles",
+      "filePath": "script/publish.ts",
+      "lineRange": [19, 29],
+      "summary": "Rewrites the version string in every discovered package.json, then runs bun install and the SDK build script so all artifacts carry the release version.",
+      "tags": ["versioning", "release-automation", "utility"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:script/raw-changelog.ts",
+      "type": "file",
+      "name": "raw-changelog.ts",
+      "filePath": "script/raw-changelog.ts",
+      "summary": "Deterministic changelog generator: pages the GitHub compare API between two refs, classifies commits by product area (Core/TUI/App/SDK/Extensions) from touched paths and conventional-commit type, drops reverted commits, computes first-time contributors, and renders the grouped markdown release notes.",
+      "tags": ["changelog", "release-tooling", "github-api", "cli-script"],
+      "complexity": "complex",
+      "languageNotes": "Mixes gh api/git plumbing with pure data shaping; team members (from .github/TEAM_MEMBERS) and bots are excluded from contributor credit."
+    },
+    {
+      "id": "function:script/raw-changelog.ts:diff",
+      "type": "function",
+      "name": "diff",
+      "filePath": "script/raw-changelog.ts",
+      "lineRange": [58, 72],
+      "summary": "Pages through the GitHub compare API between two refs collecting commit shas, author logins, and messages into a flat list.",
+      "tags": ["github-api", "pagination", "utility"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:script/raw-changelog.ts:reverted",
+      "type": "function",
+      "name": "reverted",
+      "filePath": "script/raw-changelog.ts",
+      "lineRange": [87, 109],
+      "summary": "Pairs commits with their later Revert \"...\" counterparts and removes both from the changelog candidate set.",
+      "tags": ["git", "filtering", "changelog"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:script/raw-changelog.ts:commits",
+      "type": "function",
+      "name": "commits",
+      "filePath": "script/raw-changelog.ts",
+      "lineRange": [111, 151],
+      "summary": "Builds the changelog commit list: fetches the compare diff, enriches each commit with product areas inferred from git diff-tree file paths, and filters out reverted commits.",
+      "tags": ["git", "classification", "changelog"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:script/raw-changelog.ts:contributors",
+      "type": "function",
+      "name": "contributors",
+      "filePath": "script/raw-changelog.ts",
+      "lineRange": [153, 167],
+      "summary": "Maps external contributor logins to the commits they authored, excluding team members and bot accounts from credit.",
+      "tags": ["contributors", "filtering", "changelog"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:script/raw-changelog.ts:published",
+      "type": "function",
+      "name": "published",
+      "filePath": "script/raw-changelog.ts",
+      "lineRange": [169, 178],
+      "summary": "Fetches the body of an already-published GitHub release and extracts its contributor-thanks section for reuse.",
+      "tags": ["github-api", "release-notes", "utility"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:script/raw-changelog.ts:thanks",
+      "type": "function",
+      "name": "thanks",
+      "filePath": "script/raw-changelog.ts",
+      "lineRange": [180, 193],
+      "summary": "Renders the first-time contributor thanks lines, combining freshly computed contributors with names already credited in previous releases.",
+      "tags": ["contributors", "release-notes", "formatting"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:script/raw-changelog.ts:format",
+      "type": "function",
+      "name": "format",
+      "filePath": "script/raw-changelog.ts",
+      "lineRange": [195, 247],
+      "summary": "Groups commits into area sections and conventional-commit types, then renders the final markdown release notes with compare links and the thanks section.",
+      "tags": ["formatting", "markdown", "changelog"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:script/release",
+      "type": "file",
+      "name": "release",
+      "filePath": "script/release",
+      "summary": "Tiny bash wrapper that dispatches a release by running gh workflow run publish.yml with a bump type argument (default patch).",
+      "tags": ["release-automation", "github-actions", "shell", "cli-script"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:script/sign-windows.ps1",
+      "type": "file",
+      "name": "sign-windows.ps1",
+      "filePath": "script/sign-windows.ps1",
+      "summary": "PowerShell release step that signs Windows binaries with Azure Trusted Signing (TrustedSigning module, RFC3161 timestamping); safely no-ops outside GitHub Actions or when Azure credentials are absent.",
+      "tags": ["code-signing", "azure", "windows", "release-automation", "security"],
+      "complexity": "moderate",
+      "languageNotes": "Uses a ValueFromRemainingArguments param to accept arbitrary file paths and pins the TrustedSigning module to version 0.5.8 for reproducibility."
+    },
+    {
+      "id": "file:script/stats.ts",
+      "type": "file",
+      "name": "stats.ts",
+      "filePath": "script/stats.ts",
+      "summary": "Analytics job that aggregates GitHub release asset downloads and npm download counts for the opencode packages, rewrites the README stats table, and ships the metrics to PostHog.",
+      "tags": ["analytics", "monitoring", "github-api", "npm", "automation"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:script/stats.ts:sendToPostHog",
+      "type": "function",
+      "name": "sendToPostHog",
+      "filePath": "script/stats.ts",
+      "lineRange": [3, 29],
+      "summary": "Posts an analytics event to the PostHog capture endpoint under the download distinct_id, warning instead of failing when no API key is configured.",
+      "tags": ["analytics", "posthog", "network"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:script/stats.ts:fetchNpmDownloads",
+      "type": "function",
+      "name": "fetchNpmDownloads",
+      "filePath": "script/stats.ts",
+      "lineRange": [52, 68],
+      "summary": "Queries the npm downloads API over a deliberately over-wide date range and sums the daily download counts for a package.",
+      "tags": ["npm", "analytics", "network"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:script/stats.ts:fetchReleases",
+      "type": "function",
+      "name": "fetchReleases",
+      "filePath": "script/stats.ts",
+      "lineRange": [70, 95],
+      "summary": "Pages through the GitHub releases API collecting tag names and per-asset download counts, with a small delay between pages to respect rate limits.",
+      "tags": ["github-api", "pagination", "analytics"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:script/stats.ts:calculate",
+      "type": "function",
+      "name": "calculate",
+      "filePath": "script/stats.ts",
+      "lineRange": [97, 123],
+      "summary": "Sums asset download counts across releases and groups them into per-platform statistics entries.",
+      "tags": ["aggregation", "analytics", "utility"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:script/stats.ts:save",
+      "type": "function",
+      "name": "save",
+      "filePath": "script/stats.ts",
+      "lineRange": [125, 189],
+      "summary": "Parses the existing README stats table, computes week-over-week deltas for GitHub, npm, and total downloads, rewrites the row, commits via git, and emits PostHog events.",
+      "tags": ["reporting", "readme", "git", "analytics"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:script/upgrade-opentui.ts",
+      "type": "file",
+      "name": "upgrade-opentui.ts",
+      "filePath": "script/upgrade-opentui.ts",
+      "summary": "Bumps @opentui/core, @opentui/keymap, and @opentui/solid across every workspace package.json and the root catalog, preserving range prefixes (^, ~, >=) and skipping catalog:/workspace: references.",
+      "tags": ["dependency-management", "monorepo", "maintenance", "opentui"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:script/upgrade-opentui.ts:editDeps",
+      "type": "function",
+      "name": "editDeps",
+      "filePath": "script/upgrade-opentui.ts",
+      "lineRange": [28, 41],
+      "summary": "Rewrites the @opentui dependency entries in a package.json dependencies object, keeping each entry's existing range prefix style.",
+      "tags": ["versioning", "transformation", "utility"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:script/upgrade-opentui.ts:editCatalog",
+      "type": "function",
+      "name": "editCatalog",
+      "filePath": "script/upgrade-opentui.ts",
+      "lineRange": [43, 54],
+      "summary": "Sets the @opentui entries in the root package.json catalog to the exact target version.",
+      "tags": ["versioning", "catalog", "transformation"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:script/version.ts",
+      "type": "file",
+      "name": "version.ts",
+      "filePath": "script/version.ts",
+      "summary": "CI release bootstrap: emits version/tag/release outputs to GITHUB_OUTPUT and creates a draft GitHub release, generating changelog notes via script/changelog.ts for stable builds or an empty beta draft for preview channels.",
+      "tags": ["release-automation", "github-cli", "versioning", "ci-cd"],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:specs/project.md",
+      "type": "document",
+      "name": "project.md",
+      "filePath": "specs/project.md",
+      "summary": "Design spec draft for running sessions across multiple projects and worktrees, sketching a project-scoped REST API (/project/:projectID/session/...) with message, revert, permission, and file endpoints.",
+      "tags": ["documentation", "api-design", "spec", "architecture"],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:specs/v2/session.md",
+      "type": "document",
+      "name": "session.md",
+      "filePath": "specs/v2/session.md",
+      "summary": "V2 spec note justifying removal of the dedicated POST /session/:sessionID/init route, which is only a wrapper around the existing /init command flow, to avoid Session.initialize-style special cases.",
+      "tags": ["documentation", "api-design", "v2", "spec"],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:specs/v2/todo.md",
+      "type": "document",
+      "name": "todo.md",
+      "filePath": "specs/v2/todo.md",
+      "summary": "V2 architecture roadmap listing eleven workstreams with owners: replacing Hono, a new data mode, agent loop and compaction reworks, plugin API, config/auth/model-database/provider/event redesigns, and hot-reloadability.",
+      "tags": ["documentation", "roadmap", "architecture", "v2"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:sst-env.d.ts",
+      "type": "file",
+      "name": "sst-env.d.ts",
+      "filePath": "sst-env.d.ts",
+      "summary": "Auto-generated SST ambient declarations enumerating every infra resource (Cloudflare Workers, KV, R2 buckets, SolidStart console, secrets) so sst resource references are fully typed in application code.",
+      "tags": ["type-definition", "infrastructure", "codegen", "sst"],
+      "complexity": "complex",
+      "languageNotes": "Header marks it as machine-generated by SST; it augments the Resource interface inside the 'sst' module declaration and should never be hand-edited."
+    },
+    {
+      "id": "file:sst.config.ts",
+      "type": "file",
+      "name": "sst.config.ts",
+      "filePath": "sst.config.ts",
+      "summary": "SST infrastructure entry point: defines the opencode app on Cloudflare with Stripe/PlanetScale/Honeycomb providers, production protect/retain policies, and dynamically imports the app, console, enterprise, and monitoring stacks.",
+      "tags": ["infrastructure", "sst", "configuration", "cloudflare", "entry-point"],
+      "complexity": "simple"
+    }
+  ],
+  "edges": [
+    { "source": "file:script/beta.ts", "target": "function:script/beta.ts:commentOnPR", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:script/beta.ts", "target": "function:script/beta.ts:cleanup", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:script/beta.ts", "target": "function:script/beta.ts:typecheck", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:script/beta.ts", "target": "function:script/beta.ts:build", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:script/beta.ts", "target": "function:script/beta.ts:commitSmokeChanges", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:script/beta.ts", "target": "function:script/beta.ts:install", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:script/beta.ts", "target": "function:script/beta.ts:fix", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:script/beta.ts", "target": "function:script/beta.ts:smoke", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:script/beta.ts", "target": "function:script/beta.ts:main", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:script/check-updates.ts", "target": "function:script/check-updates.ts:findPackageJsonFiles", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:script/check-updates.ts", "target": "function:script/check-updates.ts:fetchLatestVersion", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:script/check-updates.ts", "target": "function:script/check-updates.ts:fetchVersionsInRange", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:script/dedupe-opentui.ts", "target": "function:script/dedupe-opentui.ts:relink", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:script/duplicate-pr.ts", "target": "function:script/duplicate-pr.ts:main", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:script/github/close-issues.ts", "target": "function:script/github/close-issues.ts:close", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:script/github/close-issues.ts", "target": "function:script/github/close-issues.ts:main", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:script/publish.ts", "target": "function:script/publish.ts:prepareReleaseFiles", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:script/raw-changelog.ts", "target": "function:script/raw-changelog.ts:diff", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:script/raw-changelog.ts", "target": "function:script/raw-changelog.ts:reverted", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:script/raw-changelog.ts", "target": "function:script/raw-changelog.ts:commits", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:script/raw-changelog.ts", "target": "function:script/raw-changelog.ts:contributors", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:script/raw-changelog.ts", "target": "function:script/raw-changelog.ts:published", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:script/raw-changelog.ts", "target": "function:script/raw-changelog.ts:thanks", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:script/raw-changelog.ts", "target": "function:script/raw-changelog.ts:format", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:script/stats.ts", "target": "function:script/stats.ts:sendToPostHog", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:script/stats.ts", "target": "function:script/stats.ts:fetchNpmDownloads", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:script/stats.ts", "target": "function:script/stats.ts:fetchReleases", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:script/stats.ts", "target": "function:script/stats.ts:calculate", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:script/stats.ts", "target": "function:script/stats.ts:save", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:script/upgrade-opentui.ts", "target": "function:script/upgrade-opentui.ts:editDeps", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:script/upgrade-opentui.ts", "target": "function:script/upgrade-opentui.ts:editCatalog", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:script/version.ts", "target": "file:script/changelog.ts", "type": "depends_on", "direction": "forward", "weight": 0.6 },
+    { "source": "file:script/generate.ts", "target": "file:script/format.ts", "type": "depends_on", "direction": "forward", "weight": 0.6 },
+    { "source": "file:script/generate.ts", "target": "file:packages/sdk/js/script/build.ts", "type": "depends_on", "direction": "forward", "weight": 0.6 },
+    { "source": "file:script/publish.ts", "target": "file:packages/opencode/script/publish.ts", "type": "depends_on", "direction": "forward", "weight": 0.6 },
+    { "source": "file:script/publish.ts", "target": "file:packages/sdk/js/script/publish.ts", "type": "depends_on", "direction": "forward", "weight": 0.6 },
+    { "source": "file:script/publish.ts", "target": "file:packages/plugin/script/publish.ts", "type": "depends_on", "direction": "forward", "weight": 0.6 },
+    { "source": "file:script/beta.ts", "target": "file:packages/opencode/script/build.ts", "type": "depends_on", "direction": "forward", "weight": 0.6 },
+    { "source": "file:script/release", "target": "pipeline:.github/workflows/publish.yml", "type": "triggers", "direction": "forward", "weight": 0.6 },
+    { "source": "file:sst.config.ts", "target": "file:infra/app.ts", "type": "depends_on", "direction": "forward", "weight": 0.6 },
+    { "source": "file:sst.config.ts", "target": "file:infra/console.ts", "type": "depends_on", "direction": "forward", "weight": 0.6 },
+    { "source": "file:sst.config.ts", "target": "file:infra/enterprise.ts", "type": "depends_on", "direction": "forward", "weight": 0.6 },
+    { "source": "file:sst.config.ts", "target": "file:infra/monitoring.ts", "type": "depends_on", "direction": "forward", "weight": 0.6 },
+    { "source": "file:sst.config.ts", "target": "file:sst-env.d.ts", "type": "related", "direction": "forward", "weight": 0.5 },
+    { "source": "document:specs/v2/session.md", "target": "file:packages/opencode/src/v2/session.ts", "type": "documents", "direction": "forward", "weight": 0.5 },
+    { "source": "document:specs/project.md", "target": "document:specs/v2/session.md", "type": "related", "direction": "forward", "weight": 0.5 },
+    { "source": "document:specs/v2/todo.md", "target": "document:specs/v2/session.md", "type": "related", "direction": "forward", "weight": 0.5 }
+  ]
+}

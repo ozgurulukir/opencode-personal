@@ -157,7 +157,10 @@ export class RunFooter implements FooterApi {
   private destroyed = false
   private prompts = new Set<(input: RunPrompt) => void>()
   private closes = new Set<() => void>()
-  // Microtask-coalesced commit queue. Flushed on next microtask or on close/destroy.
+  // Coalesced commit queue. Flushed on next macrotask or on close/destroy.
+  // Using setTimeout(0) instead of queueMicrotask lets I/O events (keypress,
+  // ESC interrupt) drain between flush cycles, preventing microtask starvation
+  // when settle() is slow.
   private queue: StreamCommit[] = []
   private pending = false
   private flushing: Promise<void> = Promise.resolve()
@@ -442,8 +445,10 @@ export class RunFooter implements FooterApi {
 
   // Queues a scrollback commit. Consecutive progress chunks for the same
   // part coalesce by appending text, reducing the number of retained-surface
-  // updates. Actual flush happens on the next microtask, so a burst of events
-  // from one reducer pass becomes a single ordered drain.
+  // updates. Actual flush happens on the next macrotask (setTimeout 0), so a
+  // burst of events from one reducer pass becomes a single ordered drain.
+  // setTimeout is used instead of queueMicrotask to let I/O events (keypress,
+  // ESC) drain between flush cycles — microtasks would starve them.
   public append(commit: StreamCommit): void {
     if (this.isGone) {
       return
@@ -469,10 +474,10 @@ export class RunFooter implements FooterApi {
     }
 
     this.pending = true
-    queueMicrotask(() => {
+    setTimeout(() => {
       this.pending = false
       this.flush()
-    })
+    }, 0)
   }
 
   public idle(): Promise<void> {
@@ -818,6 +823,9 @@ export class RunFooter implements FooterApi {
   // Drains the commit queue to scrollback. The surface manager owns grouping,
   // spacing, and progressive markdown/code settling so direct mode can append
   // immutable transcript rows without rewriting history.
+  // After each batch completes, if new items arrived during the drain they are
+  // scheduled for the next flush — preventing unbounded queue growth (backpressure)
+  // when settle() is slower than the event arrival rate.
   private flush(): void {
     if (this.isGone || this.queue.length === 0) {
       this.queue.length = 0
@@ -842,6 +850,19 @@ export class RunFooter implements FooterApi {
           },
         ),
       )
+      .then(() => {
+        // If new commits arrived during the drain, schedule another flush
+        // instead of waiting for the next append() call. This keeps the drain
+        // loop self-sustaining under backpressure without growing the
+        // flushing promise chain unboundedly.
+        if (this.queue.length > 0 && !this.pending && !this.isGone) {
+          this.pending = true
+          setTimeout(() => {
+            this.pending = false
+            this.flush()
+          }, 0)
+        }
+      })
       .catch(() => {})
   }
 }

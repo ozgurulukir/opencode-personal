@@ -166,6 +166,26 @@ This symptom means the DB path has full content but the TUI streaming path lost 
 
 `MarkdownRenderable._blockStates` / `_stableBlockCount` / `settle()` are external `@opentui/core` APIs (not indexed by codebase-memory-mcp). `settle()` resolving does NOT guarantee all `_blockStates` entries are populated — `commitMarkdownBlocks` can return false on the final block (incomplete code fence, whitespace-only trailing block). `flushActive` has a force-commit fallback (`done && surface.height > committedRows`) to prevent content loss before `finishActive` destroys the surface.
 
+## `settle()` throttle and content-change skip
+
+`settle()` triggers tree-sitter re-parse of the **full accumulated content** (`renderable.content = active.content`). Called per-delta, it starves the event loop and delays keypress handling (ESC interrupt). Three optimizations in `scrollback.surface.ts`:
+
+1. **Throttle** (`SETTLE_THROTTLE_MS = 16`): `writeStreaming` skips `flushActive` when less than 16ms since last settle. Text bodies are exempt (they use `render()`, not `settle()`).
+2. **Content-change check**: `flushActive` skips settle when `active.content === active.lastSettledContent` (redundant re-parse). `lastSettledContent` is updated after each settle and reset in `createEntry`.
+3. **Streaming fallback**: When `commitMarkdownBlocks` returns false during streaming (`!done`), uncommitted surface rows are committed at row-level (`commitRows`) with `committedBlocks = _stableBlockCount` to prevent double-commit on next call.
+
+`finishActive` always calls `flushActive(true, ...)` — throttle and content-check are bypassed when `done=true`.
+
+## Footer flush: `setTimeout(0)` vs `queueMicrotask`
+
+`footer.ts` uses `setTimeout(0)` (not `queueMicrotask`) for flush scheduling. Microtasks run before I/O events — a burst of microtasks from streaming delays keypress/ESC handling. `setTimeout(0)` lets I/O events drain between flush cycles.
+
+`flush()` is self-sustaining: after each batch drain, if new commits arrived, it re-schedules via `setTimeout(0)` without waiting for the next `append()` call. This prevents unbounded queue growth (backpressure) when `scrollback.append` is slower than event arrival rate.
+
+## `runSync` → `runPromise` for TUI transport callbacks
+
+`stream.transport.ts` transport callbacks (`selectSubagent`, `runPromptTurn`, `close`) must use `runtime.runPromise`, not `runtime.runSync`. Even when the Effect is `Effect.sync()` (truly synchronous), `runSync` risks blocking the TUI event loop if the Effect ever becomes async. Use `void runtime.runPromise(...).catch(() => {})` to preserve the `void` return type.
+
 ## `reduceSubagentData` — `message.part.updated` branch is reachable
 
 `subagent-data.ts:782-784` handles `message.part.updated` by extracting

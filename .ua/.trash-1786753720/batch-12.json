@@ -1,0 +1,165 @@
+{
+  "nodes": [
+    {
+      "id": "document:packages/app/AGENTS.md",
+      "type": "document",
+      "name": "AGENTS.md",
+      "filePath": "packages/app/AGENTS.md",
+      "summary": "Workspace instructions for the packages/app web frontend covering local dev workflow (separate backend and Vite dev servers), SolidJS reactivity guardrails (prefer createStore, never fake createResource shapes), Bolt performance conventions with the ⚡ marker, i18n namespace rules, and browser automation commands.",
+      "tags": ["documentation", "agent-instructions", "conventions", "development"],
+      "complexity": "simple",
+      "languageNotes": "Agent instruction file injected as a user message on every LLM call; documents the historical use-filtered-list.tsx createResource regression (commit 016a457) as a hard rule."
+    },
+    {
+      "id": "document:packages/app/README.md",
+      "type": "document",
+      "name": "README.md",
+      "filePath": "packages/app/README.md",
+      "summary": "Package readme derived from the SolidJS Vite template, documenting available dev/build scripts, Playwright E2E setup with PLAYWRIGHT_* environment variables for pointing at a local opencode backend, and static hosting deployment of the dist folder.",
+      "tags": ["documentation", "overview", "getting-started", "testing"],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:packages/app/bunfig.toml",
+      "type": "config",
+      "name": "bunfig.toml",
+      "filePath": "packages/app/bunfig.toml",
+      "summary": "Bun runtime configuration for the package's unit tests: sets the test root to ./src and preloads happydom.ts so bun test runs against a happy-dom DOM shim.",
+      "tags": ["configuration", "testing", "bun", "test-environment"],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:packages/app/create-effect-simplification-spec.md",
+      "type": "document",
+      "name": "create-effect-simplification-spec.md",
+      "filePath": "packages/app/create-effect-simplification-spec.md",
+      "summary": "Implementation spec for reducing reactive misuse across packages/app/src (101 createEffect calls in 37 files). Defines an effect taxonomy with replacement rules (createMemo, keyed remounts, event handlers/actions, onMount/onCleanup, kept external bridges), a six-phase implementation plan, nine detailed work items by area, and verification/regression checks.",
+      "tags": ["documentation", "refactoring", "reactivity", "solidjs", "implementation-spec"],
+      "complexity": "complex",
+      "languageNotes": "Anchors every replacement rule to concrete file:line targets (session.tsx, layout.tsx, file-tabs.tsx, context providers), making it a executable refactor checklist rather than prose guidance."
+    },
+    {
+      "id": "file:packages/app/index.html",
+      "type": "file",
+      "name": "index.html",
+      "filePath": "packages/app/index.html",
+      "summary": "Vite entry HTML shell for the SolidJS web app: declares favicon/manifest/OG metadata, light and dark theme-color meta tags, a synchronous theme preload script, and mounts the app by loading /src/entry.tsx into the #root div.",
+      "tags": ["entry-point", "vite", "markup", "theming"],
+      "complexity": "simple",
+      "languageNotes": "Loads oc-theme-preload.js before the module bundle to apply the CSS theme variable before first paint, avoiding a flash of unstyled background."
+    },
+    {
+      "id": "config:packages/app/package.json",
+      "type": "config",
+      "name": "package.json",
+      "filePath": "packages/app/package.json",
+      "summary": "Package manifest for @opencode-ai/app, the SolidJS web frontend. Defines Vite dev/build/serve scripts, tsgo -b typechecking, bun unit tests with happydom preload, Playwright E2E scripts, and dependencies on the workspace sdk/ui/core packages plus the SolidJS, TanStack Query, and Shiki ecosystems.",
+      "tags": ["configuration", "package-manifest", "build-system", "dependencies"],
+      "complexity": "moderate",
+      "languageNotes": "Uses Bun workspace conventions throughout: catalog: references for shared versions, workspace:* for internal packages, and source .ts entry points via the exports map."
+    },
+    {
+      "id": "config:packages/app/tsconfig.json",
+      "type": "config",
+      "name": "tsconfig.json",
+      "filePath": "packages/app/tsconfig.json",
+      "summary": "TypeScript configuration for the app package: strict mode, composite project emitting declarations only into node_modules/.ts-dist, solid-js JSX preserve mode, bundler module resolution, and the @/* path alias mapped to ./src/*.",
+      "tags": ["configuration", "typescript", "build-system", "path-alias"],
+      "complexity": "simple",
+      "languageNotes": "composite + emitDeclarationOnly feeds the monorepo's tsgo -b project graph; its incremental .tsbuildinfo cache under node_modules/.ts-dist is a known source of stale typecheck results."
+    }
+  ],
+  "edges": [
+    {
+      "source": "config:packages/app/tsconfig.json",
+      "target": "file:packages/app/src/entry.tsx",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "config:packages/app/tsconfig.json",
+      "target": "file:packages/app/src/index.ts",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "config:packages/app/package.json",
+      "target": "file:packages/app/src/index.ts",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "config:packages/app/package.json",
+      "target": "file:packages/app/index.html",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "config:packages/app/bunfig.toml",
+      "target": "file:packages/app/happydom.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/app/index.html",
+      "target": "file:packages/app/src/entry.tsx",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "document:packages/app/README.md",
+      "target": "file:packages/app/src/entry.tsx",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/app/AGENTS.md",
+      "target": "file:packages/app/src/components/file-tree.tsx",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/app/create-effect-simplification-spec.md",
+      "target": "file:packages/app/src/pages/session.tsx",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/app/create-effect-simplification-spec.md",
+      "target": "file:packages/app/src/pages/layout.tsx",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/app/create-effect-simplification-spec.md",
+      "target": "file:packages/app/src/pages/session/file-tabs.tsx",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/app/create-effect-simplification-spec.md",
+      "target": "file:packages/app/src/context/file.tsx",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/app/AGENTS.md",
+      "target": "document:packages/app/create-effect-simplification-spec.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    }
+  ]
+}

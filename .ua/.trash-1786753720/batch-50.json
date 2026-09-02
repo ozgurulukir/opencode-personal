@@ -1,0 +1,600 @@
+{
+  "nodes": [
+    {
+      "id": "table:packages/opencode/migration/20260501142318_next_venus/migration.sql:session",
+      "type": "table",
+      "name": "20260501142318_next_venus/migration.sql",
+      "filePath": "packages/opencode/migration/20260501142318_next_venus/migration.sql",
+      "summary": "SQLite migration adding `agent` and `model` text columns to the `session` table to record which agent and model each session ran with.",
+      "tags": ["database", "migration", "sqlite", "drizzle"],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:packages/opencode/migration/20260501142318_next_venus/snapshot.json",
+      "type": "config",
+      "name": "20260501142318_next_venus/snapshot.json",
+      "filePath": "packages/opencode/migration/20260501142318_next_venus/snapshot.json",
+      "summary": "Generated drizzle-kit snapshot of the SQLite schema state after the next_venus migration.",
+      "tags": ["database", "drizzle", "generated", "schema-definition"],
+      "complexity": "simple"
+    },
+    {
+      "id": "table:packages/opencode/migration/20260504145000_add_sync_owner/migration.sql:event_sequence",
+      "type": "table",
+      "name": "20260504145000_add_sync_owner/migration.sql",
+      "filePath": "packages/opencode/migration/20260504145000_add_sync_owner/migration.sql",
+      "summary": "SQLite migration adding an `owner_id` text column to the `event_sequence` table so event sequence numbers can be scoped per owner for sync.",
+      "tags": ["database", "migration", "sqlite", "drizzle"],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:packages/opencode/migration/20260504145000_add_sync_owner/snapshot.json",
+      "type": "config",
+      "name": "20260504145000_add_sync_owner/snapshot.json",
+      "filePath": "packages/opencode/migration/20260504145000_add_sync_owner/snapshot.json",
+      "summary": "Generated drizzle-kit snapshot of the SQLite schema state after the add_sync_owner migration.",
+      "tags": ["database", "drizzle", "generated", "schema-definition"],
+      "complexity": "simple"
+    },
+    {
+      "id": "table:packages/opencode/migration/20260507164347_add_workspace_time/migration.sql:workspace",
+      "type": "table",
+      "name": "20260507164347_add_workspace_time/migration.sql",
+      "filePath": "packages/opencode/migration/20260507164347_add_workspace_time/migration.sql",
+      "summary": "SQLite migration adding a `time_used` integer column (NOT NULL DEFAULT 0) to the `workspace` table for cumulative usage tracking.",
+      "tags": ["database", "migration", "sqlite", "drizzle"],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:packages/opencode/migration/20260507164347_add_workspace_time/snapshot.json",
+      "type": "config",
+      "name": "20260507164347_add_workspace_time/snapshot.json",
+      "filePath": "packages/opencode/migration/20260507164347_add_workspace_time/snapshot.json",
+      "summary": "Generated drizzle-kit snapshot of the SQLite schema state after the add_workspace_time migration.",
+      "tags": ["database", "drizzle", "generated", "schema-definition"],
+      "complexity": "simple"
+    },
+    {
+      "id": "table:packages/opencode/migration/20260511000411_data_migration_state/migration.sql:data_migration",
+      "type": "table",
+      "name": "20260511000411_data_migration_state/migration.sql",
+      "filePath": "packages/opencode/migration/20260511000411_data_migration_state/migration.sql",
+      "summary": "SQLite migration creating the `data_migration` table (name primary key, time_completed) that tracks which data backfills have already run.",
+      "tags": ["database", "migration", "sqlite", "drizzle"],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:packages/opencode/migration/20260511000411_data_migration_state/snapshot.json",
+      "type": "config",
+      "name": "20260511000411_data_migration_state/snapshot.json",
+      "filePath": "packages/opencode/migration/20260511000411_data_migration_state/snapshot.json",
+      "summary": "Generated drizzle-kit snapshot of the SQLite schema state after the data_migration_state migration.",
+      "tags": ["database", "drizzle", "generated", "schema-definition"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/opencode/parsers-config.ts",
+      "type": "file",
+      "name": "parsers-config.ts",
+      "filePath": "packages/opencode/parsers-config.ts",
+      "summary": "Declarative registry of tree-sitter parser definitions mapping 26 filetypes to downloadable WASM parser binaries and highlight/local/injection query URLs used for TUI syntax highlighting.",
+      "tags": ["config", "tree-sitter", "syntax-highlighting", "data-model", "tui"],
+      "complexity": "moderate",
+      "languageNotes": "Pure data module (default-exported object) with no logic; comments document nvim-treesitter query incompatibilities and the 'inherits: ecma' dependency rule when copying queries."
+    },
+    {
+      "id": "file:packages/opencode/script/build-node.ts",
+      "type": "file",
+      "name": "build-node.ts",
+      "filePath": "packages/opencode/script/build-node.ts",
+      "summary": "Builds the Node.js-target distribution from src/node.ts with Bun.build, embedding all SQL migrations and the release channel as compile-time defines.",
+      "tags": ["build-system", "node", "bun", "script"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:packages/opencode/script/build.ts",
+      "type": "file",
+      "name": "build.ts",
+      "filePath": "packages/opencode/script/build.ts",
+      "summary": "The main Bun.build --compile pipeline producing self-contained cross-platform opencode binaries (12 linux/darwin/windows targets), patching @opentui/core's parser worker to use a static WASM file import with a WASI shim, injecting diff-wasm and embedded Web UI as virtual files, and uploading release artifacts to GitHub.",
+      "tags": ["build-system", "binary-compilation", "wasm", "cross-platform", "release"],
+      "complexity": "complex",
+      "languageNotes": "Key compile-mode trick: dynamic import(..., { with: { type: \"wasm\" } }) cannot be resolved by Bun.build --compile, so the worker source string is patched to a static `import ... with { type: \"file\" }` and injected via Bun.build's `files` virtual-file map, resolving to /$bunfs/root/<name> at runtime."
+    },
+    {
+      "id": "file:packages/opencode/script/check-migrations.ts",
+      "type": "file",
+      "name": "check-migrations.ts",
+      "filePath": "packages/opencode/script/check-migrations.ts",
+      "summary": "CI guard that runs `bun drizzle-kit check` and exits non-zero when the Drizzle schema has changes not captured in generated migrations.",
+      "tags": ["database", "drizzle", "ci-check", "script"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/opencode/script/copy-wasm-glue.mjs",
+      "type": "file",
+      "name": "copy-wasm-glue.mjs",
+      "filePath": "packages/opencode/script/copy-wasm-glue.mjs",
+      "summary": "Postinstall helper copying onnxruntime-web's emscripten WASM glue (.mjs factory + .wasm binary) into src/search/wasm so semantic search can embed it in compiled binaries.",
+      "tags": ["wasm", "onnxruntime", "postinstall", "search", "script"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/opencode/script/fix-node-pty.ts",
+      "type": "file",
+      "name": "fix-node-pty.ts",
+      "filePath": "packages/opencode/script/fix-node-pty.ts",
+      "summary": "Postinstall helper restoring the executable bit on node-pty prebuilt spawn-helper binaries on non-Windows platforms, where archive extraction drops permissions.",
+      "tags": ["postinstall", "node-pty", "permissions", "script"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/opencode/script/generate.ts",
+      "type": "file",
+      "name": "generate.ts",
+      "filePath": "packages/opencode/script/generate.ts",
+      "summary": "Fetches the models.dev provider catalog (from env-overridable URL or local JSON) and writes the generated src/provider/models-snapshot.js plus its .d.ts declaration.",
+      "tags": ["code-generation", "models", "data-snapshot", "script"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/opencode/script/httpapi-exercise.ts",
+      "type": "file",
+      "name": "httpapi-exercise.ts",
+      "filePath": "packages/opencode/script/httpapi-exercise.ts",
+      "summary": "One-line launcher that dynamically imports the HTTP API exercise suite from test/server/httpapi-exercise.",
+      "tags": ["test-runner", "entry-point", "httpapi", "script"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/opencode/script/postinstall.mjs",
+      "type": "file",
+      "name": "postinstall.mjs",
+      "filePath": "packages/opencode/script/postinstall.mjs",
+      "summary": "npm postinstall script for the platform-package wrapper that locates the platform-specific opencode binary (opencode-<platform>-<arch>) and links or copies it into bin/.opencode with executable permissions.",
+      "tags": ["postinstall", "npm", "binary-setup", "platform-detection"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:packages/opencode/script/publish.ts",
+      "type": "file",
+      "name": "publish.ts",
+      "filePath": "packages/opencode/script/publish.ts",
+      "summary": "Release orchestration script that publishes platform packages to npm, builds and pushes a multi-arch Docker image, computes release checksums, and updates the Arch AUR PKGBUILD and Homebrew tap formulas.",
+      "tags": ["release", "npm-publish", "docker", "homebrew", "aur"],
+      "complexity": "complex",
+      "languageNotes": "Idempotent by design: checks `npm view name@version` before publishing and retries the AUR push loop up to 30 times to tolerate transient clone/checkout races."
+    },
+    {
+      "id": "file:packages/opencode/script/run-workspace-server",
+      "type": "file",
+      "name": "run-workspace-server",
+      "filePath": "packages/opencode/script/run-workspace-server",
+      "summary": "Development harness that runs a local opencode server as a simulated remote workspace, watching a JSON state file's mtime and restarting the dev server whenever the workspace definition changes.",
+      "tags": ["dev-tool", "workspace", "dev-server", "watcher", "debugging"],
+      "complexity": "moderate",
+      "languageNotes": "Extensionless Bun script (#!/usr/bin/env bun) — treated as TypeScript by the runtime; uses mtime double-read snapshots to avoid reading a JSON file mid-write."
+    },
+    {
+      "id": "file:packages/opencode/script/schema.ts",
+      "type": "file",
+      "name": "schema.ts",
+      "filePath": "packages/opencode/script/schema.ts",
+      "summary": "Generates JSON Schema files for the opencode config and TUI config from their zod schemas, preserving strictness (additionalProperties: false) and surfacing defaults as self-documenting examples.",
+      "tags": ["code-generation", "json-schema", "zod", "config"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:packages/opencode/script/time.ts",
+      "type": "file",
+      "name": "time.ts",
+      "filePath": "packages/opencode/script/time.ts",
+      "summary": "Micro-benchmark helper that dynamically imports a module path from argv and prints performance.now() after it finishes loading.",
+      "tags": ["utility", "benchmarking", "dev-tool", "script"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/opencode/script/trace-imports.ts",
+      "type": "file",
+      "name": "trace-imports.ts",
+      "filePath": "packages/opencode/script/trace-imports.ts",
+      "summary": "Development CLI that recursively traces the project-internal import chain from a given entry file using the TypeScript compiler API, printing a depth-indented dependency tree.",
+      "tags": ["dev-tool", "dependency-analysis", "typescript-compiler", "cli"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "document:packages/opencode/specs/openapi-translation-cleanup.md",
+      "type": "document",
+      "name": "openapi-translation-cleanup.md",
+      "filePath": "packages/opencode/specs/openapi-translation-cleanup.md",
+      "summary": "Incremental 7-PR plan to strip post-generation OpenAPI rewrites from the HttpApi public.ts transform hook until the generated spec is a direct projection of runtime route schemas, without breaking the generated SDK.",
+      "tags": ["documentation", "openapi", "sdk", "refactoring-plan", "api-schema"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "document:packages/opencode/specs/tui-plugins.md",
+      "type": "document",
+      "name": "tui-plugins.md",
+      "filePath": "packages/opencode/specs/tui-plugins.md",
+      "summary": "Specification for the TUI plugin system covering author package shape, npm install flow, version compatibility, the plugin API (keymaps, routes, dialogs, KV/state/client/events, themes, slots), lifecycle disposal rules, and the eight built-in internal plugins.",
+      "tags": ["documentation", "tui", "plugin-system", "specification"],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:packages/opencode/specs/v2/api.ts",
+      "type": "file",
+      "name": "v2/api.ts",
+      "filePath": "packages/opencode/specs/v2/api.ts",
+      "summary": "Executable spec exercising the @opencode-ai/core programmatic API end to end: registering tools and an openai agent, creating a session, prompting with text and image attachments, and reading back messages.",
+      "tags": ["example", "api-client", "sdk-usage", "spec"],
+      "complexity": "moderate",
+      "languageNotes": "Marked @ts-nocheck — a living usage sketch of the core API surface rather than typechecked production code."
+    },
+    {
+      "id": "function:packages/opencode/script/build.ts:createEmbeddedWebUIBundle",
+      "type": "function",
+      "name": "createEmbeddedWebUIBundle",
+      "filePath": "packages/opencode/script/build.ts",
+      "lineRange": [57, 91],
+      "summary": "Builds the web app package and generates a TypeScript module that statically imports every dist file with `with { type: \"file\" }` and re-exports them as a path map, allowing the Web UI to be embedded in the compiled binary; returns null on failure so builds continue without it.",
+      "tags": ["code-generation", "web-ui", "embedding", "build-step"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/opencode/script/postinstall.mjs:detectPlatformAndArch",
+      "type": "function",
+      "name": "detectPlatformAndArch",
+      "filePath": "packages/opencode/script/postinstall.mjs",
+      "lineRange": [12, 48],
+      "summary": "Maps os.platform()/os.arch() to npm package naming conventions (win32 → windows) to derive the platform-specific binary package name.",
+      "tags": ["platform-detection", "utility", "postinstall"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/script/postinstall.mjs:findBinary",
+      "type": "function",
+      "name": "findBinary",
+      "filePath": "packages/opencode/script/postinstall.mjs",
+      "lineRange": [50, 69],
+      "summary": "Resolves the opencode-<platform>-<arch> package via require.resolve and verifies its bin/opencode(.exe) binary exists, throwing a wrapped error otherwise.",
+      "tags": ["binary-setup", "module-resolution", "postinstall"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/script/postinstall.mjs:main",
+      "type": "function",
+      "name": "main",
+      "filePath": "packages/opencode/script/postinstall.mjs",
+      "lineRange": [71, 95],
+      "summary": "Postinstall entry point: skips setup on Windows (exe ships in the package), otherwise hard-links or copies the resolved platform binary to bin/.opencode and marks it executable.",
+      "tags": ["postinstall", "entry-point", "binary-setup"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/script/publish.ts:publish",
+      "type": "function",
+      "name": "publish",
+      "filePath": "packages/opencode/script/publish.ts",
+      "lineRange": [14, 24],
+      "summary": "Publishes one built package directory to npm if the version is not already published, fixing executable permissions first because GitHub artifact downloads can drop the exec bit.",
+      "tags": ["npm-publish", "release", "idempotent"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/script/run-workspace-server:readDataMtime",
+      "type": "function",
+      "name": "readDataMtime",
+      "filePath": "packages/opencode/script/run-workspace-server",
+      "lineRange": [24, 34],
+      "summary": "Returns the mtime of the dev workspace state file, or undefined when it does not yet exist (ENOENT), rethrowing any other error.",
+      "tags": ["utility", "file-system", "watcher"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/script/run-workspace-server:readSnapshot",
+      "type": "function",
+      "name": "readSnapshot",
+      "filePath": "packages/opencode/script/run-workspace-server",
+      "lineRange": [36, 60],
+      "summary": "Polls until the workspace state JSON can be read atomically, using a before/after mtime comparison to guarantee the file was not rewritten mid-read.",
+      "tags": ["watcher", "polling", "consistency", "file-system"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/opencode/script/run-workspace-server:startDevServer",
+      "type": "function",
+      "name": "startDevServer",
+      "filePath": "packages/opencode/script/run-workspace-server",
+      "lineRange": [62, 75],
+      "summary": "Spawns `bun run dev serve` as a child process on the port from the workspace state, merging its env overrides and redirecting XDG_DATA_HOME to /tmp/data.",
+      "tags": ["dev-server", "process-spawn", "dev-tool"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/script/schema.ts:generate",
+      "type": "function",
+      "name": "generate",
+      "filePath": "packages/opencode/script/schema.ts",
+      "lineRange": [7, 52],
+      "summary": "Converts a zod schema to a self-documenting JSON Schema via z.toJSONSchema, forcing additionalProperties: false on objects and promoting string defaults into examples and description suffixes, then flags the result as JSONC-tolerant.",
+      "tags": ["json-schema", "zod", "code-generation", "config"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/opencode/script/trace-imports.ts:resolveImport",
+      "type": "function",
+      "name": "resolveImport",
+      "filePath": "packages/opencode/script/trace-imports.ts",
+      "lineRange": [12, 23],
+      "summary": "Resolves an import specifier relative to the importing file, handling alias, absolute, and relative forms.",
+      "tags": ["module-resolution", "utility", "dependency-analysis"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/script/trace-imports.ts:tryExtensions",
+      "type": "function",
+      "name": "tryExtensions",
+      "filePath": "packages/opencode/script/trace-imports.ts",
+      "lineRange": [29, 56],
+      "summary": "Resolves a bare file path to an actual file by probing directories for an index file and appending common TypeScript/JavaScript extensions.",
+      "tags": ["module-resolution", "file-system", "utility"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/opencode/script/trace-imports.ts:extractImports",
+      "type": "function",
+      "name": "extractImports",
+      "filePath": "packages/opencode/script/trace-imports.ts",
+      "lineRange": [58, 93],
+      "summary": "Parses a TypeScript source file and collects all module specifiers from static import/export declarations and string-literal dynamic import() calls using a recursive AST visitor.",
+      "tags": ["typescript-compiler", "ast", "dependency-analysis"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/opencode/script/trace-imports.ts:traceFile",
+      "type": "function",
+      "name": "traceFile",
+      "filePath": "packages/opencode/script/trace-imports.ts",
+      "lineRange": [95, 137],
+      "summary": "Recursively walks the internal import graph from a file, printing a depth-indented tree, skipping generated files and node_modules, and memoizing visited files to avoid cycles.",
+      "tags": ["dependency-analysis", "recursion", "cli"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/opencode/script/trace-imports.ts:main",
+      "type": "function",
+      "name": "main",
+      "filePath": "packages/opencode/script/trace-imports.ts",
+      "lineRange": [139, 151],
+      "summary": "CLI entry point that takes a source file argument and starts the import trace from the package root.",
+      "tags": ["entry-point", "cli", "utility"],
+      "complexity": "simple"
+    }
+  ],
+  "edges": [
+    {
+      "source": "table:packages/opencode/migration/20260501142318_next_venus/migration.sql:session",
+      "target": "config:packages/opencode/migration/20260501142318_next_venus/snapshot.json",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:packages/opencode/migration/20260504145000_add_sync_owner/migration.sql:event_sequence",
+      "target": "config:packages/opencode/migration/20260504145000_add_sync_owner/snapshot.json",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:packages/opencode/migration/20260507164347_add_workspace_time/migration.sql:workspace",
+      "target": "config:packages/opencode/migration/20260507164347_add_workspace_time/snapshot.json",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:packages/opencode/migration/20260511000411_data_migration_state/migration.sql:data_migration",
+      "target": "config:packages/opencode/migration/20260511000411_data_migration_state/snapshot.json",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/opencode/script/build.ts",
+      "target": "function:packages/opencode/script/build.ts:createEmbeddedWebUIBundle",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/script/postinstall.mjs",
+      "target": "function:packages/opencode/script/postinstall.mjs:detectPlatformAndArch",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/script/postinstall.mjs",
+      "target": "function:packages/opencode/script/postinstall.mjs:findBinary",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/script/postinstall.mjs",
+      "target": "function:packages/opencode/script/postinstall.mjs:main",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/script/publish.ts",
+      "target": "function:packages/opencode/script/publish.ts:publish",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/script/run-workspace-server",
+      "target": "function:packages/opencode/script/run-workspace-server:readDataMtime",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/script/run-workspace-server",
+      "target": "function:packages/opencode/script/run-workspace-server:readSnapshot",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/script/run-workspace-server",
+      "target": "function:packages/opencode/script/run-workspace-server:startDevServer",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/script/schema.ts",
+      "target": "function:packages/opencode/script/schema.ts:generate",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/script/trace-imports.ts",
+      "target": "function:packages/opencode/script/trace-imports.ts:resolveImport",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/script/trace-imports.ts",
+      "target": "function:packages/opencode/script/trace-imports.ts:tryExtensions",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/script/trace-imports.ts",
+      "target": "function:packages/opencode/script/trace-imports.ts:extractImports",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/script/trace-imports.ts",
+      "target": "function:packages/opencode/script/trace-imports.ts:traceFile",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/script/trace-imports.ts",
+      "target": "function:packages/opencode/script/trace-imports.ts:main",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/script/build.ts",
+      "target": "file:packages/opencode/script/generate.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/opencode/script/build-node.ts",
+      "target": "file:packages/opencode/script/generate.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/opencode/script/publish.ts",
+      "target": "file:packages/opencode/script/postinstall.mjs",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/opencode/script/publish.ts",
+      "target": "file:packages/opencode/script/build.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/opencode/script/build.ts",
+      "target": "file:packages/opencode/src/index.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/opencode/script/build-node.ts",
+      "target": "file:packages/opencode/src/node.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/opencode/script/httpapi-exercise.ts",
+      "target": "file:packages/opencode/test/server/httpapi-exercise/index.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/opencode/script/schema.ts",
+      "target": "file:packages/opencode/src/config/config.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/opencode/script/schema.ts",
+      "target": "file:packages/opencode/src/cli/cmd/tui/config/tui.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "document:packages/opencode/specs/openapi-translation-cleanup.md",
+      "target": "file:packages/opencode/src/server/routes/instance/httpapi/public.ts",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/opencode/specs/openapi-translation-cleanup.md",
+      "target": "file:packages/sdk/js/script/build.ts",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/opencode/specs/openapi-translation-cleanup.md",
+      "target": "file:packages/opencode/test/server/httpapi-query-schema-drift.test.ts",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/opencode/specs/tui-plugins.md",
+      "target": "file:packages/opencode/src/cli/cmd/tui/config/tui.ts",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/opencode/specs/tui-plugins.md",
+      "target": "file:packages/opencode/src/cli/cmd/tui/plugin/runtime.ts",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    }
+  ]
+}

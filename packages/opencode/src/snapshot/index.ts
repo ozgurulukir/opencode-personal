@@ -89,6 +89,7 @@ export const layer: Layer.Layer<
           worktree: ctx.worktree,
           gitdir: path.join(Global.Path.data, "snapshot", ctx.project.id, Hash.fast(ctx.worktree)),
           vcs: ctx.project.vcs,
+          lastHash: undefined as string | undefined,
         }
 
         const args = (cmd: string[]) => ["--git-dir", state.gitdir, "--work-tree", state.worktree, ...cmd]
@@ -231,13 +232,13 @@ export const layer: Layer.Layer<
               otherCode: other.code,
               otherStderr: other.stderr,
             })
-            return
+            return 0
           }
 
           const tracked = diff.text.split("\0").filter(Boolean)
           const untracked = other.text.split("\0").filter(Boolean)
           const all = Array.from(new Set([...tracked, ...untracked]))
-          if (!all.length) return
+          if (!all.length) return 0
 
           // Resolve source-repo ignore rules against the exact candidate set.
           // --no-index keeps this pattern-based even when a path is already tracked.
@@ -251,7 +252,10 @@ export const layer: Layer.Layer<
           }
 
           const allow = all.filter((item) => !ignored.has(item))
-          if (!allow.length) return
+          // When all candidates are ignored, allow is empty — but drop() above
+          // may have removed files from the index, so the index changed.
+          // Return all.length (not 0) so track() runs write-tree to refresh lastHash.
+          if (!allow.length) return all.length
 
           const large = new Set(
             (yield* Effect.all(
@@ -267,13 +271,14 @@ export const layer: Layer.Layer<
                     }),
                   ),
               ),
-              { concurrency: 8 },
+              { concurrency: 32 },
             )).filter((item): item is string => Boolean(item)),
           )
           const block = new Set(untracked.filter((item) => large.has(item)))
           yield* sync(Array.from(block))
           // Stage only the allowed candidate paths so snapshot updates stay scoped.
           yield* stage(allow.filter((item) => !block.has(item)))
+          return all.length
         })
 
         const cleanup = Effect.fnUntraced(function* () {
@@ -310,9 +315,18 @@ export const layer: Layer.Layer<
                 yield* git(["--git-dir", state.gitdir, "config", "core.fsmonitor", "false"])
                 log.info("initialized")
               }
-              yield* add()
+              const changed = yield* add()
+              // Skip the expensive write-tree call when nothing changed since the
+              // last track(). This avoids a git process spawn on every LLM step
+              // when the worktree is idle — critical for large repos where
+              // write-tree scans the full index.
+              if (changed === 0 && state.lastHash) {
+                log.info("tracking (unchanged)", { hash: state.lastHash, cwd: state.worktree, git: state.gitdir })
+                return state.lastHash
+              }
               const result = yield* git(args(["write-tree"]), { cwd: state.worktree })
               const hash = result.text.trim()
+              state.lastHash = hash
               log.info("tracking", { hash, cwd: state.worktree, git: state.gitdir })
               return hash
             }),
@@ -391,7 +405,11 @@ export const layer: Layer.Layer<
                 const checkout = yield* git([...core, ...args(["checkout-index", "-a", "-f"])], {
                   cwd: state.worktree,
                 })
-                if (checkout.code === 0) return
+                if (checkout.code === 0) {
+                  // Invalidate lastHash — worktree changed, next track() must re-scan.
+                  state.lastHash = undefined
+                  return
+                }
                 log.error("failed to restore snapshot", {
                   snapshot,
                   exitCode: checkout.code,
@@ -519,6 +537,8 @@ export const layer: Layer.Layer<
 
                 i = j
               }
+              // Invalidate lastHash — worktree changed, next track() must re-scan.
+              state.lastHash = undefined
             }),
           )
         })

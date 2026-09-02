@@ -16,7 +16,7 @@
 // We also re-check live session status before resolving an idle event so a
 // delayed idle from an older turn cannot complete a newer busy turn.
 import type { Event, GlobalEvent, OpencodeClient } from "@opencode-ai/sdk/v2"
-import { Context, Deferred, Effect, Exit, Layer, Scope, Stream } from "effect"
+import { Cause, Context, Deferred, Effect, Exit, Layer, Scope, Stream } from "effect"
 import { makeRuntime } from "@/effect/run-service"
 import {
   blockerStatus,
@@ -210,7 +210,7 @@ function active(event: Event, sessionID: string): boolean {
 // Races the turn's deferred completion against an abort signal.
 function waitTurn(done: Wait["done"], signal: AbortSignal) {
   return Effect.raceAll([
-    Deferred.await(done).pipe(Effect.as("idle" as const), Effect.exit),
+    Deferred.await(done).pipe(Effect.exit),
     Effect.callback<"abort">((resume) => {
       if (signal.aborted) {
         resume(Effect.succeed("abort"))
@@ -225,7 +225,14 @@ function waitTurn(done: Wait["done"], signal: AbortSignal) {
       signal.addEventListener("abort", onAbort, { once: true })
       return Effect.sync(() => signal.removeEventListener("abort", onAbort))
     }).pipe(Effect.exit),
-  ]).pipe(Effect.flatMap((exit) => (Exit.isFailure(exit) ? Effect.failCause(exit.cause) : Effect.succeed(exit.value))))
+  ]).pipe(
+    Effect.flatMap((exit: any) => {
+      if (Exit.isSuccess(exit)) return Effect.succeed(exit.value as unknown as "idle" | "abort")
+      const error = Cause.findError(exit.cause)
+      if (error._tag === "Success") return Effect.fail(error.success)
+      return Effect.fail(new Error("turn failed"))
+    }),
+  )
 }
 
 export function formatUnknownError(error: unknown): string {
@@ -657,6 +664,48 @@ function createLayer(input: StreamInput) {
           )
         })
 
+        const recover = Effect.fn("RunStreamTransport.recover")(function* () {
+          const [messagesList, permissions, questions] = yield* Effect.all(
+            [
+              messages(input.sessionID, SUBAGENT_BOOTSTRAP_LIMIT),
+              Effect.promise(() => input.sdk.permission.list()).pipe(
+                Effect.map((item) => item.data ?? []),
+                Effect.orElseSucceed(() => []),
+              ),
+              Effect.promise(() => input.sdk.question.list()).pipe(
+                Effect.map((item) => item.data ?? []),
+                Effect.orElseSucceed(() => []),
+              ),
+            ],
+            { concurrency: "unbounded" },
+          )
+
+          bootstrapSessionData({
+            data: state.data,
+            messages: messagesList,
+            permissions: permissions.filter((item) => item.sessionID === input.sessionID),
+            questions: questions.filter((item) => item.sessionID === input.sessionID),
+          })
+          bootstrapSubagentData({
+            data: state.subagent,
+            messages: messagesList,
+            children: [...state.subagent.tabs.keys()].map((id) => ({ id, slug: id, projectID: "", directory: "", title: id, version: "1", time: { created: 0, updated: 0 } })),
+            permissions,
+            questions,
+          })
+
+          for (const request of [
+            ...state.data.permissions,
+            ...listSubagentPermissions(state.subagent),
+            ...state.data.questions,
+            ...listSubagentQuestions(state.subagent),
+          ].sort((a, b) => a.id.localeCompare(b.id))) {
+            seedBlocker(request.id)
+          }
+
+          syncFooter([], undefined, currentSubagentState())
+        })
+
         const idle = Effect.fn("RunStreamTransport.idle")((fallback: boolean) =>
           Effect.promise(() => input.sdk.session.status()).pipe(
             Effect.map((out) => {
@@ -738,85 +787,127 @@ function createLayer(input: StreamInput) {
           })
         }
 
-        const watch = Effect.fn("RunStreamTransport.watch")(() =>
-          Stream.fromAsyncIterable(events.stream, (error) =>
+        const processEvent = Effect.fn("RunStreamTransport.event")(function* (item: unknown) {
+          if (input.footer.isClosed) {
+            abort.abort()
+            return
+          }
+
+          if (isMatchingDisposeEvent(item, input.directory)) {
+            yield* fail(new Error("instance disposed"))
+            yield* closeScope()
+            return
+          }
+
+          const event = globalPayloadEvent(item)
+          if (!event) {
+            return
+          }
+
+          const sessionID = sid(event)
+          if (sessionID !== input.sessionID && (!sessionID || !state.subagent.tabs.has(sessionID))) {
+            return
+          }
+
+          input.trace?.write("recv.event", event)
+          trackBlocker(event)
+
+          const prev = event.type === "message.part.updated" ? listSubagentTabs(state.subagent) : undefined
+          const next = reduceSessionData({
+            data: state.data,
+            event,
+            sessionID: input.sessionID,
+            thinking: input.thinking,
+            limits: input.limits(),
+          })
+          state.data = next.data
+
+          if (
+            event.type === "message.part.updated" &&
+            event.properties.part.sessionID === input.sessionID &&
+            event.properties.part.type === "tool" &&
+            event.properties.part.tool === "question" &&
+            event.properties.part.state.status === "running" &&
+            state.data.questions.length === 0
+          ) {
+            yield* recoverQuestion(event.properties.part.id).pipe(
+              Effect.forkIn(scope, { startImmediately: true }),
+              Effect.asVoid,
+            )
+          }
+
+          const changed = reduceSubagentData({
+            data: state.subagent,
+            event,
+            sessionID: input.sessionID,
+            thinking: input.thinking,
+            limits: input.limits(),
+          })
+          if (changed && prev) {
+            traceTabs(input.trace, prev, listSubagentTabs(state.subagent))
+          }
+          releaseBlocker(event)
+
+          syncFooter(next.commits, next.footer?.patch, changed ? currentSubagentState() : undefined)
+
+          touch(event)
+          yield* mark(event)
+        })
+
+        const loop = Effect.fn("RunStreamTransport.watchLoop")(function* (stream: AsyncIterable<unknown>) {
+          yield* Stream.fromAsyncIterable(stream, (error) =>
             error instanceof Error ? error : new Error(String(error)),
           ).pipe(
             Stream.takeUntil(() => input.footer.isClosed || abort.signal.aborted),
-            Stream.runForEach(
-              Effect.fn("RunStreamTransport.event")(function* (item: unknown) {
-                if (input.footer.isClosed) {
-                  abort.abort()
-                  return
-                }
+            Stream.runForEach(processEvent),
+          )
+        })
 
-                if (isMatchingDisposeEvent(item, input.directory)) {
-                  yield* fail(new Error("instance disposed"))
-                  yield* closeScope()
-                  return
-                }
+const reconnect = Effect.fn("RunStreamTransport.reconnect")(function* () {
+          let attempt = 0
+          const maxAttempts = 3
+          const baseDelay = 1000
 
-                const event = globalPayloadEvent(item)
-                if (!event) {
-                  return
-                }
+          const attemptReconnect = Effect.fn("RunStreamTransport.reconnectAttempt")(function* () {
+            yield* recover()
+            const newEvents = yield* Effect.promise(() =>
+              input.sdk.global.event({ signal: abort.signal }),
+            )
+            closeStream = () => {
+              void newEvents.stream.return(undefined).catch(() => {})
+            }
+            yield* loop(newEvents.stream)
+          })
 
-                const sessionID = sid(event)
-                if (sessionID !== input.sessionID && (!sessionID || !state.subagent.tabs.has(sessionID))) {
-                  return
-                }
+          while (!abort.signal.aborted && !input.footer.isClosed) {
+            attempt++
+            input.trace?.write("sse.reconnect", { attempt })
 
-                input.trace?.write("recv.event", event)
-                trackBlocker(event)
+            const result = yield* attemptReconnect().pipe(Effect.exit)
+            if (result._tag === "Success") return
 
-                const prev = event.type === "message.part.updated" ? listSubagentTabs(state.subagent) : undefined
-                const next = reduceSessionData({
-                  data: state.data,
-                  event,
-                  sessionID: input.sessionID,
-                  thinking: input.thinking,
-                  limits: input.limits(),
-                })
-                state.data = next.data
+            const error = result.cause
+            input.trace?.write("sse.reconnect.error", {
+              attempt,
+              error: formatUnknownError(error),
+            })
+            if (attempt >= maxAttempts) {
+              yield* fail(error)
+              return
+            }
+            const backoff = Math.min(baseDelay * 2 ** (attempt - 1), 30000)
+            yield* Effect.sleep(`${backoff} millis`)
+          }
+        })
 
-                if (
-                  event.type === "message.part.updated" &&
-                  event.properties.part.sessionID === input.sessionID &&
-                  event.properties.part.type === "tool" &&
-                  event.properties.part.tool === "question" &&
-                  event.properties.part.state.status === "running" &&
-                  state.data.questions.length === 0
-                ) {
-                  yield* recoverQuestion(event.properties.part.id).pipe(
-                    Effect.forkIn(scope, { startImmediately: true }),
-                    Effect.asVoid,
-                  )
-                }
-
-                const changed = reduceSubagentData({
-                  data: state.subagent,
-                  event,
-                  sessionID: input.sessionID,
-                  thinking: input.thinking,
-                  limits: input.limits(),
-                })
-                if (changed && prev) {
-                  traceTabs(input.trace, prev, listSubagentTabs(state.subagent))
-                }
-                releaseBlocker(event)
-
-                syncFooter(next.commits, next.footer?.patch, changed ? currentSubagentState() : undefined)
-
-                touch(event)
-                yield* mark(event)
-              }),
-            ),
-            Effect.catch((error) => (abort.signal.aborted ? Effect.void : fail(error))),
+        const watch = Effect.fn("RunStreamTransport.watch")(() =>
+          loop(events.stream).pipe(
+            Effect.catch((error) => {
+              if (abort.signal.aborted) return Effect.void
+              return reconnect()
+            }),
             Effect.ensuring(
-              Effect.gen(function* () {
-                if (!abort.signal.aborted && !state.fault) {
-                  yield* fail(new Error("global event stream closed"))
-                }
+              Effect.sync(() => {
                 closeStream()
               }),
             ),
@@ -1058,7 +1149,9 @@ export async function createSessionTransport(input: StreamInput): Promise<Sessio
 
   return {
     runPromptTurn: (next) => runtime.runPromise((svc) => svc.runPromptTurn(next)),
-    selectSubagent: (sessionID) => runtime.runSync((svc) => svc.selectSubagent(sessionID)),
+    selectSubagent: (sessionID) => {
+      void runtime.runPromise((svc) => svc.selectSubagent(sessionID)).catch(() => {})
+    },
     close: () => runtime.runPromise((svc) => svc.close()),
   }
 }

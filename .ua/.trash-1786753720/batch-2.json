@@ -1,0 +1,37 @@
+{
+  "nodes": [
+    {
+      "id": "service:packages/containers/bun-node/Dockerfile",
+      "type": "service",
+      "name": "Dockerfile",
+      "filePath": "packages/containers/bun-node/Dockerfile",
+      "summary": "CI container image that layers Node.js 24 and Bun on top of the build/base image, detecting the CPU architecture at build time to fetch the matching linux-x64/arm64 Node tarball and enabling corepack. Published as ghcr.io/anomalyco/build/bun-node:24.04, the standard image for GitHub Actions jobs in this monorepo.",
+      "tags": ["containerization", "infrastructure", "ci-cd", "bun", "node-js"],
+      "complexity": "simple",
+      "languageNotes": "The BUN_VERSION build-arg is fed from the root package.json packageManager field by packages/containers/script/build.ts, keeping the image's Bun version in lockstep with the monorepo. A uname -m based arch mapping keeps a single Dockerfile valid for multi-platform buildx builds."
+    }
+  ],
+  "edges": [
+    {
+      "source": "service:packages/containers/bun-node/Dockerfile",
+      "target": "service:packages/containers/base/Dockerfile",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "service:packages/containers/bun-node/Dockerfile",
+      "target": "config:package.json",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "service:packages/containers/bun-node/Dockerfile",
+      "target": "file:packages/containers/script/build.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    }
+  ]
+}

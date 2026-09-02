@@ -1,0 +1,792 @@
+{
+  "nodes": [
+    {
+      "id": "file:packages/ui/src/theme/loader.ts",
+      "type": "file",
+      "name": "loader.ts",
+      "filePath": "packages/ui/src/theme/loader.ts",
+      "summary": "Theme loader that applies DesktopTheme objects to the document by resolving light and dark variants into CSS and injecting it into a managed style element. Tracks the active theme in memory, supports loading themes from URLs, and toggling color-scheme overrides.",
+      "tags": ["theme", "browser-dom", "runtime", "utility"],
+      "complexity": "moderate",
+      "languageNotes": "The default theme (oc-2) emits CSS scoped to :root while custom themes use html[data-theme] selectors, with prefers-color-scheme media queries flipping light/dark token sets."
+    },
+    {
+      "id": "file:packages/ui/src/theme/resolve.ts",
+      "type": "file",
+      "name": "resolve.ts",
+      "filePath": "packages/ui/src/theme/resolve.ts",
+      "summary": "Core theme resolution engine: derives the full CSS custom-property token set (backgrounds, surfaces, borders, syntax, markdown, diff colors) from a variant's seed or palette colors. Uses OKLCH color math, 12-step scale generation, alpha blending, and WCAG luminance checks to produce contrast-safe tokens.",
+      "tags": ["theme", "color-science", "oklch", "algorithm", "token-generation"],
+      "complexity": "complex",
+      "languageNotes": "All hue/lightness/chroma math happens in OKLCH perceptual space; an inline WCAG relative-luminance function (sRGB linearization) picks contrast-safe 'on' text colors for tinted surfaces."
+    },
+    {
+      "id": "file:packages/ui/src/theme/theme-css.ts",
+      "type": "file",
+      "name": "theme-css.ts",
+      "filePath": "packages/ui/src/theme/theme-css.ts",
+      "summary": "Applies a single light-or-dark theme variant to the document as :root CSS, caching non-default theme CSS to localStorage for instant preload on next load. Detects system color-scheme preference and removes the preload style element once live CSS is applied.",
+      "tags": ["theme", "css", "browser-dom", "persistence"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/ui/src/theme/theme-glob.ts",
+      "type": "file",
+      "name": "theme-glob.ts",
+      "filePath": "packages/ui/src/theme/theme-glob.ts",
+      "summary": "Lazy theme registry built on Vite's import.meta.glob over themes/*.json, exposing memoized theme IDs, a known-themes set, and a display-name map for roughly 40 built-in themes.",
+      "tags": ["theme", "registry", "lazy-loading", "catalog"],
+      "complexity": "moderate",
+      "languageNotes": "import.meta.glob turns every theme JSON into a lazy dynamic-import chunk; module-level caches (files/ids/known) memoize the registry after first access."
+    },
+    {
+      "id": "file:packages/ui/src/theme/theme-storage.ts",
+      "type": "file",
+      "name": "theme-storage.ts",
+      "filePath": "packages/ui/src/theme/theme-storage.ts",
+      "summary": "Safe localStorage wrappers for theme persistence: canonical storage keys, oc-1 to oc-2 theme-id normalization, try/catch-guarded read/write/drop helpers, and a clearThemeCss utility for the cached light/dark CSS blobs.",
+      "tags": ["theme", "storage", "persistence", "utility"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/ui/src/theme/types.ts",
+      "type": "file",
+      "name": "types.ts",
+      "filePath": "packages/ui/src/theme/types.ts",
+      "summary": "Type system for the theming model: HexColor/OklchColor primitives, ThemeSeedColors vs ThemePaletteColors inputs, a discriminated ThemeVariant (seeds or palette, never both), DesktopTheme, token categories, and the flat ResolvedTheme token record.",
+      "tags": ["type-definition", "theme", "data-model"],
+      "complexity": "simple",
+      "languageNotes": "The seeds/palette mutual exclusion is expressed with a `never`-typed discriminant pair rather than a string literal tag."
+    },
+    {
+      "id": "file:packages/ui/sst-env.d.ts",
+      "type": "file",
+      "name": "sst-env.d.ts",
+      "filePath": "packages/ui/sst-env.d.ts",
+      "summary": "Auto-generated SST ambient type declaration that pulls in the project's sst environment types for the ui package. Do not edit by hand.",
+      "tags": ["type-definition", "auto-generated", "environment"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/ui/vite.config.ts",
+      "type": "file",
+      "name": "vite.config.ts",
+      "filePath": "packages/ui/vite.config.ts",
+      "summary": "Vite build config for the shared ui package: SolidJS plugin, dual icons-spritesheet generation (file-type and provider icons into typed component directories), and a custom plugin that fetches provider logo SVGs from models.dev on dev-server start and build start.",
+      "tags": ["build-system", "configuration", "vite", "plugin", "icons"],
+      "complexity": "moderate",
+      "languageNotes": "Custom Vite plugin pattern: configureServer and buildStart hooks fire-and-forget an asset sync so provider logos stay fresh in dev and CI without becoming build-blocking steps."
+    },
+    {
+      "id": "file:packages/web/astro.config.mjs",
+      "type": "file",
+      "name": "astro.config.mjs",
+      "filePath": "packages/web/astro.config.mjs",
+      "summary": "Astro/Starlight site configuration for the opencode docs and session-share site: 18 locales, Cloudflare SSR adapter with passthrough images, SolidJS integration, toolbeam-docs-theme, overrides for five Starlight components, and a configSchema integration that runs the opencode schema script after build.",
+      "tags": ["configuration", "build-system", "astro", "i18n", "docs-site"],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:packages/web/config.mjs",
+      "type": "file",
+      "name": "config.mjs",
+      "filePath": "packages/web/config.mjs",
+      "summary": "Stage-aware site constants derived from SST_STAGE: production vs staging URLs for the site and auth console, contact email, social-card service, GitHub/Discord links, and header navigation entries.",
+      "tags": ["configuration", "environment", "constants"],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:packages/web/public/robots.txt",
+      "type": "document",
+      "name": "robots.txt",
+      "filePath": "packages/web/public/robots.txt",
+      "summary": "Robots directives allowing all crawlers site-wide while disallowing /s/ and /share/ so shared session pages stay out of search indexes.",
+      "tags": ["documentation", "seo", "robots", "web-crawling"],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:packages/web/public/theme.json",
+      "type": "config",
+      "name": "theme.json",
+      "filePath": "packages/web/public/theme.json",
+      "summary": "Public JSON Schema (draft-07) describing the terminal theme.json format: named color defs (hex, ANSI 0-255, or \"none\") and a theme object covering roughly 40 color roles from primary and text to diff highlights and borders. Served as a static asset so editors can validate user theme files.",
+      "tags": ["schema-definition", "configuration", "theme", "json-schema", "validation"],
+      "complexity": "moderate",
+      "languageNotes": "A $ref-referenced colorValue definition is reused across every theme role, keeping the 183-line schema DRY."
+    },
+    {
+      "id": "file:packages/web/src/components/Footer.astro",
+      "type": "file",
+      "name": "Footer.astro",
+      "filePath": "packages/web/src/components/Footer.astro",
+      "summary": "Starlight footer override rendered only for doc-template pages: edit-on-GitHub link, issue and Discord links from social config, language selector, Anomaly copyright, and last-updated timestamp.",
+      "tags": ["component", "astro", "override", "i18n", "footer"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:packages/web/src/components/Head.astro",
+      "type": "file",
+      "name": "Head.astro",
+      "filePath": "packages/web/src/components/Head.astro",
+      "summary": "Starlight head override that computes dynamic OG/Twitter card images for docs pages via the social-cards service (Base64-encoded, length-capped titles) and suppresses those meta tags entirely on session-share pages.",
+      "tags": ["component", "astro", "override", "seo", "metadata"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/web/src/components/Header.astro",
+      "type": "file",
+      "name": "Header.astro",
+      "filePath": "packages/web/src/components/Header.astro",
+      "summary": "Starlight header override that swaps in a simplified site header (site title, nav links from config.headerLinks, social icons) for session-share paths while delegating to the toolbeam theme's default header everywhere else.",
+      "tags": ["component", "astro", "override", "navigation"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:packages/web/src/components/Hero.astro",
+      "type": "file",
+      "name": "Hero.astro",
+      "filePath": "packages/web/src/components/Hero.astro",
+      "summary": "Routing shim for the hero region: renders the custom marketing Lander on the home route and defers to Starlight's default Hero on every other page.",
+      "tags": ["component", "astro", "routing", "override"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/web/src/components/Lander.astro",
+      "type": "file",
+      "name": "Lander.astro",
+      "filePath": "packages/web/src/components/Lander.astro",
+      "summary": "Marketing landing page for the home route: i18n'd hero headline, copy-to-clipboard install commands (curl, npm, bun, brew, paru, mise), feature list, product screenshots for TUI/VS Code/GitHub integrations, and GitHub/Discord footer links, backed by roughly 520 lines of scoped CSS.",
+      "tags": ["component", "astro", "landing-page", "marketing", "i18n"],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:packages/web/src/components/Share.tsx",
+      "type": "file",
+      "name": "Share.tsx",
+      "filePath": "packages/web/src/components/Share.tsx",
+      "summary": "SolidJS session-share view: connects to the share API over WebSocket with reconnect handling, reconciles messages and parts into a reactive store, and renders the transcript with connection status, cost/token/context-usage stats, deep-linkable message anchors, and a hover-aware scroll-to-bottom button. Includes adapters for v1 payloads and shell initialization.",
+      "tags": ["component", "solidjs", "websocket", "real-time", "session-share"],
+      "complexity": "complex",
+      "languageNotes": "Idiomatic fine-grained SolidJS: createStore + reconcile structurally diffs WebSocket snapshots instead of replacing state, and an IntersectionObserver sentinel drives near-bottom detection for the scroll button."
+    },
+    {
+      "id": "file:packages/web/src/components/SiteTitle.astro",
+      "type": "file",
+      "name": "SiteTitle.astro",
+      "filePath": "packages/web/src/components/SiteTitle.astro",
+      "summary": "Starlight site-title override rendering the logo image with light/dark variants and screen-reader handling when the logo replaces the visible title text.",
+      "tags": ["component", "astro", "override", "branding"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/web/src/components/icons/arrows.tsx",
+      "type": "file",
+      "name": "arrows.tsx",
+      "filePath": "packages/web/src/components/icons/arrows.tsx",
+      "summary": "Catalog of 41 exported Heroicons arrow SVG components (outline set): directional arrows, u-turns, trending arrows, arrow-on-square variants, and pointing/transfer pairs, each a 13-line SolidJS component wrapping static SVG paths.",
+      "tags": ["icons", "component", "svg", "heroicons", "catalog"],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:packages/web/src/components/icons/coding.tsx",
+      "type": "file",
+      "name": "coding.tsx",
+      "filePath": "packages/web/src/components/icons/coding.tsx",
+      "summary": "Small Heroicons coding-category catalog exporting IconBugAnt, IconCommandLine, and IconCommand as SolidJS SVG components.",
+      "tags": ["icons", "component", "svg", "heroicons"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/web/src/components/icons/communication.tsx",
+      "type": "file",
+      "name": "communication.tsx",
+      "filePath": "packages/web/src/components/icons/communication.tsx",
+      "summary": "Heroicons communication catalog: 15 exported SolidJS SVG components covering chat bubbles, envelopes (including a solid variant), paper airplane, and phone icons.",
+      "tags": ["icons", "component", "svg", "heroicons", "catalog"],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:packages/web/src/components/icons/custom.tsx",
+      "type": "file",
+      "name": "custom.tsx",
+      "filePath": "packages/web/src/components/icons/custom.tsx",
+      "summary": "Custom (non-Heroicons) brand and mascot icons: OpenAI, Anthropic, Gemini, the OpenCode logo, Meta, Robot, and Brain, exported as SolidJS SVG components.",
+      "tags": ["icons", "component", "svg", "branding", "custom"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/web/src/components/icons/data.tsx",
+      "type": "file",
+      "name": "data.tsx",
+      "filePath": "packages/web/src/components/icons/data.tsx",
+      "summary": "Heroicons data-category catalog: 10 exported SolidJS SVG components for bar and pie charts, cloud upload/download, cubes, and server icons.",
+      "tags": ["icons", "component", "svg", "heroicons", "catalog"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:packages/web/src/components/icons/file.tsx",
+      "type": "file",
+      "name": "file.tsx",
+      "filePath": "packages/web/src/components/icons/file.tsx",
+      "summary": "Heroicons file-category catalog: 26 exported SolidJS SVG components covering archive boxes, clipboards, code brackets, documents with status decorations, folders, and presentation charts.",
+      "tags": ["icons", "component", "svg", "heroicons", "catalog"],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:packages/ui/src/theme/loader.ts:applyTheme",
+      "type": "function",
+      "name": "applyTheme",
+      "filePath": "packages/ui/src/theme/loader.ts",
+      "lineRange": [18, 27],
+      "summary": "Resolves a theme's light and dark variants, builds the combined CSS via buildThemeCss, injects it into the managed style element, and stamps data-theme on the document root.",
+      "tags": ["theme", "browser-dom", "runtime"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/ui/src/theme/loader.ts:buildThemeCss",
+      "type": "function",
+      "name": "buildThemeCss",
+      "filePath": "packages/ui/src/theme/loader.ts",
+      "lineRange": [29, 67],
+      "summary": "Assembles the final stylesheet string: the default oc-2 theme is scoped to :root while custom themes get an html[data-theme] selector, with prefers-color-scheme dark media queries and text-mix-blend-mode tokens for both modes.",
+      "tags": ["theme", "css", "code-generation"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/ui/src/theme/loader.ts:loadThemeFromUrl",
+      "type": "function",
+      "name": "loadThemeFromUrl",
+      "filePath": "packages/ui/src/theme/loader.ts",
+      "lineRange": [69, 75],
+      "summary": "Fetches and parses a DesktopTheme JSON document from a URL, throwing on non-OK responses.",
+      "tags": ["theme", "fetch", "utility"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/ui/src/theme/loader.ts:getActiveTheme",
+      "type": "function",
+      "name": "getActiveTheme",
+      "filePath": "packages/ui/src/theme/loader.ts",
+      "lineRange": [77, 86],
+      "summary": "Returns the in-memory theme only if its id matches the document's current data-theme attribute, otherwise null.",
+      "tags": ["theme", "utility", "state"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/ui/src/theme/loader.ts:removeTheme",
+      "type": "function",
+      "name": "removeTheme",
+      "filePath": "packages/ui/src/theme/loader.ts",
+      "lineRange": [88, 95],
+      "summary": "Tears down the applied theme: clears the in-memory reference, removes the style element, and deletes the data-theme attribute.",
+      "tags": ["theme", "browser-dom", "cleanup"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/ui/src/theme/loader.ts:setColorScheme",
+      "type": "function",
+      "name": "setColorScheme",
+      "filePath": "packages/ui/src/theme/loader.ts",
+      "lineRange": [97, 103],
+      "summary": "Overrides the document's color-scheme inline style for light/dark, or removes the override to fall back to auto (system preference).",
+      "tags": ["theme", "browser-dom", "color-scheme"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/ui/src/theme/resolve.ts:resolveThemeVariant",
+      "type": "function",
+      "name": "resolveThemeVariant",
+      "filePath": "packages/ui/src/theme/resolve.ts",
+      "lineRange": [4, 456],
+      "summary": "The heart of the theming engine: a ~450-line function that turns a theme variant's seed or palette colors into the complete token set. Generates 12-step OKLCH scales per hue, neutral alpha scales, alpha-blended surfaces and borders, WCAG-contrast-checked 'on' text colors, syntax/markdown/diff palettes, and passes through explicit overrides.",
+      "tags": ["theme", "color-science", "oklch", "token-generation", "algorithm"],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:packages/ui/src/theme/resolve.ts:getColors",
+      "type": "function",
+      "name": "getColors",
+      "filePath": "packages/ui/src/theme/resolve.ts",
+      "lineRange": [473, 514],
+      "summary": "Validates that a variant defines exactly one of palette or seeds (throwing on both or neither) and normalizes either input into the internal ThemeColors shape with defaults like accent from info and interactive from primary.",
+      "tags": ["theme", "validation", "normalization"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/ui/src/theme/resolve.ts:resolveTheme",
+      "type": "function",
+      "name": "resolveTheme",
+      "filePath": "packages/ui/src/theme/resolve.ts",
+      "lineRange": [529, 534],
+      "summary": "Convenience wrapper resolving a full DesktopTheme into its light and dark token pairs in one call.",
+      "tags": ["theme", "utility", "token-generation"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/ui/src/theme/resolve.ts:themeToCss",
+      "type": "function",
+      "name": "themeToCss",
+      "filePath": "packages/ui/src/theme/resolve.ts",
+      "lineRange": [536, 540],
+      "summary": "Serializes a resolved token record into CSS custom-property declarations of the form `--key: value;` joined for direct style-element injection.",
+      "tags": ["theme", "css", "serialization"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/ui/src/theme/theme-css.ts:applyThemeCss",
+      "type": "function",
+      "name": "applyThemeCss",
+      "filePath": "packages/ui/src/theme/theme-css.ts",
+      "lineRange": [21, 41],
+      "summary": "Resolves a single variant for the given mode, caches its CSS to localStorage for non-default themes, removes the preload style element, and writes the live :root CSS plus data-theme and data-color-scheme attributes.",
+      "tags": ["theme", "css", "browser-dom", "persistence"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/ui/src/theme/theme-css.ts:cacheThemeVariants",
+      "type": "function",
+      "name": "cacheThemeVariants",
+      "filePath": "packages/ui/src/theme/theme-css.ts",
+      "lineRange": [43, 52],
+      "summary": "Pre-computes both light and dark variant CSS for a non-default theme and stores them under the theme CSS localStorage keys for fast subsequent loads.",
+      "tags": ["theme", "persistence", "cache"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/ui/vite.config.ts:providerIconsPlugin",
+      "type": "function",
+      "name": "providerIconsPlugin",
+      "filePath": "packages/ui/vite.config.ts",
+      "lineRange": [35, 45],
+      "summary": "Minimal Vite plugin whose configureServer and buildStart hooks kick off fetchProviderIcons fire-and-forget, keeping provider logo assets synchronized during dev and CI builds.",
+      "tags": ["vite-plugin", "build-system", "icons"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/ui/vite.config.ts:fetchProviderIcons",
+      "type": "function",
+      "name": "fetchProviderIcons",
+      "filePath": "packages/ui/vite.config.ts",
+      "lineRange": [47, 59],
+      "summary": "Fetches the provider list from the models.dev API (or OPENCODE_MODELS_URL), then downloads each provider's logo SVG in parallel and writes them into src/assets/icons/provider/.",
+      "tags": ["icons", "fetch", "asset-sync"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/web/astro.config.mjs:configSchema",
+      "type": "function",
+      "name": "configSchema",
+      "filePath": "packages/web/astro.config.mjs",
+      "lineRange": [311, 321],
+      "summary": "Astro integration that runs the opencode schema generation script (../opencode/script/schema.ts) in the astro:build:done hook to emit dist/config.json and dist/tui.json alongside the built site.",
+      "tags": ["astro-integration", "build-system", "code-generation"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/web/src/components/Share.tsx:getStatusText",
+      "type": "function",
+      "name": "getStatusText",
+      "filePath": "packages/web/src/components/Share.tsx",
+      "lineRange": [24, 39],
+      "summary": "Maps the connection status tuple (with optional error detail) to the corresponding i18n message string for the share view's status banner.",
+      "tags": ["i18n", "utility", "status"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/web/src/components/Share.tsx:Share",
+      "type": "function",
+      "name": "Share",
+      "filePath": "packages/web/src/components/Share.tsx",
+      "lineRange": [41, 501],
+      "summary": "Default-exported SolidJS component for live shared sessions: manages a WebSocket with reconnect/status tracking, reconciles incoming message and part snapshots into a store, renders the transcript with part components, cost/token/context statistics, hash-based anchor scrolling, and a hover-aware scroll-to-bottom button.",
+      "tags": ["solidjs", "websocket", "real-time", "session-share", "component"],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:packages/web/src/components/Share.tsx:fromV1",
+      "type": "function",
+      "name": "fromV1",
+      "filePath": "packages/web/src/components/Share.tsx",
+      "lineRange": [503, 646],
+      "summary": "Adapts v1 share payloads into the MessageV2 store shape: maps AI-SDK-style toolInvocation states (partial-call, call, result) to pending/running/completed statuses, extracts titles, timing, and metadata, and reindexes message parts.",
+      "tags": ["adapter", "data-transform", "messages"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/web/src/components/Share.tsx:fromShell",
+      "type": "function",
+      "name": "fromShell",
+      "filePath": "packages/web/src/components/Share.tsx",
+      "lineRange": [648, 685],
+      "summary": "Builds the initial empty share store from shell bootstrap data, seeding session info and a pending user message with current timestamps before the WebSocket delivers real content.",
+      "tags": ["adapter", "initialization", "session-share"],
+      "complexity": "moderate"
+    }
+  ],
+  "edges": [
+    {
+      "source": "file:packages/ui/src/theme/loader.ts",
+      "target": "function:packages/ui/src/theme/loader.ts:applyTheme",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/ui/src/theme/loader.ts",
+      "target": "function:packages/ui/src/theme/loader.ts:buildThemeCss",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/ui/src/theme/loader.ts",
+      "target": "function:packages/ui/src/theme/loader.ts:loadThemeFromUrl",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/ui/src/theme/loader.ts",
+      "target": "function:packages/ui/src/theme/loader.ts:getActiveTheme",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/ui/src/theme/loader.ts",
+      "target": "function:packages/ui/src/theme/loader.ts:removeTheme",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/ui/src/theme/loader.ts",
+      "target": "function:packages/ui/src/theme/loader.ts:setColorScheme",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/ui/src/theme/loader.ts",
+      "target": "function:packages/ui/src/theme/loader.ts:applyTheme",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/ui/src/theme/loader.ts",
+      "target": "function:packages/ui/src/theme/loader.ts:loadThemeFromUrl",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/ui/src/theme/loader.ts",
+      "target": "function:packages/ui/src/theme/loader.ts:getActiveTheme",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/ui/src/theme/loader.ts",
+      "target": "function:packages/ui/src/theme/loader.ts:removeTheme",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/ui/src/theme/loader.ts",
+      "target": "function:packages/ui/src/theme/loader.ts:setColorScheme",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/ui/src/theme/resolve.ts",
+      "target": "function:packages/ui/src/theme/resolve.ts:resolveThemeVariant",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/ui/src/theme/resolve.ts",
+      "target": "function:packages/ui/src/theme/resolve.ts:getColors",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/ui/src/theme/resolve.ts",
+      "target": "function:packages/ui/src/theme/resolve.ts:resolveTheme",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/ui/src/theme/resolve.ts",
+      "target": "function:packages/ui/src/theme/resolve.ts:themeToCss",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/ui/src/theme/resolve.ts",
+      "target": "function:packages/ui/src/theme/resolve.ts:resolveThemeVariant",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/ui/src/theme/resolve.ts",
+      "target": "function:packages/ui/src/theme/resolve.ts:resolveTheme",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/ui/src/theme/resolve.ts",
+      "target": "function:packages/ui/src/theme/resolve.ts:themeToCss",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/ui/src/theme/theme-css.ts",
+      "target": "function:packages/ui/src/theme/theme-css.ts:applyThemeCss",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/ui/src/theme/theme-css.ts",
+      "target": "function:packages/ui/src/theme/theme-css.ts:cacheThemeVariants",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/ui/src/theme/theme-css.ts",
+      "target": "function:packages/ui/src/theme/theme-css.ts:applyThemeCss",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/ui/src/theme/theme-css.ts",
+      "target": "function:packages/ui/src/theme/theme-css.ts:cacheThemeVariants",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/ui/vite.config.ts",
+      "target": "function:packages/ui/vite.config.ts:providerIconsPlugin",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/ui/vite.config.ts",
+      "target": "function:packages/ui/vite.config.ts:fetchProviderIcons",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/web/astro.config.mjs",
+      "target": "function:packages/web/astro.config.mjs:configSchema",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/web/src/components/Share.tsx",
+      "target": "function:packages/web/src/components/Share.tsx:getStatusText",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/web/src/components/Share.tsx",
+      "target": "function:packages/web/src/components/Share.tsx:Share",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/web/src/components/Share.tsx",
+      "target": "function:packages/web/src/components/Share.tsx:fromV1",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/web/src/components/Share.tsx",
+      "target": "function:packages/web/src/components/Share.tsx:fromShell",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/web/src/components/Share.tsx",
+      "target": "function:packages/web/src/components/Share.tsx:Share",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/web/src/components/Share.tsx",
+      "target": "function:packages/web/src/components/Share.tsx:fromV1",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:packages/ui/src/theme/loader.ts:applyTheme",
+      "target": "function:packages/ui/src/theme/resolve.ts:resolveThemeVariant",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:packages/ui/src/theme/loader.ts:buildThemeCss",
+      "target": "function:packages/ui/src/theme/resolve.ts:themeToCss",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:packages/ui/src/theme/theme-css.ts:applyThemeCss",
+      "target": "function:packages/ui/src/theme/resolve.ts:resolveThemeVariant",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:packages/ui/src/theme/theme-css.ts:applyThemeCss",
+      "target": "function:packages/ui/src/theme/resolve.ts:themeToCss",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:packages/ui/src/theme/theme-css.ts:cacheThemeVariants",
+      "target": "function:packages/ui/src/theme/resolve.ts:resolveThemeVariant",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:packages/ui/src/theme/theme-css.ts:cacheThemeVariants",
+      "target": "function:packages/ui/src/theme/resolve.ts:themeToCss",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/ui/src/theme/theme-css.ts",
+      "target": "file:packages/ui/src/theme/theme-storage.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/ui/src/theme/loader.ts",
+      "target": "file:packages/ui/src/theme/resolve.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/ui/src/theme/theme-glob.ts",
+      "target": "file:packages/ui/src/theme/types.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/web/astro.config.mjs",
+      "target": "file:packages/web/config.mjs",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/web/src/components/Hero.astro",
+      "target": "file:packages/web/src/components/Lander.astro",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/web/src/components/Head.astro",
+      "target": "file:packages/web/config.mjs",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/web/src/components/Header.astro",
+      "target": "file:packages/web/config.mjs",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/web/src/components/Share.tsx",
+      "target": "file:packages/web/src/components/icons/custom.tsx",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/web/src/components/Share.tsx",
+      "target": "file:packages/web/src/components/icons/arrows.tsx",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/web/astro.config.mjs",
+      "target": "file:packages/web/src/components/Hero.astro",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/web/astro.config.mjs",
+      "target": "file:packages/web/src/components/Head.astro",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/web/astro.config.mjs",
+      "target": "file:packages/web/src/components/Header.astro",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/web/astro.config.mjs",
+      "target": "file:packages/web/src/components/Footer.astro",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/web/astro.config.mjs",
+      "target": "file:packages/web/src/components/SiteTitle.astro",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "document:packages/web/public/robots.txt",
+      "target": "file:packages/web/src/components/Share.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    }
+  ]
+}

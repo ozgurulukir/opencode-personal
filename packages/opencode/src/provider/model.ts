@@ -10,6 +10,7 @@ const ProviderApiInfo = Schema.Struct({
   id: Schema.String,
   url: Schema.String,
   npm: Schema.String,
+  supportsMaxOutputTokens: Schema.optional(Schema.Boolean),
 })
 
 const ProviderModalities = Schema.Struct({
