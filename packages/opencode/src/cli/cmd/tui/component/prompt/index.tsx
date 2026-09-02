@@ -25,6 +25,7 @@ import { useEvent } from "@tui/context/event"
 import { editorSelectionKey, useEditorContext, type EditorSelection } from "@tui/context/editor"
 import { MessageID, PartID } from "@/session/schema"
 import { createStore, produce, unwrap } from "solid-js/store"
+import * as Log from "@opencode-ai/core/util/log"
 import { usePromptHistory, type PromptInfo } from "./history"
 import { computePromptTraits } from "./traits"
 import { assign } from "./part"
@@ -1192,7 +1193,7 @@ export function Prompt(props: PromptProps) {
       })
 
       if (res.error) {
-        console.log("Creating a session failed:", res.error)
+        Log.Default.error("Creating a session failed:", { error: res.error })
 
         toast.show({
           message: "Creating a session failed. Open console for more details.",

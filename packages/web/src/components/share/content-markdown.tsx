@@ -40,7 +40,7 @@ export function ContentMarkdown(props: Props) {
     () => strip(props.text),
     async (markdown) => {
       const parsed = await markedWithShiki.parse(markdown)
-      return DOMPurify.sanitize(parsed)
+      return parsed
     },
   )
   const [expanded, setExpanded] = createSignal(false)
