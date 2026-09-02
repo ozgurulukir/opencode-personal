@@ -113,11 +113,32 @@ function endPosition(text: string) {
 
 // Some servers send MarkupContent ({kind, value}) where LSP requires a string
 // message; key on value so identical text dedupes without stringifying.
-// Other objects keep JSON.stringify: their content defines uniqueness.
+// Other objects are stringified using lightweight string concatenation to avoid
+// high GC pressure from JSON.stringify in hot dedupe paths.
+function buildDiagnosticKey(obj: unknown, depth = 0): string {
+  if (depth > 5) return ""
+  if (typeof obj === "string" || typeof obj === "number" || typeof obj === "boolean") {
+    return String(obj)
+  }
+  if (typeof obj !== "object" || obj === null) {
+    return ""
+  }
+  let key = ""
+  for (const k in obj) {
+    if (Object.prototype.hasOwnProperty.call(obj, k)) {
+      key += k + ":" + buildDiagnosticKey((obj as Record<string, unknown>)[k], depth + 1) + ","
+    }
+  }
+  return key
+}
+
 export function diagnosticMessageKey(message: unknown) {
   if (typeof message === "string") return message
-  if (typeof message === "object" && message !== null && "value" in message) return String(message.value)
-  return JSON.stringify(message)
+  if (typeof message === "object" && message !== null) {
+    if ("value" in message) return String((message as Record<string, unknown>).value)
+    return buildDiagnosticKey(message)
+  }
+  return String(message)
 }
 
 function dedupeDiagnostics(items: Diagnostic[]) {
