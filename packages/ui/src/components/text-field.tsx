@@ -116,7 +116,7 @@ export function TextField(props: TextFieldProps) {
             <Kobalte.Input
               {...others}
               autofocus={local.autofocus}
-              ref={inputRef as HTMLInputElement}
+              ref={(el: HTMLInputElement) => (inputRef = el)}
               data-slot="input-input"
               class={local.class}
             />
@@ -126,7 +126,7 @@ export function TextField(props: TextFieldProps) {
             {...others}
             autoResize
             autofocus={local.autofocus}
-            ref={inputRef as HTMLTextAreaElement}
+            ref={(el: HTMLTextAreaElement) => (inputRef = el)}
             data-slot="input-input"
             class={local.class}
           />
