@@ -4,7 +4,7 @@ import path from "path"
 const libName = (() => {
   switch (process.platform) {
     case "win32":
-      return "libopentui.dll"
+      return "opentui.dll"
     case "darwin":
       return "libopentui.dylib"
     default:

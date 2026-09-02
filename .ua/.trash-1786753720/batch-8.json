@@ -1,0 +1,64 @@
+{
+  "nodes": [
+    {
+      "id": "config:.github/ISSUE_TEMPLATE/bug-report.yml",
+      "type": "config",
+      "name": "bug-report.yml",
+      "filePath": ".github/ISSUE_TEMPLATE/bug-report.yml",
+      "summary": "GitHub issue form template for bug reports, collecting a required description plus plugins in use, OpenCode version, reproduction steps, a /share link or screenshot, OS, and terminal emulator.",
+      "tags": ["configuration", "issue-template", "github", "bug-report", "community"],
+      "complexity": "moderate",
+      "languageNotes": "Uses GitHub's structured issue forms schema (textarea/input types with validations) rather than legacy markdown templates, producing labeled, machine-parseable issue fields."
+    },
+    {
+      "id": "config:.github/ISSUE_TEMPLATE/config.yml",
+      "type": "config",
+      "name": "config.yml",
+      "filePath": ".github/ISSUE_TEMPLATE/config.yml",
+      "summary": "Issue template chooser configuration that disables blank issues and adds a Discord community contact link for quick questions.",
+      "tags": ["configuration", "issue-template", "github", "community-support"],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:.github/ISSUE_TEMPLATE/feature-request.yml",
+      "type": "config",
+      "name": "feature-request.yml",
+      "filePath": ".github/ISSUE_TEMPLATE/feature-request.yml",
+      "summary": "GitHub issue form template for feature requests, requiring a duplicate-check confirmation checkbox and a detailed description of the desired enhancement.",
+      "tags": ["configuration", "issue-template", "github", "feature-request"],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:.github/ISSUE_TEMPLATE/question.yml",
+      "type": "config",
+      "name": "question.yml",
+      "filePath": ".github/ISSUE_TEMPLATE/question.yml",
+      "summary": "Minimal GitHub issue form template for questions, with a single required free-text question field.",
+      "tags": ["configuration", "issue-template", "github", "support"],
+      "complexity": "simple"
+    }
+  ],
+  "edges": [
+    {
+      "source": "config:.github/ISSUE_TEMPLATE/config.yml",
+      "target": "config:.github/ISSUE_TEMPLATE/bug-report.yml",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "config:.github/ISSUE_TEMPLATE/config.yml",
+      "target": "config:.github/ISSUE_TEMPLATE/feature-request.yml",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "config:.github/ISSUE_TEMPLATE/config.yml",
+      "target": "config:.github/ISSUE_TEMPLATE/question.yml",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    }
+  ]
+}

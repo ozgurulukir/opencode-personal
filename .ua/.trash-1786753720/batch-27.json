@@ -1,0 +1,331 @@
+{
+  "nodes": [
+    {
+      "id": "file:packages/ui/src/components/inline-input.css",
+      "type": "file",
+      "name": "inline-input.css",
+      "filePath": "packages/ui/src/components/inline-input.css",
+      "summary": "Styles the borderless inline text input that inherits surrounding typography and shows only a focus ring shadow.",
+      "tags": ["styles", "form-control", "minimal"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/ui/src/components/keybind.css",
+      "type": "file",
+      "name": "keybind.css",
+      "filePath": "packages/ui/src/components/keybind.css",
+      "summary": "Styles the keyboard shortcut badge as a small centered chip with surface background, border shadow, and 12px regular text.",
+      "tags": ["styles", "ui-component", "badge", "typography"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/ui/src/components/list.css",
+      "type": "file",
+      "name": "list.css",
+      "filePath": "packages/ui/src/components/list.css",
+      "summary": "Styles the selectable/filterable list component: filter input, groups, items with selected/active/extra icons, dividers, empty state, and a scroll fade animation.",
+      "tags": ["styles", "ui-component", "list", "filtering", "animation"],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:packages/ui/src/components/logo.css",
+      "type": "file",
+      "name": "logo.css",
+      "filePath": "packages/ui/src/components/logo.css",
+      "summary": "Sets the logo mark dimensions with a fixed 16px width and 4/5 aspect ratio.",
+      "tags": ["styles", "branding", "icon"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/ui/src/components/markdown.css",
+      "type": "file",
+      "name": "markdown.css",
+      "filePath": "packages/ui/src/components/markdown.css",
+      "summary": "Styles rendered markdown output with a typography reset, uniform heading sizes distinguished by color, dense element spacing, and code blocks with a copy button that swaps check/copy icons.",
+      "tags": ["styles", "typography", "markdown-rendering", "code-block"],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:packages/ui/src/components/message-nav.css",
+      "type": "file",
+      "name": "message-nav.css",
+      "filePath": "packages/ui/src/components/message-nav.css",
+      "summary": "Styles the message timeline navigator with nav items, message/tick buttons, a tick line, title previews, and a hover tooltip.",
+      "tags": ["styles", "chat-ui", "navigation", "timeline"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:packages/ui/src/components/message-part.css",
+      "type": "file",
+      "name": "message-part.css",
+      "filePath": "packages/ui/src/components/message-part.css",
+      "summary": "The largest component stylesheet: styles every chat message part renderer (assistant/user messages, tool outputs, diffs, bash output, diagnostics, compaction parts, apply-patch diffs, edit content, dock prompt, code) with prefers-color-scheme dark adjustments.",
+      "tags": ["styles", "chat-ui", "message-parts", "diff", "dark-mode"],
+      "complexity": "complex",
+      "languageNotes": "1,275 lines of per-part overrides that effectively catalog every message part variant; relies on native CSS nesting and dark-scheme media queries."
+    },
+    {
+      "id": "file:packages/ui/src/components/popover.css",
+      "type": "file",
+      "name": "popover.css",
+      "filePath": "packages/ui/src/components/popover.css",
+      "summary": "Styles the anchored popover with open/close animations, arrow, header/title/description/body slots, and a close button.",
+      "tags": ["styles", "ui-component", "overlay", "animation"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:packages/ui/src/components/progress-circle.css",
+      "type": "file",
+      "name": "progress-circle.css",
+      "filePath": "packages/ui/src/components/progress-circle.css",
+      "summary": "Styles the circular progress indicator as a -90deg-rotated SVG with weak background stroke and an active stroke whose dash-offset animates via cubic-bezier transition.",
+      "tags": ["styles", "feedback", "progress", "svg-animation"],
+      "complexity": "simple",
+      "languageNotes": "Circular progress via stroke-dashoffset transition instead of keyframes."
+    },
+    {
+      "id": "file:packages/ui/src/components/progress.css",
+      "type": "file",
+      "name": "progress.css",
+      "filePath": "packages/ui/src/components/progress.css",
+      "summary": "Styles the linear progress bar with track, fill, header, label, and value-label slots plus an indeterminate animation.",
+      "tags": ["styles", "feedback", "progress", "animation"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:packages/ui/src/components/provider-icon.css",
+      "type": "file",
+      "name": "provider-icon.css",
+      "filePath": "packages/ui/src/components/provider-icon.css",
+      "summary": "Sets fixed 16x16 non-shrinking dimensions for provider logo icons.",
+      "tags": ["styles", "icon", "branding"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/ui/src/components/radio-group.css",
+      "type": "file",
+      "name": "radio-group.css",
+      "filePath": "packages/ui/src/components/radio-group.css",
+      "summary": "Styles the radio group form control with wrapper, items, hidden native input, custom control with animated indicator, and labels.",
+      "tags": ["styles", "form-control", "ui-component", "states"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:packages/ui/src/components/resize-handle.css",
+      "type": "file",
+      "name": "resize-handle.css",
+      "filePath": "packages/ui/src/components/resize-handle.css",
+      "summary": "Styles edge and corner resize handles with direction and edge variants, hover/active visibility transitions, and matching resize cursors.",
+      "tags": ["styles", "layout", "interaction", "resizing"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:packages/ui/src/components/scroll-view.css",
+      "type": "file",
+      "name": "scroll-view.css",
+      "filePath": "packages/ui/src/components/scroll-view.css",
+      "summary": "Styles the custom-scrollable view: hidden native scrollbars, a styled thumb with hover and dragging states, and dark-mode adjustments.",
+      "tags": ["styles", "scrolling", "custom-scrollbar", "dark-mode"],
+      "complexity": "moderate",
+      "languageNotes": "Uses both scrollbar-width: none and ::-webkit-scrollbar to suppress native scrollbars cross-browser."
+    },
+    {
+      "id": "file:packages/ui/src/components/select.css",
+      "type": "file",
+      "name": "select.css",
+      "filePath": "packages/ui/src/components/select.css",
+      "summary": "Styles the select dropdown with a trigger showing value and chevron icon, an open-animated content list, and items with check indicators.",
+      "tags": ["styles", "form-control", "ui-component", "animation"],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:packages/ui/src/components/session-review.css",
+      "type": "file",
+      "name": "session-review.css",
+      "filePath": "packages/ui/src/components/session-review.css",
+      "summary": "Styles the session review UI with container, change groups, per-change rows, accordion items and content, actions, and embedded radio-group overrides for change dispositions.",
+      "tags": ["styles", "chat-ui", "review", "accordion"],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:packages/ui/src/components/session-turn.css",
+      "type": "file",
+      "name": "session-turn.css",
+      "filePath": "packages/ui/src/components/session-turn.css",
+      "summary": "Styles the session turn grouping with assistant content, compaction sections, and collapsible diffs groups featuring chevron, directory, filename, and path meta rows.",
+      "tags": ["styles", "chat-ui", "session", "diff"],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:packages/ui/src/components/shell-submessage.css",
+      "type": "file",
+      "name": "shell-submessage.css",
+      "filePath": "packages/ui/src/components/shell-submessage.css",
+      "summary": "Styles the inline shell/tool sub-message layout used inside message parts, keeping values on the text baseline with clipped width slots.",
+      "tags": ["styles", "chat-ui", "layout"],
+      "complexity": "simple",
+      "languageNotes": "Has no sibling shell-submessage.tsx; its data-component selectors are consumed by message-part.tsx."
+    },
+    {
+      "id": "file:packages/ui/src/components/spinner.css",
+      "type": "file",
+      "name": "spinner.css",
+      "filePath": "packages/ui/src/components/spinner.css",
+      "summary": "Minimal sizing for the loading spinner: inherits color, renders as an 18px square that never shrinks.",
+      "tags": ["styles", "feedback", "loading-indicator"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/ui/src/components/sticky-accordion-header.css",
+      "type": "file",
+      "name": "sticky-accordion-header.css",
+      "filePath": "packages/ui/src/components/sticky-accordion-header.css",
+      "summary": "Makes the accordion header sticky with a CSS-variable-driven top offset stack and an opaque background to hide scrolling content behind it.",
+      "tags": ["styles", "sticky-positioning", "accordion"],
+      "complexity": "simple",
+      "languageNotes": "Top offset composes two custom properties (--sticky-accordion-top + --sticky-accordion-offset) so parents can stack sticky headers."
+    }
+  ],
+  "edges": [
+    {
+      "source": "file:packages/ui/src/components/inline-input.css",
+      "target": "file:packages/ui/src/components/inline-input.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/ui/src/components/keybind.css",
+      "target": "file:packages/ui/src/components/keybind.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/ui/src/components/list.css",
+      "target": "file:packages/ui/src/components/list.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/ui/src/components/logo.css",
+      "target": "file:packages/ui/src/components/logo.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/ui/src/components/markdown.css",
+      "target": "file:packages/ui/src/components/markdown.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/ui/src/components/message-nav.css",
+      "target": "file:packages/ui/src/components/message-nav.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/ui/src/components/message-part.css",
+      "target": "file:packages/ui/src/components/message-part.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/ui/src/components/popover.css",
+      "target": "file:packages/ui/src/components/popover.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/ui/src/components/progress-circle.css",
+      "target": "file:packages/ui/src/components/progress-circle.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/ui/src/components/progress.css",
+      "target": "file:packages/ui/src/components/progress.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/ui/src/components/provider-icon.css",
+      "target": "file:packages/ui/src/components/provider-icon.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/ui/src/components/radio-group.css",
+      "target": "file:packages/ui/src/components/radio-group.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/ui/src/components/resize-handle.css",
+      "target": "file:packages/ui/src/components/resize-handle.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/ui/src/components/scroll-view.css",
+      "target": "file:packages/ui/src/components/scroll-view.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/ui/src/components/select.css",
+      "target": "file:packages/ui/src/components/select.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/ui/src/components/session-review.css",
+      "target": "file:packages/ui/src/components/session-review.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/ui/src/components/session-turn.css",
+      "target": "file:packages/ui/src/components/session-turn.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/ui/src/components/shell-submessage.css",
+      "target": "file:packages/ui/src/components/message-part.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/ui/src/components/spinner.css",
+      "target": "file:packages/ui/src/components/spinner.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/ui/src/components/sticky-accordion-header.css",
+      "target": "file:packages/ui/src/components/sticky-accordion-header.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    }
+  ]
+}
