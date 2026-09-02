@@ -42,3 +42,4 @@ plugins/
 packages/opencode/dist.old/opencode-windows-x64/bin/opencode.exe.old
 
 .soloncode/
+.zcode/
