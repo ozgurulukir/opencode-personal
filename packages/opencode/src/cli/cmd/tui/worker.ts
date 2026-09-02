@@ -15,6 +15,7 @@ import { AppRuntime } from "@/effect/app-runtime"
 import { ensureProcessMetadata } from "@opencode-ai/core/util/opencode-process"
 import { Effect } from "effect"
 import { disposeAllInstancesAndEmitGlobalDisposed } from "@/server/global-lifecycle"
+import { capture as captureStderr } from "./stderr-capture"
 
 // AbortSignal.any() creates internal EventTarget listeners on constituent
 // signals. When a long-lived signal (e.g. session-level) is reused across many
@@ -33,6 +34,11 @@ await Log.init({
     return "INFO"
   })(),
 })
+
+// Workers share the TUI process terminal descriptors, but have their own
+// console methods. Capture them here as well so worker errors cannot corrupt
+// the alternate screen buffer.
+captureStderr()
 
 Heap.start()
 

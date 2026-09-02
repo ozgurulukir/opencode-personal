@@ -24,3 +24,14 @@
 ## 2026-08-18 - DOM-based XSS vulnerabilities with DOMPurify and Shiki
 **Vulnerability:** Using DOMPurify to sanitize HTML and directly assigning it via `innerHTML` can lead to Mutation XSS (mXSS) vulnerabilities. **Learning:** For unsafe dynamically generated HTML, sanitize using `DOMPurify` with `RETURN_DOM_FRAGMENT: true` and inject the result using `appendChild` instead of `innerHTML`. Shiki output destined for raw `innerHTML` injection must still pass through `DOMPurify` (preferably with `RETURN_DOM_FRAGMENT: true`); only skip sanitization when the output is never injected as HTML.
 **Prevention:** Always verify if an external library already handles escaping (like Shiki) before adding DOMPurify. When using DOMPurify, prefer injecting the sanitized output as a `DocumentFragment` rather than a raw HTML string.
+
+## 2026-08-22 - SSR XSS with DOMPurify in SolidJS
+**Vulnerability:** Sending raw DOMPurify sanitized strings over SSR via `innerHTML` is inherently vulnerable to Mutation XSS (mXSS). Even if the string looks safe on the server, the browser's parser can mutate it into an executable script payload upon hydration, before client-side SolidJS code can safely parse or mount it as a `DocumentFragment`.
+**Learning:** Do not render untrusted HTML strings using `innerHTML` on the server (SSR), even if sanitized by a library like DOMPurify. SSR strings are fully evaluated by the browser parser prior to any client-side safe DOM insertion patterns (like `RETURN_DOM_FRAGMENT`).
+**Prevention:** Completely remove `innerHTML` on the server for untrusted markdown (e.g., render an empty `<div>`). Rely exclusively on the client-side `createEffect` and `appendChild` with `DOMPurify.sanitize(..., { RETURN_DOM_FRAGMENT: true })` to safely mount the parsed payload.
+
+## 2026-09-01 - Insecure CORS Origin Validation via startsWith
+
+**Vulnerability:** The CORS origin checking logic used `input.startsWith("http://localhost:")` and `input.startsWith("http://127.0.0.1:")`. This allows malicious actors to host a website on a subdomain like `http://localhost:3000.evil.com` and bypass local CORS security restrictions.
+**Learning:** Using `startsWith` or weak Regex to validate URLs or domains is highly vulnerable to domain prefix/suffix spoofing.
+**Prevention:** When validating CORS origins, avoid vulnerable string-matching like `input.startsWith('http://localhost:')`. Instead, use robust URL parsing (`new URL(input)`) and check `url.hostname` explicitly.

@@ -32,6 +32,9 @@ type ActiveEntry = {
   committedBlocks: number
   pendingSpacerRows: number
   rendered: boolean
+  // Content snapshot from the last settle() call. When the current content
+  // hasn't changed since the last settle, we skip the expensive re-parse.
+  lastSettledContent: string
 }
 
 let nextId = 0
@@ -84,6 +87,12 @@ function staticBody(commit: StreamCommit, body: RunEntryBody, spaced: number): R
   }
 }
 
+// Minimum interval between settle() calls during streaming (ms).
+// settle() triggers tree-sitter markdown re-parse of the full accumulated
+// content; calling it on every delta starves the event loop and delays
+// keypress handling (ESC interrupt). 16ms ≈ one frame at 60fps.
+const SETTLE_THROTTLE_MS = 16
+
 export class RunScrollbackStream {
   private tail: StreamCommit | undefined
   private rendered: StreamCommit | undefined
@@ -92,6 +101,7 @@ export class RunScrollbackStream {
   private sessionID?: () => string | undefined
   private treeSitterClient: TreeSitterClient | undefined
   private wrote: boolean
+  private lastSettleTime = 0
 
   constructor(
     private renderer: CliRenderer,
@@ -110,6 +120,7 @@ export class RunScrollbackStream {
   }
 
   private createEntry(commit: StreamCommit, body: ActiveBody): ActiveEntry {
+    this.lastSettleTime = 0
     const surface = this.renderer.createScrollbackSurface({
       startOnNewLine: entryFlags(commit).startOnNewLine,
     })
@@ -164,6 +175,7 @@ export class RunScrollbackStream {
       committedBlocks: 0,
       pendingSpacerRows: rows || (!this.rendered && this.wrote ? 1 : 0),
       rendered: false,
+      lastSettledContent: "",
     }
   }
 
@@ -223,9 +235,14 @@ export class RunScrollbackStream {
       }
 
       const renderable = active.renderable
+      const contentChanged = active.content !== active.lastSettledContent
+      if (!contentChanged && !done) {
+        return false
+      }
       renderable.content = active.content
       renderable.streaming = !done
       await active.surface.settle()
+      active.lastSettledContent = active.content
       const targetRows = done ? active.surface.height : Math.max(active.committedRows, active.surface.height - 1)
       if (targetRows <= active.committedRows) {
         return false
@@ -245,9 +262,21 @@ export class RunScrollbackStream {
     }
 
     const renderable = active.renderable
+
+    // Skip the expensive settle() re-parse when content hasn't changed since
+    // the last settle. This happens when multiple flushActive calls race
+    // through the microtask queue before settle finishes, or when a
+    // throttled writeStreaming finally fires but no new content arrived.
+    const contentChanged = active.content !== active.lastSettledContent
+    if (!contentChanged && !done) {
+      return false
+    }
+
     renderable.content = active.content
     renderable.streaming = !done
     await active.surface.settle()
+    active.lastSettledContent = active.content
+
     const targetBlockCount = done ? renderable._blockStates.length : renderable._stableBlockCount
     if (targetBlockCount <= active.committedBlocks) {
       return false
@@ -285,6 +314,24 @@ export class RunScrollbackStream {
       return true
     }
 
+    // Streaming fallback: settle parsed new content (contentChanged) but
+    // commitMarkdownBlocks failed because _blockStates entries are not yet
+    // populated. Commit the uncommitted surface rows so the user sees
+    // incremental progress instead of a blank gap while waiting for blocks
+    // to stabilize. Advance committedBlocks to _stableBlockCount so the
+    // next successful commitMarkdownBlocks call doesn't re-commit these rows.
+    if (!done && contentChanged && active.surface.height > active.committedRows) {
+      this.flushPendingSpacer(active)
+      const targetRows = Math.max(active.committedRows, active.surface.height - 1)
+      if (targetRows > active.committedRows) {
+        active.surface.commitRows(active.committedRows, targetRows, { trailingNewline: false })
+        active.committedRows = targetRows
+        active.committedBlocks = renderable._stableBlockCount
+        active.rendered = true
+        return true
+      }
+    }
+
     return false
   }
 
@@ -319,6 +366,22 @@ export class RunScrollbackStream {
     this.active.body = body
     this.active.commit = commit
     this.active.content += body.content
+
+    // Throttle settle() during streaming: tree-sitter re-parses the full
+    // accumulated content on every call, so calling it per-delta starves the
+    // event loop and delays input handling (ESC interrupt). Skip the settle
+    // when not enough time has elapsed since the last one; the accumulated
+    // content is preserved in active.content and will be parsed on the next
+    // throttled flush or on finishActive (done=true always settles).
+    // Text bodies don't call settle() (only render()), so skip the throttle.
+    if (body.type !== "text") {
+      const now = performance.now()
+      if (now - this.lastSettleTime < SETTLE_THROTTLE_MS) {
+        return
+      }
+      this.lastSettleTime = now
+    }
+
     await this.flushActive(false, false)
     if (this.active.rendered) {
       this.markRendered(this.active.commit)

@@ -1282,20 +1282,23 @@ describe("run stream transport", () => {
     }
   })
 
-  test("rejects the active turn when the event stream faults", async () => {
+  test("rejects the active turn when the event stream faults after retries exhausted", async () => {
     const ui = footer()
     const ready = defer()
+    let callCount = 0
 
     const transport = await createSessionTransport({
       sdk: sdk({
-        globalEvent: () =>
-          globalSse(
+        globalEvent: () => {
+          callCount++
+          return globalSse(
             (async function* (): AsyncGenerator<GlobalEvent> {
               await ready.promise
               yield globalEvent(busy())
               throw new Error("boom")
             })(),
-          ),
+          )
+        },
         promptAsync: async () => {
           ready.resolve()
           return ok(undefined)
@@ -1318,7 +1321,9 @@ describe("run stream transport", () => {
           files: [],
           includeFiles: false,
         }),
-      ).rejects.toThrow("boom")
+      ).rejects.toThrow()
+      // Should have attempted reconnect 3 times + original = 4 total calls
+      expect(callCount).toBe(4)
     } finally {
       await transport.close()
     }

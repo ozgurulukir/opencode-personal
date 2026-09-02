@@ -1,0 +1,29 @@
+{
+  "nodes": [
+    {
+      "id": "service:packages/containers/rust/Dockerfile",
+      "type": "service",
+      "name": "Dockerfile",
+      "filePath": "packages/containers/rust/Dockerfile",
+      "summary": "CI container image that installs the stable Rust toolchain via rustup (minimal profile, CARGO_HOME=/opt/cargo, RUSTUP_HOME=/opt/rustup) on top of build/bun-node. Provides rustc and cargo for jobs that need native or WASM compilation alongside the Bun/Node toolchain.",
+      "tags": ["containerization", "infrastructure", "ci-cd", "rust", "toolchain"],
+      "complexity": "simple"
+    }
+  ],
+  "edges": [
+    {
+      "source": "service:packages/containers/rust/Dockerfile",
+      "target": "service:packages/containers/bun-node/Dockerfile",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "service:packages/containers/rust/Dockerfile",
+      "target": "file:packages/containers/script/build.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    }
+  ]
+}

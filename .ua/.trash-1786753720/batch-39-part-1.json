@@ -1,0 +1,481 @@
+{
+  "nodes": [
+    {
+      "id": "file:nix/desktop.nix",
+      "type": "file",
+      "name": "desktop.nix",
+      "filePath": "nix/desktop.nix",
+      "summary": "Nix derivation packaging the Tauri-based OpenCode desktop app. It inherits version, src, and node_modules from the opencode CLI derivation, builds the Rust/Tauri bundle against GTK4 and WebKitGTK on Linux, stages the CLI binary as a sidecar, and renames the output binary to opencode-desktop.",
+      "tags": ["nix", "packaging", "desktop-app", "tauri", "infrastructure"],
+      "complexity": "moderate",
+      "languageNotes": "Uses rustPlatform.buildRustPackage with cargoRoot pointing at packages/desktop/src-tauri; the Linux postFixup renames OpenCode to opencode-desktop to dodge case-insensitive filesystem conflicts."
+    },
+    {
+      "id": "config:nix/hashes.json",
+      "type": "config",
+      "name": "hashes.json",
+      "filePath": "nix/hashes.json",
+      "summary": "Stores the per-platform sha256 fixed-output hashes for the opencode node_modules derivation across the four supported Linux and macOS platforms.",
+      "tags": ["configuration", "nix", "checksums", "dependencies"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:nix/node_modules.nix",
+      "type": "file",
+      "name": "node_modules.nix",
+      "filePath": "nix/node_modules.nix",
+      "summary": "Fixed-output Nix derivation that runs bun install with a frozen lockfile for the opencode, desktop, and app workspace packages, then canonicalizes symlinks and normalizes bin entries via the bundled scripts, yielding a reproducible node_modules tree keyed by the hashes in hashes.json.",
+      "tags": ["nix", "packaging", "dependencies", "bun", "build-system"],
+      "complexity": "moderate",
+      "languageNotes": "Achieves reproducibility through outputHashMode = \"recursive\" content addressing; cross-platform builds are steered with bun's --cpu/--os flags instead of native interpreters."
+    },
+    {
+      "id": "file:nix/opencode.nix",
+      "type": "file",
+      "name": "opencode.nix",
+      "filePath": "nix/opencode.nix",
+      "summary": "Main Nix derivation for the opencode CLI: stages the prebuilt node_modules tree, patches shebangs, compiles the self-contained binary via script/build.ts --single under bun, installs schema.json, and wraps the binary with ripgrep and shell completions.",
+      "tags": ["nix", "packaging", "cli", "build-system", "infrastructure"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:nix/scripts/canonicalize-node-modules.ts",
+      "type": "file",
+      "name": "canonicalize-node-modules.ts",
+      "filePath": "nix/scripts/canonicalize-node-modules.ts",
+      "summary": "Post-install build script that rebuilds node_modules/.bun/node_modules symlinks so every package slug resolves to its highest installed version, making bun's content-addressed store look like a canonical node_modules layout for Nix packaging.",
+      "tags": ["build-script", "bun", "node-modules", "symlink", "utility"],
+      "complexity": "moderate",
+      "languageNotes": "Top-level-await ESM script driven by Bun APIs (Bun.semver.order/satisfies); parseEntry decodes bun's \"@scope+name@version\" directory labels."
+    },
+    {
+      "id": "file:nix/scripts/normalize-bun-binaries.ts",
+      "type": "file",
+      "name": "normalize-bun-binaries.ts",
+      "filePath": "nix/scripts/normalize-bun-binaries.ts",
+      "summary": "Post-install build script that scans bun's package store, reads each manifest's bin entries, and symlinks them into a normalized bin directory with deduplicated names so the Nix build exposes package executables uniformly.",
+      "tags": ["build-script", "bun", "binaries", "symlink", "utility"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "config:packages/app/e2e/tsconfig.json",
+      "type": "config",
+      "name": "tsconfig.json",
+      "filePath": "packages/app/e2e/tsconfig.json",
+      "summary": "TypeScript configuration scoped to the Playwright e2e test directory, extending the app package's base tsconfig with test-specific compiler options.",
+      "tags": ["configuration", "typescript", "e2e", "test"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/app/happydom.ts",
+      "type": "file",
+      "name": "happydom.ts",
+      "filePath": "packages/app/happydom.ts",
+      "summary": "Test DOM shim that registers happy-dom globally and replaces HTMLCanvasElement.getContext with a stubbed CanvasRenderingContext2D so canvas-dependent UI code can run in Node-based unit tests.",
+      "tags": ["test", "dom-shim", "canvas-mock", "testing"],
+      "complexity": "moderate",
+      "languageNotes": "Overrides the canvas prototype at test-setup time and falls through to the original implementation for non-2d contexts."
+    },
+    {
+      "id": "file:packages/app/playwright.config.ts",
+      "type": "file",
+      "name": "playwright.config.ts",
+      "filePath": "packages/app/playwright.config.ts",
+      "summary": "Playwright e2e configuration for the web app: a chromium project, the Vite dev server booted via `bun run dev` as a reusable webServer, and HTML/line reporters with retries and traces configured for CI.",
+      "tags": ["e2e", "playwright", "test", "configuration"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/app/public/_headers",
+      "type": "file",
+      "name": "_headers",
+      "filePath": "packages/app/public/_headers",
+      "summary": "Cloudflare Pages header rules that force correct Content-Type headers for JavaScript, ES-module, and CSS assets served from the app's public directory.",
+      "tags": ["cloudflare-pages", "http-headers", "static-assets", "configuration"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/app/public/oc-theme-preload.js",
+      "type": "file",
+      "name": "oc-theme-preload.js",
+      "filePath": "packages/app/public/oc-theme-preload.js",
+      "summary": "Blocking theme bootstrap script that reads the persisted theme id and color scheme from localStorage, migrates legacy oc-1 themes to oc-2, sets data-theme/data-color-scheme on the document element, and injects cached theme CSS to prevent a flash of unstyled content.",
+      "tags": ["theme", "preload", "local-storage", "anti-fouc", "bootstrap"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/app/src/addons/serialize.ts",
+      "type": "file",
+      "name": "serialize.ts",
+      "filePath": "packages/app/src/addons/serialize.ts",
+      "summary": "Port of the xterm.js serialize addon for ghostty-web: walks terminal buffer cells, diffs SGR styles between cells, and reconstructs ANSI escape sequences that can restore terminal state, plus a plain-text serialization mode.",
+      "tags": ["terminal", "serialization", "addon", "ghostty-web", "algorithm"],
+      "complexity": "complex",
+      "languageNotes": "Class hierarchy mirrors xterm.js (BaseSerializeHandler to StringSerializeHandler) with per-cell SGR diffing to minimize emitted escape codes."
+    },
+    {
+      "id": "file:packages/app/src/app.tsx",
+      "type": "file",
+      "name": "app.tsx",
+      "filePath": "packages/app/src/app.tsx",
+      "summary": "SolidJS application root: composes the full provider stack (query client, i18n, dialogs, SDK, sync, theming, routing), lazy-loads route pages, and gates rendering on a server health check with a connection-error fallback screen.",
+      "tags": ["entry-point", "component", "provider-stack", "routing", "solidjs"],
+      "complexity": "complex",
+      "languageNotes": "ConnectionGate runs the health-check retry loop inside Effect.gen with timeoutOrElse/ensuring, bridging Effect fibers into Solid's createResource lifecycle."
+    },
+    {
+      "id": "function:nix/scripts/canonicalize-node-modules.ts:parseEntry",
+      "type": "function",
+      "name": "parseEntry",
+      "filePath": "nix/scripts/canonicalize-node-modules.ts",
+      "lineRange": [90, 101],
+      "summary": "Parses a bun store directory label (\"@scope+name@version\") into name and version parts, treating \"+\" as the scope-path separator and rejecting malformed labels.",
+      "tags": ["utility", "parsing", "bun-store"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:nix/scripts/normalize-bun-binaries.ts:collectPackages",
+      "type": "function",
+      "name": "collectPackages",
+      "filePath": "nix/scripts/normalize-bun-binaries.ts",
+      "lineRange": [50, 74],
+      "summary": "Walks the bun modules store including @scoped subdirectories and returns the sorted list of package directory paths that expose a manifest.",
+      "tags": ["utility", "filesystem", "traversal"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:nix/scripts/normalize-bun-binaries.ts:linkBinary",
+      "type": "function",
+      "name": "linkBinary",
+      "filePath": "nix/scripts/normalize-bun-binaries.ts",
+      "lineRange": [85, 104],
+      "summary": "Creates a relative symlink for a package's bin entry inside the normalized bin root, skipping duplicates via a seen-set and removing stale links first.",
+      "tags": ["utility", "symlink", "binaries"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/app/src/addons/serialize.ts:isBuffer",
+      "type": "function",
+      "name": "isBuffer",
+      "filePath": "packages/app/src/addons/serialize.ts",
+      "lineRange": [69, 79],
+      "summary": "Duck-types a value as a terminal buffer by checking its type field, cursor coordinates, and getLine/getNullCell members.",
+      "tags": ["utility", "type-guard", "terminal"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/app/src/addons/serialize.ts:getTerminalBuffers",
+      "type": "function",
+      "name": "getTerminalBuffers",
+      "filePath": "packages/app/src/addons/serialize.ts",
+      "lineRange": [81, 90],
+      "summary": "Extracts the normal and alternate buffers from a terminal-like object using structural checks so the addon works without importing ghostty-web internals.",
+      "tags": ["utility", "type-guard", "terminal"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/app/src/addons/serialize.ts:equalFlags",
+      "type": "function",
+      "name": "equalFlags",
+      "filePath": "packages/app/src/addons/serialize.ts",
+      "lineRange": [173, 184],
+      "summary": "Compares the attribute flags (bold, italic, underline, blink, inverse, invisible, dim, strikethrough) of two buffer cells to decide whether SGR state changed.",
+      "tags": ["utility", "comparison", "sgr"],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:packages/app/src/addons/serialize.ts:BaseSerializeHandler",
+      "type": "class",
+      "name": "BaseSerializeHandler",
+      "filePath": "packages/app/src/addons/serialize.ts",
+      "lineRange": [190, 233],
+      "summary": "Abstract buffer serializer that iterates rows and cells within a buffer range, delegating to overridable _nextCell/_rowEnd/_serializeString hooks.",
+      "tags": ["serializer", "base-class", "iterator", "terminal"],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:packages/app/src/addons/serialize.ts:StringSerializeHandler",
+      "type": "class",
+      "name": "StringSerializeHandler",
+      "filePath": "packages/app/src/addons/serialize.ts",
+      "lineRange": [239, 499],
+      "summary": "Concrete serializer that emits ANSI escape sequences with per-cell SGR diffing, cursor-style tracking, wide-character handling, and row separators so output can restore terminal state.",
+      "tags": ["serializer", "ansi", "sgr-diffing", "terminal"],
+      "complexity": "complex"
+    },
+    {
+      "id": "class:packages/app/src/addons/serialize.ts:SerializeAddon",
+      "type": "class",
+      "name": "SerializeAddon",
+      "filePath": "packages/app/src/addons/serialize.ts",
+      "lineRange": [505, 634],
+      "summary": "Addon entry point that activates on a terminal and exposes serialize() (escape-sequence output over scrollback or an explicit range) and serializeAsText() for plain-text extraction.",
+      "tags": ["addon", "terminal", "serialization", "facade"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/app/src/app.tsx:QueryProvider",
+      "type": "function",
+      "name": "QueryProvider",
+      "filePath": "packages/app/src/app.tsx",
+      "lineRange": [85, 96],
+      "summary": "Wraps children in a TanStack Query QueryClientProvider bound to a shared client for the subtree.",
+      "tags": ["component", "provider", "query-client"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/app/src/app.tsx:AppShellProviders",
+      "type": "function",
+      "name": "AppShellProviders",
+      "filePath": "packages/app/src/app.tsx",
+      "lineRange": [98, 116],
+      "summary": "Nests the app-level context providers (global SDK, sync, layout, permission, notification) around the application shell.",
+      "tags": ["component", "provider", "context"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/app/src/app.tsx:SessionProviders",
+      "type": "function",
+      "name": "SessionProviders",
+      "filePath": "packages/app/src/app.tsx",
+      "lineRange": [118, 128],
+      "summary": "Installs per-session providers such as prompt, comments, and highlights around session-scoped routes.",
+      "tags": ["component", "provider", "session"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/app/src/app.tsx:RouterRoot",
+      "type": "function",
+      "name": "RouterRoot",
+      "filePath": "packages/app/src/app.tsx",
+      "lineRange": [130, 139],
+      "summary": "Declares the root Solid router with a lazy-loaded home route and parameterized session routes.",
+      "tags": ["component", "routing", "lazy-loading"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/app/src/app.tsx:AppBaseProviders",
+      "type": "function",
+      "name": "AppBaseProviders",
+      "filePath": "packages/app/src/app.tsx",
+      "lineRange": [141, 171],
+      "summary": "Base provider composition (theme, i18n, dialogs, marked renderer, fonts) plus desktop titlebar wiring and Sentry error capturing; exported for reuse outside the default tree.",
+      "tags": ["component", "provider", "error-handling", "theming"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/app/src/app.tsx:ConnectionGate",
+      "type": "function",
+      "name": "ConnectionGate",
+      "filePath": "packages/app/src/app.tsx",
+      "lineRange": [173, 237],
+      "summary": "Polls server health with an Effect retry loop (repeat until healthy, timeout with background-mode fallback), exposes retry and switch-server actions, and only renders children once a connection is established.",
+      "tags": ["component", "health-check", "effect", "connection-gate"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/app/src/app.tsx:ConnectionError",
+      "type": "function",
+      "name": "ConnectionError",
+      "filePath": "packages/app/src/app.tsx",
+      "lineRange": [239, 284],
+      "summary": "Full-screen connection failure view that names the unreachable server, offers other known servers to switch to, and auto-retries on an interval until cleanup.",
+      "tags": ["component", "error-screen", "retry", "server-selection"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/app/src/app.tsx:AppInterface",
+      "type": "function",
+      "name": "AppInterface",
+      "filePath": "packages/app/src/app.tsx",
+      "lineRange": [295, 330],
+      "summary": "Top-level app interface composing the connection gate, layout shell, dialog stack, and debug bar; exported as the embeddable app surface.",
+      "tags": ["component", "app-shell", "composition"],
+      "complexity": "simple"
+    }
+  ],
+  "edges": [
+    {
+      "source": "file:nix/desktop.nix",
+      "target": "file:nix/opencode.nix",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:nix/opencode.nix",
+      "target": "file:nix/node_modules.nix",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:nix/node_modules.nix",
+      "target": "config:nix/hashes.json",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:nix/node_modules.nix",
+      "target": "file:nix/scripts/canonicalize-node-modules.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:nix/node_modules.nix",
+      "target": "file:nix/scripts/normalize-bun-binaries.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:nix/scripts/canonicalize-node-modules.ts",
+      "target": "function:nix/scripts/canonicalize-node-modules.ts:parseEntry",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:nix/scripts/normalize-bun-binaries.ts",
+      "target": "function:nix/scripts/normalize-bun-binaries.ts:collectPackages",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:nix/scripts/normalize-bun-binaries.ts",
+      "target": "function:nix/scripts/normalize-bun-binaries.ts:linkBinary",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/app/src/addons/serialize.ts",
+      "target": "function:packages/app/src/addons/serialize.ts:isBuffer",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/app/src/addons/serialize.ts",
+      "target": "function:packages/app/src/addons/serialize.ts:getTerminalBuffers",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/app/src/addons/serialize.ts",
+      "target": "function:packages/app/src/addons/serialize.ts:equalFlags",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/app/src/addons/serialize.ts",
+      "target": "class:packages/app/src/addons/serialize.ts:BaseSerializeHandler",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/app/src/addons/serialize.ts",
+      "target": "class:packages/app/src/addons/serialize.ts:StringSerializeHandler",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/app/src/addons/serialize.ts",
+      "target": "class:packages/app/src/addons/serialize.ts:SerializeAddon",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/app/src/addons/serialize.ts",
+      "target": "class:packages/app/src/addons/serialize.ts:SerializeAddon",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "class:packages/app/src/addons/serialize.ts:StringSerializeHandler",
+      "target": "class:packages/app/src/addons/serialize.ts:BaseSerializeHandler",
+      "type": "inherits",
+      "direction": "forward",
+      "weight": 0.9
+    },
+    {
+      "source": "file:packages/app/src/app.tsx",
+      "target": "function:packages/app/src/app.tsx:QueryProvider",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/app/src/app.tsx",
+      "target": "function:packages/app/src/app.tsx:AppShellProviders",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/app/src/app.tsx",
+      "target": "function:packages/app/src/app.tsx:SessionProviders",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/app/src/app.tsx",
+      "target": "function:packages/app/src/app.tsx:RouterRoot",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/app/src/app.tsx",
+      "target": "function:packages/app/src/app.tsx:AppBaseProviders",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/app/src/app.tsx",
+      "target": "function:packages/app/src/app.tsx:ConnectionGate",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/app/src/app.tsx",
+      "target": "function:packages/app/src/app.tsx:ConnectionError",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/app/src/app.tsx",
+      "target": "function:packages/app/src/app.tsx:AppInterface",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/app/src/app.tsx",
+      "target": "function:packages/app/src/app.tsx:AppBaseProviders",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/app/src/app.tsx",
+      "target": "function:packages/app/src/app.tsx:AppInterface",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    }
+  ]
+}

@@ -82,7 +82,6 @@ export const { use: useSDK, provider: SDKProvider } = createSimpleContext({
 
           const events = await sdk.global.event({
             signal: ctrl.signal,
-            sseMaxRetryAttempts: 0,
           })
 
           if (Flag.OPENCODE_EXPERIMENTAL_WORKSPACES) {

@@ -1,4 +1,8 @@
 [data-component="icon-button"] {
+  transition:
+    transform 0.05s ease-out,
+    background-color 0.15s ease,
+    box-shadow 0.15s ease;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -26,10 +30,15 @@
     &:hover:not(:disabled) {
       background-color: var(--icon-strong-hover);
     }
-    &:focus:not(:disabled) {
+    &:focus-visible:not(:disabled) {
+      box-shadow: var(--shadow-xs-border-focus);
       background-color: var(--icon-strong-focus);
     }
+    &:focus-visible:active {
+      box-shadow: none;
+    }
     &:active:not(:disabled) {
+      transform: scale(0.93);
       background-color: var(--icon-strong-active);
     }
     &:disabled {
@@ -61,6 +70,7 @@
       box-shadow: none;
     }
     &:active:not(:disabled) {
+      transform: scale(0.93);
       background-color: var(--button-secondary-base);
     }
 
@@ -92,8 +102,13 @@
     }
     &:focus-visible:not(:disabled) {
       background-color: var(--surface-base-hover);
+      box-shadow: var(--shadow-xs-border-focus);
+    }
+    &:focus-visible:active {
+      box-shadow: none;
     }
     &:active:not(:disabled) {
+      transform: scale(0.93);
       background-color: var(--surface-base-active);
       /* [data-slot="icon-svg"] { */
       /*   color: var(--icon-active); */

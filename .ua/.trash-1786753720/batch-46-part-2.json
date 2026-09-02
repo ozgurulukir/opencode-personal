@@ -1,0 +1,413 @@
+{
+  "nodes": [
+    {
+      "id": "file:packages/app/src/utils/server.ts",
+      "type": "file",
+      "name": "server.ts",
+      "filePath": "packages/app/src/utils/server.ts",
+      "summary": "Builds @opencode-ai/sdk clients bound to a specific server connection, generating Basic auth headers from username/password credentials and encoding/decoding credential tokens.",
+      "tags": ["sdk-client", "authentication", "factory", "networking"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/app/src/utils/server.ts:authFromToken",
+      "type": "function",
+      "name": "authFromToken",
+      "filePath": "packages/app/src/utils/server.ts",
+      "lineRange": [9, 18],
+      "summary": "Decodes a Basic auth token back into its username and password components.",
+      "tags": ["authentication", "decoding", "utility"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/app/src/utils/server.ts:createSdkForServer",
+      "type": "function",
+      "name": "createSdkForServer",
+      "filePath": "packages/app/src/utils/server.ts",
+      "lineRange": [20, 41],
+      "summary": "Instantiates an SDK client pointed at a specific server URL, injecting a Basic Authorization header when credentials are present and merging any custom fetch config headers.",
+      "tags": ["sdk-client", "factory", "authentication"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/app/src/utils/session-title.ts",
+      "type": "file",
+      "name": "session-title.ts",
+      "filePath": "packages/app/src/utils/session-title.ts",
+      "summary": "Strips the auto-generated timestamp suffix from default session titles ('New session - 2026-01-01T...Z' becomes 'New session') for display.",
+      "tags": ["utility", "formatting", "session"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/app/src/utils/session-title.ts:sessionTitle",
+      "type": "function",
+      "name": "sessionTitle",
+      "filePath": "packages/app/src/utils/session-title.ts",
+      "lineRange": [3, 7],
+      "summary": "Matches an auto-generated title pattern and returns just the label part, passing through custom titles unchanged.",
+      "tags": ["formatting", "regex", "session"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/app/src/utils/solid-dnd.tsx",
+      "type": "file",
+      "name": "solid-dnd.tsx",
+      "filePath": "packages/app/src/utils/solid-dnd.tsx",
+      "summary": "Drag-and-drop helpers for solid-dnd: extracts draggable IDs from custom drag events and exports axis-constraint transformers (ConstrainDragXAxis / ConstrainDragYAxis) that lock dragging to a single axis.",
+      "tags": ["drag-and-drop", "solidjs", "ui", "transformers"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/app/src/utils/solid-dnd.tsx:getDraggableId",
+      "type": "function",
+      "name": "getDraggableId",
+      "filePath": "packages/app/src/utils/solid-dnd.tsx",
+      "lineRange": [12, 17],
+      "summary": "Extracts the draggable node id from a solid-dnd drag event object.",
+      "tags": ["drag-and-drop", "event-handler", "utility"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/app/src/utils/solid-dnd.tsx:createAxisConstraint",
+      "type": "function",
+      "name": "createAxisConstraint",
+      "filePath": "packages/app/src/utils/solid-dnd.tsx",
+      "lineRange": [25, 45],
+      "summary": "Builds a drag transformer that zeroes movement along one axis, registering it with the drag-drop context when the constrained node starts dragging and removing it on drag end or cleanup.",
+      "tags": ["drag-and-drop", "transformer", "solidjs"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:packages/app/src/utils/sound.ts",
+      "type": "file",
+      "name": "sound.ts",
+      "filePath": "packages/app/src/utils/sound.ts",
+      "summary": "Plays notification sounds by lazily loading audio assets discovered via Vite's import.meta.glob, caching resolved URLs and exposing SOUND_OPTIONS plus playSoundById for the settings UI.",
+      "tags": ["audio", "notifications", "vite-glob", "lazy-loading"],
+      "complexity": "moderate",
+      "languageNotes": "Uses import.meta.glob so sound assets are code-split and only fetched on first play, with a Promise cache to avoid repeated dynamic imports."
+    },
+    {
+      "id": "function:packages/app/src/utils/sound.ts:getLoads",
+      "type": "function",
+      "name": "getLoads",
+      "filePath": "packages/app/src/utils/sound.ts",
+      "lineRange": [64, 74],
+      "summary": "Maps sound file paths discovered by import.meta.glob to lazy loader functions keyed by sound id.",
+      "tags": ["lazy-loading", "vite-glob", "audio"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/app/src/utils/sound.ts:soundSrc",
+      "type": "function",
+      "name": "soundSrc",
+      "filePath": "packages/app/src/utils/sound.ts",
+      "lineRange": [78, 87],
+      "summary": "Resolves and caches the URL for a sound id by invoking its lazy loader, falling back to the default sound when the id is unknown.",
+      "tags": ["audio", "caching", "url"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/app/src/utils/sound.ts:playSound",
+      "type": "function",
+      "name": "playSound",
+      "filePath": "packages/app/src/utils/sound.ts",
+      "lineRange": [89, 98],
+      "summary": "Plays an audio element for a source URL, pausing any currently playing sound first and swallowing autoplay-policy rejections.",
+      "tags": ["audio", "playback", "error-handling"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/app/src/utils/terminal-websocket-url.ts",
+      "type": "file",
+      "name": "terminal-websocket-url.ts",
+      "filePath": "packages/app/src/utils/terminal-websocket-url.ts",
+      "summary": "Builds the WebSocket URL for a terminal session from an HTTP base URL, converting the scheme, carrying query parameters, and appending Basic auth credentials when the server requires them.",
+      "tags": ["websocket", "url-building", "terminal", "authentication"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/app/src/utils/terminal-websocket-url.ts:terminalWebSocketURL",
+      "type": "function",
+      "name": "terminalWebSocketURL",
+      "filePath": "packages/app/src/utils/terminal-websocket-url.ts",
+      "lineRange": [3, 28],
+      "summary": "Converts an HTTP(S) server URL plus session parameters into an authenticated ws(s):// WebSocket URL for the terminal connection.",
+      "tags": ["websocket", "url-building", "authentication"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/app/src/utils/terminal-writer.ts",
+      "type": "file",
+      "name": "terminal-writer.ts",
+      "filePath": "packages/app/src/utils/terminal-writer.ts",
+      "summary": "Batching writer for terminal output: coalesces queued chunks and flushes them through a schedulable callback with error settling, preventing interleaved partial writes to the xterm display.",
+      "tags": ["terminal", "batching", "async", "writer"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/app/src/utils/terminal-writer.ts:terminalWriter",
+      "type": "function",
+      "name": "terminalWriter",
+      "filePath": "packages/app/src/utils/terminal-writer.ts",
+      "lineRange": [1, 65],
+      "summary": "Creates a coalescing writer around a terminal write callback: batches pushed chunks, flushes joined output through the provided scheduler, settles write errors, and lets callers await completion via flush().",
+      "tags": ["terminal", "batching", "async", "writer"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:packages/app/src/utils/time.ts",
+      "type": "file",
+      "name": "time.ts",
+      "filePath": "packages/app/src/utils/time.ts",
+      "summary": "Formats timestamps as localized relative-time strings (seconds, minutes, hours, or days ago) through a translation callback.",
+      "tags": ["utility", "time", "formatting", "i18n"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/app/src/utils/time.ts:getRelativeTime",
+      "type": "function",
+      "name": "getRelativeTime",
+      "filePath": "packages/app/src/utils/time.ts",
+      "lineRange": [9, 22],
+      "summary": "Formats a date as a localized relative-time string ('5m ago') by bucketing the elapsed duration and delegating each unit label to a translation callback.",
+      "tags": ["time", "formatting", "i18n"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/app/src/utils/uuid.ts",
+      "type": "file",
+      "name": "uuid.ts",
+      "filePath": "packages/app/src/utils/uuid.ts",
+      "summary": "Generates RFC 4122 UUIDs via crypto.randomUUID with a Math.random-based fallback for environments lacking the Web Crypto API.",
+      "tags": ["utility", "uuid", "crypto", "fallback"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/app/src/utils/uuid.ts:uuid",
+      "type": "function",
+      "name": "uuid",
+      "filePath": "packages/app/src/utils/uuid.ts",
+      "lineRange": [3, 12],
+      "summary": "Returns crypto.randomUUID() when available, otherwise concatenates random hex slices into a UUID-shaped fallback string.",
+      "tags": ["uuid", "crypto", "fallback"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/app/src/utils/worktree.ts",
+      "type": "file",
+      "name": "worktree.ts",
+      "filePath": "packages/app/src/utils/worktree.ts",
+      "summary": "Module-level registry tracking worktree setup state (pending/ready/failed) per directory, with promise-based wait() so components can await worktree readiness exactly once.",
+      "tags": ["state-machine", "worktree", "async", "registry"],
+      "complexity": "moderate",
+      "languageNotes": "A const-object singleton (Worktree) built from Map-based state plus deferred-promise waiters rather than a class; waiter promises are shared per directory until resolved."
+    },
+    {
+      "id": "file:packages/app/sst-env.d.ts",
+      "type": "file",
+      "name": "sst-env.d.ts",
+      "filePath": "packages/app/sst-env.d.ts",
+      "summary": "Auto-generated SST ambient type declaration that pulls in the sst environment types for the app package.",
+      "tags": ["type-definition", "infrastructure", "generated", "ambient-types"],
+      "complexity": "simple",
+      "languageNotes": "Generated by SST (marked do-not-edit); references the repo-root sst-env.d.ts via a triple-slash path."
+    },
+    {
+      "id": "file:packages/app/vite.config.ts",
+      "type": "file",
+      "name": "vite.config.ts",
+      "filePath": "packages/app/vite.config.ts",
+      "summary": "Vite configuration for the app package: dev server on 0.0.0.0:3000, esnext build target with sourcemaps, optional Sentry release/source-map upload when env tokens are set, and the desktop plugin pipeline from vite.js.",
+      "tags": ["build-system", "vite", "sentry", "configuration"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/app/vite.js",
+      "type": "file",
+      "name": "vite.js",
+      "filePath": "packages/app/vite.js",
+      "summary": "Vite plugin pipeline for the SolidJS app: configures the '@' path alias and ES worker format, inlines the theme preload script into index.html at build time, and registers Tailwind CSS v4 and the solid plugin.",
+      "tags": ["build-system", "vite-plugin", "tailwind", "solidjs"],
+      "complexity": "simple",
+      "languageNotes": "Plain JS (not TS) so Vite can load it without transformation; the theme-preload plugin inlines oc-theme-preload.js into the HTML to avoid a flash of wrong theme."
+    }
+  ],
+  "edges": [
+    {
+      "source": "file:packages/app/src/utils/server.ts",
+      "target": "function:packages/app/src/utils/server.ts:authFromToken",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/app/src/utils/server.ts",
+      "target": "function:packages/app/src/utils/server.ts:createSdkForServer",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/app/src/utils/server.ts",
+      "target": "function:packages/app/src/utils/server.ts:authFromToken",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/app/src/utils/server.ts",
+      "target": "function:packages/app/src/utils/server.ts:createSdkForServer",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:packages/app/src/utils/server.ts:authFromToken",
+      "target": "function:packages/app/src/utils/base64.ts:decode64",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/app/src/utils/session-title.ts",
+      "target": "function:packages/app/src/utils/session-title.ts:sessionTitle",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/app/src/utils/session-title.ts",
+      "target": "function:packages/app/src/utils/session-title.ts:sessionTitle",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/app/src/utils/solid-dnd.tsx",
+      "target": "function:packages/app/src/utils/solid-dnd.tsx:getDraggableId",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/app/src/utils/solid-dnd.tsx",
+      "target": "function:packages/app/src/utils/solid-dnd.tsx:createAxisConstraint",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/app/src/utils/solid-dnd.tsx",
+      "target": "function:packages/app/src/utils/solid-dnd.tsx:getDraggableId",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/app/src/utils/sound.ts",
+      "target": "function:packages/app/src/utils/sound.ts:getLoads",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/app/src/utils/sound.ts",
+      "target": "function:packages/app/src/utils/sound.ts:soundSrc",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/app/src/utils/sound.ts",
+      "target": "function:packages/app/src/utils/sound.ts:playSound",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/app/src/utils/sound.ts",
+      "target": "function:packages/app/src/utils/sound.ts:soundSrc",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/app/src/utils/sound.ts",
+      "target": "function:packages/app/src/utils/sound.ts:playSound",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/app/src/utils/terminal-websocket-url.ts",
+      "target": "function:packages/app/src/utils/terminal-websocket-url.ts:terminalWebSocketURL",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/app/src/utils/terminal-websocket-url.ts",
+      "target": "function:packages/app/src/utils/terminal-websocket-url.ts:terminalWebSocketURL",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/app/src/utils/terminal-websocket-url.ts",
+      "target": "file:packages/app/src/utils/server.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/app/src/utils/terminal-writer.ts",
+      "target": "function:packages/app/src/utils/terminal-writer.ts:terminalWriter",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/app/src/utils/terminal-writer.ts",
+      "target": "function:packages/app/src/utils/terminal-writer.ts:terminalWriter",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/app/src/utils/time.ts",
+      "target": "function:packages/app/src/utils/time.ts:getRelativeTime",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/app/src/utils/time.ts",
+      "target": "function:packages/app/src/utils/time.ts:getRelativeTime",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/app/src/utils/uuid.ts",
+      "target": "function:packages/app/src/utils/uuid.ts:uuid",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/app/src/utils/uuid.ts",
+      "target": "function:packages/app/src/utils/uuid.ts:uuid",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/app/vite.config.ts",
+      "target": "file:packages/app/vite.js",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    }
+  ]
+}

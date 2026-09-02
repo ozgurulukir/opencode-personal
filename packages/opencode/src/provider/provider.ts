@@ -41,6 +41,11 @@ function shouldUseCopilotResponsesApi(modelID: string): boolean {
   return Number(match[1]) >= 5 && !modelID.startsWith("gpt-5-mini")
 }
 
+function defaultSupportsMaxOutputTokens(providerID: string, modelID: string) {
+  if (providerID.includes("github-copilot") && modelID.includes("gpt")) return false
+  return undefined
+}
+
 export const DEFAULT_HTTP_TIMEOUT = 300_000
 export const DEFAULT_CHUNK_TIMEOUT = 60_000
 
@@ -955,6 +960,10 @@ function fromModelsDevModel(provider: ModelsDev.Provider, model: ModelsDev.Model
       id: model.id,
       url: model.provider?.api ?? provider.api ?? "",
       npm: model.provider?.npm ?? provider.npm ?? "@ai-sdk/openai-compatible",
+      supportsMaxOutputTokens:
+        model.provider?.supportsMaxOutputTokens ??
+        provider.supportsMaxOutputTokens ??
+        defaultSupportsMaxOutputTokens(provider.id, model.id),
     },
     status: model.status ?? "active",
     headers: {},
@@ -1113,7 +1122,7 @@ const layer: Layer.Layer<
           if (!p || !models) continue
 
           const providerID = ProviderID.make(p.id)
-          if (disabled.has(providerID)) continue
+          if (!isProviderAllowed(providerID)) continue
 
           const provider = getDatabaseProvider(providerID)
           if (!provider) continue
@@ -1166,6 +1175,11 @@ const layer: Layer.Layer<
                 id: apiID,
                 npm: apiNpm,
                 url: model.provider?.api ?? provider?.api ?? existingModel?.api.url ?? modelsDev[providerID]?.api ?? "",
+                supportsMaxOutputTokens:
+                  model.provider?.supportsMaxOutputTokens ??
+                  provider.supportsMaxOutputTokens ??
+                  existingModel?.api.supportsMaxOutputTokens ??
+                  defaultSupportsMaxOutputTokens(providerID, apiID),
               },
               status: model.status ?? existingModel?.status ?? "active",
               name,
@@ -1233,7 +1247,7 @@ const layer: Layer.Layer<
         const knownIDs = new Set([...Object.keys(modelsDev), ...Object.keys(databaseCache)])
         for (const id of knownIDs) {
           const providerID = ProviderID.make(id)
-          if (disabled.has(providerID)) continue
+          if (!isProviderAllowed(providerID)) continue
           const dbEntry = databaseCache[id]
           const envList = dbEntry ? dbEntry.env : (modelsDev[id]?.env ?? [])
           const apiKey = envList.find((item) => envs[item])
@@ -1248,7 +1262,7 @@ const layer: Layer.Layer<
         const auths = yield* auth.all().pipe(Effect.orDie)
         for (const [id, provider] of Object.entries(auths)) {
           const providerID = ProviderID.make(id)
-          if (disabled.has(providerID)) continue
+          if (!isProviderAllowed(providerID)) continue
           if (provider.type === "api") {
             mergeProvider(providerID, {
               source: "api",
@@ -1261,7 +1275,7 @@ const layer: Layer.Layer<
         for (const plugin of plugins) {
           if (!plugin.auth) continue
           const providerID = ProviderID.make(plugin.auth.provider)
-          if (disabled.has(providerID)) continue
+          if (!isProviderAllowed(providerID)) continue
 
           const stored = yield* auth.get(providerID).pipe(Effect.orDie)
           if (!stored) continue
@@ -1280,7 +1294,7 @@ const layer: Layer.Layer<
 
         for (const [id, fn] of Object.entries(custom(dep))) {
           const providerID = ProviderID.make(id)
-          if (disabled.has(providerID)) continue
+          if (!isProviderAllowed(providerID)) continue
           const data = getDatabaseProvider(providerID)
           if (!data) {
             log.error("Provider does not exist in model list " + providerID)

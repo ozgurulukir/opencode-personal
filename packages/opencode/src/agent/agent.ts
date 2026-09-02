@@ -477,8 +477,12 @@ export const layer = Layer.effect(
             // ⚡ Bolt Optimization: Replace chained .filter().map() with direct push to reduce GC pressure.
             // An IIFE is used here to avoid polluting the outer scope and strictly type the array.
             const systemArray: Array<{ role: "system"; content: string }> = []
-            if (system.prefix) systemArray.push({ role: "system" as const, content: system.prefix })
-            if (system.suffix) systemArray.push({ role: "system" as const, content: system.suffix })
+            for (const part of ProviderTransform.systemPromptMessages(
+              resolved,
+              [system.prefix, system.suffix].filter((x) => x),
+            )) {
+              systemArray.push({ role: "system" as const, content: part })
+            }
             return systemArray
           })(),
           model: language,

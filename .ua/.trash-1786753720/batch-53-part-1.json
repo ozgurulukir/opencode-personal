@@ -1,0 +1,1503 @@
+{
+  "nodes": [
+    {
+      "id": "file:packages/opencode/src/cli/cmd/providers.ts",
+      "type": "file",
+      "name": "providers.ts",
+      "filePath": "packages/opencode/src/cli/cmd/providers.ts",
+      "summary": "CLI command group for `opencode providers` — lists configured models and providers, runs OAuth and API-key login flows (including plugin-provided auth), and logs out stored credentials.",
+      "tags": [
+        "cli-command",
+        "authentication",
+        "oauth",
+        "provider-registry"
+      ],
+      "complexity": "complex",
+      "languageNotes": "Effect-based effectCmd handlers; plugin auth providers are collected via Hooks and merged with built-in ModelsDev entries."
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/providers.ts:resolvePluginProviders",
+      "type": "function",
+      "name": "resolvePluginProviders",
+      "filePath": "packages/opencode/src/cli/cmd/providers.ts",
+      "lineRange": [
+        204,
+        229
+      ],
+      "summary": "Collects auth providers registered by plugins and merges them with the built-in provider set for the login command list.",
+      "tags": [
+        "plugin-system",
+        "provider-registry",
+        "utility"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/opencode/src/cli/cmd/run.ts",
+      "type": "file",
+      "name": "run.ts",
+      "filePath": "packages/opencode/src/cli/cmd/run.ts",
+      "summary": "CLI entry point for `opencode run` with three modes: non-interactive single-prompt streaming to stdout, interactive local mode booting the split-footer direct UI with an in-process server, and interactive attach against a running server. Also handles slash-command execution, JSON event output, and session continue/fork.",
+      "tags": [
+        "entry-point",
+        "cli-command",
+        "streaming",
+        "session-management"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/run.ts:resolveRunInput",
+      "type": "function",
+      "name": "resolveRunInput",
+      "filePath": "packages/opencode/src/cli/cmd/run.ts",
+      "lineRange": [
+        43,
+        53
+      ],
+      "summary": "Resolves the run input text from CLI arguments or piped stdin, rejecting interactive TTY input in non-interactive mode.",
+      "tags": [
+        "input-parsing",
+        "utility",
+        "stdin",
+        "cli"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/run.ts:tool",
+      "type": "function",
+      "name": "tool",
+      "filePath": "packages/opencode/src/cli/cmd/run.ts",
+      "lineRange": [
+        87,
+        103
+      ],
+      "summary": "Formats a streaming tool part into stdout display blocks for non-interactive mode.",
+      "tags": [
+        "formatting",
+        "streaming",
+        "tool-output"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/run.ts:toolError",
+      "type": "function",
+      "name": "toolError",
+      "filePath": "packages/opencode/src/cli/cmd/run.ts",
+      "lineRange": [
+        105,
+        121
+      ],
+      "summary": "Formats a failed tool part together with its error output for non-interactive stdout display.",
+      "tags": [
+        "formatting",
+        "error-handling",
+        "tool-output"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:packages/opencode/src/cli/cmd/run/AGENTS.md",
+      "type": "document",
+      "name": "AGENTS.md",
+      "filePath": "packages/opencode/src/cli/cmd/run/AGENTS.md",
+      "summary": "Architecture guide for the cli/cmd/run directory documenting the layered module organization, the .shared.ts pure-state-machine dependency rules, the handler signature constraints (no footer APIs, no IO), and session.error discriminated-union handling pitfalls.",
+      "tags": [
+        "documentation",
+        "architecture",
+        "development"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:packages/opencode/src/cli/cmd/run/demo.ts",
+      "type": "file",
+      "name": "demo.ts",
+      "filePath": "packages/opencode/src/cli/cmd/run/demo.ts",
+      "summary": "Demo mode for direct interactive mode (`--demo`) that intercepts prompt submissions and generates synthetic SDK events through the real reducer and footer pipeline, letting permission, question, and tool UIs be exercised without model calls via slash commands like /permission, /question, and /fmt.",
+      "tags": [
+        "demo",
+        "test-harness",
+        "event-simulation",
+        "footer-ui"
+      ],
+      "complexity": "complex",
+      "languageNotes": "Synthetic events reuse the production reduceSessionData pipeline, so demo output formatting stays in lockstep with real transcripts."
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/run/demo.ts:showSubagent",
+      "type": "function",
+      "name": "showSubagent",
+      "filePath": "packages/opencode/src/cli/cmd/run/demo.ts",
+      "lineRange": [
+        176,
+        216
+      ],
+      "summary": "Displays the subagent footer panel with synthetic status tabs for demo mode.",
+      "tags": [
+        "demo",
+        "footer-ui",
+        "subagent"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/run/demo.ts:open",
+      "type": "function",
+      "name": "open",
+      "filePath": "packages/opencode/src/cli/cmd/run/demo.ts",
+      "lineRange": [
+        276,
+        312
+      ],
+      "summary": "Initializes the demo session state and emits the synthetic session started/opened events.",
+      "tags": [
+        "demo",
+        "initialization",
+        "event-simulation"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/run/demo.ts:emitText",
+      "type": "function",
+      "name": "emitText",
+      "filePath": "packages/opencode/src/cli/cmd/run/demo.ts",
+      "lineRange": [
+        314,
+        375
+      ],
+      "summary": "Streams synthetic text parts word-by-word into the reducer to simulate model output with realistic pacing.",
+      "tags": [
+        "demo",
+        "event-simulation",
+        "streaming"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/run/demo.ts:emitReasoning",
+      "type": "function",
+      "name": "emitReasoning",
+      "filePath": "packages/opencode/src/cli/cmd/run/demo.ts",
+      "lineRange": [
+        377,
+        438
+      ],
+      "summary": "Streams synthetic reasoning/thinking parts with interleaved delays to simulate model reasoning output.",
+      "tags": [
+        "demo",
+        "event-simulation",
+        "streaming"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/run/demo.ts:startTool",
+      "type": "function",
+      "name": "startTool",
+      "filePath": "packages/opencode/src/cli/cmd/run/demo.ts",
+      "lineRange": [
+        451,
+        475
+      ],
+      "summary": "Emits a tool part in running state with metadata to begin a synthetic tool call.",
+      "tags": [
+        "demo",
+        "tool-simulation",
+        "event-simulation",
+        "metadata"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/run/demo.ts:askPermission",
+      "type": "function",
+      "name": "askPermission",
+      "filePath": "packages/opencode/src/cli/cmd/run/demo.ts",
+      "lineRange": [
+        477,
+        501
+      ],
+      "summary": "Emits a synthetic permission request and resolves it locally with the selected reply.",
+      "tags": [
+        "demo",
+        "permission",
+        "event-simulation"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/run/demo.ts:doneTool",
+      "type": "function",
+      "name": "doneTool",
+      "filePath": "packages/opencode/src/cli/cmd/run/demo.ts",
+      "lineRange": [
+        503,
+        538
+      ],
+      "summary": "Completes a synthetic tool part with generated output state such as success metadata or diffs.",
+      "tags": [
+        "demo",
+        "tool-simulation",
+        "event-simulation",
+        "output"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/run/demo.ts:failTool",
+      "type": "function",
+      "name": "failTool",
+      "filePath": "packages/opencode/src/cli/cmd/run/demo.ts",
+      "lineRange": [
+        540,
+        566
+      ],
+      "summary": "Fails a synthetic tool part with error output state.",
+      "tags": [
+        "demo",
+        "tool-simulation",
+        "error-handling"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/run/demo.ts:emitError",
+      "type": "function",
+      "name": "emitError",
+      "filePath": "packages/opencode/src/cli/cmd/run/demo.ts",
+      "lineRange": [
+        568,
+        583
+      ],
+      "summary": "Emits a synthetic session error event with a message.",
+      "tags": [
+        "demo",
+        "error-handling",
+        "event-simulation"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/run/demo.ts:emitPatch",
+      "type": "function",
+      "name": "emitPatch",
+      "filePath": "packages/opencode/src/cli/cmd/run/demo.ts",
+      "lineRange": [
+        629,
+        656
+      ],
+      "summary": "Emits a synthetic patch tool part with unified diff output.",
+      "tags": [
+        "demo",
+        "tool-simulation",
+        "diff"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/run/demo.ts:emitTask",
+      "type": "function",
+      "name": "emitTask",
+      "filePath": "packages/opencode/src/cli/cmd/run/demo.ts",
+      "lineRange": [
+        658,
+        734
+      ],
+      "summary": "Runs a synthetic subagent task lifecycle — spawning a child session with streamed progress and completion states.",
+      "tags": [
+        "demo",
+        "subagent",
+        "event-simulation"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/run/demo.ts:emitTodo",
+      "type": "function",
+      "name": "emitTodo",
+      "filePath": "packages/opencode/src/cli/cmd/run/demo.ts",
+      "lineRange": [
+        736,
+        758
+      ],
+      "summary": "Emits synthetic todo-list snapshots showing progressive task completion.",
+      "tags": [
+        "demo",
+        "todo",
+        "event-simulation"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/run/demo.ts:emitQuestionTool",
+      "type": "function",
+      "name": "emitQuestionTool",
+      "filePath": "packages/opencode/src/cli/cmd/run/demo.ts",
+      "lineRange": [
+        760,
+        791
+      ],
+      "summary": "Emits a synthetic in-tool question request and resolves it from local demo answers.",
+      "tags": [
+        "demo",
+        "question-ui",
+        "tool-simulation"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/run/demo.ts:emitPermission",
+      "type": "function",
+      "name": "emitPermission",
+      "filePath": "packages/opencode/src/cli/cmd/run/demo.ts",
+      "lineRange": [
+        793,
+        927
+      ],
+      "summary": "Drives every permission UI variant through the footer — request, always-confirm, and reject-text stages — with local reply handling.",
+      "tags": [
+        "demo",
+        "permission",
+        "footer-ui"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/run/demo.ts:emitQuestion",
+      "type": "function",
+      "name": "emitQuestion",
+      "filePath": "packages/opencode/src/cli/cmd/run/demo.ts",
+      "lineRange": [
+        929,
+        1021
+      ],
+      "summary": "Drives single and multi-question UI variants through the footer with option picking and custom answers.",
+      "tags": [
+        "demo",
+        "question-ui",
+        "footer-ui"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/run/demo.ts:emitFmt",
+      "type": "function",
+      "name": "emitFmt",
+      "filePath": "packages/opencode/src/cli/cmd/run/demo.ts",
+      "lineRange": [
+        1023,
+        1101
+      ],
+      "summary": "Dispatches /fmt demo slash commands, producing the requested tool/text output type (bash, write, edit, table, error, mix, and others).",
+      "tags": [
+        "demo",
+        "dispatcher",
+        "event-simulation"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/run/demo.ts:intro",
+      "type": "function",
+      "name": "intro",
+      "filePath": "packages/opencode/src/cli/cmd/run/demo.ts",
+      "lineRange": [
+        1103,
+        1119
+      ],
+      "summary": "Emits the synthetic assistant header entry shown when a demo response starts.",
+      "tags": [
+        "demo",
+        "event-simulation",
+        "footer-ui",
+        "header"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/run/demo.ts:createRunDemo",
+      "type": "function",
+      "name": "createRunDemo",
+      "filePath": "packages/opencode/src/cli/cmd/run/demo.ts",
+      "lineRange": [
+        1121,
+        1274
+      ],
+      "summary": "Builds the demo-mode FooterApi wrapper that intercepts prompt submissions and dispatches synthetic events for each demo slash command.",
+      "tags": [
+        "demo",
+        "factory",
+        "event-simulation"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:packages/opencode/src/cli/cmd/run/entry.body.ts",
+      "type": "file",
+      "name": "entry.body.ts",
+      "filePath": "packages/opencode/src/cli/cmd/run/entry.body.ts",
+      "summary": "Builds renderable RunEntryBody descriptors (text, code, markdown, reasoning) from stream commit entries, computing spacing flags and streaming/done state for the scrollback renderer.",
+      "tags": [
+        "utility",
+        "serialization",
+        "rendering"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/run/entry.body.ts:entryFlags",
+      "type": "function",
+      "name": "entryFlags",
+      "filePath": "packages/opencode/src/cli/cmd/run/entry.body.ts",
+      "lineRange": [
+        81,
+        128
+      ],
+      "summary": "Computes spacing and newline flags for a commit entry based on its body type and prior state.",
+      "tags": [
+        "formatting",
+        "utility",
+        "entry-body",
+        "spacing"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/run/entry.body.ts:entryDone",
+      "type": "function",
+      "name": "entryDone",
+      "filePath": "packages/opencode/src/cli/cmd/run/entry.body.ts",
+      "lineRange": [
+        130,
+        140
+      ],
+      "summary": "Determines whether a commit entry is in its final (done) state.",
+      "tags": [
+        "utility",
+        "state-inspection",
+        "entry-body",
+        "streaming"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/run/entry.body.ts:entryCanStream",
+      "type": "function",
+      "name": "entryCanStream",
+      "filePath": "packages/opencode/src/cli/cmd/run/entry.body.ts",
+      "lineRange": [
+        142,
+        156
+      ],
+      "summary": "Checks whether a commit entry body can still receive streamed updates.",
+      "tags": [
+        "utility",
+        "state-inspection",
+        "entry-body",
+        "streaming"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/run/entry.body.ts:entryBody",
+      "type": "function",
+      "name": "entryBody",
+      "filePath": "packages/opencode/src/cli/cmd/run/entry.body.ts",
+      "lineRange": [
+        158,
+        194
+      ],
+      "summary": "Reduces a stream commit into its renderable RunEntryBody descriptor (text, code, markdown, reasoning, or none).",
+      "tags": [
+        "serialization",
+        "rendering",
+        "entry-body",
+        "scrollback"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:packages/opencode/src/cli/cmd/run/event-loop.ts",
+      "type": "file",
+      "name": "event-loop.ts",
+      "filePath": "packages/opencode/src/cli/cmd/run/event-loop.ts",
+      "summary": "Event loop for non-interactive `opencode run` that consumes the subscribed session event stream and mirrors message updates, tool parts, errors, and status changes to stdout or JSON output.",
+      "tags": [
+        "event-handler",
+        "streaming",
+        "orchestrator",
+        "cli"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/run/event-loop.ts:handleToolPart",
+      "type": "function",
+      "name": "handleToolPart",
+      "filePath": "packages/opencode/src/cli/cmd/run/event-loop.ts",
+      "lineRange": [
+        28,
+        90
+      ],
+      "summary": "Mirrors tool part updates to stdout with running/done/error formatting and JSON passthrough.",
+      "tags": [
+        "event-handler",
+        "formatting",
+        "tool-output"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/run/event-loop.ts:handlePermissionAsked",
+      "type": "function",
+      "name": "handlePermissionAsked",
+      "filePath": "packages/opencode/src/cli/cmd/run/event-loop.ts",
+      "lineRange": [
+        115,
+        137
+      ],
+      "summary": "Auto-approves permission requests in non-interactive mode after printing the request details.",
+      "tags": [
+        "event-handler",
+        "permission",
+        "non-interactive",
+        "auto-approve"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/run/event-loop.ts:loop",
+      "type": "function",
+      "name": "loop",
+      "filePath": "packages/opencode/src/cli/cmd/run/event-loop.ts",
+      "lineRange": [
+        141,
+        174
+      ],
+      "summary": "Orchestrates the non-interactive event loop: subscribes to the session event stream and dispatches each event to its dedicated handler until exit.",
+      "tags": [
+        "orchestrator",
+        "event-loop",
+        "streaming"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:packages/opencode/src/cli/cmd/run/footer.command.tsx",
+      "type": "file",
+      "name": "footer.command.tsx",
+      "filePath": "packages/opencode/src/cli/cmd/run/footer.command.tsx",
+      "summary": "Command palette and model/variant selection panels for the run footer — a fuzzysort-filtered command menu plus variant cycle and model pick lists built on the shared footer menu component.",
+      "tags": [
+        "component",
+        "command-palette",
+        "fuzzy-search",
+        "footer-ui"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/run/footer.command.tsx:handleKey",
+      "type": "function",
+      "name": "handleKey",
+      "filePath": "packages/opencode/src/cli/cmd/run/footer.command.tsx",
+      "lineRange": [
+        92,
+        156
+      ],
+      "summary": "Routes keyboard events for the command panel — arrow navigation, enter to select, escape to dismiss.",
+      "tags": [
+        "keyboard-navigation",
+        "event-handler",
+        "footer-ui",
+        "command-palette"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/run/footer.command.tsx:PanelShell",
+      "type": "function",
+      "name": "PanelShell",
+      "filePath": "packages/opencode/src/cli/cmd/run/footer.command.tsx",
+      "lineRange": [
+        169,
+        271
+      ],
+      "summary": "Shared panel chrome wrapping menu bodies with a query input, fuzzy filtering, and footer hints.",
+      "tags": [
+        "component",
+        "layout",
+        "footer-ui",
+        "command-palette"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/run/footer.command.tsx:PanelBody",
+      "type": "function",
+      "name": "PanelBody",
+      "filePath": "packages/opencode/src/cli/cmd/run/footer.command.tsx",
+      "lineRange": [
+        273,
+        354
+      ],
+      "summary": "Renders the filtered panel rows with category headers and highlighted fuzzy matches.",
+      "tags": [
+        "component",
+        "rendering",
+        "footer-ui",
+        "fuzzy-search"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/run/footer.command.tsx:RunCommandMenuBody",
+      "type": "function",
+      "name": "RunCommandMenuBody",
+      "filePath": "packages/opencode/src/cli/cmd/run/footer.command.tsx",
+      "lineRange": [
+        356,
+        462
+      ],
+      "summary": "Command palette body listing commands, model switching, and variant cycling entries with fuzzy search.",
+      "tags": [
+        "component",
+        "command-palette",
+        "footer-ui",
+        "fuzzy-search"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/run/footer.command.tsx:RunVariantSelectBody",
+      "type": "function",
+      "name": "RunVariantSelectBody",
+      "filePath": "packages/opencode/src/cli/cmd/run/footer.command.tsx",
+      "lineRange": [
+        464,
+        502
+      ],
+      "summary": "Model variant selection list body for the footer command panel.",
+      "tags": [
+        "component",
+        "selection",
+        "footer-ui",
+        "variant-cycle"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/run/footer.command.tsx:RunModelSelectBody",
+      "type": "function",
+      "name": "RunModelSelectBody",
+      "filePath": "packages/opencode/src/cli/cmd/run/footer.command.tsx",
+      "lineRange": [
+        504,
+        565
+      ],
+      "summary": "Model selection list body grouped by provider with context-window metadata.",
+      "tags": [
+        "component",
+        "selection",
+        "model-picker"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:packages/opencode/src/cli/cmd/run/footer.menu.tsx",
+      "type": "file",
+      "name": "footer.menu.tsx",
+      "filePath": "packages/opencode/src/cli/cmd/run/footer.menu.tsx",
+      "summary": "Reusable scrolling footer menu component with keyboard-driven reveal/offset navigation and a pure createFooterMenuState machine, used by the command palette, model select, and autocomplete popups.",
+      "tags": [
+        "component",
+        "menu",
+        "keyboard-navigation",
+        "footer-ui"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/run/footer.menu.tsx:createFooterMenuState",
+      "type": "function",
+      "name": "createFooterMenuState",
+      "filePath": "packages/opencode/src/cli/cmd/run/footer.menu.tsx",
+      "lineRange": [
+        55,
+        113
+      ],
+      "summary": "Pure state machine for the footer menu — selection index, offset with reveal-on-move, and query filtering.",
+      "tags": [
+        "state-machine",
+        "pure-functions",
+        "menu"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/run/footer.menu.tsx:RunFooterMenu",
+      "type": "function",
+      "name": "RunFooterMenu",
+      "filePath": "packages/opencode/src/cli/cmd/run/footer.menu.tsx",
+      "lineRange": [
+        115,
+        306
+      ],
+      "summary": "Scrolling menu component rendering headers, items, and spacers within a fixed row budget with keyboard-driven offset.",
+      "tags": [
+        "component",
+        "menu",
+        "rendering"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:packages/opencode/src/cli/cmd/run/footer.permission.tsx",
+      "type": "file",
+      "name": "footer.permission.tsx",
+      "filePath": "packages/opencode/src/cli/cmd/run/footer.permission.tsx",
+      "summary": "Permission prompt UI for the run footer rendering Allow once / Always / Reject stages with diff preview and a rejection text field; all state transitions delegate to the pure permission.shared state machine.",
+      "tags": [
+        "component",
+        "permission",
+        "footer-ui",
+        "keyboard-navigation"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/run/footer.permission.tsx:RejectField",
+      "type": "function",
+      "name": "RejectField",
+      "filePath": "packages/opencode/src/cli/cmd/run/footer.permission.tsx",
+      "lineRange": [
+        67,
+        133
+      ],
+      "summary": "Rejection message textarea with cursor-style key handling and submit/cancel on enter/escape.",
+      "tags": [
+        "component",
+        "form-input",
+        "permission",
+        "footer-ui"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/run/footer.permission.tsx:RunPermissionBody",
+      "type": "function",
+      "name": "RunPermissionBody",
+      "filePath": "packages/opencode/src/cli/cmd/run/footer.permission.tsx",
+      "lineRange": [
+        135,
+        478
+      ],
+      "summary": "Permission prompt body cycling through permission/always/reject stages with option buttons, diff preview, and reply dispatch via permissionRun.",
+      "tags": [
+        "component",
+        "permission",
+        "footer-ui"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:packages/opencode/src/cli/cmd/run/footer.prompt.tsx",
+      "type": "file",
+      "name": "footer.prompt.tsx",
+      "filePath": "packages/opencode/src/cli/cmd/run/footer.prompt.tsx",
+      "summary": "Thin barrel re-exporting the prompt textarea component, its state factory, and sizing constants from the decomposed prompt/ modules (prompt-state, autocomplete, submit, parts).",
+      "tags": [
+        "barrel",
+        "re-export",
+        "footer-ui"
+      ],
+      "complexity": "simple",
+      "languageNotes": "Keeps the historical ./footer.prompt import path stable after the prompt state machine was decomposed into prompt/ submodules."
+    },
+    {
+      "id": "file:packages/opencode/src/cli/cmd/run/footer.question.tsx",
+      "type": "file",
+      "name": "footer.question.tsx",
+      "filePath": "packages/opencode/src/cli/cmd/run/footer.question.tsx",
+      "summary": "Question prompt UI for the run footer supporting single-option selection and multi-question tabbed flows with custom text input; rendering only, with all state logic in question.shared.ts.",
+      "tags": [
+        "component",
+        "question-ui",
+        "footer-ui",
+        "keyboard-navigation"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/run/footer.question.tsx:RunQuestionBody",
+      "type": "function",
+      "name": "RunQuestionBody",
+      "filePath": "packages/opencode/src/cli/cmd/run/footer.question.tsx",
+      "lineRange": [
+        46,
+        582
+      ],
+      "summary": "Question body rendering single-option lists or tabbed multi-question flows with custom input, delegating all transitions to the question.shared state machine.",
+      "tags": [
+        "component",
+        "question-ui",
+        "footer-ui"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:packages/opencode/src/cli/cmd/run/footer.shared.ts",
+      "type": "file",
+      "name": "footer.shared.ts",
+      "filePath": "packages/opencode/src/cli/cmd/run/footer.shared.ts",
+      "summary": "Small pure helpers shared across footer modules: derives ordered state actions from model/variant select callback results and detects stale selections after async model list refreshes.",
+      "tags": [
+        "utility",
+        "pure-functions",
+        "footer-ui"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/run/footer.shared.ts:selectApply",
+      "type": "function",
+      "name": "selectApply",
+      "filePath": "packages/opencode/src/cli/cmd/run/footer.shared.ts",
+      "lineRange": [
+        14,
+        29
+      ],
+      "summary": "Derives ordered footer state actions from a model/variant select callback result using load-bearing presence checks pinned by characterization tests.",
+      "tags": [
+        "pure-functions",
+        "utility",
+        "footer-ui",
+        "selection"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/run/footer.shared.ts:modelSelectStale",
+      "type": "function",
+      "name": "modelSelectStale",
+      "filePath": "packages/opencode/src/cli/cmd/run/footer.shared.ts",
+      "lineRange": [
+        36,
+        41
+      ],
+      "summary": "Detects when the selected model no longer exists after a model list refresh.",
+      "tags": [
+        "utility",
+        "validation",
+        "model-picker",
+        "selection"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/run/footer.shared.ts:variantSelectStale",
+      "type": "function",
+      "name": "variantSelectStale",
+      "filePath": "packages/opencode/src/cli/cmd/run/footer.shared.ts",
+      "lineRange": [
+        48,
+        53
+      ],
+      "summary": "Detects when the selected variant is no longer offered at the current selection position.",
+      "tags": [
+        "utility",
+        "validation",
+        "model-picker",
+        "selection"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/opencode/src/cli/cmd/run/footer.subagent.tsx",
+      "type": "file",
+      "name": "footer.subagent.tsx",
+      "filePath": "packages/opencode/src/cli/cmd/run/footer.subagent.tsx",
+      "summary": "Subagent status tabs and inspector body for the run footer, rendering per-subagent state chips and a scrollable detail view of subagent transcript entries.",
+      "tags": [
+        "component",
+        "subagent",
+        "footer-ui",
+        "monitoring"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/run/footer.subagent.tsx:RunFooterSubagentTabs",
+      "type": "function",
+      "name": "RunFooterSubagentTabs",
+      "filePath": "packages/opencode/src/cli/cmd/run/footer.subagent.tsx",
+      "lineRange": [
+        52,
+        100
+      ],
+      "summary": "Renders the subagent status tab strip with per-status colors and counts.",
+      "tags": [
+        "component",
+        "subagent",
+        "footer-ui",
+        "status-chips"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/run/footer.subagent.tsx:RunFooterSubagentBody",
+      "type": "function",
+      "name": "RunFooterSubagentBody",
+      "filePath": "packages/opencode/src/cli/cmd/run/footer.subagent.tsx",
+      "lineRange": [
+        102,
+        190
+      ],
+      "summary": "Renders the subagent inspector panel with scrollable transcript entries from the selected tab.",
+      "tags": [
+        "component",
+        "subagent",
+        "inspector"
+      ],
+      "complexity": "moderate"
+    }
+  ],
+  "edges": [
+    {
+      "source": "file:packages/opencode/src/cli/cmd/providers.ts",
+      "target": "function:packages/opencode/src/cli/cmd/providers.ts:resolvePluginProviders",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/providers.ts",
+      "target": "function:packages/opencode/src/cli/cmd/providers.ts:resolvePluginProviders",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run.ts:resolveRunInput",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run.ts:tool",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run.ts:toolError",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run.ts",
+      "target": "file:packages/opencode/src/cli/cmd/run/event-loop.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "document:packages/opencode/src/cli/cmd/run/AGENTS.md",
+      "target": "file:packages/opencode/src/cli/cmd/run/event-loop.ts",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/opencode/src/cli/cmd/run/AGENTS.md",
+      "target": "file:packages/opencode/src/cli/cmd/run/footer.shared.ts",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/opencode/src/cli/cmd/run/AGENTS.md",
+      "target": "file:packages/opencode/src/cli/cmd/run/keymap.shared.ts",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/opencode/src/cli/cmd/run/AGENTS.md",
+      "target": "file:packages/opencode/src/cli/cmd/run/permission.shared.ts",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/opencode/src/cli/cmd/run/AGENTS.md",
+      "target": "file:packages/opencode/src/cli/cmd/run/prompt.shared.ts",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/opencode/src/cli/cmd/run/AGENTS.md",
+      "target": "file:packages/opencode/src/cli/cmd/run/question.shared.ts",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/demo.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/demo.ts:showSubagent",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/demo.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/demo.ts:open",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/demo.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/demo.ts:emitText",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/demo.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/demo.ts:emitReasoning",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/demo.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/demo.ts:startTool",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/demo.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/demo.ts:askPermission",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/demo.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/demo.ts:doneTool",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/demo.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/demo.ts:failTool",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/demo.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/demo.ts:emitError",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/demo.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/demo.ts:emitPatch",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/demo.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/demo.ts:emitTask",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/demo.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/demo.ts:emitTodo",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/demo.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/demo.ts:emitQuestionTool",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/demo.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/demo.ts:emitPermission",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/demo.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/demo.ts:emitQuestion",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/demo.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/demo.ts:emitFmt",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/demo.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/demo.ts:intro",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/demo.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/demo.ts:createRunDemo",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/demo.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/demo.ts:createRunDemo",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/entry.body.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/entry.body.ts:entryFlags",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/entry.body.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/entry.body.ts:entryDone",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/entry.body.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/entry.body.ts:entryCanStream",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/entry.body.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/entry.body.ts:entryBody",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/entry.body.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/entry.body.ts:entryFlags",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/entry.body.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/entry.body.ts:entryDone",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/entry.body.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/entry.body.ts:entryCanStream",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/entry.body.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/entry.body.ts:entryBody",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/event-loop.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/event-loop.ts:handleToolPart",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/event-loop.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/event-loop.ts:handlePermissionAsked",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/event-loop.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/event-loop.ts:loop",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/event-loop.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/event-loop.ts:loop",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/footer.command.tsx",
+      "target": "function:packages/opencode/src/cli/cmd/run/footer.command.tsx:handleKey",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/footer.command.tsx",
+      "target": "function:packages/opencode/src/cli/cmd/run/footer.command.tsx:PanelShell",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/footer.command.tsx",
+      "target": "function:packages/opencode/src/cli/cmd/run/footer.command.tsx:PanelBody",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/footer.command.tsx",
+      "target": "function:packages/opencode/src/cli/cmd/run/footer.command.tsx:RunCommandMenuBody",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/footer.command.tsx",
+      "target": "function:packages/opencode/src/cli/cmd/run/footer.command.tsx:RunVariantSelectBody",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/footer.command.tsx",
+      "target": "function:packages/opencode/src/cli/cmd/run/footer.command.tsx:RunModelSelectBody",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/footer.command.tsx",
+      "target": "function:packages/opencode/src/cli/cmd/run/footer.command.tsx:RunCommandMenuBody",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/footer.command.tsx",
+      "target": "function:packages/opencode/src/cli/cmd/run/footer.command.tsx:RunVariantSelectBody",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/footer.command.tsx",
+      "target": "function:packages/opencode/src/cli/cmd/run/footer.command.tsx:RunModelSelectBody",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/footer.command.tsx",
+      "target": "file:packages/opencode/src/cli/cmd/run/footer.menu.tsx",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/footer.command.tsx",
+      "target": "file:packages/opencode/src/cli/cmd/run/keymap.shared.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/footer.menu.tsx",
+      "target": "function:packages/opencode/src/cli/cmd/run/footer.menu.tsx:createFooterMenuState",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/footer.menu.tsx",
+      "target": "function:packages/opencode/src/cli/cmd/run/footer.menu.tsx:RunFooterMenu",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/footer.menu.tsx",
+      "target": "function:packages/opencode/src/cli/cmd/run/footer.menu.tsx:createFooterMenuState",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/footer.menu.tsx",
+      "target": "function:packages/opencode/src/cli/cmd/run/footer.menu.tsx:RunFooterMenu",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/footer.permission.tsx",
+      "target": "function:packages/opencode/src/cli/cmd/run/footer.permission.tsx:RejectField",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/footer.permission.tsx",
+      "target": "function:packages/opencode/src/cli/cmd/run/footer.permission.tsx:RunPermissionBody",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/footer.permission.tsx",
+      "target": "function:packages/opencode/src/cli/cmd/run/footer.permission.tsx:RunPermissionBody",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/footer.permission.tsx",
+      "target": "file:packages/opencode/src/cli/cmd/run/permission.shared.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "function:packages/opencode/src/cli/cmd/run/footer.permission.tsx:RunPermissionBody",
+      "target": "function:packages/opencode/src/cli/cmd/run/permission.shared.ts:permissionRun",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/footer.question.tsx",
+      "target": "function:packages/opencode/src/cli/cmd/run/footer.question.tsx:RunQuestionBody",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/footer.question.tsx",
+      "target": "function:packages/opencode/src/cli/cmd/run/footer.question.tsx:RunQuestionBody",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/footer.question.tsx",
+      "target": "file:packages/opencode/src/cli/cmd/run/question.shared.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/footer.shared.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/footer.shared.ts:selectApply",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/footer.shared.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/footer.shared.ts:modelSelectStale",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/footer.shared.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/footer.shared.ts:variantSelectStale",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/footer.shared.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/footer.shared.ts:selectApply",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/footer.shared.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/footer.shared.ts:modelSelectStale",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/footer.shared.ts",
+      "target": "function:packages/opencode/src/cli/cmd/run/footer.shared.ts:variantSelectStale",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/footer.subagent.tsx",
+      "target": "function:packages/opencode/src/cli/cmd/run/footer.subagent.tsx:RunFooterSubagentTabs",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/footer.subagent.tsx",
+      "target": "function:packages/opencode/src/cli/cmd/run/footer.subagent.tsx:RunFooterSubagentBody",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/footer.subagent.tsx",
+      "target": "function:packages/opencode/src/cli/cmd/run/footer.subagent.tsx:RunFooterSubagentTabs",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/cli/cmd/run/footer.subagent.tsx",
+      "target": "function:packages/opencode/src/cli/cmd/run/footer.subagent.tsx:RunFooterSubagentBody",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    }
+  ]
+}

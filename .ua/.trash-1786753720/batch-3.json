@@ -1,0 +1,36 @@
+{
+  "nodes": [
+    {
+      "id": "service:packages/containers/publish/Dockerfile",
+      "type": "service",
+      "name": "Dockerfile",
+      "filePath": "packages/containers/publish/Dockerfile",
+      "summary": "Release CI container image that adds the Docker CLI (docker.io) and pacman-package-manager (AUR tooling) on top of build/bun-node. Backs release jobs that push multi-arch container images to GHCR and maintain Arch Linux AUR packages, mirroring the steps of the publish workflow.",
+      "tags": ["containerization", "infrastructure", "ci-cd", "release", "aur"],
+      "complexity": "simple"
+    }
+  ],
+  "edges": [
+    {
+      "source": "service:packages/containers/publish/Dockerfile",
+      "target": "service:packages/containers/bun-node/Dockerfile",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "service:packages/containers/publish/Dockerfile",
+      "target": "file:packages/containers/script/build.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "service:packages/containers/publish/Dockerfile",
+      "target": "pipeline:.github/workflows/publish.yml",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    }
+  ]
+}

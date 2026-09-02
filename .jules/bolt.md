@@ -112,3 +112,13 @@
 ## 2024-05-18 - Reduce Callback Overhead in Sizing Loops
 **Learning:** Using nested `.reduce()` to compute aggregate sizes over complex structures (like hunks and lines in patches) incurs significant function allocation and invocation overhead, particularly on operations that block the main thread.
 **Action:** Replace nested array reductions (`reduce`, `map`, `filter`) with manual imperative `for` loops in utility calculations to eliminate intermediate array allocations and closure executions.
+## 2026-08-26 - Optimizing JSON.stringify for Deduplication Keys
+**Learning:** Replacing `JSON.stringify` with a static string (like `""`) when stringifying object properties for deduplication keys will break the uniqueness of the key and cause false positives (e.g., dropping distinct diagnostic messages that happen to share the same location).
+**Action:** When optimizing `JSON.stringify` in deduplication keys, ensure the replacement logic securely tracks the identity or contents of the object (or do not optimize it if the object content defines uniqueness), rather than blindly replacing it with an empty string.
+
+## 2026-08-31 - LSP dedupe key for MarkupContent messages
+**Learning:** The #88 perf pass replaced per-diagnostic `JSON.stringify` in `dedupeDiagnostics` (lsp/client.ts) with string-concatenation keys but kept `JSON.stringify(item.message)` for non-string messages. Some servers send `MarkupContent` ({kind, value}) where LSP requires a string, so stringifying those objects still allocated on every dedupe pass. A naive replacement with a static value or `String(obj)` (= "[object Object]") would collapse distinct diagnostics into one key (see 2026-08-26).
+**Action:** Extracted `diagnosticMessageKey(message)` in `lsp/client.ts`: string messages as-is, `String(message.value)` for objects with a `value` property (the content that defines uniqueness), `JSON.stringify` fallback for everything else to preserve discrimination. Characterization tests in `test/lsp/dedupe.test.ts`. Behavior change: MarkupContent with the same value but different kind (plain vs markdown) now dedupes to one entry.
+## 2026-09-02 - GC Pressure from `JSON.stringify` in Hot Paths
+**Learning:** Using `JSON.stringify` as a fallback for generating uniqueness keys in hot paths (like LSP diagnostic deduplication processing thousands of items) creates significant Garbage Collection (GC) pressure and serialization overhead. The memory allocations during `stringify` add up quickly in high-frequency loops.
+**Action:** When deriving deterministic string keys from objects in high-throughput areas, replace `JSON.stringify` with lightweight, recursive string concatenation of the primitive properties.

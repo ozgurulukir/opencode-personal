@@ -3,7 +3,8 @@ import { codeToHtml } from "shiki"
 import markedShiki from "marked-shiki"
 import { createOverflow, useShareMessages } from "./common"
 import { CopyButton } from "./copy-button"
-import { createResource, createSignal, createEffect } from "solid-js"
+import { createEffect, createResource, createSignal } from "solid-js"
+import { isServer } from "solid-js/web"
 import DOMPurify from "isomorphic-dompurify"
 import style from "./content-markdown.module.css"
 
@@ -39,24 +40,19 @@ export function ContentMarkdown(props: Props) {
     () => strip(props.text),
     async (markdown) => {
       const parsed = await markedWithShiki.parse(markdown)
-      return parsed
+      return DOMPurify.sanitize(parsed)
     },
   )
   const [expanded, setExpanded] = createSignal(false)
   const overflow = createOverflow()
   const messages = useShareMessages()
-
-  let markdownRef!: HTMLDivElement
+  let markdownRef: HTMLDivElement | undefined
 
   createEffect(() => {
     const content = html()
-    if (content && markdownRef) {
+    if (!isServer && markdownRef && content) {
       markdownRef.innerHTML = ""
-      if (!DOMPurify.isSupported) {
-        return
-      }
-      const fragment = DOMPurify.sanitize(content, { RETURN_DOM_FRAGMENT: true }) as unknown as DocumentFragment
-      markdownRef.appendChild(fragment.cloneNode(true))
+      markdownRef.appendChild(DOMPurify.sanitize(content, { RETURN_DOM_FRAGMENT: true }) as Node)
     }
   })
 
@@ -66,7 +62,13 @@ export function ContentMarkdown(props: Props) {
       data-highlight={props.highlight === true ? true : undefined}
       data-expanded={expanded() || props.expand === true ? true : undefined}
     >
-      <div data-slot="markdown" ref={(el) => { overflow.ref(el); markdownRef = el; }} />
+      <div
+        data-slot="markdown"
+        ref={(el) => {
+          markdownRef = el
+          overflow.ref(el)
+        }}
+      />
 
       {!props.expand && overflow.status && (
         <button

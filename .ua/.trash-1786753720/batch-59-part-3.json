@@ -1,0 +1,223 @@
+{
+  "nodes": [
+    {
+      "id": "file:packages/opencode/src/cli/cmd/tui/stderr-capture.ts",
+      "type": "file",
+      "name": "stderr-capture.ts",
+      "filePath": "packages/opencode/src/cli/cmd/tui/stderr-capture.ts",
+      "summary": "Redirects process.stderr.write and all console.* methods into the log file during TUI rendering so stray output cannot corrupt the alternate screen; stdout is deliberately left untouched for OSC 52 clipboard escape sequences.",
+      "tags": ["utility", "logging", "terminal", "io-capture"],
+      "complexity": "moderate",
+      "languageNotes": "Bun's optimized console writes directly to file descriptors, bypassing process.stderr.write, so both layers must be patched; capture/restore are idempotent via a saved original reference."
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/tui/stderr-capture.ts:formatValue",
+      "type": "function",
+      "name": "formatValue",
+      "filePath": "packages/opencode/src/cli/cmd/tui/stderr-capture.ts",
+      "lineRange": [46, 70],
+      "summary": "Serializes an arbitrary console argument (errors with chained causes, arrays, objects) into a log-safe JSON string with String() fallbacks for non-serializable values.",
+      "tags": ["serialization", "logging", "utility"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/tui/stderr-capture.ts:capture",
+      "type": "function",
+      "name": "capture",
+      "filePath": "packages/opencode/src/cli/cmd/tui/stderr-capture.ts",
+      "lineRange": [76, 113],
+      "summary": "Installs the stderr.write override and console.* redirections that append level-prefixed formatted lines to the current log file; no-op when already captured.",
+      "tags": ["io-capture", "logging", "monkey-patching"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/tui/stderr-capture.ts:restore",
+      "type": "function",
+      "name": "restore",
+      "filePath": "packages/opencode/src/cli/cmd/tui/stderr-capture.ts",
+      "lineRange": [115, 124],
+      "summary": "Restores the original process.stderr.write and console methods saved by capture().",
+      "tags": ["io-capture", "cleanup"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/opencode/src/cli/cmd/tui/thread.ts",
+      "type": "file",
+      "name": "thread.ts",
+      "filePath": "packages/opencode/src/cli/cmd/tui/thread.ts",
+      "summary": "The `opencode` TUI entrypoint command: spawns the TUI worker thread, bridges fetch and the global event stream over RPC to the worker, applies win32 console guards, and handles --prompt stdin piping, heap snapshots, network options, and session validation.",
+      "tags": ["entry-point", "command", "worker", "rpc"],
+      "complexity": "complex",
+      "languageNotes": "Uses a compile-time OPENCODE_WORKER_PATH define to locate the bundled worker, falling back to a dist or source URL; the RPC client re-implements fetch and SSE-style event subscription across the thread boundary."
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/tui/thread.ts:createWorkerFetch",
+      "type": "function",
+      "name": "createWorkerFetch",
+      "filePath": "packages/opencode/src/cli/cmd/tui/thread.ts",
+      "lineRange": [31, 47],
+      "summary": "Wraps the worker RPC client in a fetch-compatible function that forwards URL, method, headers, and body and rebuilds a Response from the RPC result.",
+      "tags": ["rpc", "fetch", "adapter"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/tui/thread.ts:resolveThreadDirectory",
+      "type": "function",
+      "name": "resolveThreadDirectory",
+      "filePath": "packages/opencode/src/cli/cmd/tui/thread.ts",
+      "lineRange": [73, 77],
+      "summary": "Resolves the TUI working directory from an optional --project path (absolute, or joined onto PWD/cwd) for the worker thread.",
+      "tags": ["path-resolution", "utility"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/opencode/src/cli/cmd/tui/ui/dialog-alert.tsx",
+      "type": "file",
+      "name": "dialog-alert.tsx",
+      "filePath": "packages/opencode/src/cli/cmd/tui/ui/dialog-alert.tsx",
+      "summary": "Minimal alert dialog showing a bold title and message with enter-to-confirm and esc/click-to-dismiss.",
+      "tags": ["component", "dialog", "ui"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/tui/ui/dialog-alert.tsx:DialogAlert",
+      "type": "function",
+      "name": "DialogAlert",
+      "filePath": "packages/opencode/src/cli/cmd/tui/ui/dialog-alert.tsx",
+      "lineRange": [12, 57],
+      "summary": "Renders the alert box with a bold title, muted message, and a return-key binding that invokes onConfirm and clears the dialog.",
+      "tags": ["component", "dialog", "keymap"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/opencode/src/cli/cmd/tui/ui/dialog-confirm.tsx",
+      "type": "file",
+      "name": "dialog-confirm.tsx",
+      "filePath": "packages/opencode/src/cli/cmd/tui/ui/dialog-confirm.tsx",
+      "summary": "Confirmation dialog with confirm/cancel focus switching via arrow keys and enter to activate the focused action.",
+      "tags": ["component", "dialog", "ui", "confirmation"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/tui/ui/dialog-confirm.tsx:DialogConfirm",
+      "type": "function",
+      "name": "DialogConfirm",
+      "filePath": "packages/opencode/src/cli/cmd/tui/ui/dialog-confirm.tsx",
+      "lineRange": [19, 91],
+      "summary": "Two-button confirm/cancel dialog tracking the active button in a store, switching focus with left/right keys, and invoking the matching callback on enter.",
+      "tags": ["component", "dialog", "confirmation", "keymap"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:packages/opencode/src/cli/cmd/tui/ui/dialog-export-options.tsx",
+      "type": "file",
+      "name": "dialog-export-options.tsx",
+      "filePath": "packages/opencode/src/cli/cmd/tui/ui/dialog-export-options.tsx",
+      "summary": "Transcript export options dialog: a filename input plus tab-cycled toggles for including thinking, tool details, assistant metadata, and open-without-saving.",
+      "tags": ["component", "dialog", "export", "forms"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/tui/ui/dialog-export-options.tsx:DialogExportOptions",
+      "type": "function",
+      "name": "DialogExportOptions",
+      "filePath": "packages/opencode/src/cli/cmd/tui/ui/dialog-export-options.tsx",
+      "lineRange": [24, 185],
+      "summary": "Renders the export form with a textarea filename field, toggle rows that flip boolean options, tab navigation across fields, and confirm/cancel callbacks carrying the chosen options.",
+      "tags": ["component", "dialog", "forms", "export"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:packages/opencode/src/cli/cmd/tui/ui/dialog-help.tsx",
+      "type": "file",
+      "name": "dialog-help.tsx",
+      "filePath": "packages/opencode/src/cli/cmd/tui/ui/dialog-help.tsx",
+      "summary": "Small help dialog pointing users at the command palette shortcut for discovering all available actions.",
+      "tags": ["component", "dialog", "help", "ui"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/tui/ui/dialog-help.tsx:DialogHelp",
+      "type": "function",
+      "name": "DialogHelp",
+      "filePath": "packages/opencode/src/cli/cmd/tui/ui/dialog-help.tsx",
+      "lineRange": [6, 40],
+      "summary": "Renders the help text with the resolved command-palette shortcut and ok/esc dismissal bindings.",
+      "tags": ["component", "dialog", "keymap"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/opencode/src/cli/cmd/tui/ui/dialog-prompt.tsx",
+      "type": "file",
+      "name": "dialog-prompt.tsx",
+      "filePath": "packages/opencode/src/cli/cmd/tui/ui/dialog-prompt.tsx",
+      "summary": "Text-input dialog with a busy state that suspends the textarea and shows a spinner status line while an async operation runs.",
+      "tags": ["component", "dialog", "input", "ui"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/tui/ui/dialog-prompt.tsx:DialogPrompt",
+      "type": "function",
+      "name": "DialogPrompt",
+      "filePath": "packages/opencode/src/cli/cmd/tui/ui/dialog-prompt.tsx",
+      "lineRange": [18, 90],
+      "summary": "Renders the titled textarea dialog, focusing and moving the cursor to the end on mount and toggling suspend/BUSY traits plus a spinner while props.busy is set.",
+      "tags": ["component", "dialog", "input", "async-state"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:packages/opencode/src/cli/cmd/tui/ui/dialog-select.tsx",
+      "type": "file",
+      "name": "dialog-select.tsx",
+      "filePath": "packages/opencode/src/cli/cmd/tui/ui/dialog-select.tsx",
+      "summary": "The generic fuzzy-filterable selection dialog used by virtually every TUI picker: grouped options, custom keymap actions with resolved shortcut labels, keyboard and mouse selection, and a filter input.",
+      "tags": ["component", "dialog", "fuzzy-search", "ui"],
+      "complexity": "complex",
+      "languageNotes": "Combines fuzzysort for filtering, remeda pipe/groupBy for option grouping, and a keymap selector to render live action-button shortcut labels."
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/tui/ui/dialog-select.tsx:DialogSelect",
+      "type": "function",
+      "name": "DialogSelect",
+      "filePath": "packages/opencode/src/cli/cmd/tui/ui/dialog-select.tsx",
+      "lineRange": [64, 527],
+      "summary": "Full-featured generic select dialog managing filter and selection state, fuzzy filtering with grouping, custom action bindings, current-value syncing, and onSelect/onMove dispatch for every TUI picker.",
+      "tags": ["component", "dialog", "fuzzy-search", "state-management"],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:packages/opencode/src/cli/cmd/tui/ui/dialog-select.tsx:Option",
+      "type": "function",
+      "name": "Option",
+      "filePath": "packages/opencode/src/cli/cmd/tui/ui/dialog-select.tsx",
+      "lineRange": [529, 573],
+      "summary": "Renders a single option row with selection highlight, description/footer, gutter decorations, and disabled/mouse-hover states.",
+      "tags": ["component", "dialog", "list-item"],
+      "complexity": "simple"
+    }
+  ],
+  "edges": [
+    { "source": "file:packages/opencode/src/cli/cmd/tui/stderr-capture.ts", "target": "function:packages/opencode/src/cli/cmd/tui/stderr-capture.ts:formatValue", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:packages/opencode/src/cli/cmd/tui/stderr-capture.ts", "target": "function:packages/opencode/src/cli/cmd/tui/stderr-capture.ts:capture", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:packages/opencode/src/cli/cmd/tui/stderr-capture.ts", "target": "function:packages/opencode/src/cli/cmd/tui/stderr-capture.ts:restore", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:packages/opencode/src/cli/cmd/tui/stderr-capture.ts", "target": "function:packages/opencode/src/cli/cmd/tui/stderr-capture.ts:capture", "type": "exports", "direction": "forward", "weight": 0.8 },
+    { "source": "file:packages/opencode/src/cli/cmd/tui/stderr-capture.ts", "target": "function:packages/opencode/src/cli/cmd/tui/stderr-capture.ts:restore", "type": "exports", "direction": "forward", "weight": 0.8 },
+    { "source": "file:packages/opencode/src/cli/cmd/tui/thread.ts", "target": "function:packages/opencode/src/cli/cmd/tui/thread.ts:createWorkerFetch", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:packages/opencode/src/cli/cmd/tui/thread.ts", "target": "function:packages/opencode/src/cli/cmd/tui/thread.ts:resolveThreadDirectory", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:packages/opencode/src/cli/cmd/tui/thread.ts", "target": "function:packages/opencode/src/cli/cmd/tui/thread.ts:resolveThreadDirectory", "type": "exports", "direction": "forward", "weight": 0.8 },
+    { "source": "file:packages/opencode/src/cli/cmd/tui/ui/dialog-alert.tsx", "target": "function:packages/opencode/src/cli/cmd/tui/ui/dialog-alert.tsx:DialogAlert", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:packages/opencode/src/cli/cmd/tui/ui/dialog-alert.tsx", "target": "function:packages/opencode/src/cli/cmd/tui/ui/dialog-alert.tsx:DialogAlert", "type": "exports", "direction": "forward", "weight": 0.8 },
+    { "source": "file:packages/opencode/src/cli/cmd/tui/ui/dialog-confirm.tsx", "target": "function:packages/opencode/src/cli/cmd/tui/ui/dialog-confirm.tsx:DialogConfirm", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:packages/opencode/src/cli/cmd/tui/ui/dialog-confirm.tsx", "target": "function:packages/opencode/src/cli/cmd/tui/ui/dialog-confirm.tsx:DialogConfirm", "type": "exports", "direction": "forward", "weight": 0.8 },
+    { "source": "file:packages/opencode/src/cli/cmd/tui/ui/dialog-export-options.tsx", "target": "function:packages/opencode/src/cli/cmd/tui/ui/dialog-export-options.tsx:DialogExportOptions", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:packages/opencode/src/cli/cmd/tui/ui/dialog-export-options.tsx", "target": "function:packages/opencode/src/cli/cmd/tui/ui/dialog-export-options.tsx:DialogExportOptions", "type": "exports", "direction": "forward", "weight": 0.8 },
+    { "source": "file:packages/opencode/src/cli/cmd/tui/ui/dialog-help.tsx", "target": "function:packages/opencode/src/cli/cmd/tui/ui/dialog-help.tsx:DialogHelp", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:packages/opencode/src/cli/cmd/tui/ui/dialog-help.tsx", "target": "function:packages/opencode/src/cli/cmd/tui/ui/dialog-help.tsx:DialogHelp", "type": "exports", "direction": "forward", "weight": 0.8 },
+    { "source": "file:packages/opencode/src/cli/cmd/tui/ui/dialog-prompt.tsx", "target": "function:packages/opencode/src/cli/cmd/tui/ui/dialog-prompt.tsx:DialogPrompt", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:packages/opencode/src/cli/cmd/tui/ui/dialog-prompt.tsx", "target": "function:packages/opencode/src/cli/cmd/tui/ui/dialog-prompt.tsx:DialogPrompt", "type": "exports", "direction": "forward", "weight": 0.8 },
+    { "source": "file:packages/opencode/src/cli/cmd/tui/ui/dialog-select.tsx", "target": "function:packages/opencode/src/cli/cmd/tui/ui/dialog-select.tsx:DialogSelect", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:packages/opencode/src/cli/cmd/tui/ui/dialog-select.tsx", "target": "function:packages/opencode/src/cli/cmd/tui/ui/dialog-select.tsx:Option", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:packages/opencode/src/cli/cmd/tui/ui/dialog-select.tsx", "target": "function:packages/opencode/src/cli/cmd/tui/ui/dialog-select.tsx:DialogSelect", "type": "exports", "direction": "forward", "weight": 0.8 },
+    { "source": "function:packages/opencode/src/cli/cmd/tui/ui/dialog-select.tsx:DialogSelect", "target": "function:packages/opencode/src/cli/cmd/tui/ui/dialog-select.tsx:Option", "type": "contains", "direction": "forward", "weight": 1.0 }
+  ]
+}

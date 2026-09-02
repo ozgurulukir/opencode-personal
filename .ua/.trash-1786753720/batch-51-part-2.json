@@ -1,0 +1,507 @@
+{
+  "nodes": [
+    {
+      "id": "file:packages/opencode/src/acp/session.ts",
+      "type": "file",
+      "name": "session.ts",
+      "filePath": "packages/opencode/src/acp/session.ts",
+      "summary": "In-memory ACP session manager that caches ACPSessionState (model, variant, mode) per session id, deduplicates concurrent server loads through a pendingLoads map, and syncs create/load/remove operations with the SDK.",
+      "tags": ["acp", "session", "state-management", "service"],
+      "complexity": "moderate",
+      "languageNotes": "Deliberately in-memory only — ACP protocol methods don't send cwd with every request, so the manager re-loads from the server on demand; get() throws RequestError.invalidParams while tryGet() silently drops unknown sessions."
+    },
+    {
+      "id": "class:packages/opencode/src/acp/session.ts:ACPSessionManager",
+      "type": "class",
+      "name": "ACPSessionManager",
+      "filePath": "packages/opencode/src/acp/session.ts",
+      "lineRange": [8, 167],
+      "summary": "Caches ACPSessionState per session with tryGet/getOrLoad/tryGetOrLoad accessors and setters for model, variant, and mode; concurrent loads of the same id share one in-flight promise via pendingLoads, and remove() evicts the cached entry.",
+      "tags": ["acp", "session", "cache", "state-management"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:packages/opencode/src/acp/tool-dispatch.ts",
+      "type": "file",
+      "name": "tool-dispatch.ts",
+      "filePath": "packages/opencode/src/acp/tool-dispatch.ts",
+      "summary": "Translates opencode tool-call parts into ACP tool_call updates: a pending/in-progress/completed/failed state machine with shell output dedup, edit/read location derivation, todo-plan decoding, and image content extraction.",
+      "tags": ["acp", "tool-calls", "state-machine", "serialization"],
+      "complexity": "complex",
+      "languageNotes": "handleToolPartUpdate centralizes all tool state transitions and deduplicates shell output by hashing so ACP clients don't receive repeated identical output blocks."
+    },
+    {
+      "id": "function:packages/opencode/src/acp/tool-dispatch.ts:shellOutput",
+      "type": "function",
+      "name": "shellOutput",
+      "filePath": "packages/opencode/src/acp/tool-dispatch.ts",
+      "lineRange": [18, 24],
+      "summary": "Extracts the combined stdout/stderr output text from a running shell tool part.",
+      "tags": ["utility", "shell", "acp"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/acp/tool-dispatch.ts:toolStart",
+      "type": "function",
+      "name": "toolStart",
+      "filePath": "packages/opencode/src/acp/tool-dispatch.ts",
+      "lineRange": [26, 50],
+      "summary": "Emits the initial pending tool_call update for a call id, deduplicated through the shared toolStarts set so each call is announced to the ACP client exactly once.",
+      "tags": ["tool-calls", "acp", "deduplication"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/acp/tool-dispatch.ts:handleToolPartUpdate",
+      "type": "function",
+      "name": "handleToolPartUpdate",
+      "filePath": "packages/opencode/src/acp/tool-dispatch.ts",
+      "lineRange": [52, 206],
+      "summary": "State machine for tool parts across running, pending, and completed-error states: emits in-progress updates (with shell output deduped by hash), completed updates carrying content blocks or decoded todo plans, and failed updates with error content and raw output.",
+      "tags": ["tool-calls", "state-machine", "acp", "serialization"],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:packages/opencode/src/acp/tool-dispatch.ts:toToolKind",
+      "type": "function",
+      "name": "toToolKind",
+      "filePath": "packages/opencode/src/acp/tool-dispatch.ts",
+      "lineRange": [208, 237],
+      "summary": "Maps opencode tool names (edit, write, bash, read, fetch, move, search...) to ACP ToolKind values, defaulting to other.",
+      "tags": ["utility", "tool-calls", "mapping"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/acp/tool-dispatch.ts:toLocations",
+      "type": "function",
+      "name": "toLocations",
+      "filePath": "packages/opencode/src/acp/tool-dispatch.ts",
+      "lineRange": [239, 259],
+      "summary": "Derives ACP Locations (file path plus optional line range) from tool input metadata for edit, read, and move tools.",
+      "tags": ["utility", "locations", "tool-calls"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/acp/tool-dispatch.ts:completedToolContent",
+      "type": "function",
+      "name": "completedToolContent",
+      "filePath": "packages/opencode/src/acp/tool-dispatch.ts",
+      "lineRange": [261, 294],
+      "summary": "Builds the ACP content blocks for a completed tool call from its title, metadata, and image attachments.",
+      "tags": ["serialization", "tool-calls", "content"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/acp/tool-dispatch.ts:completedToolRawOutput",
+      "type": "function",
+      "name": "completedToolRawOutput",
+      "filePath": "packages/opencode/src/acp/tool-dispatch.ts",
+      "lineRange": [296, 303],
+      "summary": "Serializes a completed tool part's state (output, metadata, error) into the rawOutput payload for ACP clients.",
+      "tags": ["serialization", "tool-calls", "utility"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/acp/tool-dispatch.ts:imageContents",
+      "type": "function",
+      "name": "imageContents",
+      "filePath": "packages/opencode/src/acp/tool-dispatch.ts",
+      "lineRange": [305, 323],
+      "summary": "Converts image attachments carrying data URIs into ACP image content blocks, ignoring non-image mime types.",
+      "tags": ["serialization", "images", "attachments"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/opencode/src/acp/types.ts",
+      "type": "file",
+      "name": "types.ts",
+      "filePath": "packages/opencode/src/acp/types.ts",
+      "summary": "Shared ACP types: ACPSessionState (per-session id, cwd, MCP servers, model/variant/mode) and ACPConfig (SDK client plus optional default model) used by the agent adapter and session manager.",
+      "tags": ["type-definition", "acp", "session"],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:packages/opencode/src/agent/AGENTS.md",
+      "type": "document",
+      "name": "AGENTS.md",
+      "filePath": "packages/opencode/src/agent/AGENTS.md",
+      "summary": "Agent-system notes documenting subagent permission invariants: allow-only has() semantics for tool restrictions, deny-only forwarding with first-wins dedupe in deriveSubagentSessionPermission, prompt permission merging rules, and the shared V1/V2 helpers in subagent-permissions.ts.",
+      "tags": ["documentation", "agent-system", "permissions", "invariants"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/opencode/src/agent/agent.ts",
+      "type": "file",
+      "name": "agent.ts",
+      "filePath": "packages/opencode/src/agent/agent.ts",
+      "summary": "Central agent registry as an Effect service: defines the built-in agents (build, plan, general, explore, scout, compaction, title, summary) with layered permission rulesets, merges user config overrides and scout reference agents per instance, and exposes get/list/defaultAgent plus an LLM-backed generate() that turns a description into a new agent config.",
+      "tags": ["agent-registry", "service", "permissions", "configuration", "effect"],
+      "complexity": "complex",
+      "languageNotes": "Agent state is built per-instance via InstanceState (config, skills, and scout references resolved lazily); Permission.merge composes defaults + per-agent + user rulesets; generate() uses the AI SDK's generateObject/streamObject with provider-specific system prompt delivery and avoids colliding identifiers."
+    },
+    {
+      "id": "document:packages/opencode/src/agent/generate.txt",
+      "type": "document",
+      "name": "generate.txt",
+      "filePath": "packages/opencode/src/agent/generate.txt",
+      "summary": "System prompt for the LLM-driven agent generator, instructing the model to turn a natural-language description into a JSON agent config (identifier, whenToUse with Task-tool examples, systemPrompt); imported by agent.ts as PROMPT_GENERATE.",
+      "tags": ["prompt-template", "agent-generation", "llm", "documentation"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/opencode/src/agent/subagent-permissions.ts",
+      "type": "file",
+      "name": "subagent-permissions.ts",
+      "filePath": "packages/opencode/src/agent/subagent-permissions.ts",
+      "summary": "Shared V1/V2 subagent permission helpers: derives the subagent session permission with deny-only parent forwarding and first-wins dedupe, and computes tool enable/disable restrictions from primary_tools.",
+      "tags": ["permissions", "subagent", "shared-logic", "security"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/opencode/src/agent/subagent-permissions.ts:dedupe",
+      "type": "function",
+      "name": "dedupe",
+      "filePath": "packages/opencode/src/agent/subagent-permissions.ts",
+      "lineRange": [10, 21],
+      "summary": "Deduplicates permission rules by pattern+permission key, keeping the first occurrence encountered (earlier entries win).",
+      "tags": ["utility", "permissions", "deduplication"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/agent/subagent-permissions.ts:deriveSubagentSessionPermission",
+      "type": "function",
+      "name": "deriveSubagentSessionPermission",
+      "filePath": "packages/opencode/src/agent/subagent-permissions.ts",
+      "lineRange": [32, 46],
+      "summary": "Merges the subagent's permission with deny rules forwarded from the parent agent, deduped first-wins; only deny rules propagate from the parent so subagents never gain extra rights.",
+      "tags": ["permissions", "subagent", "security"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/agent/subagent-permissions.ts:subagentSessionPermission",
+      "type": "function",
+      "name": "subagentSessionPermission",
+      "filePath": "packages/opencode/src/agent/subagent-permissions.ts",
+      "lineRange": [58, 72],
+      "summary": "Wraps deriveSubagentSessionPermission and additionally grants an allow rule for each of the subagent's primary tools.",
+      "tags": ["permissions", "subagent", "tools"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/agent/subagent-permissions.ts:subagentToolRestrictions",
+      "type": "function",
+      "name": "subagentToolRestrictions",
+      "filePath": "packages/opencode/src/agent/subagent-permissions.ts",
+      "lineRange": [80, 90],
+      "summary": "Builds a tools enable/disable record from primary_tools — a tool is enabled only when the subagent's permission rules contain an explicit allow for it.",
+      "tags": ["permissions", "subagent", "tool-restrictions"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/opencode/src/audio.d.ts",
+      "type": "file",
+      "name": "audio.d.ts",
+      "filePath": "packages/opencode/src/audio.d.ts",
+      "summary": "Ambient module declarations enabling default imports of .wav and .wasm asset files as URL strings for the bundler.",
+      "tags": ["type-definition", "assets", "ambient-types"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/opencode/src/auth/index.ts",
+      "type": "file",
+      "name": "index.ts",
+      "filePath": "packages/opencode/src/auth/index.ts",
+      "summary": "Auth credential store as an Effect service: reads and writes auth.json (mode 0600) with OAuth, API-key, and well-known variants discriminated by type, honoring OPENCODE_AUTH_CONTENT for injected credentials and normalizing trailing-slash provider keys.",
+      "tags": ["authentication", "service", "credentials", "effect"],
+      "complexity": "moderate",
+      "languageNotes": "A Schema.Class union with a type discriminator gives typed decoding of the stored file; the OPENCODE_AUTH_CONTENT env var overrides the file entirely; writes strip duplicate trailing-slash keys."
+    },
+    {
+      "id": "file:packages/opencode/src/bus/bus-event.ts",
+      "type": "file",
+      "name": "bus-event.ts",
+      "filePath": "packages/opencode/src/bus/bus-event.ts",
+      "summary": "Typed bus event definition factory: registers event types with their Effect Schema properties and regenerates the effectPayloads schema set (id/type/properties) used for the SDK event union.",
+      "tags": ["event-system", "type-definition", "schema", "factory"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/bus/bus-event.ts:define",
+      "type": "function",
+      "name": "define",
+      "filePath": "packages/opencode/src/bus/bus-event.ts",
+      "lineRange": [10, 17],
+      "summary": "Registers a bus event type with its properties schema in the module registry and returns a definition object carrying the type string and schema.",
+      "tags": ["factory", "event-system", "registry"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/bus/bus-event.ts:effectPayloads",
+      "type": "function",
+      "name": "effectPayloads",
+      "filePath": "packages/opencode/src/bus/bus-event.ts",
+      "lineRange": [19, 30],
+      "summary": "Maps every registered event definition to an Effect Schema struct (id, literal type, properties) annotated as Event.<type> for the generated SDK event union.",
+      "tags": ["schema", "event-system", "code-generation"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/opencode/src/bus/global.ts",
+      "type": "file",
+      "name": "global.ts",
+      "filePath": "packages/opencode/src/bus/global.ts",
+      "summary": "Process-wide GlobalBus EventEmitter that stamps emitted event payloads with an ascending evt id (reusing the sync event's id when present), fanning bus events out to non-Effect listeners.",
+      "tags": ["event-system", "global-state", "emitter"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/opencode/src/bus/index.ts",
+      "type": "file",
+      "name": "index.ts",
+      "filePath": "packages/opencode/src/bus/index.ts",
+      "summary": "The core event bus as an Effect service: per-instance typed and wildcard PubSubs created via InstanceState, publish/subscribe/subscribeAll streams, callback subscriptions bridged into fibers via EffectBridge, GlobalBus fan-out, and an InstanceDisposed event published on shutdown; module-level publish/subscribe wrappers run the service outside Effect contexts.",
+      "tags": ["event-system", "service", "pubsub", "effect", "core"],
+      "complexity": "complex",
+      "languageNotes": "Each event type gets its own unbounded PubSub alongside a wildcard PubSub; a scope finalizer publishes server.instance.disposed before shutdown; EffectBridge plus an explicit Scope converts Effect streams into plain callback subscriptions with proper cleanup."
+    }
+  ],
+  "edges": [
+    {
+      "source": "file:packages/opencode/src/acp/session.ts",
+      "target": "class:packages/opencode/src/acp/session.ts:ACPSessionManager",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/src/acp/session.ts",
+      "target": "class:packages/opencode/src/acp/session.ts:ACPSessionManager",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/acp/session.ts",
+      "target": "file:packages/opencode/src/acp/types.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/opencode/src/acp/tool-dispatch.ts",
+      "target": "function:packages/opencode/src/acp/tool-dispatch.ts:shellOutput",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/src/acp/tool-dispatch.ts",
+      "target": "function:packages/opencode/src/acp/tool-dispatch.ts:shellOutput",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/acp/tool-dispatch.ts",
+      "target": "function:packages/opencode/src/acp/tool-dispatch.ts:toolStart",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/src/acp/tool-dispatch.ts",
+      "target": "function:packages/opencode/src/acp/tool-dispatch.ts:toolStart",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/acp/tool-dispatch.ts",
+      "target": "function:packages/opencode/src/acp/tool-dispatch.ts:handleToolPartUpdate",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/src/acp/tool-dispatch.ts",
+      "target": "function:packages/opencode/src/acp/tool-dispatch.ts:handleToolPartUpdate",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/acp/tool-dispatch.ts",
+      "target": "function:packages/opencode/src/acp/tool-dispatch.ts:toToolKind",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/src/acp/tool-dispatch.ts",
+      "target": "function:packages/opencode/src/acp/tool-dispatch.ts:toToolKind",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/acp/tool-dispatch.ts",
+      "target": "function:packages/opencode/src/acp/tool-dispatch.ts:toLocations",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/src/acp/tool-dispatch.ts",
+      "target": "function:packages/opencode/src/acp/tool-dispatch.ts:toLocations",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/acp/tool-dispatch.ts",
+      "target": "function:packages/opencode/src/acp/tool-dispatch.ts:completedToolContent",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/src/acp/tool-dispatch.ts",
+      "target": "function:packages/opencode/src/acp/tool-dispatch.ts:completedToolContent",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/acp/tool-dispatch.ts",
+      "target": "function:packages/opencode/src/acp/tool-dispatch.ts:completedToolRawOutput",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/src/acp/tool-dispatch.ts",
+      "target": "function:packages/opencode/src/acp/tool-dispatch.ts:completedToolRawOutput",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/acp/tool-dispatch.ts",
+      "target": "function:packages/opencode/src/acp/tool-dispatch.ts:imageContents",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/src/acp/tool-dispatch.ts",
+      "target": "function:packages/opencode/src/acp/tool-dispatch.ts:imageContents",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "document:packages/opencode/src/agent/AGENTS.md",
+      "target": "file:packages/opencode/src/agent/subagent-permissions.ts",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/opencode/src/agent/agent.ts",
+      "target": "document:packages/opencode/src/agent/generate.txt",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/opencode/src/agent/subagent-permissions.ts",
+      "target": "function:packages/opencode/src/agent/subagent-permissions.ts:dedupe",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/src/agent/subagent-permissions.ts",
+      "target": "function:packages/opencode/src/agent/subagent-permissions.ts:deriveSubagentSessionPermission",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/src/agent/subagent-permissions.ts",
+      "target": "function:packages/opencode/src/agent/subagent-permissions.ts:deriveSubagentSessionPermission",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/agent/subagent-permissions.ts",
+      "target": "function:packages/opencode/src/agent/subagent-permissions.ts:subagentSessionPermission",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/src/agent/subagent-permissions.ts",
+      "target": "function:packages/opencode/src/agent/subagent-permissions.ts:subagentSessionPermission",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/agent/subagent-permissions.ts",
+      "target": "function:packages/opencode/src/agent/subagent-permissions.ts:subagentToolRestrictions",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/src/agent/subagent-permissions.ts",
+      "target": "function:packages/opencode/src/agent/subagent-permissions.ts:subagentToolRestrictions",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/bus/bus-event.ts",
+      "target": "function:packages/opencode/src/bus/bus-event.ts:define",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/src/bus/bus-event.ts",
+      "target": "function:packages/opencode/src/bus/bus-event.ts:define",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/bus/bus-event.ts",
+      "target": "function:packages/opencode/src/bus/bus-event.ts:effectPayloads",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/src/bus/bus-event.ts",
+      "target": "function:packages/opencode/src/bus/bus-event.ts:effectPayloads",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/bus/index.ts",
+      "target": "file:packages/opencode/src/bus/bus-event.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/opencode/src/bus/index.ts",
+      "target": "file:packages/opencode/src/bus/global.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    }
+  ]
+}

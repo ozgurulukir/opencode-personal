@@ -1,0 +1,693 @@
+{
+  "nodes": [
+    {
+      "id": "file:packages/opencode/src/effect/instance-ref.ts",
+      "type": "file",
+      "name": "instance-ref.ts",
+      "filePath": "packages/opencode/src/effect/instance-ref.ts",
+      "summary": "Defines Effect Context.Reference slots (InstanceRef, WorkspaceRef) for propagating the current project instance context and workspace ID through Effect fibers without explicit parameter passing.",
+      "tags": ["effect", "type-definition", "context", "utility"],
+      "complexity": "simple",
+      "languageNotes": "Uses Effect 4 Context.Reference with defaultValue factories as a fiber-safe alternative to Node's AsyncLocalStorage."
+    },
+    {
+      "id": "file:packages/opencode/src/effect/instance-registry.ts",
+      "type": "file",
+      "name": "instance-registry.ts",
+      "filePath": "packages/opencode/src/effect/instance-registry.ts",
+      "summary": "Tiny global registry of per-directory disposer callbacks used to invalidate instance-scoped state; disposeInstance runs all registered disposers concurrently and ignores individual failures.",
+      "tags": ["effect", "lifecycle", "utility", "state-management"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/effect/instance-registry.ts:registerDisposer",
+      "type": "function",
+      "name": "registerDisposer",
+      "filePath": "packages/opencode/src/effect/instance-registry.ts",
+      "lineRange": [3, 8],
+      "summary": "Registers a disposer callback and returns an unsubscribe function; disposers receive a directory key so they can invalidate matching instance state.",
+      "tags": ["utility", "lifecycle", "callback"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/effect/instance-registry.ts:disposeInstance",
+      "type": "function",
+      "name": "disposeInstance",
+      "filePath": "packages/opencode/src/effect/instance-registry.ts",
+      "lineRange": [10, 12],
+      "summary": "Invokes every registered disposer via Promise.allSettled and waits for all outcomes, tolerating individual disposer errors.",
+      "tags": ["utility", "lifecycle", "cleanup"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/opencode/src/effect/instance-state.ts",
+      "type": "file",
+      "name": "instance-state.ts",
+      "filePath": "packages/opencode/src/effect/instance-state.ts",
+      "summary": "Implements InstanceState, a per-directory scoped cache over Effect's ScopedCache that lazily initializes state for each project instance and invalidates it on dispose — the backbone for instance-scoped services like Env, File, and Format.",
+      "tags": ["effect", "caching", "state-management", "service"],
+      "complexity": "moderate",
+      "languageNotes": "ScopedCache is created with infinite capacity keyed by directory, but lookup ignores the key and derives state from the ambient InstanceRef context instead."
+    },
+    {
+      "id": "function:packages/opencode/src/effect/instance-state.ts:bind",
+      "type": "function",
+      "name": "bind",
+      "filePath": "packages/opencode/src/effect/instance-state.ts",
+      "lineRange": [16, 26],
+      "summary": "Wraps a function so it executes with the ambient InstanceContext restored, falling back to the fiber's InstanceRef when Instance.bind throws LocalContext.NotFound.",
+      "tags": ["effect", "context", "utility"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/effect/instance-state.ts:make",
+      "type": "function",
+      "name": "make",
+      "filePath": "packages/opencode/src/effect/instance-state.ts",
+      "lineRange": [38, 59],
+      "summary": "Creates an InstanceState cache whose lookup runs the init effect with the current instance context, registering a directory-keyed disposer that invalidates the cache entry on dispose.",
+      "tags": ["effect", "caching", "factory"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/opencode/src/effect/instance-state.ts:get",
+      "type": "function",
+      "name": "get",
+      "filePath": "packages/opencode/src/effect/instance-state.ts",
+      "lineRange": [61, 64],
+      "summary": "Yields the cached state value for the current instance directory, initializing it on first access.",
+      "tags": ["effect", "accessor", "caching"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/effect/instance-state.ts:use",
+      "type": "function",
+      "name": "use",
+      "filePath": "packages/opencode/src/effect/instance-state.ts",
+      "lineRange": [66, 66],
+      "summary": "Maps the current instance state through a selector function.",
+      "tags": ["effect", "accessor", "utility"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/effect/instance-state.ts:useEffect",
+      "type": "function",
+      "name": "useEffect",
+      "filePath": "packages/opencode/src/effect/instance-state.ts",
+      "lineRange": [68, 71],
+      "summary": "Flat-maps the current instance state into an effect that produces a derived value.",
+      "tags": ["effect", "accessor", "utility"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/effect/instance-state.ts:has",
+      "type": "function",
+      "name": "has",
+      "filePath": "packages/opencode/src/effect/instance-state.ts",
+      "lineRange": [73, 76],
+      "summary": "Checks whether state has already been initialized for the current directory without triggering a lookup.",
+      "tags": ["effect", "accessor", "caching"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/effect/instance-state.ts:invalidate",
+      "type": "function",
+      "name": "invalidate",
+      "filePath": "packages/opencode/src/effect/instance-state.ts",
+      "lineRange": [78, 81],
+      "summary": "Evicts the cached state for the current directory, forcing re-initialization on next access.",
+      "tags": ["effect", "caching", "invalidation"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/opencode/src/effect/run-service.ts",
+      "type": "file",
+      "name": "run-service.ts",
+      "filePath": "packages/opencode/src/effect/run-service.ts",
+      "summary": "Runtime helpers that attach InstanceRef/WorkspaceRef context to effects and build a ManagedRuntime whose run* executors automatically re-attach the instance context, letting non-Effect code call services.",
+      "tags": ["effect", "runtime", "service", "utility"],
+      "complexity": "moderate",
+      "languageNotes": "ManagedRuntime runSync/runPromise/runPromiseExit/runFork/runCallback variants are each wrapped so callback-style consumers inherit the ambient instance context."
+    },
+    {
+      "id": "function:packages/opencode/src/effect/run-service.ts:attachWith",
+      "type": "function",
+      "name": "attachWith",
+      "filePath": "packages/opencode/src/effect/run-service.ts",
+      "lineRange": [16, 24],
+      "summary": "Provides the given instance and workspace references to an effect via Effect.provideService.",
+      "tags": ["effect", "context", "utility"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/effect/run-service.ts:attach",
+      "type": "function",
+      "name": "attach",
+      "filePath": "packages/opencode/src/effect/run-service.ts",
+      "lineRange": [26, 41],
+      "summary": "Captures the current InstanceContext (from Instance.current or the fiber's references) and attaches it to an effect so it runs with the right instance.",
+      "tags": ["effect", "context", "utility"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/effect/run-service.ts:makeRuntime",
+      "type": "function",
+      "name": "makeRuntime",
+      "filePath": "packages/opencode/src/effect/run-service.ts",
+      "lineRange": [43, 57],
+      "summary": "Builds a ManagedRuntime from a service and layer, returning runSync/runPromise/runPromiseExit/runFork/runCallback executors that attach instance context to every invocation.",
+      "tags": ["effect", "runtime", "factory"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:packages/opencode/src/effect/runner.ts",
+      "type": "file",
+      "name": "runner.ts",
+      "filePath": "packages/opencode/src/effect/runner.ts",
+      "summary": "Implements a generic single-flight Runner state machine (Idle/Running/Shell/ShellThenRun) over Effect SynchronizedRef, serializing work so only one effect runs at a time, with exclusive shell mode, interruption recovery, and cancellation semantics.",
+      "tags": ["effect", "concurrency", "state-machine", "service"],
+      "complexity": "complex",
+      "languageNotes": "SynchronizedRef.modifyEffect makes state transitions atomic; interrupt-only exits are converted to a Cancelled tagged error so callers can distinguish user cancellation from failure."
+    },
+    {
+      "id": "function:packages/opencode/src/effect/runner.ts:make",
+      "type": "function",
+      "name": "make",
+      "filePath": "packages/opencode/src/effect/runner.ts",
+      "lineRange": [38, 220],
+      "summary": "Runner factory wiring ensureRunning (queue work behind a running fiber), startShell (exclusive shell mode with ready latch, busy error, and onInterrupt recovery), cancel, plus state/busy accessors over an atomic state reference.",
+      "tags": ["effect", "concurrency", "factory", "state-machine"],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:packages/opencode/src/effect/service-use.ts",
+      "type": "file",
+      "name": "service-use.ts",
+      "filePath": "packages/opencode/src/effect/service-use.ts",
+      "summary": "Provides serviceUse, a Proxy-based accessor that lazily wraps every Effect-returning method of a Context.Service so callers can invoke service methods directly while adding the service identifier to the effect requirements.",
+      "tags": ["effect", "service", "utility", "type-definition"],
+      "complexity": "simple",
+      "languageNotes": "The ServiceUse mapped type filters the service shape to Effect-returning methods only; the Proxy property access is the single dynamic boundary."
+    },
+    {
+      "id": "function:packages/opencode/src/effect/service-use.ts:serviceUse",
+      "type": "function",
+      "name": "serviceUse",
+      "filePath": "packages/opencode/src/effect/service-use.ts",
+      "lineRange": [17, 38],
+      "summary": "Creates a Proxy whose property access returns a function that runs the corresponding service method inside tag.use, dying with a descriptive error for non-function members.",
+      "tags": ["effect", "service", "proxy", "utility"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/opencode/src/env/index.ts",
+      "type": "file",
+      "name": "index.ts",
+      "filePath": "packages/opencode/src/env/index.ts",
+      "summary": "Env service exposing get/all/set/remove over a per-instance snapshot of process.env backed by InstanceState, so environment mutations are scoped to the current project instance.",
+      "tags": ["service", "effect", "environment", "state-management"],
+      "complexity": "simple",
+      "languageNotes": "State seeds from a shallow copy of process.env on first use per instance; set/remove mutate the snapshot rather than the real process environment."
+    },
+    {
+      "id": "file:packages/opencode/src/file/ignore.ts",
+      "type": "file",
+      "name": "ignore.ts",
+      "filePath": "packages/opencode/src/file/ignore.ts",
+      "summary": "Defines the built-in file ignore rules (build dirs, VCS metadata, caches, logs, OS artifacts) and a match() predicate supporting extra patterns and whitelist overrides, used by file scanning and watching.",
+      "tags": ["utility", "ignore-patterns", "filtering", "filesystem"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/file/ignore.ts:match",
+      "type": "function",
+      "name": "match",
+      "filePath": "packages/opencode/src/file/ignore.ts",
+      "lineRange": [56, 78],
+      "summary": "Returns true when a path hits an ignored folder segment or glob pattern, consulting whitelist patterns first and honoring caller-supplied extras.",
+      "tags": ["utility", "filtering", "glob"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/opencode/src/file/index.ts",
+      "type": "file",
+      "name": "index.ts",
+      "filePath": "packages/opencode/src/file/index.ts",
+      "summary": "Core File service: maintains a per-instance scan of project files via ripgrep, exposes list/read/search with fuzzy ranking and hidden-file handling, git-aware modified-file info, and text/binary content encoding with structured patch metadata.",
+      "tags": ["service", "filesystem", "effect", "search"],
+      "complexity": "complex",
+      "languageNotes": "Global-home scans walk only two directory levels with protected-name filtering, while project scans derive the directory tree from ripgrep's file list."
+    },
+    {
+      "id": "function:packages/opencode/src/file/index.ts:sortHiddenLast",
+      "type": "function",
+      "name": "sortHiddenLast",
+      "filePath": "packages/opencode/src/file/index.ts",
+      "lineRange": [306, 315],
+      "summary": "Splits listing items into visible and dot-prefixed entries, returning visible ones first unless the caller prefers the raw order.",
+      "tags": ["utility", "sorting", "filesystem"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/opencode/src/file/protected.ts",
+      "type": "file",
+      "name": "protected.ts",
+      "filePath": "packages/opencode/src/file/protected.ts",
+      "summary": "Enumerates platform-specific protected directories (macOS TCC areas like Documents, Desktop, Mail and Safari data; Windows user folders) that must never be watched, stated, or scanned, exposed as both name sets and absolute paths.",
+      "tags": ["utility", "filesystem", "security", "platform-specific"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/file/protected.ts:names",
+      "type": "function",
+      "name": "names",
+      "filePath": "packages/opencode/src/file/protected.ts",
+      "lineRange": [41, 45],
+      "summary": "Returns the platform-specific set of home-directory entry names to skip when scanning (populated on darwin and win32, empty elsewhere).",
+      "tags": ["utility", "platform-specific", "filesystem"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/file/protected.ts:paths",
+      "type": "function",
+      "name": "paths",
+      "filePath": "packages/opencode/src/file/protected.ts",
+      "lineRange": [48, 57],
+      "summary": "Returns absolute protected paths — macOS TCC home and Library directories plus root metadata volumes, or Windows user folders — that must never be watched or stated.",
+      "tags": ["utility", "platform-specific", "filesystem", "security"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/opencode/src/file/ripgrep.ts",
+      "type": "file",
+      "name": "ripgrep.ts",
+      "filePath": "packages/opencode/src/file/ripgrep.ts",
+      "summary": "Ripgrep service: downloads and caches a pinned rg binary per platform (15.1.0), then streams file listings and executes JSON-mode content searches with abort racing, Effect Schema result decoding, and an ASCII tree renderer.",
+      "tags": ["service", "search", "effect", "filesystem"],
+      "complexity": "complex",
+      "languageNotes": "Search output is decoded from rg's JSON-lines format through a Schema.Union (Begin/Match/End/Summary); Effect.raceFirst against an abort-signal effect cancels pending processes."
+    },
+    {
+      "id": "function:packages/opencode/src/file/ripgrep.ts:filesArgs",
+      "type": "function",
+      "name": "filesArgs",
+      "filePath": "packages/opencode/src/file/ripgrep.ts",
+      "lineRange": [197, 208],
+      "summary": "Builds the rg argument vector for file listing from a FilesInput (glob, hidden, follow, maxDepth) plus hidden and exclude defaults.",
+      "tags": ["utility", "search", "cli"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/file/ripgrep.ts:searchArgs",
+      "type": "function",
+      "name": "searchArgs",
+      "filePath": "packages/opencode/src/file/ripgrep.ts",
+      "lineRange": [210, 219],
+      "summary": "Builds the rg argument vector for content search from a SearchInput (pattern, glob, limit, file filters) in JSON output mode.",
+      "tags": ["utility", "search", "cli"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/opencode/src/file/watcher.ts",
+      "type": "file",
+      "name": "watcher.ts",
+      "filePath": "packages/opencode/src/file/watcher.ts",
+      "summary": "File watcher service over @parcel/watcher native bindings with platform backends (fs-events, inotify, windows), ignoring protected and ignored paths, and publishing file.watcher.updated bus events for add/change/unlink.",
+      "tags": ["service", "filesystem", "event-handler", "effect"],
+      "complexity": "moderate",
+      "languageNotes": "The native binding is loaded lazily by requiring the platform-specific @parcel/watcher-* package; subscriptions carry a 10 second timeout guard."
+    },
+    {
+      "id": "function:packages/opencode/src/file/watcher.ts:hasNativeBinding",
+      "type": "function",
+      "name": "hasNativeBinding",
+      "filePath": "packages/opencode/src/file/watcher.ts",
+      "lineRange": [59, 59],
+      "summary": "Reports whether the platform-native parcel watcher binding loaded successfully.",
+      "tags": ["utility", "filesystem", "capability-check"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/opencode/src/format/formatter.ts",
+      "type": "file",
+      "name": "formatter.ts",
+      "filePath": "packages/opencode/src/format/formatter.ts",
+      "summary": "Formatter descriptor registry with 28 formatter definitions (gofmt, prettier, biome, oxfmt, rustfmt, ruff, dart, ormolu, and more), each declaring file extensions and an async enabled() probe that resolves the formatter command line, preferring repo-local binaries over global caches.",
+      "tags": ["registry", "formatting", "tooling", "configuration"],
+      "complexity": "complex",
+      "languageNotes": "enabled() probes range from simple PATH lookups to package.json dependency scans with findUp; prettier, oxfmt, and biome prefer the repo's own node_modules binary to avoid version-skew format diffs."
+    }
+  ],
+  "edges": [
+    {
+      "source": "file:packages/opencode/src/effect/instance-registry.ts",
+      "target": "function:packages/opencode/src/effect/instance-registry.ts:registerDisposer",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/src/effect/instance-registry.ts",
+      "target": "function:packages/opencode/src/effect/instance-registry.ts:disposeInstance",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/src/effect/instance-registry.ts",
+      "target": "function:packages/opencode/src/effect/instance-registry.ts:registerDisposer",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/effect/instance-registry.ts",
+      "target": "function:packages/opencode/src/effect/instance-registry.ts:disposeInstance",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/effect/instance-state.ts",
+      "target": "function:packages/opencode/src/effect/instance-state.ts:bind",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/src/effect/instance-state.ts",
+      "target": "function:packages/opencode/src/effect/instance-state.ts:make",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/src/effect/instance-state.ts",
+      "target": "function:packages/opencode/src/effect/instance-state.ts:get",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/src/effect/instance-state.ts",
+      "target": "function:packages/opencode/src/effect/instance-state.ts:use",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/src/effect/instance-state.ts",
+      "target": "function:packages/opencode/src/effect/instance-state.ts:useEffect",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/src/effect/instance-state.ts",
+      "target": "function:packages/opencode/src/effect/instance-state.ts:has",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/src/effect/instance-state.ts",
+      "target": "function:packages/opencode/src/effect/instance-state.ts:invalidate",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/src/effect/instance-state.ts",
+      "target": "function:packages/opencode/src/effect/instance-state.ts:bind",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/effect/instance-state.ts",
+      "target": "function:packages/opencode/src/effect/instance-state.ts:make",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/effect/instance-state.ts",
+      "target": "function:packages/opencode/src/effect/instance-state.ts:get",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/effect/instance-state.ts",
+      "target": "function:packages/opencode/src/effect/instance-state.ts:use",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/effect/instance-state.ts",
+      "target": "function:packages/opencode/src/effect/instance-state.ts:useEffect",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/effect/instance-state.ts",
+      "target": "function:packages/opencode/src/effect/instance-state.ts:has",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/effect/instance-state.ts",
+      "target": "function:packages/opencode/src/effect/instance-state.ts:invalidate",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/effect/instance-state.ts",
+      "target": "file:packages/opencode/src/effect/instance-ref.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/opencode/src/effect/instance-state.ts",
+      "target": "file:packages/opencode/src/effect/instance-registry.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/opencode/src/effect/run-service.ts",
+      "target": "function:packages/opencode/src/effect/run-service.ts:attachWith",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/src/effect/run-service.ts",
+      "target": "function:packages/opencode/src/effect/run-service.ts:attach",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/src/effect/run-service.ts",
+      "target": "function:packages/opencode/src/effect/run-service.ts:makeRuntime",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/src/effect/run-service.ts",
+      "target": "function:packages/opencode/src/effect/run-service.ts:attachWith",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/effect/run-service.ts",
+      "target": "function:packages/opencode/src/effect/run-service.ts:attach",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/effect/run-service.ts",
+      "target": "function:packages/opencode/src/effect/run-service.ts:makeRuntime",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/effect/runner.ts",
+      "target": "function:packages/opencode/src/effect/runner.ts:make",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/src/effect/runner.ts",
+      "target": "function:packages/opencode/src/effect/runner.ts:make",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/effect/service-use.ts",
+      "target": "function:packages/opencode/src/effect/service-use.ts:serviceUse",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/src/effect/service-use.ts",
+      "target": "function:packages/opencode/src/effect/service-use.ts:serviceUse",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/env/index.ts",
+      "target": "file:packages/opencode/src/effect/instance-state.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/opencode/src/file/ignore.ts",
+      "target": "function:packages/opencode/src/file/ignore.ts:match",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/src/file/ignore.ts",
+      "target": "function:packages/opencode/src/file/ignore.ts:match",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/file/index.ts",
+      "target": "function:packages/opencode/src/file/index.ts:sortHiddenLast",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/src/file/index.ts",
+      "target": "file:packages/opencode/src/file/ripgrep.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/opencode/src/file/index.ts",
+      "target": "file:packages/opencode/src/file/protected.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/opencode/src/file/index.ts",
+      "target": "file:packages/opencode/src/git/index.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/opencode/src/file/index.ts",
+      "target": "file:packages/opencode/src/effect/instance-state.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/opencode/src/file/protected.ts",
+      "target": "function:packages/opencode/src/file/protected.ts:names",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/src/file/protected.ts",
+      "target": "function:packages/opencode/src/file/protected.ts:paths",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/src/file/protected.ts",
+      "target": "function:packages/opencode/src/file/protected.ts:names",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/file/protected.ts",
+      "target": "function:packages/opencode/src/file/protected.ts:paths",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/file/ripgrep.ts",
+      "target": "function:packages/opencode/src/file/ripgrep.ts:filesArgs",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/src/file/ripgrep.ts",
+      "target": "function:packages/opencode/src/file/ripgrep.ts:searchArgs",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/src/file/watcher.ts",
+      "target": "function:packages/opencode/src/file/watcher.ts:hasNativeBinding",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:packages/opencode/src/file/watcher.ts",
+      "target": "function:packages/opencode/src/file/watcher.ts:hasNativeBinding",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/opencode/src/file/watcher.ts",
+      "target": "file:packages/opencode/src/effect/instance-state.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/opencode/src/file/watcher.ts",
+      "target": "file:packages/opencode/src/file/ignore.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/opencode/src/file/watcher.ts",
+      "target": "file:packages/opencode/src/file/protected.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/opencode/src/file/watcher.ts",
+      "target": "file:packages/opencode/src/git/index.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    }
+  ]
+}

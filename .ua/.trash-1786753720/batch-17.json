@@ -1,0 +1,96 @@
+{
+  "nodes": [
+    {
+      "id": "document:packages/opencode/AGENTS.md",
+      "type": "document",
+      "name": "AGENTS.md",
+      "filePath": "packages/opencode/AGENTS.md",
+      "summary": "Package-level engineering guide for the opencode core package, covering prompt architecture (shared core + provider delta), Drizzle database conventions, CLI event-loop design (LoopContext / FooterOutput contract), Effect v4 rules, module-shape conventions, and the V2 session delegation bridge. Injected into the agent's context as a user message on every LLM API call, so its file:line references directly shape agent behavior.",
+      "tags": ["documentation", "conventions", "architecture", "effect", "agent-instructions"],
+      "complexity": "complex",
+      "languageNotes": "This file is re-read from disk on every LLM API call and injected as a user message per the Instruction Hierarchy pattern, so stale file:line anchors propagate directly into agent behavior."
+    },
+    {
+      "id": "document:packages/opencode/BUN_SHELL_MIGRATION_PLAN.md",
+      "type": "document",
+      "name": "BUN_SHELL_MIGRATION_PLAN.md",
+      "filePath": "packages/opencode/BUN_SHELL_MIGRATION_PLAN.md",
+      "summary": "Phased migration plan to replace 143 runtime Bun `$` shell template calls across 17 source files with a unified Process API in util/process.ts. Prioritizes git-heavy hotspots (github.ts, worktree, LSP server, installation, snapshot) in Phase 1, with explicit shell-only exceptions and a validation strategy per phase.",
+      "tags": ["documentation", "migration-plan", "process-api", "refactoring", "shell-commands"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "document:packages/opencode/README.md",
+      "type": "document",
+      "name": "README.md",
+      "filePath": "packages/opencode/README.md",
+      "summary": "Minimal bun init boilerplate README with install (bun install) and run (bun run index.ts) instructions; contains no project-specific documentation.",
+      "tags": ["documentation", "boilerplate", "overview"],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:packages/opencode/bunfig.toml",
+      "type": "config",
+      "name": "bunfig.toml",
+      "filePath": "packages/opencode/bunfig.toml",
+      "summary": "Bun runtime configuration for the opencode package: preloads @opentui/solid globally for TUI rendering and adds the shared test preload (test/preload.ts) to the bun test runner.",
+      "tags": ["configuration", "bun", "test-runner", "preload"],
+      "complexity": "simple",
+      "languageNotes": "bunfig.toml's [test] timeout key is not actually parsed by Bun (oven-sh/bun#7789), so the test timeout is passed via --timeout in package.json scripts instead."
+    },
+    {
+      "id": "config:packages/opencode/package.json",
+      "type": "config",
+      "name": "package.json",
+      "filePath": "packages/opencode/package.json",
+      "summary": "Manifest for the opencode core package: defines the opencode CLI binary, dev/build/test/typecheck scripts (tsgo, bun test with junit CI reporting, compile-mode builds), wildcard src exports, and the full Effect / AI-sdk / OpenTUI / drizzle dependency set managed via workspace catalog versions.",
+      "tags": ["configuration", "package-manifest", "build-system", "dependencies", "cli"],
+      "complexity": "moderate",
+      "languageNotes": "Uses Node subpath imports (#db, #pty, #httpapi-server) with bun/node runtime conditions for platform-specific module resolution, plus catalog: version references resolved by the Bun workspace root."
+    },
+    {
+      "id": "config:packages/opencode/tsconfig.json",
+      "type": "config",
+      "name": "tsconfig.json",
+      "filePath": "packages/opencode/tsconfig.json",
+      "summary": "TypeScript configuration for the opencode package, extending @tsconfig/bun with OpenTUI SolidJS JSX settings (jsxImportSource @opentui/solid), browser custom conditions, and @/*, @tui/*, @test/* path aliases.",
+      "tags": ["configuration", "typescript", "build-system", "path-aliases"],
+      "complexity": "simple",
+      "languageNotes": "The @/* path aliases often produce false-positive 'Cannot find module' LSP diagnostics; bun typecheck (tsgo) is the source of truth for alias resolution."
+    }
+  ],
+  "edges": [
+    { "source": "document:packages/opencode/AGENTS.md", "target": "file:packages/opencode/src/session/prompt.ts", "type": "documents", "direction": "forward", "weight": 0.5 },
+    { "source": "document:packages/opencode/AGENTS.md", "target": "file:packages/opencode/src/session/system.ts", "type": "documents", "direction": "forward", "weight": 0.5 },
+    { "source": "document:packages/opencode/AGENTS.md", "target": "file:packages/opencode/src/session/llm.ts", "type": "documents", "direction": "forward", "weight": 0.5 },
+    { "source": "document:packages/opencode/AGENTS.md", "target": "file:packages/opencode/src/session/projectors-next.ts", "type": "documents", "direction": "forward", "weight": 0.5 },
+    { "source": "document:packages/opencode/AGENTS.md", "target": "file:packages/opencode/src/cli/cmd/run/event-loop.ts", "type": "documents", "direction": "forward", "weight": 0.5 },
+    { "source": "document:packages/opencode/AGENTS.md", "target": "file:packages/opencode/src/cli/cmd/run/session-data.ts", "type": "documents", "direction": "forward", "weight": 0.5 },
+    { "source": "document:packages/opencode/AGENTS.md", "target": "file:packages/opencode/src/effect/run-service.ts", "type": "documents", "direction": "forward", "weight": 0.5 },
+    { "source": "document:packages/opencode/AGENTS.md", "target": "file:packages/opencode/src/effect/instance-state.ts", "type": "documents", "direction": "forward", "weight": 0.5 },
+    { "source": "document:packages/opencode/AGENTS.md", "target": "file:packages/opencode/src/project/bootstrap.ts", "type": "documents", "direction": "forward", "weight": 0.5 },
+    { "source": "document:packages/opencode/AGENTS.md", "target": "file:packages/opencode/src/v2/session.ts", "type": "documents", "direction": "forward", "weight": 0.5 },
+    { "source": "document:packages/opencode/AGENTS.md", "target": "file:packages/opencode/src/provider/models.ts", "type": "documents", "direction": "forward", "weight": 0.5 },
+    { "source": "document:packages/opencode/AGENTS.md", "target": "file:packages/opencode/src/skill/index.ts", "type": "documents", "direction": "forward", "weight": 0.5 },
+    { "source": "document:packages/opencode/AGENTS.md", "target": "file:packages/opencode/src/plugin/index.ts", "type": "documents", "direction": "forward", "weight": 0.5 },
+    { "source": "document:packages/opencode/AGENTS.md", "target": "file:packages/opencode/src/tool/task.ts", "type": "documents", "direction": "forward", "weight": 0.5 },
+    { "source": "document:packages/opencode/AGENTS.md", "target": "file:packages/opencode/src/format/index.ts", "type": "documents", "direction": "forward", "weight": 0.5 },
+    { "source": "document:packages/opencode/AGENTS.md", "target": "file:packages/opencode/drizzle.config.ts", "type": "documents", "direction": "forward", "weight": 0.5 },
+    { "source": "document:packages/opencode/AGENTS.md", "target": "file:packages/opencode/test/cli/cmd/run/session-data.characterization.test.ts", "type": "documents", "direction": "forward", "weight": 0.5 },
+    { "source": "document:packages/opencode/AGENTS.md", "target": "file:packages/opencode/test/v2/session.test.ts", "type": "documents", "direction": "forward", "weight": 0.5 },
+    { "source": "document:packages/opencode/AGENTS.md", "target": "file:packages/opencode/test/permission/next.test.ts", "type": "documents", "direction": "forward", "weight": 0.5 },
+    { "source": "document:packages/opencode/AGENTS.md", "target": "document:packages/opencode/specs/effect/migration.md", "type": "related", "direction": "forward", "weight": 0.5 },
+    { "source": "document:packages/opencode/BUN_SHELL_MIGRATION_PLAN.md", "target": "file:packages/opencode/src/util/process.ts", "type": "documents", "direction": "forward", "weight": 0.5 },
+    { "source": "document:packages/opencode/BUN_SHELL_MIGRATION_PLAN.md", "target": "file:packages/opencode/src/cli/cmd/github.ts", "type": "documents", "direction": "forward", "weight": 0.5 },
+    { "source": "document:packages/opencode/BUN_SHELL_MIGRATION_PLAN.md", "target": "file:packages/opencode/src/worktree/index.ts", "type": "documents", "direction": "forward", "weight": 0.5 },
+    { "source": "document:packages/opencode/BUN_SHELL_MIGRATION_PLAN.md", "target": "file:packages/opencode/src/lsp/server.ts", "type": "documents", "direction": "forward", "weight": 0.5 },
+    { "source": "document:packages/opencode/BUN_SHELL_MIGRATION_PLAN.md", "target": "file:packages/opencode/src/installation/index.ts", "type": "documents", "direction": "forward", "weight": 0.5 },
+    { "source": "document:packages/opencode/BUN_SHELL_MIGRATION_PLAN.md", "target": "file:packages/opencode/src/snapshot/index.ts", "type": "documents", "direction": "forward", "weight": 0.5 },
+    { "source": "document:packages/opencode/README.md", "target": "file:packages/opencode/src/index.ts", "type": "documents", "direction": "forward", "weight": 0.5 },
+    { "source": "config:packages/opencode/bunfig.toml", "target": "file:packages/opencode/test/preload.ts", "type": "configures", "direction": "forward", "weight": 0.6 },
+    { "source": "config:packages/opencode/bunfig.toml", "target": "config:packages/opencode/package.json", "type": "related", "direction": "forward", "weight": 0.5 },
+    { "source": "config:packages/opencode/package.json", "target": "file:packages/opencode/src/index.ts", "type": "configures", "direction": "forward", "weight": 0.6 },
+    { "source": "config:packages/opencode/package.json", "target": "file:packages/opencode/script/build.ts", "type": "configures", "direction": "forward", "weight": 0.6 },
+    { "source": "config:packages/opencode/tsconfig.json", "target": "file:packages/opencode/src/index.ts", "type": "configures", "direction": "forward", "weight": 0.6 }
+  ]
+}

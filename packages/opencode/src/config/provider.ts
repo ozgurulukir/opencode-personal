@@ -52,7 +52,11 @@ export const Model = Schema.Struct({
   experimental: Schema.optional(Schema.Boolean),
   status: Schema.optional(ModelStatus),
   provider: Schema.optional(
-    Schema.Struct({ npm: Schema.optional(Schema.String), api: Schema.optional(Schema.String) }),
+    Schema.Struct({
+      npm: Schema.optional(Schema.String),
+      api: Schema.optional(Schema.String),
+      supportsMaxOutputTokens: Schema.optional(Schema.Boolean),
+    }),
   ),
   options: Schema.optional(Schema.Record(Schema.String, Schema.Any)),
   headers: Schema.optional(Schema.Record(Schema.String, Schema.String)),
@@ -71,6 +75,7 @@ export const Model = Schema.Struct({
 
 export const Info = Schema.Struct({
   api: Schema.optional(Schema.String),
+  supportsMaxOutputTokens: Schema.optional(Schema.Boolean),
   name: Schema.optional(Schema.String),
   env: Schema.optional(Schema.mutable(Schema.Array(Schema.String))),
   id: Schema.optional(Schema.String),
