@@ -28,9 +28,13 @@ function projectsKey(key: ServerConnection.Key) {
   return key
 }
 
-function isLocalHost(url: string) {
-  const host = url.replace(/^https?:\/\//, "").split(":")[0]
-  if (host === "localhost" || host === "127.0.0.1") return "local"
+function isLocalHost(input: string) {
+  try {
+    const url = new URL(input)
+    if (url.hostname === "localhost" || url.hostname === "127.0.0.1") return "local"
+  } catch {
+    //
+  }
 }
 
 export function resolveServerList(input: {
