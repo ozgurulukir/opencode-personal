@@ -17,7 +17,7 @@ describe("diagnosticMessageKey", () => {
   })
 
   test("keeps content-based discrimination for other objects", () => {
-    expect(diagnosticMessageKey({ foo: 1 })).toBe(JSON.stringify({ foo: 1 }))
+    expect(diagnosticMessageKey({ foo: 1 })).toBe("foo:1,")
     expect(diagnosticMessageKey({ foo: 1 })).not.toBe(diagnosticMessageKey({ foo: 2 }))
   })
 
