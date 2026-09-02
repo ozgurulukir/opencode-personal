@@ -86,7 +86,10 @@ function init() {
     }
     lock.value = false
 
-    const id = Math.random().toString(36).slice(2)
+    const id =
+      globalThis.crypto && globalThis.crypto.randomUUID
+        ? globalThis.crypto.randomUUID()
+        : Math.random().toString(36).slice(2)
     let dispose: (() => void) | undefined
     let setClosing: ((closing: boolean) => void) | undefined
 
