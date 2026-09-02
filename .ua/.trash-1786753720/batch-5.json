@@ -1,0 +1,29 @@
+{
+  "nodes": [
+    {
+      "id": "service:packages/containers/tauri-linux/Dockerfile",
+      "type": "service",
+      "name": "Dockerfile",
+      "filePath": "packages/containers/tauri-linux/Dockerfile",
+      "summary": "Top layer of the CI container chain, adding Tauri's Linux build dependencies (libwebkit2gtk-4.1-dev, librsvg2-dev, libappindicator3-dev, patchelf) on top of the rust image. Used for building Tauri desktop applications on Linux inside CI.",
+      "tags": ["containerization", "infrastructure", "ci-cd", "tauri", "desktop"],
+      "complexity": "simple"
+    }
+  ],
+  "edges": [
+    {
+      "source": "service:packages/containers/tauri-linux/Dockerfile",
+      "target": "service:packages/containers/rust/Dockerfile",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "service:packages/containers/tauri-linux/Dockerfile",
+      "target": "file:packages/containers/script/build.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    }
+  ]
+}

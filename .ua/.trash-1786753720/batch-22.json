@@ -1,0 +1,333 @@
+{
+  "nodes": [
+    {
+      "id": "document:packages/opencode/src/session/prompt/build-switch.txt",
+      "type": "document",
+      "name": "build-switch.txt",
+      "filePath": "packages/opencode/src/session/prompt/build-switch.txt",
+      "summary": "Transient system-reminder template injected when the session switches from plan mode to build mode, telling the agent it is no longer read-only and may edit files and run tools again. Loaded and injected by session/loop/reminders.ts.",
+      "tags": ["system-prompt", "prompt-template", "mode-switch", "system-reminder", "agent-behavior"],
+      "complexity": "simple",
+      "languageNotes": "Wrapped in a <system-reminder> tag, the project's convention for transient authoritative directives that override ordinary user-message content."
+    },
+    {
+      "id": "document:packages/opencode/src/session/prompt/core.txt",
+      "type": "document",
+      "name": "core.txt",
+      "filePath": "packages/opencode/src/session/prompt/core.txt",
+      "summary": "The shared system prompt core appended before any provider delta, defining the agent's identity, tone, task workflow, autonomous hunk-based patch retry behavior, code conventions, system-tag semantics, and the four-level instruction priority hierarchy. Its content is the cacheable prefix base assembled by SystemPrompt.provider() in session/system.ts and streamed by session/llm.ts.",
+      "tags": ["system-prompt", "prompt-template", "agent-behavior", "instruction-hierarchy", "documentation"],
+      "complexity": "moderate",
+      "languageNotes": "Establishes the project's XML tag semantics: <system-reminder> for authoritative transient directives and <instructions source=\"...\"> for AGENTS.md provenance, with an explicit priority ladder (system prompt > system-reminder > project instructions > user)."
+    },
+    {
+      "id": "document:packages/opencode/src/session/prompt/delta-anthropic.txt",
+      "type": "document",
+      "name": "delta-anthropic.txt",
+      "filePath": "packages/opencode/src/session/prompt/delta-anthropic.txt",
+      "summary": "Claude-specific system prompt delta enforcing professional objectivity over user validation, frequent TodoWrite usage for task tracking, and preferring the Task tool with parallel tool calls for codebase exploration. Selected by matchDelta() in session/system.ts for Anthropic models.",
+      "tags": ["system-prompt", "provider-delta", "anthropic", "task-management", "prompt-template"],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:packages/opencode/src/session/prompt/delta-beast.txt",
+      "type": "document",
+      "name": "delta-beast.txt",
+      "filePath": "packages/opencode/src/session/prompt/delta-beast.txt",
+      "summary": "Autonomous-mode provider delta instructing the agent to persist until the query is fully resolved, following a nine-step workflow of URL fetching, codebase investigation, TodoWrite planning, incremental implementation, debugging, and testing. Matched by matchDelta() in session/system.ts for the beast provider profile.",
+      "tags": ["system-prompt", "provider-delta", "autonomous-mode", "workflow", "prompt-template"],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:packages/opencode/src/session/prompt/delta-codex.txt",
+      "type": "document",
+      "name": "delta-codex.txt",
+      "filePath": "packages/opencode/src/session/prompt/delta-codex.txt",
+      "summary": "Codex provider delta covering editing constraints (ASCII default, apply_patch for single-file edits), git workspace hygiene rules forbidding destructive commands, frontend design guidance against generic layouts, and concise presentation conventions. Selected by matchDelta() in session/system.ts.",
+      "tags": ["system-prompt", "provider-delta", "codex", "editing-constraints", "git-hygiene"],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:packages/opencode/src/session/prompt/delta-deepseek.txt",
+      "type": "document",
+      "name": "delta-deepseek.txt",
+      "filePath": "packages/opencode/src/session/prompt/delta-deepseek.txt",
+      "summary": "DeepSeek provider delta that branches behavior between reasoning models (deepseek-reasoner, deepseek-r1, any `:thinking` suffix) that should reason step by step in a separate trace, and direct chat models (deepseek-chat, v3, v4-flash). Encourages unexplained parallel tool calls and clean summary output. Matched by matchDelta() in session/system.ts.",
+      "tags": ["system-prompt", "provider-delta", "deepseek", "reasoning-mode", "prompt-template"],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:packages/opencode/src/session/prompt/delta-default.txt",
+      "type": "document",
+      "name": "delta-default.txt",
+      "filePath": "packages/opencode/src/session/prompt/delta-default.txt",
+      "summary": "Fallback provider delta used by matchDelta() in session/system.ts when no provider-specific adjustments apply, explicitly stating that the core prompt provides all necessary guidance.",
+      "tags": ["system-prompt", "provider-delta", "fallback", "prompt-template"],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:packages/opencode/src/session/prompt/delta-gemini.txt",
+      "type": "document",
+      "name": "delta-gemini.txt",
+      "filePath": "packages/opencode/src/session/prompt/delta-gemini.txt",
+      "summary": "Gemini provider delta requiring verification of established library usage before employment, construction of absolute paths from the project root before filesystem tools, project-specific build/lint verification after changes, and brief explanations before state-modifying bash commands. Matched by matchDelta() in session/system.ts.",
+      "tags": ["system-prompt", "provider-delta", "gemini", "verification", "prompt-template"],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:packages/opencode/src/session/prompt/delta-glm.txt",
+      "type": "document",
+      "name": "delta-glm.txt",
+      "filePath": "packages/opencode/src/session/prompt/delta-glm.txt",
+      "summary": "GLM provider delta directing built-in thinking mode for complex tasks, direct unexplained parallel tool calls with sequential chaining when steps depend on each other, and structured concise output. Matched by matchDelta() in session/system.ts for GLM models.",
+      "tags": ["system-prompt", "provider-delta", "glm", "thinking-mode", "prompt-template"],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:packages/opencode/src/session/prompt/delta-gpt.txt",
+      "type": "document",
+      "name": "delta-gpt.txt",
+      "filePath": "packages/opencode/src/session/prompt/delta-gpt.txt",
+      "summary": "GPT provider delta promoting minimal correct changes and end-to-end autonomy, git hygiene with a preference for non-interactive commands, and strict markdown formatting rules (flat single-level lists, short bold Title Case headers, inline code for identifiers). Matched by matchDelta() in session/system.ts.",
+      "tags": ["system-prompt", "provider-delta", "gpt", "markdown-formatting", "autonomy"],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:packages/opencode/src/session/prompt/delta-kimi.txt",
+      "type": "document",
+      "name": "delta-kimi.txt",
+      "filePath": "packages/opencode/src/session/prompt/delta-kimi.txt",
+      "summary": "Kimi provider delta instructing the agent to interpret ambiguous requests as tasks, issue unexplained parallel tool calls, follow bug-fix/feature/refactor coding guidelines, and keep AGENTS.md updated when modified files are documented there. Matched by matchDelta() in session/system.ts.",
+      "tags": ["system-prompt", "provider-delta", "kimi", "coding-guidelines", "prompt-template"],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:packages/opencode/src/session/prompt/delta-qwen.txt",
+      "type": "document",
+      "name": "delta-qwen.txt",
+      "filePath": "packages/opencode/src/session/prompt/delta-qwen.txt",
+      "summary": "Qwen provider delta explaining the DashScope `enable_thinking` parameter for reasoning traces on complex multi-step tasks, self-explanatory parallel tool calls, and concise step-by-step output style. Matched by matchDelta() in session/system.ts for Qwen models.",
+      "tags": ["system-prompt", "provider-delta", "qwen", "thinking-mode", "prompt-template"],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:packages/opencode/src/session/prompt/delta-trinity.txt",
+      "type": "document",
+      "name": "delta-trinity.txt",
+      "filePath": "packages/opencode/src/session/prompt/delta-trinity.txt",
+      "summary": "Token-efficiency provider delta demanding extreme conciseness (fewer than four lines, one-word answers when possible), exactly one tool call per assistant message, the question tool for vague requests, and no code comments unless requested. Matched by matchDelta() in session/system.ts for the trinity provider profile.",
+      "tags": ["system-prompt", "provider-delta", "conciseness", "token-efficiency", "prompt-template"],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:packages/opencode/src/session/prompt/max-steps.txt",
+      "type": "document",
+      "name": "max-steps.txt",
+      "filePath": "packages/opencode/src/session/prompt/max-steps.txt",
+      "summary": "Critical reminder injected by session/loop/run-loop.ts when the agent exhausts its maximum step budget: all tools are disabled and the model must respond with text only, summarizing completed work, remaining tasks, and recommended next steps.",
+      "tags": ["system-prompt", "prompt-template", "step-limit", "system-reminder", "agent-behavior"],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:packages/opencode/src/session/prompt/plan.txt",
+      "type": "document",
+      "name": "plan.txt",
+      "filePath": "packages/opencode/src/session/prompt/plan.txt",
+      "summary": "Plan-mode system-reminder template injected by session/loop/reminders.ts that enforces strict read-only operation (no edits, no non-readonly tools, overriding even direct user edit requests) and defines the agent's responsibility to research and present a well-formed plan with clarifying questions.",
+      "tags": ["system-prompt", "prompt-template", "plan-mode", "read-only", "system-reminder"],
+      "complexity": "simple",
+      "languageNotes": "Uses the <system-reminder> wrapper plus explicit override language, mirroring the instruction-priority ladder defined in core.txt where system-reminders outrank project instructions and user messages."
+    }
+  ],
+  "edges": [
+    {
+      "source": "document:packages/opencode/src/session/prompt/core.txt",
+      "target": "file:packages/opencode/src/session/system.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/opencode/src/session/prompt/core.txt",
+      "target": "file:packages/opencode/src/session/llm.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/opencode/src/session/prompt/delta-anthropic.txt",
+      "target": "file:packages/opencode/src/session/system.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/opencode/src/session/prompt/delta-anthropic.txt",
+      "target": "file:packages/opencode/src/session/llm.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/opencode/src/session/prompt/delta-beast.txt",
+      "target": "file:packages/opencode/src/session/system.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/opencode/src/session/prompt/delta-beast.txt",
+      "target": "file:packages/opencode/src/session/llm.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/opencode/src/session/prompt/delta-codex.txt",
+      "target": "file:packages/opencode/src/session/system.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/opencode/src/session/prompt/delta-codex.txt",
+      "target": "file:packages/opencode/src/session/llm.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/opencode/src/session/prompt/delta-deepseek.txt",
+      "target": "file:packages/opencode/src/session/system.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/opencode/src/session/prompt/delta-deepseek.txt",
+      "target": "file:packages/opencode/src/session/llm.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/opencode/src/session/prompt/delta-default.txt",
+      "target": "file:packages/opencode/src/session/system.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/opencode/src/session/prompt/delta-default.txt",
+      "target": "file:packages/opencode/src/session/llm.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/opencode/src/session/prompt/delta-gemini.txt",
+      "target": "file:packages/opencode/src/session/system.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/opencode/src/session/prompt/delta-gemini.txt",
+      "target": "file:packages/opencode/src/session/llm.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/opencode/src/session/prompt/delta-glm.txt",
+      "target": "file:packages/opencode/src/session/system.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/opencode/src/session/prompt/delta-glm.txt",
+      "target": "file:packages/opencode/src/session/llm.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/opencode/src/session/prompt/delta-gpt.txt",
+      "target": "file:packages/opencode/src/session/system.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/opencode/src/session/prompt/delta-gpt.txt",
+      "target": "file:packages/opencode/src/session/llm.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/opencode/src/session/prompt/delta-kimi.txt",
+      "target": "file:packages/opencode/src/session/system.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/opencode/src/session/prompt/delta-kimi.txt",
+      "target": "file:packages/opencode/src/session/llm.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/opencode/src/session/prompt/delta-qwen.txt",
+      "target": "file:packages/opencode/src/session/system.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/opencode/src/session/prompt/delta-qwen.txt",
+      "target": "file:packages/opencode/src/session/llm.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/opencode/src/session/prompt/delta-trinity.txt",
+      "target": "file:packages/opencode/src/session/system.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/opencode/src/session/prompt/delta-trinity.txt",
+      "target": "file:packages/opencode/src/session/llm.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/opencode/src/session/prompt/plan.txt",
+      "target": "file:packages/opencode/src/session/loop/reminders.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/opencode/src/session/prompt/build-switch.txt",
+      "target": "file:packages/opencode/src/session/loop/reminders.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/opencode/src/session/prompt/max-steps.txt",
+      "target": "file:packages/opencode/src/session/loop/run-loop.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    }
+  ]
+}

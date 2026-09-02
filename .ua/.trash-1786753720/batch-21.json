@@ -1,0 +1,294 @@
+{
+ "nodes": [
+  {
+   "id": "config:packages/opencode/src/cli/cmd/tui/context/theme/nord.json",
+   "type": "config",
+   "name": "nord.json",
+   "filePath": "packages/opencode/src/cli/cmd/tui/context/theme/nord.json",
+   "summary": "Defines the Nord theme — an arctic, north-bluish clean palette with Polar Night (#2e3440) dark and Snow Storm (#eceff4) light bases and frost-blue primaries — for the TUI's semantic color slots.",
+   "tags": [
+    "tui",
+    "theme",
+    "color-palette",
+    "dual-mode",
+    "blue"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "config:packages/opencode/src/cli/cmd/tui/context/theme/one-dark.json",
+   "type": "config",
+   "name": "one-dark.json",
+   "filePath": "packages/opencode/src/cli/cmd/tui/context/theme/one-dark.json",
+   "summary": "Defines the One Dark theme — Atom's default #282c34 dark palette with blue primaries and cyan accents — with a light variant for the TUI's semantic color slots.",
+   "tags": [
+    "tui",
+    "theme",
+    "color-palette",
+    "dual-mode",
+    "editor-theme"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "config:packages/opencode/src/cli/cmd/tui/context/theme/opencode.json",
+   "type": "config",
+   "name": "opencode.json",
+   "filePath": "packages/opencode/src/cli/cmd/tui/context/theme/opencode.json",
+   "summary": "Defines OpenCode's own flagship theme — near-black #0a0a0a dark and pure-white light bases with a peach primary and lavender accent — for the TUI's semantic color slots.",
+   "tags": [
+    "tui",
+    "theme",
+    "color-palette",
+    "dual-mode",
+    "brand-theme"
+   ],
+   "complexity": "moderate",
+   "languageNotes": "Uses 38 defs aliases including parallel darkStep1-12 / lightStep1-12 grayscale ramps that the {dark, light} slot objects reference."
+  },
+  {
+   "id": "config:packages/opencode/src/cli/cmd/tui/context/theme/orng.json",
+   "type": "config",
+   "name": "orng.json",
+   "filePath": "packages/opencode/src/cli/cmd/tui/context/theme/orng.json",
+   "summary": "Defines the ORNG brand theme — stark black/white bases with a single vivid orange (#ec5b2b) primary — for the TUI's semantic color slots.",
+   "tags": [
+    "tui",
+    "theme",
+    "color-palette",
+    "brand-theme",
+    "orange"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "config:packages/opencode/src/cli/cmd/tui/context/theme/osaka-jade.json",
+   "type": "config",
+   "name": "osaka-jade.json",
+   "filePath": "packages/opencode/src/cli/cmd/tui/context/theme/osaka-jade.json",
+   "summary": "Defines the Osaka Jade theme — jade green (#2dd5b7) primaries on a deep green-black (#111c18) base with a warm-paper light variant — for the TUI's semantic color slots.",
+   "tags": [
+    "tui",
+    "theme",
+    "color-palette",
+    "dual-mode",
+    "green"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "config:packages/opencode/src/cli/cmd/tui/context/theme/palenight.json",
+   "type": "config",
+   "name": "palenight.json",
+   "filePath": "packages/opencode/src/cli/cmd/tui/context/theme/palenight.json",
+   "summary": "Defines the Palenight theme — a Material-derived indigo #292d3e dark base with periwinkle-blue primaries and cyan accents — for the TUI's semantic color slots.",
+   "tags": [
+    "tui",
+    "theme",
+    "color-palette",
+    "dual-mode",
+    "material-design"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "config:packages/opencode/src/cli/cmd/tui/context/theme/rosepine.json",
+   "type": "config",
+   "name": "rosepine.json",
+   "filePath": "packages/opencode/src/cli/cmd/tui/context/theme/rosepine.json",
+   "summary": "Defines the Rosé Pine theme — a natural, muted rose-toned palette with an ink #191724 dark base, warm-paper #faf4ed light base, and rose accents — for the TUI's semantic color slots.",
+   "tags": [
+    "tui",
+    "theme",
+    "color-palette",
+    "dual-mode",
+    "pastel"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "config:packages/opencode/src/cli/cmd/tui/context/theme/solarized.json",
+   "type": "config",
+   "name": "solarized.json",
+   "filePath": "packages/opencode/src/cli/cmd/tui/context/theme/solarized.json",
+   "summary": "Defines the Solarized theme — Ethan Schoonover's classic precision palette with base03 (#002b36) dark and base3 (#fdf6e3) light bases, blue primaries and teal accents — for the TUI's semantic color slots.",
+   "tags": [
+    "tui",
+    "theme",
+    "color-palette",
+    "dual-mode",
+    "classic"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "config:packages/opencode/src/cli/cmd/tui/context/theme/synthwave84.json",
+   "type": "config",
+   "name": "synthwave84.json",
+   "filePath": "packages/opencode/src/cli/cmd/tui/context/theme/synthwave84.json",
+   "summary": "Defines the Synthwave '84 theme — a retro-futuristic 80s neon palette with a deep purple #262335 base, hot cyan primaries, and purple accents — for the TUI's semantic color slots.",
+   "tags": [
+    "tui",
+    "theme",
+    "color-palette",
+    "neon",
+    "retro"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "config:packages/opencode/src/cli/cmd/tui/context/theme/tokyonight.json",
+   "type": "config",
+   "name": "tokyonight.json",
+   "filePath": "packages/opencode/src/cli/cmd/tui/context/theme/tokyonight.json",
+   "summary": "Defines the Tokyo Night theme — a palette inspired by Tokyo at night, with a #1a1b26 dark base, blue primaries, and sunset-orange accents — for the TUI's semantic color slots.",
+   "tags": [
+    "tui",
+    "theme",
+    "color-palette",
+    "dual-mode",
+    "blue"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "config:packages/opencode/src/cli/cmd/tui/context/theme/vercel.json",
+   "type": "config",
+   "name": "vercel.json",
+   "filePath": "packages/opencode/src/cli/cmd/tui/context/theme/vercel.json",
+   "summary": "Defines the Vercel theme — a high-contrast monochrome black/white base with Geist blue (#0070f3) primaries and purple accents — for the TUI's semantic color slots.",
+   "tags": [
+    "tui",
+    "theme",
+    "color-palette",
+    "brand-theme",
+    "monochrome"
+   ],
+   "complexity": "moderate"
+  },
+  {
+   "id": "config:packages/opencode/src/cli/cmd/tui/context/theme/vesper.json",
+   "type": "config",
+   "name": "vesper.json",
+   "filePath": "packages/opencode/src/cli/cmd/tui/context/theme/vesper.json",
+   "summary": "Defines the Vesper theme — a warm charcoal #101010 base (white in light mode) where a single warm amber (#ffc799) drives primary, accent, and syntax tones — for the TUI's semantic color slots.",
+   "tags": [
+    "tui",
+    "theme",
+    "color-palette",
+    "dual-mode",
+    "monochrome"
+   ],
+   "complexity": "moderate",
+   "languageNotes": "Nearly monochromatic: one amber tone is reused across primary, accent, and most syntax slots."
+  },
+  {
+   "id": "config:packages/opencode/src/cli/cmd/tui/context/theme/zenburn.json",
+   "type": "config",
+   "name": "zenburn.json",
+   "filePath": "packages/opencode/src/cli/cmd/tui/context/theme/zenburn.json",
+   "summary": "Defines the Zenburn theme — the classic low-contrast dark palette (#3f3f3f base) with muted teal and green pastels — with a light variant for the TUI's semantic color slots.",
+   "tags": [
+    "tui",
+    "theme",
+    "color-palette",
+    "dual-mode",
+    "low-contrast"
+   ],
+   "complexity": "moderate"
+  }
+ ],
+ "edges": [
+  {
+   "source": "config:packages/opencode/src/cli/cmd/tui/context/theme/nord.json",
+   "target": "file:packages/opencode/src/cli/cmd/tui/context/theme.tsx",
+   "type": "configures",
+   "direction": "forward",
+   "weight": 0.6
+  },
+  {
+   "source": "config:packages/opencode/src/cli/cmd/tui/context/theme/one-dark.json",
+   "target": "file:packages/opencode/src/cli/cmd/tui/context/theme.tsx",
+   "type": "configures",
+   "direction": "forward",
+   "weight": 0.6
+  },
+  {
+   "source": "config:packages/opencode/src/cli/cmd/tui/context/theme/opencode.json",
+   "target": "file:packages/opencode/src/cli/cmd/tui/context/theme.tsx",
+   "type": "configures",
+   "direction": "forward",
+   "weight": 0.6
+  },
+  {
+   "source": "config:packages/opencode/src/cli/cmd/tui/context/theme/orng.json",
+   "target": "file:packages/opencode/src/cli/cmd/tui/context/theme.tsx",
+   "type": "configures",
+   "direction": "forward",
+   "weight": 0.6
+  },
+  {
+   "source": "config:packages/opencode/src/cli/cmd/tui/context/theme/osaka-jade.json",
+   "target": "file:packages/opencode/src/cli/cmd/tui/context/theme.tsx",
+   "type": "configures",
+   "direction": "forward",
+   "weight": 0.6
+  },
+  {
+   "source": "config:packages/opencode/src/cli/cmd/tui/context/theme/palenight.json",
+   "target": "file:packages/opencode/src/cli/cmd/tui/context/theme.tsx",
+   "type": "configures",
+   "direction": "forward",
+   "weight": 0.6
+  },
+  {
+   "source": "config:packages/opencode/src/cli/cmd/tui/context/theme/rosepine.json",
+   "target": "file:packages/opencode/src/cli/cmd/tui/context/theme.tsx",
+   "type": "configures",
+   "direction": "forward",
+   "weight": 0.6
+  },
+  {
+   "source": "config:packages/opencode/src/cli/cmd/tui/context/theme/solarized.json",
+   "target": "file:packages/opencode/src/cli/cmd/tui/context/theme.tsx",
+   "type": "configures",
+   "direction": "forward",
+   "weight": 0.6
+  },
+  {
+   "source": "config:packages/opencode/src/cli/cmd/tui/context/theme/synthwave84.json",
+   "target": "file:packages/opencode/src/cli/cmd/tui/context/theme.tsx",
+   "type": "configures",
+   "direction": "forward",
+   "weight": 0.6
+  },
+  {
+   "source": "config:packages/opencode/src/cli/cmd/tui/context/theme/tokyonight.json",
+   "target": "file:packages/opencode/src/cli/cmd/tui/context/theme.tsx",
+   "type": "configures",
+   "direction": "forward",
+   "weight": 0.6
+  },
+  {
+   "source": "config:packages/opencode/src/cli/cmd/tui/context/theme/vercel.json",
+   "target": "file:packages/opencode/src/cli/cmd/tui/context/theme.tsx",
+   "type": "configures",
+   "direction": "forward",
+   "weight": 0.6
+  },
+  {
+   "source": "config:packages/opencode/src/cli/cmd/tui/context/theme/vesper.json",
+   "target": "file:packages/opencode/src/cli/cmd/tui/context/theme.tsx",
+   "type": "configures",
+   "direction": "forward",
+   "weight": 0.6
+  },
+  {
+   "source": "config:packages/opencode/src/cli/cmd/tui/context/theme/zenburn.json",
+   "target": "file:packages/opencode/src/cli/cmd/tui/context/theme.tsx",
+   "type": "configures",
+   "direction": "forward",
+   "weight": 0.6
+  }
+ ]
+}

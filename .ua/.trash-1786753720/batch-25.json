@@ -1,0 +1,49 @@
+{
+  "nodes": [
+    {
+      "id": "document:packages/ui/AGENTS.md",
+      "type": "document",
+      "name": "AGENTS.md",
+      "filePath": "packages/ui/AGENTS.md",
+      "summary": "Conventions guide for the @opencode-ai/ui SolidJS component package: SSR/HMR-safe module initialization (no module-level Math.random), tests co-located in src/components/, the theme system's context/loader separation with the triple-cache Vite glob pattern, and Storybook patterns (DataProvider wrappers, mock data factories, FileStub for the diff viewer, deterministic IDs for snapshots).",
+      "tags": ["documentation", "component-patterns", "testing", "storybook", "theming"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "config:packages/ui/package.json",
+      "type": "config",
+      "name": "package.json",
+      "filePath": "packages/ui/package.json",
+      "summary": "Package manifest for @opencode-ai/ui, the shared SolidJS component library: subpath exports for components, hooks, context, theme, i18n, pierre, icons, styles, fonts, and audio assets; Vite dev server and tsgo typecheck scripts; and dependencies on solid-js, kobalte, marked, shiki, katex, motion, virtua, plus the workspace SDK, core, and diff-wasm packages.",
+      "tags": ["configuration", "package-manifest", "solidjs", "ui-components"],
+      "complexity": "moderate",
+      "languageNotes": "Uses wildcard subpath exports (./* mapped to ./src/components/*.tsx) so every component is importable by filename without a barrel file; workspace:* entries link sibling packages through the Bun workspace symlink layout."
+    },
+    {
+      "id": "config:packages/ui/tsconfig.json",
+      "type": "config",
+      "name": "tsconfig.json",
+      "filePath": "packages/ui/tsconfig.json",
+      "summary": "TypeScript configuration for the UI package: SolidJS JSX setup (jsx preserve with solid-js import source), bundler module resolution, strict type checking, vite/client and bun ambient types, and exclusion of Storybook stories and MDX files from compilation.",
+      "tags": ["configuration", "typescript", "solidjs", "build-system"],
+      "complexity": "simple",
+      "languageNotes": "jsx: \"preserve\" with jsxImportSource: \"solid-js\" is the SolidJS compile model — the compiler emits JSX untouched for vite-plugin-solid to transform, unlike React's classic/automatic runtime imports."
+    }
+  ],
+  "edges": [
+    {
+      "source": "config:packages/ui/tsconfig.json",
+      "target": "config:packages/ui/package.json",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:packages/ui/AGENTS.md",
+      "target": "config:packages/ui/package.json",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    }
+  ]
+}

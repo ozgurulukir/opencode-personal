@@ -1,0 +1,177 @@
+{
+  "nodes": [
+    {
+      "id": "config:packages/ui/src/theme/themes/nightowl.json",
+      "type": "config",
+      "name": "nightowl.json",
+      "filePath": "packages/ui/src/theme/themes/nightowl.json",
+      "summary": "Night Owl port (Sarah Drasner) with deep blue-black dark background (#011627), periwinkle blue primary, and coral/orange accents.",
+      "tags": ["ui-theme", "color-palette", "design-tokens", "configuration"],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:packages/ui/src/theme/themes/nord.json",
+      "type": "config",
+      "name": "nord.json",
+      "filePath": "packages/ui/src/theme/themes/nord.json",
+      "summary": "Nord arctic palette with frost-blue primary and muted red accent over snow-light and polar-dark (#2e3440) variants.",
+      "tags": ["ui-theme", "color-palette", "design-tokens", "configuration"],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:packages/ui/src/theme/themes/oc-2.json",
+      "type": "config",
+      "name": "oc-2.json",
+      "filePath": "packages/ui/src/theme/themes/oc-2.json",
+      "summary": "OC-2, opencode's default desktop theme: a near-monochrome neutral scale with chartreuse light primary and peach dark accent, defining 26 light / 25 dark token overrides.",
+      "tags": ["ui-theme", "color-palette", "design-tokens", "configuration", "default-theme"],
+      "complexity": "moderate",
+      "languageNotes": "Special-cased in loader.ts: buildThemeCss() emits OC-2 under :root (no data-theme attribute required) so it acts as the fallback theme; every other theme is scoped to html[data-theme=\"<id>\"]."
+    },
+    {
+      "id": "config:packages/ui/src/theme/themes/one-dark.json",
+      "type": "config",
+      "name": "one-dark.json",
+      "filePath": "packages/ui/src/theme/themes/one-dark.json",
+      "summary": "One Dark port (Atom) with the classic #282c34 slate dark background, sky-blue primary, cyan accents, and a matching light variant.",
+      "tags": ["ui-theme", "color-palette", "design-tokens", "configuration"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "config:packages/ui/src/theme/themes/onedarkpro.json",
+      "type": "config",
+      "name": "onedarkpro.json",
+      "filePath": "packages/ui/src/theme/themes/onedarkpro.json",
+      "summary": "One Dark Pro variant with brighter blue primary (#528bff) and red accent over the One Dark slate dark background and a light counterpart.",
+      "tags": ["ui-theme", "color-palette", "design-tokens", "configuration"],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:packages/ui/src/theme/themes/opencode.json",
+      "type": "config",
+      "name": "opencode.json",
+      "filePath": "packages/ui/src/theme/themes/opencode.json",
+      "summary": "OpenCode brand theme with clean white/pure-black neutrals, blue primary, amber dark-mode accent, and violet secondary accent over full token overrides.",
+      "tags": ["ui-theme", "color-palette", "design-tokens", "configuration"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "config:packages/ui/src/theme/themes/orng.json",
+      "type": "config",
+      "name": "orng.json",
+      "filePath": "packages/ui/src/theme/themes/orng.json",
+      "summary": "Orng theme with a bold orange primary (#EC5B2B) over white light and pure-black dark variants, with extensive token overrides.",
+      "tags": ["ui-theme", "color-palette", "design-tokens", "configuration"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "config:packages/ui/src/theme/themes/osaka-jade.json",
+      "type": "config",
+      "name": "osaka-jade.json",
+      "filePath": "packages/ui/src/theme/themes/osaka-jade.json",
+      "summary": "Osaka Jade theme with jade-teal primary and forest-green accent over pale jasmine light and deep green-black dark backgrounds.",
+      "tags": ["ui-theme", "color-palette", "design-tokens", "configuration"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "config:packages/ui/src/theme/themes/palenight.json",
+      "type": "config",
+      "name": "palenight.json",
+      "filePath": "packages/ui/src/theme/themes/palenight.json",
+      "summary": "Material Palenight port with indigo-night dark background (#292d3e), soft blue and cyan accents, and a matching light variant.",
+      "tags": ["ui-theme", "color-palette", "design-tokens", "configuration"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "config:packages/ui/src/theme/themes/rosepine.json",
+      "type": "config",
+      "name": "rosepine.json",
+      "filePath": "packages/ui/src/theme/themes/rosepine.json",
+      "summary": "Rosé Pine port with a muted rose and iris palette over paper-warm light (#faf4ed) and ink-dark (#191724) variants.",
+      "tags": ["ui-theme", "color-palette", "design-tokens", "configuration"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "config:packages/ui/src/theme/themes/shadesofpurple.json",
+      "type": "config",
+      "name": "shadesofpurple.json",
+      "filePath": "packages/ui/src/theme/themes/shadesofpurple.json",
+      "summary": "Shades of Purple port with violet-purple primary and pink accents over a deep purple-black dark background and lavender-tinted light variant.",
+      "tags": ["ui-theme", "color-palette", "design-tokens", "configuration"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "config:packages/ui/src/theme/themes/solarized.json",
+      "type": "config",
+      "name": "solarized.json",
+      "filePath": "packages/ui/src/theme/themes/solarized.json",
+      "summary": "Classic Solarized theme (Ethan Schoonover) with the signature warm cream light (#fdf6e3) and deep teal-dark (#002b36) bases plus blue/magenta accents.",
+      "tags": ["ui-theme", "color-palette", "design-tokens", "configuration"],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:packages/ui/src/theme/themes/synthwave84.json",
+      "type": "config",
+      "name": "synthwave84.json",
+      "filePath": "packages/ui/src/theme/themes/synthwave84.json",
+      "summary": "Synthwave '84 port with retro-futuristic neon cyan and magenta-purple accents over a violet-night dark background.",
+      "tags": ["ui-theme", "color-palette", "design-tokens", "configuration"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "config:packages/ui/src/theme/themes/tokyonight.json",
+      "type": "config",
+      "name": "tokyonight.json",
+      "filePath": "packages/ui/src/theme/themes/tokyonight.json",
+      "summary": "Tokyo Night port with a blue-hour palette: sky-blue primary and orange accent over the #1a1b26 night dark and pale blue-gray light variants.",
+      "tags": ["ui-theme", "color-palette", "design-tokens", "configuration"],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:packages/ui/src/theme/themes/vercel.json",
+      "type": "config",
+      "name": "vercel.json",
+      "filePath": "packages/ui/src/theme/themes/vercel.json",
+      "summary": "Vercel brand theme with minimal pure-white light and pure-black dark variants, the Geist blue (#0070F3) primary, and violet accent.",
+      "tags": ["ui-theme", "color-palette", "design-tokens", "configuration"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "config:packages/ui/src/theme/themes/vesper.json",
+      "type": "config",
+      "name": "vesper.json",
+      "filePath": "packages/ui/src/theme/themes/vesper.json",
+      "summary": "Vesper port (Pawel Grzybek) with monochrome grays, warm peach primary, and red accent over light-gray and near-black backgrounds.",
+      "tags": ["ui-theme", "color-palette", "design-tokens", "configuration"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "config:packages/ui/src/theme/themes/zenburn.json",
+      "type": "config",
+      "name": "zenburn.json",
+      "filePath": "packages/ui/src/theme/themes/zenburn.json",
+      "summary": "Zenburn port with a low-contrast earthy palette: teal-tinted grays, slate-blue primary, and muted cyan accents in light and dark variants.",
+      "tags": ["ui-theme", "color-palette", "design-tokens", "configuration"],
+      "complexity": "moderate"
+    }
+  ],
+  "edges": [
+    { "source": "config:packages/ui/src/theme/themes/nightowl.json", "target": "file:packages/ui/src/theme/default-themes.ts", "type": "configures", "direction": "forward", "weight": 0.6 },
+    { "source": "config:packages/ui/src/theme/themes/nord.json", "target": "file:packages/ui/src/theme/default-themes.ts", "type": "configures", "direction": "forward", "weight": 0.6 },
+    { "source": "config:packages/ui/src/theme/themes/oc-2.json", "target": "file:packages/ui/src/theme/default-themes.ts", "type": "configures", "direction": "forward", "weight": 0.6 },
+    { "source": "config:packages/ui/src/theme/themes/one-dark.json", "target": "file:packages/ui/src/theme/default-themes.ts", "type": "configures", "direction": "forward", "weight": 0.6 },
+    { "source": "config:packages/ui/src/theme/themes/onedarkpro.json", "target": "file:packages/ui/src/theme/default-themes.ts", "type": "configures", "direction": "forward", "weight": 0.6 },
+    { "source": "config:packages/ui/src/theme/themes/opencode.json", "target": "file:packages/ui/src/theme/default-themes.ts", "type": "configures", "direction": "forward", "weight": 0.6 },
+    { "source": "config:packages/ui/src/theme/themes/orng.json", "target": "file:packages/ui/src/theme/default-themes.ts", "type": "configures", "direction": "forward", "weight": 0.6 },
+    { "source": "config:packages/ui/src/theme/themes/osaka-jade.json", "target": "file:packages/ui/src/theme/default-themes.ts", "type": "configures", "direction": "forward", "weight": 0.6 },
+    { "source": "config:packages/ui/src/theme/themes/palenight.json", "target": "file:packages/ui/src/theme/default-themes.ts", "type": "configures", "direction": "forward", "weight": 0.6 },
+    { "source": "config:packages/ui/src/theme/themes/rosepine.json", "target": "file:packages/ui/src/theme/default-themes.ts", "type": "configures", "direction": "forward", "weight": 0.6 },
+    { "source": "config:packages/ui/src/theme/themes/shadesofpurple.json", "target": "file:packages/ui/src/theme/default-themes.ts", "type": "configures", "direction": "forward", "weight": 0.6 },
+    { "source": "config:packages/ui/src/theme/themes/solarized.json", "target": "file:packages/ui/src/theme/default-themes.ts", "type": "configures", "direction": "forward", "weight": 0.6 },
+    { "source": "config:packages/ui/src/theme/themes/synthwave84.json", "target": "file:packages/ui/src/theme/default-themes.ts", "type": "configures", "direction": "forward", "weight": 0.6 },
+    { "source": "config:packages/ui/src/theme/themes/tokyonight.json", "target": "file:packages/ui/src/theme/default-themes.ts", "type": "configures", "direction": "forward", "weight": 0.6 },
+    { "source": "config:packages/ui/src/theme/themes/vercel.json", "target": "file:packages/ui/src/theme/default-themes.ts", "type": "configures", "direction": "forward", "weight": 0.6 },
+    { "source": "config:packages/ui/src/theme/themes/vesper.json", "target": "file:packages/ui/src/theme/default-themes.ts", "type": "configures", "direction": "forward", "weight": 0.6 },
+    { "source": "config:packages/ui/src/theme/themes/zenburn.json", "target": "file:packages/ui/src/theme/default-themes.ts", "type": "configures", "direction": "forward", "weight": 0.6 }
+  ]
+}

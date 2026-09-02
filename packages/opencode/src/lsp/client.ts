@@ -113,11 +113,26 @@ function endPosition(text: string) {
 
 // Some servers send MarkupContent ({kind, value}) where LSP requires a string
 // message; key on value so identical text dedupes without stringifying.
-// Other objects keep JSON.stringify: their content defines uniqueness.
+// Other objects use a lightweight serializer in the common case. Keep the
+// JSON.stringify fallback at the depth limit so bounded traversal does not
+// collapse distinct diagnostics into the same key.
+function buildDiagnosticKey(obj: unknown, depth = 0): string {
+  if (depth > 5) return JSON.stringify(obj) ?? "undefined"
+  if (obj === null) return "null:"
+  if (typeof obj !== "object") return `${typeof obj}:${String(obj)}`
+  if (Array.isArray(obj)) return `array:[${obj.map((value) => buildDiagnosticKey(value, depth + 1)).join(",")}]`
+  return `object:{${Object.keys(obj)
+    .map((key) => `${key}:${buildDiagnosticKey((obj as Record<string, unknown>)[key], depth + 1)}`)
+    .join(",")}}`
+}
+
 export function diagnosticMessageKey(message: unknown) {
   if (typeof message === "string") return message
-  if (typeof message === "object" && message !== null && "value" in message) return String(message.value)
-  return JSON.stringify(message)
+  if (typeof message === "object" && message !== null) {
+    if ("value" in message) return String((message as Record<string, unknown>).value)
+    return buildDiagnosticKey(message)
+  }
+  return String(message)
 }
 
 function dedupeDiagnostics(items: Diagnostic[]) {

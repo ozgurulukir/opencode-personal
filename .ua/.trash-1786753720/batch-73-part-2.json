@@ -1,0 +1,309 @@
+{
+  "nodes": [
+    {
+      "id": "document:packages/opencode/src/sync/AGENTS.md",
+      "type": "document",
+      "name": "AGENTS.md",
+      "filePath": "packages/opencode/src/sync/AGENTS.md",
+      "summary": "Developer notes on the SyncEvent system: the sync envelope wrapping on the global SSE stream, convertEvent payload transformation, BusEvent vs SyncEvent delivery differences, dual GlobalBus publication paths, registry freezing after init, and the Effect-service bypass in run/replay.",
+      "tags": ["documentation", "event-sourcing", "development-notes", "event-bus"],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:packages/opencode/src/sync/README.md",
+      "type": "document",
+      "name": "README.md",
+      "filePath": "packages/opencode/src/sync/README.md",
+      "summary": "Design document for the sync/event-sourcing system: single-writer total ordering via incrementing sequence ids, SyncEvent as a new abstraction layered onto the existing Bus for backwards compatibility, event shape, event flow, and projector-based mutations.",
+      "tags": ["documentation", "architecture", "event-sourcing", "design-doc"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:packages/opencode/src/sync/event.sql.ts",
+      "type": "file",
+      "name": "event.sql.ts",
+      "filePath": "packages/opencode/src/sync/event.sql.ts",
+      "summary": "Drizzle table definitions backing the event store: EventSequenceTable (per-aggregate sequence cursor with ownership) and EventTable (append-only event log with cascading aggregate reference and JSON-typed data).",
+      "tags": ["database", "drizzle", "event-store", "schema-definition"],
+      "complexity": "simple",
+      "languageNotes": "Follows the project's snake_case Drizzle column convention so column names need no string overrides."
+    },
+    {
+      "id": "table:packages/opencode/src/sync/event.sql.ts:event_sequence",
+      "type": "table",
+      "name": "event_sequence",
+      "filePath": "packages/opencode/src/sync/event.sql.ts",
+      "lineRange": [3, 7],
+      "summary": "Per-aggregate sequence cursor (aggregate_id primary key, seq, owner_id) that enforces total ordering and records which device currently owns the write lock for the aggregate.",
+      "tags": ["database", "event-sourcing", "concurrency", "drizzle"],
+      "complexity": "simple"
+    },
+    {
+      "id": "table:packages/opencode/src/sync/event.sql.ts:event",
+      "type": "table",
+      "name": "event",
+      "filePath": "packages/opencode/src/sync/event.sql.ts",
+      "lineRange": [9, 17],
+      "summary": "Append-only event log: one row per persisted sync event with id primary key, cascading aggregate reference, sequence number, versioned type string, and JSON-encoded payload.",
+      "tags": ["database", "event-sourcing", "event-log", "drizzle"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/opencode/src/sync/index.ts",
+      "type": "file",
+      "name": "index.ts",
+      "filePath": "packages/opencode/src/sync/index.ts",
+      "summary": "SyncEvent event-sourcing system: typed event definitions with versioned type strings, a frozen global registry, transactional process() that persists events and advances sequence cursors while running projectors, dual publication to ProjectBus and GlobalBus (raw plus sync envelope), replay/replayAll for multi-device sync, and claim() for aggregate ownership transfer.",
+      "tags": ["event-sourcing", "service", "sync", "event-bus", "database"],
+      "complexity": "complex",
+      "languageNotes": "After init() the registry is frozen and later define() calls throw; run/replay/replayAll bypass the Effect service layer via runtime.runSync on a dedicated runtime, so projectors must be initialized before tests can use them."
+    },
+    {
+      "id": "function:packages/opencode/src/sync/index.ts:init",
+      "type": "function",
+      "name": "init",
+      "filePath": "packages/opencode/src/sync/index.ts",
+      "lineRange": [205, 222],
+      "summary": "Registers every definition in the registry as a BusEvent under its unversioned type name and freezes the registry so no further SyncEvent types can be defined after projector initialization.",
+      "tags": ["event-sourcing", "initialization", "event-bus"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/sync/index.ts:define",
+      "type": "function",
+      "name": "define",
+      "filePath": "packages/opencode/src/sync/index.ts",
+      "lineRange": [230, 259],
+      "summary": "Defines a new SyncEvent type: validates type and aggregate names, tracks the highest version, stores the definition in the global registry, and returns the composed Effect Schema for the event payload.",
+      "tags": ["event-sourcing", "schema-definition", "factory", "validation"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/opencode/src/sync/index.ts:process",
+      "type": "function",
+      "name": "process",
+      "filePath": "packages/opencode/src/sync/index.ts",
+      "lineRange": [268, 337],
+      "summary": "Core persistence pipeline: inside one database transaction runs the registered projector, upserts the aggregate sequence cursor, and inserts the event row; afterwards fans the event out to the project bus (raw payload) and the global bus wrapped in a versioned sync envelope, and schedules post-commit bus effects via Database.effect.",
+      "tags": ["event-sourcing", "transactions", "event-bus", "persistence"],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:packages/opencode/src/sync/index.ts:effectPayloads",
+      "type": "function",
+      "name": "effectPayloads",
+      "filePath": "packages/opencode/src/sync/index.ts",
+      "lineRange": [365, 379],
+      "summary": "Builds the Effect Schema union of all registered sync envelope payloads (type literal \"sync\", event name, id, seq, aggregateID, and per-type data schema) for the SDK/event stream contract.",
+      "tags": ["schema-definition", "event-sourcing", "serialization"],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:packages/opencode/src/sync/index.ts:Service",
+      "type": "class",
+      "name": "Service",
+      "filePath": "packages/opencode/src/sync/index.ts",
+      "lineRange": [68, 68],
+      "summary": "Effect Context.Service handle for SyncEvent, exposing run/replay/replayAll/remove to consumers such as the server projectors.",
+      "tags": ["service", "effect", "context-tag"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/opencode/src/sync/schema.ts",
+      "type": "file",
+      "name": "schema.ts",
+      "filePath": "packages/opencode/src/sync/schema.ts",
+      "summary": "Branded EventID schema: strings prefixed with \"evt\", carrying an ascending ID factory and zod statics for boundaries that need zod validation.",
+      "tags": ["type-definition", "schema-definition", "event-sourcing", "effect-schema"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/opencode/src/temporary.ts",
+      "type": "file",
+      "name": "temporary.ts",
+      "filePath": "packages/opencode/src/temporary.ts",
+      "summary": "Standalone yargs CLI entry point wiring only the TuiThreadCommand, with global help/version/print-logs/log-level/pure options; a minimal bootstrap separate from the main CLI.",
+      "tags": ["entry-point", "cli", "yargs", "bootstrap"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/opencode/src/tool/apply_patch.ts",
+      "type": "file",
+      "name": "apply_patch.ts",
+      "filePath": "packages/opencode/src/tool/apply_patch.ts",
+      "summary": "apply_patch agent tool: parses multi-file patch text into add/update/delete/move hunks, validates containment and external-directory permissions, computes per-file diffs with BOM preservation, applies changes, publishes file and watcher events, then reports LSP diagnostics and autocloses matching todos. Failed hunks are collected and skipped rather than aborting the patch.",
+      "tags": ["agent-tool", "patch", "file-editing", "validation", "lsp"],
+      "complexity": "complex",
+      "languageNotes": "Move destinations that already exist are refused unless the patch uses Force Move, guarding against an LLM hallucinating a target path over user data."
+    },
+    {
+      "id": "function:packages/opencode/src/tool/apply_patch.ts:run",
+      "type": "function",
+      "name": "run",
+      "filePath": "packages/opencode/src/tool/apply_patch.ts",
+      "lineRange": [52, 422],
+      "summary": "The 370-line execute body of ApplyPatchTool: hunk parsing, path containment and permission checks, per-type file change computation (add/update/delete/move with diff and line counting), the edit permission ask, applying writes/removals, event publication, LSP diagnostics, and the todo autoclose plus summary output.",
+      "tags": ["agent-tool", "patch", "file-editing", "permission", "orchestration"],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:packages/opencode/src/tool/codesearch.ts",
+      "type": "file",
+      "name": "codesearch.ts",
+      "filePath": "packages/opencode/src/tool/codesearch.ts",
+      "summary": "codesearch agent tool: forwards a documentation/code-context query to the Exa MCP endpoint (get_code_context_exa) with a 1000-50000 token budget, gated by the codesearch permission.",
+      "tags": ["agent-tool", "web-search", "http-client", "permission"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:packages/opencode/src/tool/edit.replacer.ts",
+      "type": "file",
+      "name": "edit.replacer.ts",
+      "filePath": "packages/opencode/src/tool/edit.replacer.ts",
+      "summary": "Fuzzy replacement engine behind the edit tool: a chain of replacer strategies (exact, line-trimmed, block-anchor, whitespace-normalized, indentation-flexible, escape-normalized, multi-occurrence, trimmed-boundary, context-aware with Levenshtein scoring) tried in order, plus trimDiff for trimming unified diff output.",
+      "tags": ["utility", "fuzzy-matching", "text-processing", "edit-tool"],
+      "complexity": "complex",
+      "languageNotes": "Each replacer is an object conforming to a shared shape returning a match or undefined; the replace() entry point iterates the chain so LLM-imperfect old_string values still land."
+    },
+    {
+      "id": "function:packages/opencode/src/tool/edit.replacer.ts:levenshtein",
+      "type": "function",
+      "name": "levenshtein",
+      "filePath": "packages/opencode/src/tool/edit.replacer.ts",
+      "lineRange": [19, 35],
+      "summary": "Classic dynamic-programming edit distance between two strings, used by the context-aware replacer to pick the best candidate match.",
+      "tags": ["utility", "algorithm", "fuzzy-matching"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/tool/edit.replacer.ts:blockSubstring",
+      "type": "function",
+      "name": "blockSubstring",
+      "filePath": "packages/opencode/src/tool/edit.replacer.ts",
+      "lineRange": [55, 68],
+      "summary": "Extracts a line-range substring from file content, clamped to the available lines, for block-anchor replacement.",
+      "tags": ["utility", "text-processing", "line-range"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/tool/edit.replacer.ts:trimDiff",
+      "type": "function",
+      "name": "trimDiff",
+      "filePath": "packages/opencode/src/tool/edit.replacer.ts",
+      "lineRange": [407, 441],
+      "summary": "Trims unified diff output by collapsing unchanged context runs and stripping leading/trailing noise so stored diffs stay compact.",
+      "tags": ["utility", "diff", "text-processing"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/opencode/src/tool/edit.replacer.ts:replace",
+      "type": "function",
+      "name": "replace",
+      "filePath": "packages/opencode/src/tool/edit.replacer.ts",
+      "lineRange": [443, 480],
+      "summary": "Entry point that tries each replacer strategy in order for old-to-new substitution, handling replaceAll mode and falling back to exact indexOf/lastIndexOf semantics when no fuzzy strategy matches.",
+      "tags": ["utility", "fuzzy-matching", "replacement", "strategy-chain"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:packages/opencode/src/tool/edit.ts",
+      "type": "file",
+      "name": "edit.ts",
+      "filePath": "packages/opencode/src/tool/edit.ts",
+      "summary": "edit agent tool: exact-or-fuzzy string replacement in a single file with per-file locking, line-ending detection and preservation, BOM handling, an edit permission ask carrying the diff, optional formatting, file/watcher event publication, LSP diagnostics, and todo autoclose.",
+      "tags": ["agent-tool", "file-editing", "text-replacement", "lsp", "permission"],
+      "complexity": "complex",
+      "languageNotes": "Empty oldString means whole-file rewrite; a per-instance LockRegistry serializes concurrent edits to the same path since cross-instance edits are not serialized."
+    },
+    {
+      "id": "file:packages/opencode/src/tool/external-directory.ts",
+      "type": "file",
+      "name": "external-directory.ts",
+      "filePath": "packages/opencode/src/tool/external-directory.ts",
+      "summary": "Permission gate for paths outside the current project instance: normalizes the target, checks containment, and when the path escapes the instance asks the external_directory permission using a parent-directory glob.",
+      "tags": ["utility", "permission", "security", "validation"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/tool/external-directory.ts:assertExternalDirectoryEffect",
+      "type": "function",
+      "name": "assertExternalDirectoryEffect",
+      "filePath": "packages/opencode/src/tool/external-directory.ts",
+      "lineRange": [15, 44],
+      "summary": "Effect function that no-ops for contained or bypassed targets and otherwise prompts the user for external_directory approval with a normalized parent-dir glob (Windows path normalization aware).",
+      "tags": ["permission", "validation", "security", "effect"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/opencode/src/tool/file-path.ts",
+      "type": "file",
+      "name": "file-path.ts",
+      "filePath": "packages/opencode/src/tool/file-path.ts",
+      "summary": "Tool path helpers: resolvePath resolves tool-supplied paths with symlink awareness, and projectContainmentError produces the error message used by tools when a resolved path escapes the instance directory.",
+      "tags": ["utility", "path-resolution", "security", "validation"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/tool/file-path.ts:resolvePath",
+      "type": "function",
+      "name": "resolvePath",
+      "filePath": "packages/opencode/src/tool/file-path.ts",
+      "lineRange": [13, 26],
+      "summary": "Resolves a file path and follows symlinks, recovering the real target when only the file itself (not its directory) is a link.",
+      "tags": ["utility", "path-resolution", "symlink"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/opencode/src/tool/file-path.ts:projectContainmentError",
+      "type": "function",
+      "name": "projectContainmentError",
+      "filePath": "packages/opencode/src/tool/file-path.ts",
+      "lineRange": [28, 31],
+      "summary": "Returns a containment error string when a resolved path does not start with the instance directory, else undefined; used by edit and apply_patch to block writes outside the project.",
+      "tags": ["validation", "security", "utility"],
+      "complexity": "simple"
+    }
+  ],
+  "edges": [
+    { "source": "file:packages/opencode/src/sync/event.sql.ts", "target": "table:packages/opencode/src/sync/event.sql.ts:event_sequence", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:packages/opencode/src/sync/event.sql.ts", "target": "table:packages/opencode/src/sync/event.sql.ts:event", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "table:packages/opencode/src/sync/event.sql.ts:event", "target": "table:packages/opencode/src/sync/event.sql.ts:event_sequence", "type": "depends_on", "direction": "forward", "weight": 0.6 },
+    { "source": "file:packages/opencode/src/sync/index.ts", "target": "function:packages/opencode/src/sync/index.ts:init", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:packages/opencode/src/sync/index.ts", "target": "function:packages/opencode/src/sync/index.ts:define", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:packages/opencode/src/sync/index.ts", "target": "function:packages/opencode/src/sync/index.ts:process", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:packages/opencode/src/sync/index.ts", "target": "function:packages/opencode/src/sync/index.ts:effectPayloads", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:packages/opencode/src/sync/index.ts", "target": "class:packages/opencode/src/sync/index.ts:Service", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:packages/opencode/src/sync/index.ts", "target": "function:packages/opencode/src/sync/index.ts:init", "type": "exports", "direction": "forward", "weight": 0.8 },
+    { "source": "file:packages/opencode/src/sync/index.ts", "target": "function:packages/opencode/src/sync/index.ts:define", "type": "exports", "direction": "forward", "weight": 0.8 },
+    { "source": "file:packages/opencode/src/sync/index.ts", "target": "function:packages/opencode/src/sync/index.ts:effectPayloads", "type": "exports", "direction": "forward", "weight": 0.8 },
+    { "source": "file:packages/opencode/src/sync/index.ts", "target": "class:packages/opencode/src/sync/index.ts:Service", "type": "exports", "direction": "forward", "weight": 0.8 },
+    { "source": "file:packages/opencode/src/sync/index.ts", "target": "file:packages/opencode/src/sync/event.sql.ts", "type": "depends_on", "direction": "forward", "weight": 0.6 },
+    { "source": "file:packages/opencode/src/sync/index.ts", "target": "file:packages/opencode/src/storage/db.ts", "type": "depends_on", "direction": "forward", "weight": 0.6 },
+    { "source": "file:packages/opencode/src/sync/index.ts", "target": "file:packages/opencode/src/sync/schema.ts", "type": "depends_on", "direction": "forward", "weight": 0.6 },
+    { "source": "document:packages/opencode/src/sync/AGENTS.md", "target": "file:packages/opencode/src/sync/index.ts", "type": "documents", "direction": "forward", "weight": 0.5 },
+    { "source": "document:packages/opencode/src/sync/README.md", "target": "file:packages/opencode/src/sync/index.ts", "type": "documents", "direction": "forward", "weight": 0.5 },
+    { "source": "file:packages/opencode/src/temporary.ts", "target": "file:packages/opencode/src/cli/cmd/tui/thread.ts", "type": "depends_on", "direction": "forward", "weight": 0.6 },
+    { "source": "file:packages/opencode/src/tool/apply_patch.ts", "target": "function:packages/opencode/src/tool/apply_patch.ts:run", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:packages/opencode/src/tool/apply_patch.ts", "target": "file:packages/opencode/src/tool/external-directory.ts", "type": "depends_on", "direction": "forward", "weight": 0.6 },
+    { "source": "file:packages/opencode/src/tool/apply_patch.ts", "target": "file:packages/opencode/src/tool/edit.replacer.ts", "type": "depends_on", "direction": "forward", "weight": 0.6 },
+    { "source": "file:packages/opencode/src/tool/apply_patch.ts", "target": "file:packages/opencode/src/tool/file-path.ts", "type": "depends_on", "direction": "forward", "weight": 0.6 },
+    { "source": "function:packages/opencode/src/tool/apply_patch.ts:run", "target": "function:packages/opencode/src/tool/edit.replacer.ts:trimDiff", "type": "calls", "direction": "forward", "weight": 0.8 },
+    { "source": "function:packages/opencode/src/tool/apply_patch.ts:run", "target": "function:packages/opencode/src/tool/file-path.ts:resolvePath", "type": "calls", "direction": "forward", "weight": 0.8 },
+    { "source": "function:packages/opencode/src/tool/apply_patch.ts:run", "target": "function:packages/opencode/src/tool/external-directory.ts:assertExternalDirectoryEffect", "type": "calls", "direction": "forward", "weight": 0.8 },
+    { "source": "file:packages/opencode/src/tool/edit.replacer.ts", "target": "function:packages/opencode/src/tool/edit.replacer.ts:levenshtein", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:packages/opencode/src/tool/edit.replacer.ts", "target": "function:packages/opencode/src/tool/edit.replacer.ts:blockSubstring", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:packages/opencode/src/tool/edit.replacer.ts", "target": "function:packages/opencode/src/tool/edit.replacer.ts:trimDiff", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:packages/opencode/src/tool/edit.replacer.ts", "target": "function:packages/opencode/src/tool/edit.replacer.ts:replace", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:packages/opencode/src/tool/edit.replacer.ts", "target": "function:packages/opencode/src/tool/edit.replacer.ts:trimDiff", "type": "exports", "direction": "forward", "weight": 0.8 },
+    { "source": "file:packages/opencode/src/tool/edit.replacer.ts", "target": "function:packages/opencode/src/tool/edit.replacer.ts:replace", "type": "exports", "direction": "forward", "weight": 0.8 },
+    { "source": "file:packages/opencode/src/tool/edit.ts", "target": "file:packages/opencode/src/tool/edit.replacer.ts", "type": "depends_on", "direction": "forward", "weight": 0.6 },
+    { "source": "file:packages/opencode/src/tool/edit.ts", "target": "file:packages/opencode/src/tool/external-directory.ts", "type": "depends_on", "direction": "forward", "weight": 0.6 },
+    { "source": "file:packages/opencode/src/tool/edit.ts", "target": "file:packages/opencode/src/tool/file-path.ts", "type": "depends_on", "direction": "forward", "weight": 0.6 },
+    { "source": "file:packages/opencode/src/tool/external-directory.ts", "target": "function:packages/opencode/src/tool/external-directory.ts:assertExternalDirectoryEffect", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:packages/opencode/src/tool/external-directory.ts", "target": "function:packages/opencode/src/tool/external-directory.ts:assertExternalDirectoryEffect", "type": "exports", "direction": "forward", "weight": 0.8 },
+    { "source": "file:packages/opencode/src/tool/file-path.ts", "target": "function:packages/opencode/src/tool/file-path.ts:resolvePath", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:packages/opencode/src/tool/file-path.ts", "target": "function:packages/opencode/src/tool/file-path.ts:projectContainmentError", "type": "contains", "direction": "forward", "weight": 1.0 },
+    { "source": "file:packages/opencode/src/tool/file-path.ts", "target": "function:packages/opencode/src/tool/file-path.ts:resolvePath", "type": "exports", "direction": "forward", "weight": 0.8 },
+    { "source": "file:packages/opencode/src/tool/file-path.ts", "target": "function:packages/opencode/src/tool/file-path.ts:projectContainmentError", "type": "exports", "direction": "forward", "weight": 0.8 }
+  ]
+}

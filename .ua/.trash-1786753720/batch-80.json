@@ -1,0 +1,230 @@
+{
+  "nodes": [
+    {
+      "id": "file:packages/ui/src/assets/audio/nope-01.aac",
+      "type": "file",
+      "name": "nope-01.aac",
+      "filePath": "packages/ui/src/assets/audio/nope-01.aac",
+      "summary": "Nope sound effect 1 — binary AAC audio asset in the ui package's audio feedback library, one of the 'nope' negative-feedback variants.",
+      "tags": ["audio", "asset", "binary", "sound-effect"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/ui/src/assets/audio/nope-02.aac",
+      "type": "file",
+      "name": "nope-02.aac",
+      "filePath": "packages/ui/src/assets/audio/nope-02.aac",
+      "summary": "Nope sound effect 2 — binary AAC audio asset in the ui package's audio feedback library, one of the 'nope' negative-feedback variants.",
+      "tags": ["audio", "asset", "binary", "sound-effect"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/ui/src/assets/audio/nope-03.aac",
+      "type": "file",
+      "name": "nope-03.aac",
+      "filePath": "packages/ui/src/assets/audio/nope-03.aac",
+      "summary": "Nope sound effect 3 — binary AAC audio asset in the ui package's audio feedback library, one of the 'nope' negative-feedback variants.",
+      "tags": ["audio", "asset", "binary", "sound-effect"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/ui/src/assets/audio/nope-04.aac",
+      "type": "file",
+      "name": "nope-04.aac",
+      "filePath": "packages/ui/src/assets/audio/nope-04.aac",
+      "summary": "Nope sound effect 4 — binary AAC audio asset in the ui package's audio feedback library, one of the 'nope' negative-feedback variants.",
+      "tags": ["audio", "asset", "binary", "sound-effect"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/ui/src/assets/audio/nope-05.aac",
+      "type": "file",
+      "name": "nope-05.aac",
+      "filePath": "packages/ui/src/assets/audio/nope-05.aac",
+      "summary": "Nope sound effect 5 — binary AAC audio asset in the ui package's audio feedback library, one of the 'nope' negative-feedback variants.",
+      "tags": ["audio", "asset", "binary", "sound-effect"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/ui/src/assets/audio/nope-06.aac",
+      "type": "file",
+      "name": "nope-06.aac",
+      "filePath": "packages/ui/src/assets/audio/nope-06.aac",
+      "summary": "Nope sound effect 6 — binary AAC audio asset in the ui package's audio feedback library, one of the 'nope' negative-feedback variants.",
+      "tags": ["audio", "asset", "binary", "sound-effect"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/ui/src/assets/audio/nope-07.aac",
+      "type": "file",
+      "name": "nope-07.aac",
+      "filePath": "packages/ui/src/assets/audio/nope-07.aac",
+      "summary": "Nope sound effect 7 — binary AAC audio asset in the ui package's audio feedback library, one of the 'nope' negative-feedback variants.",
+      "tags": ["audio", "asset", "binary", "sound-effect"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/ui/src/assets/audio/nope-08.aac",
+      "type": "file",
+      "name": "nope-08.aac",
+      "filePath": "packages/ui/src/assets/audio/nope-08.aac",
+      "summary": "Nope sound effect 8 — binary AAC audio asset in the ui package's audio feedback library, one of the 'nope' negative-feedback variants.",
+      "tags": ["audio", "asset", "binary", "sound-effect"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/ui/src/assets/audio/nope-09.aac",
+      "type": "file",
+      "name": "nope-09.aac",
+      "filePath": "packages/ui/src/assets/audio/nope-09.aac",
+      "summary": "Nope sound effect 9 — binary AAC audio asset in the ui package's audio feedback library, one of the 'nope' negative-feedback variants.",
+      "tags": ["audio", "asset", "binary", "sound-effect"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/ui/src/assets/audio/nope-10.aac",
+      "type": "file",
+      "name": "nope-10.aac",
+      "filePath": "packages/ui/src/assets/audio/nope-10.aac",
+      "summary": "Nope sound effect 10 — binary AAC audio asset in the ui package's audio feedback library, one of the 'nope' negative-feedback variants.",
+      "tags": ["audio", "asset", "binary", "sound-effect"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/ui/src/assets/audio/nope-11.aac",
+      "type": "file",
+      "name": "nope-11.aac",
+      "filePath": "packages/ui/src/assets/audio/nope-11.aac",
+      "summary": "Nope sound effect 11 — binary AAC audio asset in the ui package's audio feedback library, one of the 'nope' negative-feedback variants.",
+      "tags": ["audio", "asset", "binary", "sound-effect"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/ui/src/assets/audio/nope-12.aac",
+      "type": "file",
+      "name": "nope-12.aac",
+      "filePath": "packages/ui/src/assets/audio/nope-12.aac",
+      "summary": "Nope sound effect 12 — binary AAC audio asset in the ui package's audio feedback library, one of the 'nope' negative-feedback variants.",
+      "tags": ["audio", "asset", "binary", "sound-effect"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/ui/src/assets/audio/staplebops-01.aac",
+      "type": "file",
+      "name": "staplebops-01.aac",
+      "filePath": "packages/ui/src/assets/audio/staplebops-01.aac",
+      "summary": "Staplebops sound effect 1 — binary AAC audio asset in the ui package's audio feedback library, one of the quirky 'staplebops' variants.",
+      "tags": ["audio", "asset", "binary", "sound-effect"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/ui/src/assets/audio/staplebops-02.aac",
+      "type": "file",
+      "name": "staplebops-02.aac",
+      "filePath": "packages/ui/src/assets/audio/staplebops-02.aac",
+      "summary": "Staplebops sound effect 2 — binary AAC audio asset in the ui package's audio feedback library, one of the quirky 'staplebops' variants.",
+      "tags": ["audio", "asset", "binary", "sound-effect"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/ui/src/assets/audio/staplebops-03.aac",
+      "type": "file",
+      "name": "staplebops-03.aac",
+      "filePath": "packages/ui/src/assets/audio/staplebops-03.aac",
+      "summary": "Staplebops sound effect 3 — binary AAC audio asset in the ui package's audio feedback library, one of the quirky 'staplebops' variants.",
+      "tags": ["audio", "asset", "binary", "sound-effect"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/ui/src/assets/audio/staplebops-04.aac",
+      "type": "file",
+      "name": "staplebops-04.aac",
+      "filePath": "packages/ui/src/assets/audio/staplebops-04.aac",
+      "summary": "Staplebops sound effect 4 — binary AAC audio asset in the ui package's audio feedback library, one of the quirky 'staplebops' variants.",
+      "tags": ["audio", "asset", "binary", "sound-effect"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/ui/src/assets/audio/staplebops-05.aac",
+      "type": "file",
+      "name": "staplebops-05.aac",
+      "filePath": "packages/ui/src/assets/audio/staplebops-05.aac",
+      "summary": "Staplebops sound effect 5 — binary AAC audio asset in the ui package's audio feedback library, one of the quirky 'staplebops' variants.",
+      "tags": ["audio", "asset", "binary", "sound-effect"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/ui/src/assets/audio/staplebops-06.aac",
+      "type": "file",
+      "name": "staplebops-06.aac",
+      "filePath": "packages/ui/src/assets/audio/staplebops-06.aac",
+      "summary": "Staplebops sound effect 6 — binary AAC audio asset in the ui package's audio feedback library, one of the quirky 'staplebops' variants.",
+      "tags": ["audio", "asset", "binary", "sound-effect"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/ui/src/assets/audio/staplebops-07.aac",
+      "type": "file",
+      "name": "staplebops-07.aac",
+      "filePath": "packages/ui/src/assets/audio/staplebops-07.aac",
+      "summary": "Staplebops sound effect 7 — binary AAC audio asset in the ui package's audio feedback library, one of the quirky 'staplebops' variants.",
+      "tags": ["audio", "asset", "binary", "sound-effect"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/ui/src/assets/audio/yup-01.aac",
+      "type": "file",
+      "name": "yup-01.aac",
+      "filePath": "packages/ui/src/assets/audio/yup-01.aac",
+      "summary": "Yup sound effect 1 — binary AAC audio asset in the ui package's audio feedback library, one of the 'yup' positive-feedback variants.",
+      "tags": ["audio", "asset", "binary", "sound-effect"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/ui/src/assets/audio/yup-02.aac",
+      "type": "file",
+      "name": "yup-02.aac",
+      "filePath": "packages/ui/src/assets/audio/yup-02.aac",
+      "summary": "Yup sound effect 2 — binary AAC audio asset in the ui package's audio feedback library, one of the 'yup' positive-feedback variants.",
+      "tags": ["audio", "asset", "binary", "sound-effect"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/ui/src/assets/audio/yup-03.aac",
+      "type": "file",
+      "name": "yup-03.aac",
+      "filePath": "packages/ui/src/assets/audio/yup-03.aac",
+      "summary": "Yup sound effect 3 — binary AAC audio asset in the ui package's audio feedback library, one of the 'yup' positive-feedback variants.",
+      "tags": ["audio", "asset", "binary", "sound-effect"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/ui/src/assets/audio/yup-04.aac",
+      "type": "file",
+      "name": "yup-04.aac",
+      "filePath": "packages/ui/src/assets/audio/yup-04.aac",
+      "summary": "Yup sound effect 4 — binary AAC audio asset in the ui package's audio feedback library, one of the 'yup' positive-feedback variants.",
+      "tags": ["audio", "asset", "binary", "sound-effect"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/ui/src/assets/audio/yup-05.aac",
+      "type": "file",
+      "name": "yup-05.aac",
+      "filePath": "packages/ui/src/assets/audio/yup-05.aac",
+      "summary": "Yup sound effect 5 — binary AAC audio asset in the ui package's audio feedback library, one of the 'yup' positive-feedback variants.",
+      "tags": ["audio", "asset", "binary", "sound-effect"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/ui/src/assets/audio/yup-06.aac",
+      "type": "file",
+      "name": "yup-06.aac",
+      "filePath": "packages/ui/src/assets/audio/yup-06.aac",
+      "summary": "Yup sound effect 6 — binary AAC audio asset in the ui package's audio feedback library, one of the 'yup' positive-feedback variants.",
+      "tags": ["audio", "asset", "binary", "sound-effect"],
+      "complexity": "simple"
+    }
+  ],
+  "edges": []
+}
