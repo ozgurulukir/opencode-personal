@@ -51,7 +51,7 @@ export function ContentMarkdown(props: Props) {
   createEffect(() => {
     const content = html()
     if (!isServer && markdownRef && content) {
-      markdownRef.innerHTML = ""
+      markdownRef.textContent = ""
       markdownRef.appendChild(DOMPurify.sanitize(content, { RETURN_DOM_FRAGMENT: true }) as Node)
     }
   })

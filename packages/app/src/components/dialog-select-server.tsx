@@ -83,7 +83,8 @@ function useServerPreview() {
     if (!normalized) return false
     const host = normalized.replace(/^https?:\/\//, "").split("/")[0]
     if (!host) return false
-    if (host.includes("localhost") || host.startsWith("127.0.0.1")) return true
+    const hostname = host.split(":")[0]
+    if (hostname === "localhost" || hostname === "127.0.0.1") return true
     return host.includes(".") || host.includes(":")
   }
 
