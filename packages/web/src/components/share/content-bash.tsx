@@ -73,6 +73,10 @@ export function ContentBash(props: Props) {
         <div data-slot="content">
           <div ref={commandRef} />
           <div data-slot="output" ref={(el) => { outputRef = el; overflow.ref(el) }} />
+          <noscript>
+            <pre>{props.command}</pre>
+            <pre>{props.output}</pre>
+          </noscript>
         </div>
       </div>
 
