@@ -1,6 +1,6 @@
 /// <reference path="../env.d.ts" />
 import { tool } from "@opencode-ai/plugin"
-async function githubFetch(endpoint: string, options: RequestInit = {}) {
+async function githubFetch<T = unknown>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const response = await fetch(`https://api.github.com${endpoint}`, {
     ...options,
     headers: {
@@ -47,7 +47,7 @@ Use the query parameter to search for keywords that might appear in PR titles or
 
     const page = Math.floor(args.offset / args.limit) + 1
     const searchQuery = encodeURIComponent(`${args.query} repo:${owner}/${repo} type:pr state:open`)
-    const result = await githubFetch(
+    const result = await githubFetch<{ total_count: number; items: PR[] }>(
       `/search/issues?q=${searchQuery}&per_page=${args.limit}&page=${page}&sort=updated&order=desc`,
     )
 
@@ -55,7 +55,7 @@ Use the query parameter to search for keywords that might appear in PR titles or
       return `No PRs found matching "${args.query}"`
     }
 
-    const prs = result.items as PR[]
+    const prs = result.items
 
     if (prs.length === 0) {
       return `No other PRs found matching "${args.query}"`

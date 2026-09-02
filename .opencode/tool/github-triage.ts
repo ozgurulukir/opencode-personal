@@ -9,8 +9,13 @@ const TEAM = {
   windows: ["Hona"],
 } as const
 
-function pick<T>(items: readonly T[]) {
-  return items[Math.floor(Math.random() * items.length)]!
+function pick<T>(items: readonly T[]): T {
+  const index = Math.floor(Math.random() * items.length)
+  const item = items[index]
+  if (item === undefined) {
+    throw new Error("Cannot pick from an empty array")
+  }
+  return item
 }
 
 function getIssueNumber(): number {
@@ -45,7 +50,7 @@ export default tool({
 Provide the team that should own the issue. This tool picks a random assignee from that team and does not apply labels.`,
   args: {
     team: tool.schema
-      .enum(Object.keys(TEAM) as [keyof typeof TEAM, ...(keyof typeof TEAM)[]])
+      .enum(["tui", "desktop_web", "core", "inference", "windows"])
       .describe("The owning team"),
   },
   async execute(args) {
