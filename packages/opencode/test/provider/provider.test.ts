@@ -2477,6 +2477,8 @@ test("plugin config enabled and disabled providers are honored", async () => {
     init: async (dir) => {
       const root = path.join(dir, ".opencode", "plugin")
       await mkdir(root, { recursive: true })
+      await markPluginDependenciesReady(path.join(dir, ".opencode"))
+      await markPluginDependenciesReady(Global.Path.config)
       await Bun.write(
         path.join(root, "provider-filter.ts"),
         [
