@@ -24,7 +24,7 @@ function getIssueNumber(): number {
   return issue
 }
 
-async function githubFetch(endpoint: string, options: RequestInit = {}) {
+async function githubFetch<T = unknown>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const response = await fetch(`https://api.github.com${endpoint}`, {
     ...options,
     headers: {
