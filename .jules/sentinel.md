@@ -35,3 +35,8 @@
 **Vulnerability:** The CORS origin checking logic used `input.startsWith("http://localhost:")` and `input.startsWith("http://127.0.0.1:")`. This allows malicious actors to host a website on a subdomain like `http://localhost:3000.evil.com` and bypass local CORS security restrictions.
 **Learning:** Using `startsWith` or weak Regex to validate URLs or domains is highly vulnerable to domain prefix/suffix spoofing.
 **Prevention:** When validating CORS origins, avoid vulnerable string-matching like `input.startsWith('http://localhost:')`. Instead, use robust URL parsing (`new URL(input)`) and check `url.hostname` explicitly.
+
+## 2025-03-09 - Insecure Math.random() Usage for Dialog IDs
+**Vulnerability:** Weak PRNG `Math.random()` was used for tracking internal Dialog component IDs. While not currently used in a security context, it is an anti-pattern.
+**Learning:** `globalThis.crypto.randomUUID()` is preferred, but *must* be implemented with a fallback (e.g. `Math.random`) in frontend components, as `randomUUID` is undefined in non-secure contexts (e.g., local HTTP development) and will throw a `TypeError`.
+**Prevention:** Always use `crypto.randomUUID()` with a safe fallback in frontend code, or just use a monotonically increasing counter for purely internal DOM/component IDs where security is not a concern, to avoid security theater.
