@@ -31,6 +31,7 @@ function init() {
   const [active, setActive] = createSignal<Active | undefined>()
   const timer = { current: undefined as ReturnType<typeof setTimeout> | undefined }
   const lock = { value: false }
+  let nextId = 0
 
   onCleanup(() => {
     if (timer.current === undefined) return
@@ -86,10 +87,7 @@ function init() {
     }
     lock.value = false
 
-    const id =
-      globalThis.crypto && globalThis.crypto.randomUUID
-        ? globalThis.crypto.randomUUID()
-        : Math.random().toString(36).slice(2)
+    const id = String(++nextId)
     let dispose: (() => void) | undefined
     let setClosing: ((closing: boolean) => void) | undefined
 

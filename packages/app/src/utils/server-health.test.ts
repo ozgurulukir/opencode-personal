@@ -14,11 +14,14 @@ function abortFromInput(input: RequestInfo | URL, init?: RequestInit) {
 
 describe("checkServerHealth", () => {
   test("returns healthy response with version", async () => {
-    const fetch = (async () =>
-      new Response(JSON.stringify({ healthy: true, version: "1.2.3" }), {
-        status: 200,
-        headers: { "content-type": "application/json" },
-      })) as unknown as typeof globalThis.fetch
+    const fetch = Object.assign(
+      async () =>
+        new Response(JSON.stringify({ healthy: true, version: "1.2.3" }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        }),
+      { preconnect: () => {} },
+    ) as typeof globalThis.fetch
 
     const result = await checkServerHealth(server, fetch)
 
@@ -26,9 +29,12 @@ describe("checkServerHealth", () => {
   })
 
   test("returns unhealthy when request fails", async () => {
-    const fetch = (async () => {
-      throw new Error("network")
-    }) as unknown as typeof globalThis.fetch
+    const fetch = Object.assign(
+      async () => {
+        throw new Error("network")
+      },
+      { preconnect: () => {} },
+    ) as typeof globalThis.fetch
 
     const result = await checkServerHealth(server, fetch)
 
@@ -43,18 +49,21 @@ describe("checkServerHealth", () => {
     })
 
     let aborted = false
-    const fetch = ((input: RequestInfo | URL, init?: RequestInit) =>
-      new Promise<Response>((_resolve, reject) => {
-        const signal = abortFromInput(input, init)
-        signal?.addEventListener(
-          "abort",
-          () => {
-            aborted = true
-            reject(new DOMException("Aborted", "AbortError"))
-          },
-          { once: true },
-        )
-      })) as unknown as typeof globalThis.fetch
+    const fetch = Object.assign(
+      (input: RequestInfo | URL, init?: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          const signal = abortFromInput(input, init)
+          signal?.addEventListener(
+            "abort",
+            () => {
+              aborted = true
+              reject(new DOMException("Aborted", "AbortError"))
+            },
+            { once: true },
+          )
+        }),
+      { preconnect: () => {} },
+    ) as typeof globalThis.fetch
 
     const result = await checkServerHealth(server, fetch, {
       timeoutMs: 10,
@@ -69,13 +78,16 @@ describe("checkServerHealth", () => {
 
   test("uses provided abort signal", async () => {
     let signal: AbortSignal | undefined
-    const fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
-      signal = abortFromInput(input, init)
-      return new Response(JSON.stringify({ healthy: true, version: "1.2.3" }), {
-        status: 200,
-        headers: { "content-type": "application/json" },
-      })
-    }) as unknown as typeof globalThis.fetch
+    const fetch = Object.assign(
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        signal = abortFromInput(input, init)
+        return new Response(JSON.stringify({ healthy: true, version: "1.2.3" }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        })
+      },
+      { preconnect: () => {} },
+    ) as typeof globalThis.fetch
 
     const abort = new AbortController()
     await checkServerHealth(server, fetch, {
@@ -87,14 +99,17 @@ describe("checkServerHealth", () => {
 
   test("retries transient failures and eventually succeeds", async () => {
     let count = 0
-    const fetch = (async () => {
-      count += 1
-      if (count < 3) throw new TypeError("network")
-      return new Response(JSON.stringify({ healthy: true, version: "1.2.3" }), {
-        status: 200,
-        headers: { "content-type": "application/json" },
-      })
-    }) as unknown as typeof globalThis.fetch
+    const fetch = Object.assign(
+      async () => {
+        count += 1
+        if (count < 3) throw new TypeError("network")
+        return new Response(JSON.stringify({ healthy: true, version: "1.2.3" }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        })
+      },
+      { preconnect: () => {} },
+    ) as typeof globalThis.fetch
 
     const result = await checkServerHealth(server, fetch, {
       retryCount: 2,
@@ -107,10 +122,13 @@ describe("checkServerHealth", () => {
 
   test("returns unhealthy when retries are exhausted", async () => {
     let count = 0
-    const fetch = (async () => {
-      count += 1
-      throw new TypeError("network")
-    }) as unknown as typeof globalThis.fetch
+    const fetch = Object.assign(
+      async () => {
+        count += 1
+        throw new TypeError("network")
+      },
+      { preconnect: () => {} },
+    ) as typeof globalThis.fetch
 
     const result = await checkServerHealth(server, fetch, {
       retryCount: 2,
