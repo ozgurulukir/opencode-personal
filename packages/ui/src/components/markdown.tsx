@@ -296,7 +296,7 @@ export function Markdown(
     if (isServer) return
 
     if (!content) {
-      container.innerHTML = ""
+      container.textContent = ""
       return
     }
 

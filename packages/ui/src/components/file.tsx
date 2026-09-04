@@ -492,7 +492,7 @@ function renderViewer<I extends RenderTarget>(opts: {
   const next = opts.create()
   opts.assign(next)
 
-  opts.viewer.container.innerHTML = ""
+  opts.viewer.container.textContent = ""
   opts.draw(next)
 
   applyViewerScheme(opts.viewer.getHost())

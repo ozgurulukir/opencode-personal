@@ -134,7 +134,7 @@ export function createFileFind(opts: CreateFileFindOptions) {
       cancelAnimationFrame(overlayFrame)
       overlayFrame = undefined
     }
-    el.innerHTML = ""
+    el.textContent = ""
   }
 
   const renderOverlay = () => {
