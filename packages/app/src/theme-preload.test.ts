@@ -5,7 +5,7 @@ const src = await Bun.file(new URL("../public/oc-theme-preload.js", import.meta.
 const run = () => Function(src)()
 
 beforeEach(() => {
-  document.head.innerHTML = ""
+  document.head.textContent = ""
   document.documentElement.removeAttribute("data-theme")
   document.documentElement.removeAttribute("data-color-scheme")
   localStorage.clear()

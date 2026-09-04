@@ -14,7 +14,7 @@ afterEach(() => {
     term.dispose()
   }
   terminals.length = 0
-  document.body.innerHTML = ""
+  document.body.textContent = ""
 })
 
 function createTerminal(cols = 80, rows = 24): { term: Terminal; addon: SerializeAddon; container: HTMLElement } {

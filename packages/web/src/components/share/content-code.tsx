@@ -28,7 +28,7 @@ export function ContentCode(props: Props) {
   createEffect(() => {
     const content = html()
     if (!isServer && ref && content) {
-      ref.innerHTML = ""
+      ref.textContent = ""
       ref.appendChild(DOMPurify.sanitize(content, { RETURN_DOM_FRAGMENT: true }) as Node)
     }
   })

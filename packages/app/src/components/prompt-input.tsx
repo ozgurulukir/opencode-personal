@@ -498,7 +498,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
   }
 
   const clearEditor = () => {
-    editorRef.innerHTML = ""
+    editorRef.textContent = ""
   }
 
   const setEditorText = (text: string) => {

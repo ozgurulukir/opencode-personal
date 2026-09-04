@@ -51,7 +51,7 @@ export function ContentBash(props: Props) {
   createEffect(() => {
     const content = commandHtml()
     if (!isServer && commandRef && content) {
-      commandRef.innerHTML = ""
+      commandRef.textContent = ""
       commandRef.appendChild(DOMPurify.sanitize(content, { RETURN_DOM_FRAGMENT: true }) as Node)
     }
   })
@@ -59,7 +59,7 @@ export function ContentBash(props: Props) {
   createEffect(() => {
     const content = outputHtml()
     if (!isServer && outputRef && content) {
-      outputRef.innerHTML = ""
+      outputRef.textContent = ""
       outputRef.appendChild(DOMPurify.sanitize(content, { RETURN_DOM_FRAGMENT: true }) as Node)
     }
   })
