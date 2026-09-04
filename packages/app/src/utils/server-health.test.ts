@@ -18,7 +18,7 @@ describe("checkServerHealth", () => {
       new Response(JSON.stringify({ healthy: true, version: "1.2.3" }), {
         status: 200,
         headers: { "content-type": "application/json" },
-      })) as unknown as typeof globalThis.fetch
+      })) as any
 
     const result = await checkServerHealth(server, fetch)
 
@@ -28,7 +28,7 @@ describe("checkServerHealth", () => {
   test("returns unhealthy when request fails", async () => {
     const fetch = (async () => {
       throw new Error("network")
-    }) as unknown as typeof globalThis.fetch
+    }) as any
 
     const result = await checkServerHealth(server, fetch)
 
@@ -54,7 +54,7 @@ describe("checkServerHealth", () => {
           },
           { once: true },
         )
-      })) as unknown as typeof globalThis.fetch
+      })) as any
 
     const result = await checkServerHealth(server, fetch, {
       timeoutMs: 10,
@@ -75,7 +75,7 @@ describe("checkServerHealth", () => {
         status: 200,
         headers: { "content-type": "application/json" },
       })
-    }) as unknown as typeof globalThis.fetch
+    }) as any
 
     const abort = new AbortController()
     await checkServerHealth(server, fetch, {
@@ -94,7 +94,7 @@ describe("checkServerHealth", () => {
         status: 200,
         headers: { "content-type": "application/json" },
       })
-    }) as unknown as typeof globalThis.fetch
+    }) as any
 
     const result = await checkServerHealth(server, fetch, {
       retryCount: 2,
@@ -110,7 +110,7 @@ describe("checkServerHealth", () => {
     const fetch = (async () => {
       count += 1
       throw new TypeError("network")
-    }) as unknown as typeof globalThis.fetch
+    }) as any
 
     const result = await checkServerHealth(server, fetch, {
       retryCount: 2,

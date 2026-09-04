@@ -44,7 +44,7 @@ describe("parseReadableConfigInvalidError", () => {
       },
     } satisfies ConfigInvalidError
 
-    const result = parseReadableConfigInvalidError(error, language.t)
+    const result = parseReadableConfigInvalidError(error, (key, vars) => language.t(key, vars))
 
     expect(result).toBe(
       ["Arquivo de config em opencode.config.ts invalido: settings.host: Required", "mode: Invalid"].join("\n"),
@@ -75,27 +75,27 @@ describe("formatServerError", () => {
       },
     } satisfies ConfigInvalidError
 
-    const result = formatServerError(error, language.t)
+    const result = formatServerError(error, (key, vars) => language.t(key, vars))
 
     expect(result).toBe("Arquivo de config em config invalido: Missing host")
   })
 
   test("returns error messages", () => {
-    expect(formatServerError(new Error("Request failed with status 503"), language.t)).toBe(
+    expect(formatServerError(new Error("Request failed with status 503"), (key, vars) => language.t(key, vars))).toBe(
       "Request failed with status 503",
     )
   })
 
   test("returns provided string errors", () => {
-    expect(formatServerError("Failed to connect to server", language.t)).toBe("Failed to connect to server")
+    expect(formatServerError("Failed to connect to server", (key, vars) => language.t(key, vars))).toBe("Failed to connect to server")
   })
 
   test("uses translated unknown fallback", () => {
-    expect(formatServerError(0, language.t)).toBe("Erro desconhecido")
+    expect(formatServerError(0, (key, vars) => language.t(key, vars))).toBe("Erro desconhecido")
   })
 
   test("falls back for unknown error objects and names", () => {
-    expect(formatServerError({ name: "ServerTimeoutError", data: { seconds: 30 } }, language.t)).toBe(
+    expect(formatServerError({ name: "ServerTimeoutError", data: { seconds: 30 } }, (key, vars) => language.t(key, vars))).toBe(
       "Erro desconhecido",
     )
   })
@@ -109,7 +109,7 @@ describe("formatServerError", () => {
       },
     } satisfies ProviderModelNotFoundError
 
-    expect(formatServerError(error, language.t)).toBe(
+    expect(formatServerError(error, (key, vars) => language.t(key, vars))).toBe(
       ["Modelo nao encontrado: openai/gpt-4.1", "Revise provider/model no config"].join("\n"),
     )
   })
