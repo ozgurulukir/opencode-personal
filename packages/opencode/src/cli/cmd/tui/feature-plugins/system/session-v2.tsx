@@ -12,6 +12,7 @@ import { useBindings } from "../../keymap"
 import { Locale } from "@/util/locale"
 import { errorMessage } from "@/util/error"
 import { isDeniedErrorMessage } from "../../util/denied-error.shared"
+import { formatSkillLabel } from "./skill-label.shared"
 import { LANGUAGE_EXTENSIONS } from "@/lsp/language"
 import { webSearchProviderLabel } from "@/tool/websearch"
 import path from "path"
@@ -956,7 +957,7 @@ function Question(props: ToolProps) {
 function Skill(props: ToolProps) {
   return (
     <InlineTool icon="→" pending="Loading skill..." complete={toolComplete(props.part)} part={props.part}>
-      Skill "{stringValue(props.input.name) ?? pendingInput(props.part)}"
+      {formatSkillLabel(props.input, pendingInput(props.part))}
     </InlineTool>
   )
 }
