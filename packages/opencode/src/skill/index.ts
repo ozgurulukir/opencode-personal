@@ -218,23 +218,6 @@ const add = Effect.fnUntraced(function* (state: State, match: string, bus: Bus.I
     log.warn("skill name does not match folder", { skill: match, expected: folderName, actual: parsed.data.name })
   }
 
-  if (parsed.success && state.skills[parsed.data.name]) {
-    const existing = state.skills[parsed.data.name]
-    if (existing.location !== "<built-in>") {
-      log.warn("duplicate skill name", {
-        name: parsed.data.name,
-        existing: existing.location,
-        duplicate: match,
-      })
-    } else {
-      log.warn("skill overridden by user disk skill", {
-        name: parsed.data.name,
-        builtin: existing.location,
-        userSkill: match,
-      })
-    }
-  }
-
   state.dirs.add(path.dirname(match))
   let skillName = parsed.success ? parsed.data.name : rawName
   if (!isSafeSkillName(skillName)) {
@@ -249,6 +232,24 @@ const add = Effect.fnUntraced(function* (state: State, match: string, bus: Bus.I
       yield* bus.publish(Event.Warning, { name: skillName, location: match, message: `${reason}; skill skipped` })
       log.warn("unsafe skill name, skipping registration", { skill: match, name: skillName })
       return
+    }
+  }
+  // Checked against the resolved name: the unsafe-name fallback can land on a
+  // name already taken, and that collision must warn like a direct duplicate.
+  const existing = state.skills[skillName]
+  if (existing) {
+    if (existing.location !== "<built-in>") {
+      log.warn("duplicate skill name", {
+        name: skillName,
+        existing: existing.location,
+        duplicate: match,
+      })
+    } else {
+      log.warn("skill overridden by user disk skill", {
+        name: skillName,
+        builtin: existing.location,
+        userSkill: match,
+      })
     }
   }
   state.skills[skillName] = {

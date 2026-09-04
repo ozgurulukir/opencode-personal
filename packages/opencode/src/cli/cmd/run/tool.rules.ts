@@ -37,6 +37,7 @@ import {
   toolPath,
 } from "./tool.helpers"
 import * as Locale from "@/util/locale"
+import { formatSkillLabel } from "@/cli/cmd/tui/feature-plugins/system/skill-label.shared"
 import stripAnsi from "strip-ansi"
 
 type PatchFile = Tool.InferMetadata<typeof ApplyPatchTool>["files"][number]
@@ -184,24 +185,7 @@ export function runTodo(p: ToolProps<typeof TodoWriteTool>): ToolInline {
 }
 
 export function runSkill(p: ToolProps<typeof SkillTool>): ToolInline {
-  const names: string[] = []
-  if (p.input.names) names.push(...p.input.names)
-  if (p.input.name) names.push(p.input.name)
-  const unique = [...new Set(names)]
-
-  if (unique.length === 0) {
-    return { icon: "→", title: "Skill" }
-  }
-
-  if (unique.length === 1) {
-    return { icon: "→", title: `Skill "${unique[0]}"` }
-  }
-
-  const joined = unique.length <= 3 ? unique.join(", ") : `${unique.slice(0, 3).join(", ")}, +${unique.length - 3}`
-  return {
-    icon: "→",
-    title: `${unique.length} Skills: ${joined}`,
-  }
+  return { icon: "→", title: formatSkillLabel(p.input) }
 }
 
 export function runPatch(p: ToolProps<typeof ApplyPatchTool>): ToolInline {
@@ -671,20 +655,7 @@ export function scrollLspStart(p: ToolProps<typeof LspTool>): string {
 }
 
 export function scrollSkillStart(p: ToolProps<typeof SkillTool>): string {
-  const names: string[] = []
-  if (p.input.names) names.push(...p.input.names)
-  if (p.input.name) names.push(p.input.name)
-  const unique = [...new Set(names)]
-
-  if (unique.length === 0) {
-    return "→ Skill"
-  }
-
-  if (unique.length === 1) {
-    return `→ Skill "${unique[0]}"`
-  }
-
-  return `→ ${unique.length} Skills: ${unique.slice(0, 2).join(", ")}${unique.length > 2 ? "..." : ""}`
+  return `→ ${formatSkillLabel(p.input)}`
 }
 
 export function scrollGlobStart(p: ToolProps<typeof GlobTool>): string {
