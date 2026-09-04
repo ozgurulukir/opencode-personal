@@ -137,6 +137,18 @@ export interface Interface {
   ) => Effect.Effect<Info[]>
 }
 
+// Skill names become permission patterns (Wildcard.match treats "*" and "?"
+// as wildcards and normalizes "\\" to "/") and are interpolated into XML-style
+// output tags. Names that could widen persisted approval rules onto other
+// skills or break output markup are rejected at registration. "__proto__" is
+// excluded because assigning it on the plain-object skills registry would
+// change the registry's prototype instead of adding an entry.
+const UNSAFE_SKILL_NAME = /[*?\\<>"]/
+
+function isSafeSkillName(name: string): boolean {
+  return name !== "__proto__" && !UNSAFE_SKILL_NAME.test(name)
+}
+
 const add = Effect.fnUntraced(function* (state: State, match: string, bus: Bus.Interface) {
   const md = yield* Effect.tryPromise({
     try: () => ConfigMarkdown.parse(match),
@@ -224,7 +236,21 @@ const add = Effect.fnUntraced(function* (state: State, match: string, bus: Bus.I
   }
 
   state.dirs.add(path.dirname(match))
-  const skillName = parsed.success ? parsed.data.name : rawName
+  let skillName = parsed.success ? parsed.data.name : rawName
+  if (!isSafeSkillName(skillName)) {
+    const reason = `name "${skillName}" contains unsupported characters (*, ?, \\, <, >, " and the reserved name "__proto__" are not allowed)`
+    if (isSafeSkillName(folderName)) {
+      const message = `${reason}; using folder name "${folderName}"`
+      warnings.push(message)
+      yield* bus.publish(Event.Warning, { name: skillName, location: match, message })
+      log.warn("unsafe skill name, falling back to folder name", { skill: match, name: skillName, fallback: folderName })
+      skillName = folderName
+    } else {
+      yield* bus.publish(Event.Warning, { name: skillName, location: match, message: `${reason}; skill skipped` })
+      log.warn("unsafe skill name, skipping registration", { skill: match, name: skillName })
+      return
+    }
+  }
   state.skills[skillName] = {
     name: skillName,
     description: parsed.success ? (parsed.data.description ?? "") : "",
@@ -524,7 +550,10 @@ export const layer = Layer.effect(
 
     const get = Effect.fn("Skill.get")(function* (name: string) {
       const s = yield* InstanceState.get(state)
-      return s.skills[name]
+      // Own-property guard: bare lookup resolves prototype keys ("__proto__",
+      // "constructor") truthy on a plain-object registry, and callers would then
+      // treat a non-Info value as a valid skill.
+      return Object.hasOwn(s.skills, name) ? s.skills[name] : undefined
     })
 
     const all = Effect.fn("Skill.all")(function* () {
@@ -586,7 +615,9 @@ export const layer = Layer.effect(
       const matched: Info[] = []
       for (const r of results) {
         const name = r.id.startsWith("skill:") ? r.id.slice("skill:".length) : ""
-        if (!name || !s.skills[name]) continue
+        // Own-property guard, same rationale as get(): stale index docs or a
+        // polluted registry must not resolve prototype keys as skills.
+        if (!name || !Object.hasOwn(s.skills, name)) continue
         if (s.loadedSkills.has(name)) continue
         if (r.score < opts.threshold) continue
         if (Permission.evaluate("skill", name, agent.permission).action === "deny") continue
