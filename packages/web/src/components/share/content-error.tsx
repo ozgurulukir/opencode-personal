@@ -12,7 +12,7 @@ export function ContentError(props: Props) {
 
   return (
     <div class={style.root} data-expanded={expanded() || props.expand === true ? true : undefined}>
-      <div data-section="content" ref={overflow.ref}>
+      <div data-section="content" ref={(el) => overflow.ref(el)}>
         {props.children}
       </div>
       {((!props.expand && overflow.status) || expanded()) && (

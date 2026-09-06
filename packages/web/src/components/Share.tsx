@@ -160,7 +160,7 @@ export default function Share(props: {
 
         // Try to reconnect after 2 seconds
         clearTimeout(reconnectTimer)
-        reconnectTimer = window.setTimeout(setupWebSocket, 2000) as unknown as number
+        reconnectTimer = window.setTimeout(setupWebSocket, 2000)
       }
     }
 

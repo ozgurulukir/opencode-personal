@@ -156,7 +156,7 @@ export type TuiDialogSelectOption<Value = unknown> = {
   title: string
   value: Value
   description?: string
-  footer?: JSX.Element | string
+  footer?: JSX.Element
   category?: string
   disabled?: boolean
   onSelect?: () => void
@@ -529,7 +529,7 @@ export type TuiPluginApi = {
     DialogConfirm: (props: TuiDialogConfirmProps) => JSX.Element
     DialogPrompt: (props: TuiDialogPromptProps) => JSX.Element
     DialogSelect: <Value = unknown>(props: TuiDialogSelectProps<Value>) => JSX.Element
-    Slot: <Name extends string>(props: TuiSlotProps<Name>) => JSX.Element | null
+    Slot: <Name extends string>(props: TuiSlotProps<Name>) => JSX.Element
     Prompt: (props: TuiPromptProps) => JSX.Element
     toast: (input: TuiToast) => void
     dialog: TuiDialogStack

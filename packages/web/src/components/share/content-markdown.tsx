@@ -52,7 +52,7 @@ export function ContentMarkdown(props: Props) {
     const content = html()
     if (!isServer && markdownRef && content) {
       markdownRef.textContent = ""
-      markdownRef.appendChild(DOMPurify.sanitize(content, { RETURN_DOM_FRAGMENT: true }) as Node)
+      markdownRef.appendChild(DOMPurify.sanitize(content, { RETURN_DOM_FRAGMENT: true }))
     }
   })
 

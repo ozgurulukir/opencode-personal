@@ -251,7 +251,7 @@ function formatAnalyzeCommand(options = {}, deps = {}) {
   }
   const mode = resolveInvocationMode(probe, resolved);
   if (mode === 'gitnexus') return `gitnexus analyze${suffix}`;
-  if (mode === 'pnpm') return `${formatPnpmDlxCommand(`analyze${suffix}`, options, resolved)}`;
+  if (mode === 'pnpm') return formatPnpmDlxCommand(`analyze${suffix}`, options, resolved);
   return `npx ${NPX_REF} analyze${suffix}`;
 }
 

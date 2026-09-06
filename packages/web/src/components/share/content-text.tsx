@@ -19,7 +19,7 @@ export function ContentText(props: Props) {
       data-expanded={expanded() || props.expand === true ? true : undefined}
       data-compact={props.compact === true ? true : undefined}
     >
-      <pre data-slot="text" ref={overflow.ref}>
+      <pre data-slot="text" ref={(el) => overflow.ref(el)}>
         {props.text}
       </pre>
       {((!props.expand && overflow.status) || expanded()) && (
