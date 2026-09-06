@@ -1,14 +1,25 @@
 import { createStore } from "solid-js/store"
 
-const [data, setData] = createStore({
-  session: [] as Array<{ id: string; parentID?: string }>,
-  permission: {} as Record<string, Array<{ id: string; sessionID: string; permission: string; patterns: string[] }>>,
-  question: {} as Record<string, Array<{ id: string; questions: unknown[] }>>,
-  session_diff: {} as Record<string, Array<{ file: string }>>,
+type SyncStore = {
+  session: Array<{ id: string; parentID?: string }>
+  permission: Record<string, Array<{ id: string; sessionID: string; permission: string; patterns: string[] }>>
+  question: Record<string, Array<{ id: string; questions: unknown[] }>>
+  session_diff: Record<string, Array<{ file: string }>>
+  message: Record<string, Array<{ id: string; role: string }>>
+  session_status: Record<string, { type: "idle" | "busy" }>
+  agent: Array<{ name: string; mode: string; hidden: boolean }>
+  command: Array<{ name: string; description: string; source: string }>
+}
+
+const [data, setData] = createStore<SyncStore>({
+  session: [],
+  permission: {},
+  question: {},
+  session_diff: {},
   message: {
-    "story-session": [] as Array<{ id: string; role: string }>,
-  } as Record<string, Array<{ id: string; role: string }>>,
-  session_status: {} as Record<string, { type: "idle" | "busy" }>,
+    "story-session": [],
+  },
+  session_status: {},
   agent: [{ name: "build", mode: "task", hidden: false }],
   command: [{ name: "fix", description: "Run fix command", source: "project" }],
 })

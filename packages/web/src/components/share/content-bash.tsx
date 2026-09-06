@@ -52,7 +52,7 @@ export function ContentBash(props: Props) {
     const content = commandHtml()
     if (!isServer && commandRef && content) {
       commandRef.textContent = ""
-      commandRef.appendChild(DOMPurify.sanitize(content, { RETURN_DOM_FRAGMENT: true }) as Node)
+      commandRef.appendChild(DOMPurify.sanitize(content, { RETURN_DOM_FRAGMENT: true }))
     }
   })
 
@@ -60,7 +60,7 @@ export function ContentBash(props: Props) {
     const content = outputHtml()
     if (!isServer && outputRef && content) {
       outputRef.textContent = ""
-      outputRef.appendChild(DOMPurify.sanitize(content, { RETURN_DOM_FRAGMENT: true }) as Node)
+      outputRef.appendChild(DOMPurify.sanitize(content, { RETURN_DOM_FRAGMENT: true }))
     }
   })
 
