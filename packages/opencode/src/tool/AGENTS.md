@@ -79,3 +79,15 @@ All search tools (`grep.ts`, `glob.ts`) call `ctx.ask` (permission prompt) befor
 ## SSRF: pin resolved IP + Host header to prevent DNS rebinding
 
 The SSRF guard in `webfetch.ts` resolves DNS before the HTTP request, but the HTTP client re-resolves DNS independently. An attacker's DNS server can return a public IP on the first lookup (passing the check) and a private IP on the second (DNS rebinding). Fix: set the request URL to the resolved IP and add the original hostname as the `Host` header. The retry path must use the same pinned URL.
+
+## Tool registration is invisible to code-graph tools
+
+Tools wire into the registry via `yield* ToolName` in `tool/registry.ts` (~140-151) — a generator yield, not a CALLS edge — so GitNexus/codebase-memory impact analysis on tool symbols returns 0 callers / risk UNKNOWN. Confirm consumers via text search: `tool/registry.ts` (registration + `describeTask`/`describeSkill` special cases at 376-377), `cli/cmd/run/tool.types.ts` (type map), `cli/cmd/run/tool.rules.ts` (TUI rendering).
+
+## Tool parameter changes need no SDK regen
+
+A tool's `Parameters` schema ships to the LLM as a runtime JSON schema — it never reaches `openapi.json` or `@opencode-ai/sdk`. Only server-side HTTP schema/config changes require `./packages/sdk/js/script/build.ts`.
+
+## Task/skill tool descriptions are assembled from two sources
+
+The LLM-visible description = the tool's static description (`task.txt`/`skill.txt` via `Tool.define`) joined with the dynamic catalog built by `describeTask`/`describeSkill` (`tool/registry.ts:374-380`). Changing how a tool is invoked may require updating both the `.txt` file and the registry builder.
