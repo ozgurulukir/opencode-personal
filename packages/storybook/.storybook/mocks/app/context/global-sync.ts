@@ -20,7 +20,7 @@ const provider = {
 const [store, setStore] = createStore({
   todo: {} as Record<string, any[]>,
   provider,
-  session: [] as any[],
+  session: [] as unknown[],
   config: { permission: {} },
 })
 

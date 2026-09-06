@@ -407,9 +407,12 @@ export function TodoWriteTool(props: ToolProps) {
     completed: 2,
     cancelled: 3,
   }
-  const todos = createMemo(() =>
-    ((props.state.input?.todos ?? []) as Todo[]).slice().sort((a, b) => priority[a.status] - priority[b.status]),
-  )
+  const todos = createMemo(() => {
+    const rawTodos = props.state.input?.todos
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion
+    const arr = Array.isArray(rawTodos) ? (rawTodos as Todo[]) : []
+    return arr.slice().sort((a, b) => priority[a.status] - priority[b.status])
+  })
   const starting = () => todos().every((t: Todo) => t.status === "pending")
   const finished = () => todos().every((t: Todo) => t.status === "completed")
 
@@ -775,6 +778,7 @@ function flattenToolArgs(obj: unknown, prefix: string = ""): Array<[string, unkn
   const entries: Array<[string, unknown]> = []
   if (typeof obj !== "object" || obj === null) return entries
 
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion
   for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
     const path = prefix ? `${prefix}.${key}` : key
 

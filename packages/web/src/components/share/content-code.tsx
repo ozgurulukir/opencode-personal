@@ -15,13 +15,13 @@ export function ContentCode(props: Props) {
   const [html] = createResource(
     () => [props.code, props.lang],
     async ([code, lang]) => {
-      return (await codeToHtml(code || "", {
+      return await codeToHtml(code || "", {
         lang: lang && lang in bundledLanguages ? lang : "text",
         themes: {
           light: "github-light",
           dark: "github-dark",
         },
-      })) as string
+      })
     },
   )
 
@@ -29,7 +29,7 @@ export function ContentCode(props: Props) {
     const content = html()
     if (!isServer && ref && content) {
       ref.textContent = ""
-      ref.appendChild(DOMPurify.sanitize(content, { RETURN_DOM_FRAGMENT: true }) as Node)
+      ref.appendChild(DOMPurify.sanitize(content, { RETURN_DOM_FRAGMENT: true }))
     }
   })
 
