@@ -408,10 +408,10 @@ export function TodoWriteTool(props: ToolProps) {
     cancelled: 3,
   }
   const todos = createMemo(() => {
-    const rawTodos = props.state.input?.todos;
+    const rawTodos = props.state.input?.todos
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion
-    const arr = Array.isArray(rawTodos) ? (rawTodos as Todo[]) : [];
-    return arr.slice().sort((a, b) => priority[a.status] - priority[b.status]);
+    const arr = Array.isArray(rawTodos) ? (rawTodos as Todo[]) : []
+    return arr.slice().sort((a, b) => priority[a.status] - priority[b.status])
   })
   const starting = () => todos().every((t: Todo) => t.status === "pending")
   const finished = () => todos().every((t: Todo) => t.status === "completed")
