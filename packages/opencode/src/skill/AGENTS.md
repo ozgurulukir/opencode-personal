@@ -2,7 +2,11 @@
 
 ## Skill matching is LLM-driven, not algorithmic
 
-The `skill` tool (`tool/skill.ts`) has no matching logic — it simply loads a skill by name. The LLM decides which skill to load based on the `<skills>` catalog in the system prompt. There is no regex, keyword, or embedding-based matching in the tool itself.
+The `skill` tool (`tool/skill.ts`) has no matching logic — it loads one or more skills by name. The LLM decides which skills to load based on the `<skills>` catalog in the system prompt. There is no regex, keyword, or embedding-based matching in the tool itself.
+
+## Multi-skill loading contract
+
+`tool/skill.ts` accepts both `name` (string, backward compatible) and `names` (string array). Execution order: normalize → dedupe → cap at `MAX_SKILLS_PER_CALL = 10` (fail-fast error before any lookup) → look up each name → fail fast with one error listing all unknown names → single permission ask covering all requested patterns → `markLoaded` loop → combined output with skills separated by `---`. Metadata is `{ names: string[], dirs: string[] }` (was `{ name, dir }`). The permission ask evaluates all requested patterns at once, so one "always" approval covers every skill in the call.
 
 ## Auto-match uses zvec, not brute-force
 
@@ -38,3 +42,7 @@ This gives the LLM immediate feedback about what's wrong, so it can fix the skil
 ## `skill.warning` bus events are for logging, not TUI toasts
 
 `skill.warning` is emitted for non-critical frontmatter issues, but the TUI no longer shows a toast for it. The event is used by `debug skill validate` and internal logging. If you need to surface a skill problem to the user, do it in the `skill` tool output instead.
+
+## Unsafe skill names are rejected at registration
+
+`isSafeSkillName()` (`skill/index.ts`) gates every registered name — both the frontmatter `name` and the folderName fallback. Blocked: `*`, `?`, `\`, `<`, `>`, `"` and the exact name `__proto__`. Rationale: names become permission patterns (`Wildcard.match` treats `*`/`?` as wildcards and normalizes `\` to `/`, so an unsafe name persisted via permission "always" could match other skills) and are interpolated into XML-style output tags; `__proto__` would pollute the plain-object skills registry on assignment. Behavior: if the folder name is safe, the skill registers under the folder name with a warning; if both are unsafe, the skill is skipped entirely (warning event + log, no registration). `Skill.Service.get()` and `matchBySemantics()` additionally use `Object.hasOwn` lookups so prototype keys can never resolve as skills.

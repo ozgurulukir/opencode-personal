@@ -37,6 +37,7 @@ import {
   toolPath,
 } from "./tool.helpers"
 import * as Locale from "@/util/locale"
+import { formatSkillLabel } from "@/cli/cmd/tui/feature-plugins/system/skill-label.shared"
 import stripAnsi from "strip-ansi"
 
 type PatchFile = Tool.InferMetadata<typeof ApplyPatchTool>["files"][number]
@@ -184,10 +185,7 @@ export function runTodo(p: ToolProps<typeof TodoWriteTool>): ToolInline {
 }
 
 export function runSkill(p: ToolProps<typeof SkillTool>): ToolInline {
-  return {
-    icon: "→",
-    title: `Skill "${p.input.name ?? ""}"`,
-  }
+  return { icon: "→", title: formatSkillLabel(p.input) }
 }
 
 export function runPatch(p: ToolProps<typeof ApplyPatchTool>): ToolInline {
@@ -657,7 +655,7 @@ export function scrollLspStart(p: ToolProps<typeof LspTool>): string {
 }
 
 export function scrollSkillStart(p: ToolProps<typeof SkillTool>): string {
-  return `→ Skill "${p.input.name ?? ""}"`
+  return `→ ${formatSkillLabel(p.input)}`
 }
 
 export function scrollGlobStart(p: ToolProps<typeof GlobTool>): string {

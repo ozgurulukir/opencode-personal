@@ -175,6 +175,84 @@ description: Second test skill.
     ),
   )
 
+  it.live("falls back to folder name when frontmatter name has unsupported characters", () =>
+    provideTmpdirInstance(
+      (dir) =>
+        Effect.gen(function* () {
+          yield* Effect.promise(() =>
+            Bun.write(
+              path.join(dir, ".opencode", "skill", "safe-folder", "SKILL.md"),
+              `---
+name: un*safe
+description: Skill with a glob metacharacter in its name.
+---
+
+# Unsafe Name
+`,
+            ),
+          )
+
+          const skill = yield* Skill.Service
+          const list = yield* skill.allIncludingInvalid()
+          expect(list.find((x) => x.name === "un*safe")).toBeUndefined()
+          const item = list.find((x) => x.name === "safe-folder")
+          expect(item).toBeDefined()
+          expect(item!.warnings?.some((w) => w.includes("unsupported characters"))).toBe(true)
+        }),
+      { git: true },
+    ),
+  )
+
+  it.live("skips registration when both frontmatter and folder names are unsafe", () =>
+    provideTmpdirInstance(
+      (dir) =>
+        Effect.gen(function* () {
+          yield* Effect.promise(() =>
+            Bun.write(
+              path.join(dir, ".opencode", "skill", "bad*folder", "SKILL.md"),
+              `---
+description: Skill whose folder name is also unsafe.
+---
+
+# Bad Folder
+`,
+            ),
+          )
+
+          const skill = yield* Skill.Service
+          const list = yield* skill.allIncludingInvalid()
+          expect(list.find((x) => x.location.includes("bad*folder"))).toBeUndefined()
+        }),
+      { git: true },
+    ),
+  )
+
+  it.live("falls back to folder name for __proto__ frontmatter name without polluting the registry", () =>
+    provideTmpdirInstance(
+      (dir) =>
+        Effect.gen(function* () {
+          yield* Effect.promise(() =>
+            Bun.write(
+              path.join(dir, ".opencode", "skill", "proto-fallback", "SKILL.md"),
+              `---
+name: __proto__
+description: Skill trying to register under a prototype key.
+---
+
+# Proto
+`,
+            ),
+          )
+
+          const skill = yield* Skill.Service
+          const list = yield* skill.allIncludingInvalid()
+          expect(list.find((x) => x.name === "proto-fallback")).toBeDefined()
+          expect(yield* skill.get("__proto__")).toBeUndefined()
+        }),
+      { git: true },
+    ),
+  )
+
   it.live("skips skills with missing frontmatter", () =>
     provideTmpdirInstance(
       (dir) =>
