@@ -114,10 +114,13 @@ Each entry includes the skill name and description:
 </available_skills>
 ```
 
-The agent loads a skill by calling the tool:
+The agent loads one or more skills by calling the tool:
 
 ```
 skill({ name: "git-release" })
+
+# load multiple skills in one call (up to 10)
+skill({ names: ["git-release", "changelog"] })
 ```
 
 ---

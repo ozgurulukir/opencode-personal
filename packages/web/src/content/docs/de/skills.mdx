@@ -118,6 +118,9 @@ Der Agent laedt einen Skill per Tool-Aufruf:
 
 ```
 skill({ name: "git-release" })
+
+# load multiple skills in one call (up to 10)
+skill({ names: ["git-release", "changelog"] })
 ```
 
 ---
