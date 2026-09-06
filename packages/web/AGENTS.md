@@ -21,3 +21,7 @@ This package follows the root [AGENTS.md](../AGENTS.md) for general repo rules.
 - `state.metadata.description` — the description shown in the tool title
 
 When constructing a synthetic bash tool part (e.g., from `fromShell()`), match this exact shape or `ContentBash` renders blank.
+
+## Translated docs share identical code blocks
+
+`content/docs/<locale>/skills.mdx` mirrors (17 locales) keep code blocks byte-identical to the English source; only prose is translated. Bulk doc edits can string-replace the shared code line across all locales in one pass; prose changes must be translated per locale.
