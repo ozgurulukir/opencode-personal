@@ -156,7 +156,7 @@ function stateApi(sync: ReturnType<typeof useSync>): TuiPluginApi["state"] {
         return sync.data.todo[sessionID] ?? []
       },
       messages(sessionID) {
-        return sync.data.message[sessionID] ?? []
+        return sync.data.messages[sessionID] ?? []
       },
       status(sessionID) {
         return sync.data.session_status[sessionID]
@@ -167,9 +167,6 @@ function stateApi(sync: ReturnType<typeof useSync>): TuiPluginApi["state"] {
       question(sessionID) {
         return sync.data.question[sessionID] ?? []
       },
-    },
-    part(messageID) {
-      return sync.data.part[messageID] ?? []
     },
     lsp() {
       return sync.data.lsp.map((item) => ({ id: item.id, root: item.root, status: item.status }))

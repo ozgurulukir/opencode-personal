@@ -1,7 +1,7 @@
 # V1/V2 Synthesis — Phase 5: message model adoption, engine re-homing, V1 deletion
 
 Date: 2026-09-07
-Status: IN PROGRESS — 5a done, 5b done, 5c batch 1 done (dialogs + small routes), 5c batch 2+ pending (session route, plugin api, run/app), 5d/5e/5f pending
+Status: IN PROGRESS — 5a/5b done, 5c batches 1-3 done (dialogs, small routes, run history, status, plugin API), 5c batch 4 pending (session/index.tsx — last TUI V1 consumer), app pipeline batch pending, 5d/5e/5f pending
 Depends on: Phase 4 (complete — commit `9d9fe54bc`, build verified)
 
 ## Goal
@@ -167,9 +167,8 @@ live behind `V2Session` emitting `SessionEvent.*` natively.
   `time.compacted`), transcript formatter (`formatTranscript` takes V1
   `{info, parts}` pairs), scroll navigation, Task subagent view, revert prompt
   restore (→ `fromUserMessage`).
-- `plugin/api.tsx` — public plugin surface (`messages()`/`part()`): decide V2
-  shapes vs adapter; own batch.
-- `context/sync.tsx` `status()` — reads `store.message` for last-message role.
+- `plugin/api.tsx` — DONE in batch 3 (V2 shapes; `part()` removed — breaking).
+- `context/sync.tsx` `status()` — DONE in batch 2.
 - Run reducers (`session.shared.ts`, `stream.transport.ts`) + app
   (`context/sync.tsx:301`, `pages/layout.tsx:745` prefetch).
 - Delete V1 `message.*` handlers + `message`/`part` slices + V1 load (last).
@@ -194,6 +193,22 @@ cleared after SDK regen); tui+run+v2+bridge suites 381/381.
   fixtures ported V1→V2 with assertions unchanged (parity proof); new test for
   stored-source reuse. A duplicate characterization file written during the
   migration was deleted — the existing suite is the canonical coverage (DRY).
+
+**Shipped in batch 3 (2026-09-07) — plugin API on V2 shapes (user decision):**
+- **`packages/plugin/src/tui.ts`** — `session.messages()` now returns
+  `ReadonlyArray<SessionMessage>` (V2 union); **`state.part(messageID)` is
+  REMOVED** — the V2 model has no per-message part slice (content is inline on
+  the message). BREAKING for external TUI plugins: read `message.content`
+  (assistant) / `message.text`+`files`+`agents` (user) instead.
+- **`plugin/api.tsx`** — `messages()` reads the V2 `messages` slice; `part()`
+  deleted.
+- **`sidebar/context.tsx`** (only in-repo plugin consumer) — V2 mapping
+  (`type === "assistant"`, `model.{providerID,id}`, `?? 0` token guards — same
+  pattern as subagent-footer/prompt-index).
+- **`test/fixture/tui-plugin.ts`** — `part` field dropped from the fixture state.
+- Verification: plugin + opencode typechecks clean; tui 49/49; `test/cli/tui/`
+  retains 1 pre-existing order-dependent flake (`does not use npm package main
+  for tui entry` — stash-verified identical baseline).
 
 **Deferred with reasons (census-driven scope corrections):**
 - **run `stream.transport.ts:562`** — the fetch feeds `bootstrapSubagentCalls`,
