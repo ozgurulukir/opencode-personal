@@ -10,6 +10,7 @@ import { HttpApiEndpoint, HttpApiError, HttpApiGroup, HttpApiSchema, OpenApi } f
 import { Authorization } from "../../middleware/authorization"
 import { InstanceContextMiddleware } from "../../middleware/instance-context"
 import { WorkspaceRoutingMiddleware, WorkspaceRoutingQuery, WorkspaceRoutingQueryFields } from "../../middleware/workspace-routing"
+import { ForkPayload, InitPayload, SummarizePayload } from "../session"
 import { QueryBoolean } from "../query"
 
 export const SessionsQuery = Schema.Struct({
@@ -194,6 +195,93 @@ export const SessionGroup = HttpApiGroup.make("v2.session")
         identifier: "v2.session.status",
         summary: "Get v2 session statuses",
         description: "Retrieve the agent-loop status for all sessions in the instance.",
+      }),
+    ),
+  )
+  .add(
+    HttpApiEndpoint.post("create", "/api/session", {
+      query: WorkspaceRoutingQuery,
+      payload: [HttpApiSchema.NoContent, Session.CreateInput],
+      success: SessionV2.Info,
+      error: [HttpApiError.BadRequest, SessionV2.NotFoundError],
+    }).annotateMerge(
+      OpenApi.annotations({
+        identifier: "v2.session.create",
+        summary: "Create v2 session",
+        description: "Create a new v2 session. Root sessions are shared automatically when auto-share is enabled.",
+      }),
+    ),
+  )
+  .add(
+    HttpApiEndpoint.post("fork", "/api/session/:sessionID/fork", {
+      params: { sessionID: SessionID },
+      query: WorkspaceRoutingQuery,
+      payload: ForkPayload,
+      success: SessionV2.Info,
+      error: SessionV2.NotFoundError,
+    }).annotateMerge(
+      OpenApi.annotations({
+        identifier: "v2.session.fork",
+        summary: "Fork v2 session",
+        description: "Create a new v2 session by forking an existing session at a specific message point.",
+      }),
+    ),
+  )
+  .add(
+    HttpApiEndpoint.post("share", "/api/session/:sessionID/share", {
+      params: { sessionID: SessionID },
+      query: WorkspaceRoutingQuery,
+      success: SessionV2.Info,
+      error: [HttpApiError.InternalServerError, SessionV2.NotFoundError],
+    }).annotateMerge(
+      OpenApi.annotations({
+        identifier: "v2.session.share",
+        summary: "Share v2 session",
+        description: "Create a shareable link for a v2 session.",
+      }),
+    ),
+  )
+  .add(
+    HttpApiEndpoint.delete("unshare", "/api/session/:sessionID/share", {
+      params: { sessionID: SessionID },
+      query: WorkspaceRoutingQuery,
+      success: SessionV2.Info,
+      error: [HttpApiError.InternalServerError, SessionV2.NotFoundError],
+    }).annotateMerge(
+      OpenApi.annotations({
+        identifier: "v2.session.unshare",
+        summary: "Unshare v2 session",
+        description: "Remove the shareable link for a v2 session, making it private again.",
+      }),
+    ),
+  )
+  .add(
+    HttpApiEndpoint.post("summarize", "/api/session/:sessionID/summarize", {
+      params: { sessionID: SessionID },
+      query: WorkspaceRoutingQuery,
+      payload: SummarizePayload,
+      success: Schema.Boolean,
+      error: SessionV2.NotFoundError,
+    }).annotateMerge(
+      OpenApi.annotations({
+        identifier: "v2.session.summarize",
+        summary: "Summarize v2 session",
+        description: "Generate a concise summary of the v2 session using AI compaction to preserve key information.",
+      }),
+    ),
+  )
+  .add(
+    HttpApiEndpoint.post("init", "/api/session/:sessionID/init", {
+      params: { sessionID: SessionID },
+      query: WorkspaceRoutingQuery,
+      payload: InitPayload,
+      success: Schema.Boolean,
+    }).annotateMerge(
+      OpenApi.annotations({
+        identifier: "v2.session.init",
+        summary: "Initialize v2 session",
+        description:
+          "Analyze the current application and create an AGENTS.md file with project-specific agent configurations.",
       }),
     ),
   )

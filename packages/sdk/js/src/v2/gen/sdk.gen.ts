@@ -218,8 +218,13 @@ import type {
   V2SessionChildrenResponses,
   V2SessionCompactResponses,
   V2SessionContextResponses,
+  V2SessionCreateErrors,
+  V2SessionCreateResponses,
+  V2SessionForkErrors,
+  V2SessionForkResponses,
   V2SessionGetErrors,
   V2SessionGetResponses,
+  V2SessionInitResponses,
   V2SessionListErrors,
   V2SessionListResponses,
   V2SessionMessagesErrors,
@@ -227,7 +232,13 @@ import type {
   V2SessionPromptResponses,
   V2SessionRemoveErrors,
   V2SessionRemoveResponses,
+  V2SessionShareErrors,
+  V2SessionShareResponses,
   V2SessionStatusResponses,
+  V2SessionSummarizeErrors,
+  V2SessionSummarizeResponses,
+  V2SessionUnshareErrors,
+  V2SessionUnshareResponses,
   V2SessionUpdateErrors,
   V2SessionUpdateResponses,
   V2SessionWaitResponses,
@@ -4369,6 +4380,57 @@ export class Session3 extends HeyApiClient {
   }
 
   /**
+   * Create v2 session
+   *
+   * Create a new v2 session. Root sessions are shared automatically when auto-share is enabled.
+   */
+  public create<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      parentID?: string
+      title?: string
+      agent?: string
+      model?: {
+        id: string
+        providerID: string
+        variant?: string
+      }
+      permission?: PermissionRuleset
+      workspaceID?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ): RequestResult<V2SessionCreateResponses, V2SessionCreateErrors, ThrowOnError> {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "parentID" },
+            { in: "body", key: "title" },
+            { in: "body", key: "agent" },
+            { in: "body", key: "model" },
+            { in: "body", key: "permission" },
+            { in: "body", key: "workspaceID" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<V2SessionCreateResponses, V2SessionCreateErrors, ThrowOnError>({
+      url: "/api/session",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
    * Send v2 message
    *
    * Create a v2 session message and queue it for the agent loop.
@@ -4705,6 +4767,195 @@ export class Session3 extends HeyApiClient {
       url: "/api/session/status",
       ...options,
       ...params,
+    })
+  }
+
+  /**
+   * Fork v2 session
+   *
+   * Create a new v2 session by forking an existing session at a specific message point.
+   */
+  public fork<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+      workspace?: string
+      messageID?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ): RequestResult<V2SessionForkResponses, V2SessionForkErrors, ThrowOnError> {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "messageID" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<V2SessionForkResponses, V2SessionForkErrors, ThrowOnError>({
+      url: "/api/session/{sessionID}/fork",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Unshare v2 session
+   *
+   * Remove the shareable link for a v2 session, making it private again.
+   */
+  public unshare<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ): RequestResult<V2SessionUnshareResponses, V2SessionUnshareErrors, ThrowOnError> {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).delete<V2SessionUnshareResponses, V2SessionUnshareErrors, ThrowOnError>({
+      url: "/api/session/{sessionID}/share",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Share v2 session
+   *
+   * Create a shareable link for a v2 session.
+   */
+  public share<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ): RequestResult<V2SessionShareResponses, V2SessionShareErrors, ThrowOnError> {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<V2SessionShareResponses, V2SessionShareErrors, ThrowOnError>({
+      url: "/api/session/{sessionID}/share",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Summarize v2 session
+   *
+   * Generate a concise summary of the v2 session using AI compaction to preserve key information.
+   */
+  public summarize<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+      workspace?: string
+      providerID: string
+      modelID: string
+      auto?: boolean
+    },
+    options?: Options<never, ThrowOnError>,
+  ): RequestResult<V2SessionSummarizeResponses, V2SessionSummarizeErrors, ThrowOnError> {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "providerID" },
+            { in: "body", key: "modelID" },
+            { in: "body", key: "auto" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<V2SessionSummarizeResponses, V2SessionSummarizeErrors, ThrowOnError>({
+      url: "/api/session/{sessionID}/summarize",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Initialize v2 session
+   *
+   * Analyze the current application and create an AGENTS.md file with project-specific agent configurations.
+   */
+  public init<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+      workspace?: string
+      modelID: string
+      providerID: string
+      messageID: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ): RequestResult<V2SessionInitResponses, unknown, ThrowOnError> {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "modelID" },
+            { in: "body", key: "providerID" },
+            { in: "body", key: "messageID" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<V2SessionInitResponses, unknown, ThrowOnError>({
+      url: "/api/session/{sessionID}/init",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
     })
   }
 

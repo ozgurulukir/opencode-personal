@@ -72,13 +72,22 @@ layer is the widest remaining duality.
   - `GET  /api/session/status` → status map (reuse V1 `StatusMap` schema)
 - `update` keeps the V1 permission-merge semantics (`Permission.merge(current, payload)`).
 
-### 3b — create + fork + share + summarize + init
-- `POST /api/session` (create — needs the raw-body pattern or a typed payload; decide
-  during implementation, prefer typed payload + `Session.CreateInput`)
-- `POST /api/session/:sessionID/fork` → `SessionV2.Info`
-- `POST/DELETE /api/session/:sessionID/share` → `SessionV2.Info`
-- `POST /api/session/:sessionID/summarize` → `true`
-- `POST /api/session/:sessionID/init` → `true`
+### 3b — create + fork + share + summarize + init ✅ (2026-09-07)
+- `POST /api/session` (create — typed payload `[HttpApiSchema.NoContent, Session.CreateInput]`;
+  handler normalizes the NoContent arm's `void` to `undefined`; goes through
+  `SessionShare.Service.create` for V1 auto-share parity, then projects via V2 `get`)
+- `POST /api/session/:sessionID/fork` → `SessionV2.Info` (service method; reuses V1 `ForkPayload`)
+- `POST/DELETE /api/session/:sessionID/share` → `SessionV2.Info` (handler-level via
+  `SessionShare.Service`; unknown errors → `HttpApiError.InternalServerError`; reuses V1
+  `InitPayload`/`SummarizePayload` schemas from the V1 group file — SSOT)
+- `POST /api/session/:sessionID/summarize` → `true` (service method; captures
+  `SessionRevert.Service` via `serviceOption`; mirrors V1 handler orchestration:
+  revert cleanup → last-user-agent pick → compaction → loop)
+- `POST /api/session/:sessionID/init` → `true` (service method; `promptV1.command` with
+  `Command.Default.INIT`; no typed error channel — V1's `mapError(BadRequest)` was dead code)
+- Not covered by integration tests: share/unshare happy path (needs real share API),
+  summarize/init happy path (needs LLM). Covered: create empty+payload, fork, share→500
+  (disabled config), fork/summarize→404 on missing session.
 
 ### 3c — domain ops
 - `GET /api/session/:sessionID/todo`, `GET /api/session/:sessionID/diff`
