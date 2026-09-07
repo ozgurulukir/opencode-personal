@@ -12,7 +12,6 @@ import PluginManager from "../feature-plugins/system/plugins"
 import SessionV2Debug from "../feature-plugins/system/session-v2"
 import WhichKey from "../feature-plugins/system/which-key"
 import type { TuiPlugin, TuiPluginModule } from "@opencode-ai/plugin/tui"
-import { Flag } from "@opencode-ai/core/flag/flag"
 
 export const INTERNAL_TUI_PLUGINS: InternalTuiPlugin[] = [
   HomeFooter,
@@ -25,5 +24,5 @@ export const INTERNAL_TUI_PLUGINS: InternalTuiPlugin[] = [
   SidebarFooter,
   PluginManager,
   WhichKey,
-  ...(Flag.OPENCODE_EXPERIMENTAL_EVENT_SYSTEM ? [SessionV2Debug] : []),
+  SessionV2Debug,
 ]

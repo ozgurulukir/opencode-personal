@@ -24,6 +24,7 @@ import { Agent } from "@/agent/agent"
 import { Config } from "@/config/config"
 import { Permission } from "@/permission"
 import { subagentSessionPermission, subagentToolRestrictions, MAX_SUBAGENT_NESTING_LEVELS } from "@/agent/subagent-permissions"
+import { NotFoundError as StorageNotFoundError } from "@/storage/storage"
 import * as Log from "@opencode-ai/core/util/log"
 import { EffectBridge } from "@/effect/bridge"
 
@@ -41,6 +42,8 @@ export class Info extends Schema.Class<Info>("Session.Info")({
   parentID: optionalOmitUndefined(SessionID),
   projectID: ProjectID,
   workspaceID: optionalOmitUndefined(WorkspaceID),
+  slug: Schema.String,
+  directory: Schema.String,
   path: optionalOmitUndefined(Schema.String),
   agent: optionalOmitUndefined(Schema.String),
   model: Modelv2.Ref.pipe(optionalOmitUndefined),
@@ -50,24 +53,29 @@ export class Info extends Schema.Class<Info>("Session.Info")({
     archived: optionalOmitUndefined(V2Schema.DateTimeUtcFromMillis),
   }),
   title: Schema.String,
-  permission: optionalOmitUndefined(Permission.Ruleset),
-  /*
-  slug: Schema.String,
-  directory: Schema.String,
-  path: optionalOmitUndefined(Schema.String),
-  parentID: optionalOmitUndefined(SessionID),
-  summary: optionalOmitUndefined(Summary),
-  share: optionalOmitUndefined(Share),
-  title: Schema.String,
   version: Schema.String,
-  time: Time,
-  revert: optionalOmitUndefined(Revert),
-  */
+  permission: optionalOmitUndefined(Permission.Ruleset),
+  summary: optionalOmitUndefined(
+    Schema.Struct({
+      additions: Schema.Finite,
+      deletions: Schema.Finite,
+      files: Schema.Finite,
+    }),
+  ),
+  share: optionalOmitUndefined(Schema.Struct({ url: Schema.String })),
+  // `revert` is intentionally omitted: transient revert state, not a SessionTable
+  // column. Revisit with the revert/unrevert endpoints (phase 3c).
+  // `summary.diffs` is intentionally omitted from the row projection — it lives in
+  // session_diff storage and is assembled by V1 separately.
 }) {}
 
-export class NotFoundError extends Schema.TaggedErrorClass<NotFoundError>()("Session.NotFoundError", {
-  sessionID: SessionID,
-}) {}
+export class NotFoundError extends Schema.TaggedErrorClass<NotFoundError>()(
+  "Session.NotFoundError",
+  {
+    sessionID: SessionID,
+  },
+  { httpApiStatus: 404 },
+) {}
 
 export interface Interface {
   readonly create: (input?: {
@@ -129,6 +137,15 @@ export interface Interface {
   readonly switchModel: (input: { sessionID: SessionID; model: Modelv2.Ref }) => Effect.Effect<void, never>
   readonly compact: (sessionID: SessionID) => Effect.Effect<void, never>
   readonly wait: (sessionID: SessionID) => Effect.Effect<void, never>
+  readonly children: (sessionID: SessionID) => Effect.Effect<Info[], NotFoundError>
+  readonly remove: (sessionID: SessionID) => Effect.Effect<void, NotFoundError>
+  readonly update: (input: {
+    sessionID: SessionID
+    title?: string
+    permission?: Permission.Ruleset
+    archived?: number
+  }) => Effect.Effect<Info, NotFoundError>
+  readonly abort: (sessionID: SessionID) => Effect.Effect<void, never>
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/v2/Session") {}
@@ -144,13 +161,15 @@ function toV2Info(info: Session.Info): Info {
     parentID: info.parentID,
     projectID: info.projectID,
     workspaceID: info.workspaceID,
+    slug: info.slug,
+    directory: info.directory,
     path: info.path,
     agent: info.agent,
     model: info.model
       ? {
-          id: Modelv2.ID.make(info.model.id as string),
-          providerID: Modelv2.ProviderID.make(info.model.providerID as string),
-          variant: Modelv2.VariantID.make((info.model.variant ?? "default") as string),
+          id: info.model.id,
+          providerID: info.model.providerID,
+          variant: Modelv2.VariantID.make(info.model.variant ?? "default"),
         }
       : undefined,
     time: {
@@ -159,7 +178,16 @@ function toV2Info(info: Session.Info): Info {
       archived: info.time.archived ? DateTime.makeUnsafe(info.time.archived) : undefined,
     },
     title: info.title,
+    version: info.version,
     permission: info.permission,
+    summary: info.summary
+      ? {
+          additions: info.summary.additions,
+          deletions: info.summary.deletions,
+          files: info.summary.files,
+        }
+      : undefined,
+    share: info.share,
   })
 }
 
@@ -179,31 +207,13 @@ function promptToParts(prompt: Prompt): SessionPrompt.PromptInput["parts"] {
 }
 
 /**
- * Bridge a V2 `Modelv2.Ref` to V1 model shapes at the delegation boundary.
- * V1 `ModelID` and V2 `Modelv2.ID` are both branded strings over the same
- * underlying `Schema.String`, but with different brand symbols (`ProviderID`
- * vs `Model.ID`), so a cast is structurally required here. Centralized so the
- * brand mismatch has exactly one explanation.
- *
- * V1 has TWO model-ref shapes: `Session.create` uses `{ id, providerID, variant? }`,
- * while `PromptInput.model` / `SessionCompaction.create` use `{ modelID, providerID }`.
- * @see v2/AGENTS.md "V1/V2 model-ID brand mismatch"
+ * V1 `PromptInput.model` / `SessionCompaction.create` use `{ modelID, providerID }`,
+ * while V2 `Modelv2.Ref` uses `{ id, providerID, variant }`. Pure field-name reshape —
+ * the brands themselves are shared with V1 since the brand unification.
  */
-function v2ModelToV1Session(model: Modelv2.Ref): { id: ModelID; providerID: ProviderID; variant?: string } {
-  return {
-    id: model.id as unknown as ModelID,
-    providerID: model.providerID as unknown as ProviderID,
-    variant: model.variant,
-  }
+function toPromptModel(model: Modelv2.Ref): { modelID: ModelID; providerID: ProviderID } {
+  return { modelID: model.id, providerID: model.providerID }
 }
-
-function v2ModelToV1Prompt(model: Modelv2.Ref): { modelID: ModelID; providerID: ProviderID } {
-  return {
-    modelID: model.id as unknown as ModelID,
-    providerID: model.providerID as unknown as ProviderID,
-  }
-}
-
 
 export const layer = Layer.effect(
   Service,
@@ -231,7 +241,10 @@ export const layer = Layer.effect(
         id: SessionID.make(row.id),
         projectID: ProjectID.make(row.project_id),
         workspaceID: row.workspace_id ? WorkspaceID.make(row.workspace_id) : undefined,
+        slug: row.slug,
+        directory: row.directory,
         title: row.title,
+        version: row.version,
         parentID: row.parent_id ? SessionID.make(row.parent_id) : undefined,
         path: row.path ?? "",
         agent: row.agent ?? undefined,
@@ -243,6 +256,15 @@ export const layer = Layer.effect(
             }
           : undefined,
         permission: row.permission ?? undefined,
+        summary:
+          row.summary_additions !== undefined || row.summary_deletions !== undefined || row.summary_files !== undefined
+            ? {
+                additions: row.summary_additions ?? 0,
+                deletions: row.summary_deletions ?? 0,
+                files: row.summary_files ?? 0,
+              }
+            : undefined,
+        share: row.share_url ? { url: row.share_url } : undefined,
         time: {
           created: DateTime.makeUnsafe(row.time_created),
           updated: DateTime.makeUnsafe(row.time_updated),
@@ -264,7 +286,7 @@ export const layer = Layer.effect(
         const info = yield* sessions.create({
           parentID: input?.parentID,
           agent: input?.agent,
-          model: input?.model ? v2ModelToV1Session(input.model) : undefined,
+          model: input?.model,
           workspaceID: input?.workspaceID,
           title: input?.title,
           permission: input?.permission,
@@ -390,9 +412,9 @@ export const layer = Layer.effect(
       }),
       prompt: Effect.fn("V2Session.prompt")(function* (input) {
         // Delegates to V1 SessionPrompt.prompt, which owns the agent loop and
-        // dual-writes SessionEvent.* behind OPENCODE_EXPERIMENTAL_EVENT_SYSTEM.
-        // The Prompted projector then populates SessionMessageTable, which the
-        // read methods (`messages`/`context`) query. V1 is the writer by design.
+        // emits SessionEvent.*.Sync unconditionally. The Prompted projector then
+        // populates SessionMessageTable, which the read methods (`messages`/`context`)
+        // query. V1 is the writer by design.
         const promptSvc = yield* requireV1(promptV1, "SessionPrompt")
         const delivery = input.delivery ?? DefaultDelivery
         const parts = promptToParts(input.prompt)
@@ -404,7 +426,7 @@ export const layer = Layer.effect(
           sessionID: input.sessionID,
           parts,
           noReply: delivery === "deferred",
-          model: input.model ? v2ModelToV1Prompt(input.model) : undefined,
+          model: input.model ? toPromptModel(input.model) : undefined,
           agent: input.agent,
           tools: input.tools,
         })
@@ -636,7 +658,7 @@ export const layer = Layer.effect(
         yield* compactionSvc.create({
           sessionID,
           agent: session.agent ?? "build",
-          model: v2ModelToV1Prompt(model),
+          model: toPromptModel(model),
           auto: false,
         })
       }),
@@ -657,6 +679,38 @@ export const layer = Layer.effect(
             Stream.take(1),
             Stream.runDrain,
           )
+      }),
+      children: Effect.fn("V2Session.children")(function* (sessionID) {
+        const sessions = yield* requireV1(sessionsV1, "Session")
+        const rows = yield* sessions.children(sessionID)
+        return rows.map(toV2Info)
+      }),
+      remove: Effect.fn("V2Session.remove")(function* (sessionID) {
+        const sessions = yield* requireV1(sessionsV1, "Session")
+        yield* sessions.remove(sessionID).pipe(
+          Effect.catchIf(StorageNotFoundError.isInstance, () => Effect.fail(new NotFoundError({ sessionID }))),
+        )
+      }),
+      update: Effect.fn("V2Session.update")(function* (input) {
+        const sessions = yield* requireV1(sessionsV1, "Session")
+        const current = yield* result.get(input.sessionID)
+        if (input.title !== undefined) {
+          yield* sessions.setTitle({ sessionID: input.sessionID, title: input.title })
+        }
+        if (input.permission !== undefined) {
+          // Same merge semantics as the V1 HTTP handler: payload rules are
+          // appended onto the session's existing ruleset.
+          const v1Permission = Permission.merge(current.permission ?? [], input.permission)
+          yield* sessions.setPermission({ sessionID: input.sessionID, permission: v1Permission })
+        }
+        if (input.archived !== undefined) {
+          yield* sessions.setArchived({ sessionID: input.sessionID, time: input.archived })
+        }
+        return yield* result.get(input.sessionID)
+      }),
+      abort: Effect.fn("V2Session.abort")(function* (sessionID) {
+        const promptSvc = yield* requireV1(promptV1, "SessionPrompt")
+        yield* promptSvc.cancel(sessionID)
       }),
     }
 

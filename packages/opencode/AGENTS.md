@@ -319,7 +319,7 @@ nativeAddon.subscribe(dir, cb)
 
 ## V2 session service — delegation bridge
 
-The V2 session service (`src/v2/session.ts`) is a **hybrid delegation bridge** to V1. The V1 agent loop (`session/prompt.ts`, `session/processor.ts`, `session/compaction.ts`) already dual-writes every V2 `SessionEvent.*` behind `OPENCODE_EXPERIMENTAL_EVENT_SYSTEM` (forced ON in tests via `test/preload.ts:37`). The V2 projectors (`session/projectors-next.ts`) are wired globally and populate `SessionMessageTable`. So the V2 read methods (`get`, `list`, `messages`, `context`) already work, and the V2 write methods delegate to V1 (which runs the real loop AND emits the events).
+The V2 session service (`src/v2/session.ts`) is a **hybrid delegation bridge** to V1. The V1 agent loop (`session/prompt.ts`, `session/processor.ts`, `session/compaction.ts`) emits every V2 `SessionEvent.*` unconditionally (the former `OPENCODE_EXPERIMENTAL_EVENT_SYSTEM` flag was removed 2026-09). The V2 projectors (`session/projectors-next.ts`) are wired globally and populate `SessionMessageTable`. So the V2 read methods (`get`, `list`, `messages`, `context`) already work, and the V2 write methods delegate to V1 (which runs the real loop AND emits the events).
 
 **Implementation** (`src/v2/session.ts`):
 - `create` → V1 `Session.create` + `toV2Info()` mapper (V1 `Info` → V2 `Info`, handling `DateTime` timestamps and `Modelv2.Ref` brand conversion)

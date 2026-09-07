@@ -569,4 +569,48 @@ describe("session HttpApi", () => {
       }),
     ),
   )
+
+  it.live(
+    "serves v2 session lifecycle routes",
+    withTmp({ git: true, config: { formatter: false, lsp: false } }, (tmp) =>
+      Effect.gen(function* () {
+        const headers = { "x-opencode-directory": tmp.path }
+        const parent = yield* createSession(tmp.path, { title: "v2 parent" })
+        const child = yield* createSession(tmp.path, { title: "v2 child", parentID: parent.id })
+
+        // get returns the full v2 Info projection (slug/directory/version present,
+        // time encoded as epoch millis per V2Schema.DateTimeUtcFromMillis).
+        const got = yield* requestJson<Record<string, any>>(`/api/session/${parent.id}`, { headers })
+        expect(got).toMatchObject({ id: parent.id, title: "v2 parent", slug: parent.slug, version: parent.version })
+        expect(got.directory).toBeTypeOf("string")
+        expect(got.time.created).toBeTypeOf("number")
+
+        // children returns v2 Info array
+        const children = yield* requestJson<Record<string, any>[]>(`/api/session/${parent.id}/children`, { headers })
+        expect(children.map((item) => item.id)).toEqual([child.id])
+
+        // update patches the title and returns the projected session
+        const updated = yield* requestJson<Record<string, any>>(`/api/session/${parent.id}`, {
+          headers,
+          method: "PATCH",
+          body: JSON.stringify({ title: "v2 renamed" }),
+        })
+        expect(updated).toMatchObject({ id: parent.id, title: "v2 renamed" })
+
+        // status map is empty with no loops running
+        expect(yield* requestJson<Record<string, unknown>>("/api/session/status", { headers })).toEqual({})
+
+        // abort on an idle session is a no-op returning true
+        expect(yield* requestJson<boolean>(`/api/session/${parent.id}/abort`, { headers, method: "POST" })).toBe(true)
+
+        // remove deletes the child; subsequent get is 404 with the v2 error tag
+        expect(yield* requestJson<boolean>(`/api/session/${child.id}`, { headers, method: "DELETE" })).toBe(true)
+        const missingChild = yield* request(`/api/session/${child.id}`, { headers })
+        expect(missingChild.status).toBe(404)
+
+        const missing = yield* request(`/api/session/${SessionID.descending()}`, { headers })
+        expect(missing.status).toBe(404)
+      }),
+    ),
+  )
 })

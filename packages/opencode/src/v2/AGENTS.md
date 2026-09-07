@@ -10,8 +10,8 @@ It is a stable two-layer design:
   work without any V1 service provided.
 - **Writes** (`create`, `prompt`, `shell`, `skill`, `subagent`, `compact`) delegate
   to the V1 services (`Session`, `SessionPrompt`, `SessionCompaction`). V1 owns the
-  agent loop and all persistence. The V1 write path dual-writes `SessionEvent.*.Sync`
-  events (gated by `Flag.OPENCODE_EXPERIMENTAL_EVENT_SYSTEM`); the V2 projectors
+  agent loop and all persistence. The V1 write path emits `SessionEvent.*.Sync`
+  unconditionally; the V2 projectors
   (`session/projectors-next.ts`) consume those events to populate
   `SessionMessageTable`, which is what the V2 read methods query.
 
@@ -26,18 +26,14 @@ multi-session replay, real-time collaboration), that is a separate architectural
 inversion — see the `_plan/` blueprint Step 4. Do not assume the current code is
 "halfway there"; it is a complete delegation bridge.
 
-## V1/V2 model-ID brand mismatch — use the cast helpers
+## Shared model-ID brands (unified 2026-09)
 
-V1 `ModelID` is `Schema.String.pipe(Schema.brand("ProviderID"))`-adjacent (defined
-in `provider/schema.ts`); V2 `Modelv2.ID` is `Schema.brand("Model.ID")`. They are
-structurally identical strings but nominally distinct branded types, so passing a
-V2 model ref into a V1 call requires a brand cast. Rather than scattering
-`as unknown as ModelID` across the file, use the centralized helpers in
-`v2/session.ts`: `v2ModelToV1Session(ref)` (for `Session.create`, which expects
-`{id, providerID, variant?}`) and `v2ModelToV1Prompt(ref)` (for `PromptInput.model`
-/ `SessionCompaction.create`, which expect `{modelID, providerID}`). The cast is
-unavoidable without unifying the two brand systems, which is out of scope for the
-delegation design.
+V1 and V2 share the `ModelID`/`ProviderID` brands — single authority in
+`provider/schema.ts`; `v2/model.ts` re-exports them as `Modelv2.ID`/`Modelv2.ProviderID`.
+No brand casts are needed at the delegation boundary. `VariantID` remains V2-local
+(no V1 counterpart). The only remaining reshape is field naming: V1 `PromptInput.model`
+uses `{ modelID, providerID }` while V2 `Modelv2.Ref` uses `{ id, providerID, variant }` —
+handled by the small `toPromptModel` helper in `v2/session.ts`.
 
 ## V2 prompt() must pass agent to V1
 
@@ -69,7 +65,7 @@ time. Tests must include `Agent.defaultLayer` in the infra layers — otherwise
 V1 `PromptInput.model` uses `{ modelID, providerID }` (no `id` or `variant`). V2
 `Modelv2.Ref` uses `{ id, providerID, variant }`. When passing model from V2 to V1,
 map `model.id` → `modelID` and drop `variant`. See `v2/session.ts` `prompt()`
-implementation (uses the `v2ModelToV1Prompt` helper).
+implementation (uses the `toPromptModel` helper).
 
 ## V1 SessionPrompt.prompt blocks until loop finishes
 

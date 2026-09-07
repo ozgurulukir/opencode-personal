@@ -3161,6 +3161,8 @@ export type SessionInfo = {
   parentID?: string
   projectID: string
   workspaceID?: string
+  slug: string
+  directory: string
   path?: string
   agent?: string
   model?: {
@@ -3174,7 +3176,16 @@ export type SessionInfo = {
     archived?: number
   }
   title: string
+  version: string
   permission?: PermissionRuleset
+  summary?: {
+    additions: number
+    deletions: number
+    files: number
+  }
+  share?: {
+    url: string
+  }
 }
 
 export type SessionDelivery = "immediate" | "deferred"
@@ -3380,6 +3391,11 @@ export type SessionMessage =
   | SessionMessageShell
   | SessionMessageAssistant
   | SessionMessageCompaction
+
+export type SessionNotFoundError = {
+  _tag: "Session.NotFoundError"
+  sessionID: string
+}
 
 export type BadRequestError = {
   name: "BadRequest"
@@ -6564,6 +6580,174 @@ export type V2SessionContextResponses = {
 }
 
 export type V2SessionContextResponse = V2SessionContextResponses[keyof V2SessionContextResponses]
+
+export type V2SessionRemoveData = {
+  body?: never
+  path: {
+    sessionID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/api/session/{sessionID}"
+}
+
+export type V2SessionRemoveErrors = {
+  /**
+   * Session.NotFoundError
+   */
+  404: SessionNotFoundError
+}
+
+export type V2SessionRemoveError = V2SessionRemoveErrors[keyof V2SessionRemoveErrors]
+
+export type V2SessionRemoveResponses = {
+  /**
+   * Success
+   */
+  200: boolean
+}
+
+export type V2SessionRemoveResponse = V2SessionRemoveResponses[keyof V2SessionRemoveResponses]
+
+export type V2SessionGetData = {
+  body?: never
+  path: {
+    sessionID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/api/session/{sessionID}"
+}
+
+export type V2SessionGetErrors = {
+  /**
+   * Session.NotFoundError
+   */
+  404: SessionNotFoundError
+}
+
+export type V2SessionGetError = V2SessionGetErrors[keyof V2SessionGetErrors]
+
+export type V2SessionGetResponses = {
+  /**
+   * Session.Info
+   */
+  200: SessionInfo
+}
+
+export type V2SessionGetResponse = V2SessionGetResponses[keyof V2SessionGetResponses]
+
+export type V2SessionUpdateData = {
+  body?: {
+    title?: string
+    permission?: PermissionRuleset
+    time?: {
+      archived?: number
+    }
+  }
+  path: {
+    sessionID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/api/session/{sessionID}"
+}
+
+export type V2SessionUpdateErrors = {
+  /**
+   * Session.NotFoundError
+   */
+  404: SessionNotFoundError
+}
+
+export type V2SessionUpdateError = V2SessionUpdateErrors[keyof V2SessionUpdateErrors]
+
+export type V2SessionUpdateResponses = {
+  /**
+   * Session.Info
+   */
+  200: SessionInfo
+}
+
+export type V2SessionUpdateResponse = V2SessionUpdateResponses[keyof V2SessionUpdateResponses]
+
+export type V2SessionChildrenData = {
+  body?: never
+  path: {
+    sessionID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/api/session/{sessionID}/children"
+}
+
+export type V2SessionChildrenErrors = {
+  /**
+   * Session.NotFoundError
+   */
+  404: SessionNotFoundError
+}
+
+export type V2SessionChildrenError = V2SessionChildrenErrors[keyof V2SessionChildrenErrors]
+
+export type V2SessionChildrenResponses = {
+  /**
+   * Success
+   */
+  200: Array<SessionInfo>
+}
+
+export type V2SessionChildrenResponse = V2SessionChildrenResponses[keyof V2SessionChildrenResponses]
+
+export type V2SessionAbortData = {
+  body?: never
+  path: {
+    sessionID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/api/session/{sessionID}/abort"
+}
+
+export type V2SessionAbortResponses = {
+  /**
+   * Success
+   */
+  200: boolean
+}
+
+export type V2SessionAbortResponse = V2SessionAbortResponses[keyof V2SessionAbortResponses]
+
+export type V2SessionStatusData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/api/session/status"
+}
+
+export type V2SessionStatusResponses = {
+  /**
+   * Success
+   */
+  200: {
+    [key: string]: SessionStatus
+  }
+}
+
+export type V2SessionStatusResponse = V2SessionStatusResponses[keyof V2SessionStatusResponses]
 
 export type V2SessionMessagesData = {
   body?: never
