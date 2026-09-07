@@ -798,6 +798,12 @@ describe("session HttpApi", () => {
                     info: { title: "renamed" },
                   })
 
+                  // Wire format: SyncEvent.process encodes DateTime timestamps to
+                  // epoch millis at publish (V2Schema.DateTimeUtcFromMillis contract).
+                  expect(
+                    typeof events.findLast((e) => e.type === "session.next.updated")?.properties.timestamp,
+                  ).toBe("number")
+
                   // SessionStatus.set -> session.status -> session.next.status
                   yield* SessionStatus.Service.use((svc) => svc.set(session.id, { type: "busy" }))
                   yield* waitForEvent(events, "session.next.status")

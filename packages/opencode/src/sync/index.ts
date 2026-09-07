@@ -8,7 +8,7 @@ import { EventSequenceTable, EventTable } from "./event.sql"
 import type { WorkspaceID } from "@/control-plane/schema"
 import { EventID } from "./schema"
 import { Flag } from "@opencode-ai/core/flag/flag"
-import { Context, Effect, Layer, Schema as EffectSchema } from "effect"
+import { Context, DateTime, Effect, Layer, Schema as EffectSchema } from "effect"
 import type { DeepMutable } from "@opencode-ai/core/schema"
 import { makeRuntime } from "@/effect/run-service"
 import { serviceUse } from "@/effect/service-use"
@@ -265,6 +265,25 @@ export function project<Def extends Definition>(
   return [def, func as ProjectorFunc]
 }
 
+/**
+ * Recursively converts `DateTime` instances to epoch millis so event payloads
+ * are JSON-safe on the wire. The declared V2 event schemas type timestamps as
+ * `V2Schema.DateTimeUtcFromMillis` (millis on the wire), but `SyncEvent.run`
+ * receives raw `DateTime` values — without this walk they would
+ * JSON-serialize as ISO strings over SSE and break consumers doing time
+ * arithmetic. Deliberately NOT a full schema encode: `encodeUnknownSync`
+ * strips fields the schema doesn't declare, which would drop undeclared
+ * payload fields V1 consumers read.
+ */
+export function encodeDateTimes(value: unknown): unknown {
+  if (DateTime.isDateTime(value)) return DateTime.toEpochMillis(value)
+  if (Array.isArray(value)) return value.map(encodeDateTimes)
+  if (typeof value === "object" && value !== null) {
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, encodeDateTimes(item)]))
+  }
+  return value
+}
+
 function process<Def extends Definition>(
   def: Def,
   event: Event<Def>,
@@ -312,7 +331,11 @@ function process<Def extends Definition>(
         }
 
         const result = convertEvent(def.type, event.data)
-        const publish = (data: unknown) => ProjectBus.publish(def, data as Properties<Def>, { id: event.id })
+        // Encode at publish: DateTime instances become epoch millis so the
+        // wire matches the declared schemas. EventTable keeps the raw data —
+        // replay re-publishes raw, which encodes again (the walk is
+        // idempotent for millis).
+        const publish = (data: unknown) => ProjectBus.publish(def, encodeDateTimes(data) as Properties<Def>, { id: event.id })
         if (result instanceof Promise) {
           void result.then(publish)
         } else {

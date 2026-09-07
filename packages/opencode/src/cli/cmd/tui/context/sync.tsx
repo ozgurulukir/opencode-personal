@@ -40,9 +40,10 @@ import { useKV } from "./kv"
 import { aggregateFailures } from "./aggregate-failures"
 import type { SyncStore } from "./sync-schema"
 
-// V2 event timestamps are declared as epoch millis on the wire, but sync.run
-// publishes raw values, so they arrive as ISO strings over SSE (and could be
-// DateTime objects in-process). Normalize all three shapes to millis.
+// V2 event timestamps are declared as epoch millis on the wire and
+// SyncEvent.process now encodes DateTime instances to millis at publish.
+// Kept as a cheap normalizer because legacy EventTable rows (experimental
+// workspaces replay) still carry ISO strings from before that fix.
 function eventTime(value: unknown): number {
   if (typeof value === "number") return value
   if (typeof value === "string") return Date.parse(value)
