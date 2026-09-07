@@ -29,6 +29,8 @@ describe("tui sync (#26560)", () => {
       project_id: "proj_test",
     }
     const { app, sync } = await mount((url) => {
+      // v2 session get route (the sync store now reads sessions via client.v2.session)
+      if (url.pathname === `/api/session/${sessionID}`) return json(sessionPayload)
       if (url.pathname === `/session/${sessionID}`) return json(sessionPayload)
       if (url.pathname === `/session/${sessionID}/messages`) return json({}, { status: 500 })
       if (url.pathname === `/session/${sessionID}/todo`) return json([])

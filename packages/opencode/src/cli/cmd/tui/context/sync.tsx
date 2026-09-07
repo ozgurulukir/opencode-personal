@@ -17,6 +17,11 @@ import type {
   ProviderListResponse,
   ProviderAuthMethod,
   VcsInfo,
+  SessionMessage,
+  SessionMessageAssistant,
+  SessionMessageAssistantReasoning,
+  SessionMessageAssistantText,
+  SessionMessageAssistantTool,
 } from "@opencode-ai/sdk/v2"
 import { createStore, produce, reconcile } from "solid-js/store"
 import { useProject } from "@tui/context/project"
@@ -34,6 +39,54 @@ import path from "path"
 import { useKV } from "./kv"
 import { aggregateFailures } from "./aggregate-failures"
 import type { SyncStore } from "./sync-schema"
+
+// V2 event timestamps are declared as epoch millis on the wire, but sync.run
+// publishes raw values, so they arrive as ISO strings over SSE (and could be
+// DateTime objects in-process). Normalize all three shapes to millis.
+function eventTime(value: unknown): number {
+  if (typeof value === "number") return value
+  if (typeof value === "string") return Date.parse(value)
+  if (value && typeof value === "object" && "epochMilliseconds" in value)
+    return (value as { epochMilliseconds: number }).epochMilliseconds
+  return Date.now()
+}
+
+function activeAssistant(messages: SessionMessage[]) {
+  const index = messages.findIndex((message) => message.type === "assistant" && !message.time.completed)
+  if (index < 0) return
+  const assistant = messages[index]
+  return assistant?.type === "assistant" ? assistant : undefined
+}
+
+function activeCompaction(messages: SessionMessage[]) {
+  const index = messages.findIndex((message) => message.type === "compaction")
+  if (index < 0) return
+  const compaction = messages[index]
+  return compaction?.type === "compaction" ? compaction : undefined
+}
+
+function activeShell(messages: SessionMessage[], callID: string) {
+  const index = messages.findIndex((message) => message.type === "shell" && message.callID === callID)
+  if (index < 0) return
+  const shell = messages[index]
+  return shell?.type === "shell" ? shell : undefined
+}
+
+function latestTool(assistant: SessionMessageAssistant | undefined, callID?: string) {
+  return assistant?.content.findLast(
+    (item): item is SessionMessageAssistantTool => item.type === "tool" && (callID === undefined || item.id === callID),
+  )
+}
+
+function latestText(assistant: SessionMessageAssistant | undefined) {
+  return assistant?.content.findLast((item): item is SessionMessageAssistantText => item.type === "text")
+}
+
+function latestReasoning(assistant: SessionMessageAssistant | undefined, reasoningID: string) {
+  return assistant?.content.findLast(
+    (item): item is SessionMessageAssistantReasoning => item.type === "reasoning" && item.id === reasoningID,
+  )
+}
 
 export const { use: useSync, provider: SyncProvider } = createSimpleContext({
   name: "Sync",
@@ -65,12 +118,22 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
       mcp_resource: {},
       formatter: [],
       vcs: undefined,
+      messages: {},
     })
 
     const event = useEvent()
     const project = useProject()
     const sdk = useSDK()
     const kv = useKV()
+
+    function update(sessionID: string, fn: (messages: SessionMessage[]) => void) {
+      setStore(
+        "messages",
+        produce((draft) => {
+          fn((draft[sessionID] ??= []))
+        }),
+      )
+    }
 
     const fullSyncedSessions = new Set<string>()
     let syncedWorkspace = project.workspace.current()
@@ -86,9 +149,9 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
     }
 
     function listSessions() {
-      return sdk.client.session
+      return sdk.client.v2.session
         .list({ start: Date.now() - 30 * 24 * 60 * 60 * 1000, ...sessionListQuery() })
-        .then((x) => (x.data ?? []).toSorted((a, b) => a.id.localeCompare(b.id)))
+        .then((x) => (x.data?.items ?? []).toSorted((a, b) => a.id.localeCompare(b.id)))
     }
 
     event.subscribe((event) => {
@@ -96,7 +159,7 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
         case "server.instance.disposed":
           void bootstrap()
           break
-        case "permission.replied": {
+        case "session.next.permission.replied": {
           const requests = store.permission[event.properties.sessionID]
           if (!requests) break
           const match = Binary.search(requests, event.properties.requestID, (r) => r.id)
@@ -111,8 +174,10 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
           break
         }
 
-        case "permission.asked": {
-          const request = event.properties
+        case "session.next.permission.asked": {
+          // The bridge wraps the whole V1 permission payload as `request`, but
+          // the SDK types it `unknown` (it is the V1 PermissionRequest shape).
+          const request = event.properties.request as PermissionRequest
           const requests = store.permission[request.sessionID]
           if (!requests) {
             setStore("permission", request.sessionID, [request])
@@ -171,16 +236,19 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
           break
         }
 
-        case "todo.updated":
-          setStore("todo", event.properties.sessionID, event.properties.todos)
+        case "session.next.todo":
+          // Bridge payloads are typed `unknown` in the SDK; they carry the V1
+          // event shapes (todos: Todo[], info: Session, status, diff).
+          setStore("todo", event.properties.sessionID, event.properties.todos as Todo[])
           break
 
-        case "session.diff":
-          setStore("session_diff", event.properties.sessionID, event.properties.diff)
+        case "session.next.diff":
+          setStore("session_diff", event.properties.sessionID, event.properties.diff as Snapshot.FileDiff[])
           break
 
-        case "session.deleted": {
-          const result = Binary.search(store.session, event.properties.info.id, (s) => s.id)
+        case "session.next.deleted": {
+          const info = event.properties.info as Session
+          const result = Binary.search(store.session, info.id, (s) => s.id)
           if (result.found) {
             setStore(
               "session",
@@ -191,25 +259,237 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
           }
           break
         }
-        case "session.updated": {
-          const result = Binary.search(store.session, event.properties.info.id, (s) => s.id)
+        case "session.next.updated": {
+          const info = event.properties.info as Session
+          const result = Binary.search(store.session, info.id, (s) => s.id)
           if (result.found) {
-            setStore("session", result.index, reconcile(event.properties.info))
+            setStore("session", result.index, reconcile(info))
             break
           }
           setStore(
             "session",
             produce((draft) => {
-              draft.splice(result.index, 0, event.properties.info)
+              draft.splice(result.index, 0, info)
             }),
           )
           break
         }
 
-        case "session.status": {
-          setStore("session_status", event.properties.sessionID, event.properties.status)
+        case "session.next.status": {
+          setStore("session_status", event.properties.sessionID, event.properties.status as SessionStatus)
           break
         }
+
+        case "session.next.prompted": {
+          update(event.properties.sessionID, (draft) => {
+            draft.unshift({
+              id: event.id,
+              type: "user",
+              text: event.properties.prompt.text,
+              files: event.properties.prompt.files,
+              agents: event.properties.prompt.agents,
+              time: { created: eventTime(event.properties.timestamp) },
+            })
+          })
+          break
+        }
+        case "session.next.synthetic":
+          update(event.properties.sessionID, (draft) => {
+            draft.unshift({
+              id: event.id,
+              type: "synthetic",
+              sessionID: event.properties.sessionID,
+              text: event.properties.text,
+              time: { created: eventTime(event.properties.timestamp) },
+            })
+          })
+          break
+        case "session.next.shell.started":
+          update(event.properties.sessionID, (draft) => {
+            draft.unshift({
+              id: event.id,
+              type: "shell",
+              callID: event.properties.callID,
+              command: event.properties.command,
+              output: "",
+              time: { created: eventTime(event.properties.timestamp) },
+            })
+          })
+          break
+        case "session.next.shell.ended":
+          update(event.properties.sessionID, (draft) => {
+            const match = activeShell(draft, event.properties.callID)
+            if (!match) return
+            match.output = event.properties.output
+            match.time.completed = eventTime(event.properties.timestamp)
+          })
+          break
+        case "session.next.step.started":
+          update(event.properties.sessionID, (draft) => {
+            const currentAssistant = activeAssistant(draft)
+            if (currentAssistant) currentAssistant.time.completed = eventTime(event.properties.timestamp)
+            draft.unshift({
+              id: event.id,
+              type: "assistant",
+              agent: event.properties.agent,
+              model: event.properties.model,
+              content: [],
+              snapshot: event.properties.snapshot ? { start: event.properties.snapshot } : undefined,
+              time: { created: eventTime(event.properties.timestamp) },
+            })
+          })
+          break
+        case "session.next.step.ended":
+          update(event.properties.sessionID, (draft) => {
+            const currentAssistant = activeAssistant(draft)
+            if (!currentAssistant) return
+            currentAssistant.time.completed = eventTime(event.properties.timestamp)
+            currentAssistant.finish = event.properties.finish
+            currentAssistant.cost = event.properties.cost
+            currentAssistant.tokens = event.properties.tokens
+            if (event.properties.snapshot)
+              currentAssistant.snapshot = { ...currentAssistant.snapshot, end: event.properties.snapshot }
+          })
+          break
+        case "session.next.step.failed":
+          update(event.properties.sessionID, (draft) => {
+            const currentAssistant = activeAssistant(draft)
+            if (!currentAssistant) return
+            currentAssistant.time.completed = eventTime(event.properties.timestamp)
+            currentAssistant.finish = "error"
+            currentAssistant.error = event.properties.error
+          })
+          break
+        case "session.next.text.started":
+          update(event.properties.sessionID, (draft) => {
+            activeAssistant(draft)?.content.push({ type: "text", text: "" })
+          })
+          break
+        case "session.next.text.delta":
+          update(event.properties.sessionID, (draft) => {
+            const match = latestText(activeAssistant(draft))
+            if (match) match.text += event.properties.delta
+          })
+          break
+        case "session.next.text.ended":
+          update(event.properties.sessionID, (draft) => {
+            const match = latestText(activeAssistant(draft))
+            if (match) match.text = event.properties.text
+          })
+          break
+        case "session.next.tool.input.started":
+          update(event.properties.sessionID, (draft) => {
+            activeAssistant(draft)?.content.push({
+              type: "tool",
+              id: event.properties.callID,
+              name: event.properties.name,
+              time: { created: eventTime(event.properties.timestamp) },
+              state: { status: "pending", input: "" },
+            })
+          })
+          break
+        case "session.next.tool.input.delta":
+          update(event.properties.sessionID, (draft) => {
+            const match = latestTool(activeAssistant(draft), event.properties.callID)
+            if (match?.state.status === "pending") match.state.input += event.properties.delta
+          })
+          break
+        case "session.next.tool.input.ended":
+          break
+        case "session.next.tool.called":
+          update(event.properties.sessionID, (draft) => {
+            const match = latestTool(activeAssistant(draft), event.properties.callID)
+            if (!match) return
+            match.time.ran = eventTime(event.properties.timestamp)
+            match.provider = event.properties.provider
+            match.state = { status: "running", input: event.properties.input, structured: {}, content: [] }
+          })
+          break
+        case "session.next.tool.progress":
+          update(event.properties.sessionID, (draft) => {
+            const match = latestTool(activeAssistant(draft), event.properties.callID)
+            if (match?.state.status !== "running") return
+            match.state.structured = event.properties.structured
+            match.state.content = [...event.properties.content]
+          })
+          break
+        case "session.next.tool.success":
+          update(event.properties.sessionID, (draft) => {
+            const match = latestTool(activeAssistant(draft), event.properties.callID)
+            if (match?.state.status !== "running") return
+            match.state = {
+              status: "completed",
+              input: match.state.input,
+              structured: event.properties.structured,
+              content: [...event.properties.content],
+            }
+            match.provider = event.properties.provider
+            match.time.completed = eventTime(event.properties.timestamp)
+          })
+          break
+        case "session.next.tool.failed":
+          update(event.properties.sessionID, (draft) => {
+            const match = latestTool(activeAssistant(draft), event.properties.callID)
+            if (match?.state.status !== "running") return
+            match.state = {
+              status: "error",
+              error: event.properties.error,
+              input: match.state.input,
+              structured: match.state.structured,
+              content: match.state.content,
+            }
+            match.provider = event.properties.provider
+            match.time.completed = eventTime(event.properties.timestamp)
+          })
+          break
+        case "session.next.reasoning.started":
+          update(event.properties.sessionID, (draft) => {
+            activeAssistant(draft)?.content.push({
+              type: "reasoning",
+              id: event.properties.reasoningID,
+              text: "",
+            })
+          })
+          break
+        case "session.next.reasoning.delta":
+          update(event.properties.sessionID, (draft) => {
+            const match = latestReasoning(activeAssistant(draft), event.properties.reasoningID)
+            if (match) match.text += event.properties.delta
+          })
+          break
+        case "session.next.reasoning.ended":
+          update(event.properties.sessionID, (draft) => {
+            const match = latestReasoning(activeAssistant(draft), event.properties.reasoningID)
+            if (match) match.text = event.properties.text
+          })
+          break
+        case "session.next.retried":
+          break
+        case "session.next.compaction.started":
+          update(event.properties.sessionID, (draft) => {
+            draft.unshift({
+              id: event.id,
+              type: "compaction",
+              reason: event.properties.reason,
+              summary: "",
+              time: { created: eventTime(event.properties.timestamp) },
+            })
+          })
+          break
+        case "session.next.compaction.delta":
+          update(event.properties.sessionID, (draft) => {
+            const match = activeCompaction(draft)
+            if (match) match.summary += event.properties.text
+          })
+          break
+        case "session.next.compaction.ended":
+          update(event.properties.sessionID, (draft) => {
+            const match = activeCompaction(draft)
+            if (!match) return
+            match.summary = event.properties.text
+            match.include = event.properties.include
+          })
+          break
 
         case "message.updated": {
           const messages = store.message[event.properties.info.sessionID]
@@ -506,7 +786,7 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
         async sync(sessionID: string) {
           if (fullSyncedSessions.has(sessionID)) return
           const [session, messages, todo, diff] = await Promise.all([
-            sdk.client.session.get({ sessionID }, { throwOnError: true }),
+            sdk.client.v2.session.get({ sessionID }, { throwOnError: true }),
             sdk.client.session.messages({ sessionID, limit: 100 }),
             sdk.client.v2.session.todo({ sessionID }),
             sdk.client.v2.session.diff({ sessionID }),
@@ -528,9 +808,23 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
           )
           fullSyncedSessions.add(sessionID)
         },
+        message: {
+          async sync(sessionID: string) {
+            const response = await sdk.client.v2.session.messages({ sessionID })
+            setStore("messages", sessionID, reconcile(response.data?.items ?? []))
+          },
+          fromSession(sessionID: string) {
+            const messages = store.messages[sessionID]
+            if (!messages) return []
+            return messages
+          },
+        },
       },
       bootstrap,
     }
     return result
   },
 })
+
+// Backwards-compatible alias: the former sync-v2 context is now unified here.
+export const useSyncV2 = useSync

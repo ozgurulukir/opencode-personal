@@ -149,7 +149,10 @@ layer is the widest remaining duality.
 - NOT migrated (follow-up, Phase 4 coherent with sync store unification):
   - `prompt` (~55 sites) — body reshape `{parts}` → `{prompt: Prompt}` + response
     `WithParts` → `Message`; non-mechanical
-  - `messages` (5 sites) — no V2 HTTP endpoint (paginated list; V2 has `context` only)
+  - `messages` (5 sites) — V2 endpoint EXISTS (`GET /api/session/:sessionID/message` in the
+    v2.message group; the earlier "no V2 endpoint" note was wrong) but the response model
+    reshapes `MessageV2.WithParts[]` → `SessionMessage[]` (content items) — migrate with the
+    sync unification (Phase 4c) where the model adoption happens coherently
   - `shell` (1 site) — V2 payload is `{command}` only; V1 caller passes `agent`
   - `get`/`list`/`create` (~27 sites) — V2 `list` response is `{items, cursor}` (reshape);
     `get`/`create` responses are structurally compatible but belong with the sync-store

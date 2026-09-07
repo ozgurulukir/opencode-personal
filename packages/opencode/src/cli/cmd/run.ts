@@ -363,7 +363,7 @@ export const RunCommand = effectCmd({
 
       async function session(sdk: OpencodeClient): Promise<SessionInfo | undefined> {
         if (args.session) {
-          const current = await sdk.session
+          const current = await sdk.v2.session
             .get({
               sessionID: args.session,
             })
@@ -397,7 +397,10 @@ export const RunCommand = effectCmd({
           }
         }
 
-        const base = args.continue ? (await sdk.session.list()).data?.find((item) => !item.parentID) : undefined
+        // limit 100 preserves the V1 list default (the v2 route caps at 50)
+        const base = args.continue
+          ? (await sdk.v2.session.list({ limit: 100 })).data?.items.find((item) => !item.parentID)
+          : undefined
 
         if (base && args.fork) {
           const forked = await sdk.v2.session.fork({
@@ -424,7 +427,7 @@ export const RunCommand = effectCmd({
         }
 
         const name = title()
-        const result = await sdk.session.create({
+        const result = await sdk.v2.session.create({
           title: name,
           permission: rules,
         })
@@ -459,7 +462,7 @@ export const RunCommand = effectCmd({
         sdk: OpencodeClient,
         input: { agent: string | undefined; model: ModelInput | undefined; variant: string | undefined },
       ): Promise<SessionInfo> {
-        const result = await sdk.session.create({
+        const result = await sdk.v2.session.create({
           title: args.title !== undefined && args.title !== "" ? args.title : undefined,
           agent: input.agent,
           model: input.model
@@ -637,12 +640,15 @@ export const RunCommand = effectCmd({
           }
 
           const model = pick(args.model)
-          await client.session.prompt({
+          await client.v2.session.prompt({
             sessionID,
             agent,
             model,
             variant: args.variant,
-            parts: [...files, { type: "text", text: message }],
+            prompt: {
+              text: message,
+              files: files.map((file) => ({ uri: file.url, mime: file.mime, name: file.filename })),
+            },
           })
           return
         }

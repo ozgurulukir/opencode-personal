@@ -224,7 +224,7 @@ export function Session() {
     const sessionID = route.sessionID
     void (async () => {
       const previousWorkspace = project.workspace.current()
-      const result = await sdk.client.session.get({ sessionID }, { throwOnError: true })
+      const result = await sdk.client.v2.session.get({ sessionID }, { throwOnError: true })
       if (!result.data) {
         toast.show({
           message: `Session not found: ${sessionID}`,

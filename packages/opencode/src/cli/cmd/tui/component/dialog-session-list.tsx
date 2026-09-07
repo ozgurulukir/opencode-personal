@@ -35,8 +35,8 @@ export function DialogSessionList() {
     () => ({ query: search(), filter: sync.session.query() }),
     async (input) => {
       if (!input.query) return undefined
-      const result = await sdk.client.session.list({ search: input.query, limit: 30, ...input.filter })
-      return result.data ?? []
+      const result = await sdk.client.v2.session.list({ search: input.query, limit: 30, ...input.filter })
+      return result.data?.items ?? []
     },
   )
 

@@ -1,4 +1,5 @@
 import { MessageID, PartID, SessionID } from "@/session/schema"
+import { ModelID, ProviderID } from "@/provider/schema"
 import { PermissionID } from "@/permission/schema"
 import { SessionStatus } from "@/session/status"
 import { Session } from "@/session/session"
@@ -23,6 +24,7 @@ import {
   PermissionResponsePayload,
   PromptPayload,
   RevertPayload,
+  ShellPayload,
   SummarizePayload,
 } from "../session"
 import { QueryBoolean } from "../query"
@@ -39,6 +41,9 @@ export const SessionsQuery = Schema.Struct({
   }),
   path: Schema.optional(Schema.String),
   roots: Schema.optional(QueryBoolean),
+  scope: Schema.optional(Schema.Literals(["project"])).annotate({
+    description: "Set to project to list sessions across the whole project instead of the routed directory.",
+  }),
   start: Schema.optional(Schema.NumberFromString),
   search: Schema.optional(Schema.String),
   cursor: Schema.optional(
@@ -77,6 +82,16 @@ export const SessionGroup = HttpApiGroup.make("v2.session")
       payload: Schema.Struct({
         prompt: Prompt,
         delivery: SessionV2.Delivery.pipe(Schema.optional),
+        // V1 PromptInput parity — the sync prompt must be able to pin the
+        // agent/model/variant for this turn (e.g. `opencode --run`) without
+        // extra switch round-trips.
+        agent: Schema.String.pipe(Schema.optional),
+        model: Schema.Struct({
+          providerID: ProviderID,
+          modelID: ModelID,
+        }).pipe(Schema.optional),
+        variant: Schema.String.pipe(Schema.optional),
+        messageID: MessageID.pipe(Schema.optional),
       }),
       success: SessionMessage.Message,
     }).annotateMerge(
@@ -131,7 +146,7 @@ export const SessionGroup = HttpApiGroup.make("v2.session")
       params: { sessionID: SessionID },
       query: WorkspaceRoutingQuery,
       success: SessionV2.Info,
-      error: SessionV2.NotFoundError,
+      error: ApiNotFoundError,
     }).annotateMerge(
       OpenApi.annotations({
         identifier: "v2.session.get",
@@ -145,7 +160,7 @@ export const SessionGroup = HttpApiGroup.make("v2.session")
       params: { sessionID: SessionID },
       query: WorkspaceRoutingQuery,
       success: Schema.Boolean,
-      error: SessionV2.NotFoundError,
+      error: ApiNotFoundError,
     }).annotateMerge(
       OpenApi.annotations({
         identifier: "v2.session.remove",
@@ -164,7 +179,7 @@ export const SessionGroup = HttpApiGroup.make("v2.session")
         time: Schema.optional(Schema.Struct({ archived: Schema.optional(Session.ArchivedTimestamp) })),
       }),
       success: SessionV2.Info,
-      error: SessionV2.NotFoundError,
+      error: ApiNotFoundError,
     }).annotateMerge(
       OpenApi.annotations({
         identifier: "v2.session.update",
@@ -178,7 +193,7 @@ export const SessionGroup = HttpApiGroup.make("v2.session")
       params: { sessionID: SessionID },
       query: WorkspaceRoutingQuery,
       success: Schema.Array(SessionV2.Info),
-      error: SessionV2.NotFoundError,
+      error: ApiNotFoundError,
     }).annotateMerge(
       OpenApi.annotations({
         identifier: "v2.session.children",
@@ -217,7 +232,7 @@ export const SessionGroup = HttpApiGroup.make("v2.session")
       query: WorkspaceRoutingQuery,
       payload: [HttpApiSchema.NoContent, Session.CreateInput],
       success: SessionV2.Info,
-      error: [HttpApiError.BadRequest, SessionV2.NotFoundError],
+      error: [HttpApiError.BadRequest, ApiNotFoundError],
     }).annotateMerge(
       OpenApi.annotations({
         identifier: "v2.session.create",
@@ -232,7 +247,7 @@ export const SessionGroup = HttpApiGroup.make("v2.session")
       query: WorkspaceRoutingQuery,
       payload: ForkPayload,
       success: SessionV2.Info,
-      error: SessionV2.NotFoundError,
+      error: ApiNotFoundError,
     }).annotateMerge(
       OpenApi.annotations({
         identifier: "v2.session.fork",
@@ -246,7 +261,7 @@ export const SessionGroup = HttpApiGroup.make("v2.session")
       params: { sessionID: SessionID },
       query: WorkspaceRoutingQuery,
       success: SessionV2.Info,
-      error: [HttpApiError.InternalServerError, SessionV2.NotFoundError],
+      error: [HttpApiError.InternalServerError, ApiNotFoundError],
     }).annotateMerge(
       OpenApi.annotations({
         identifier: "v2.session.share",
@@ -260,7 +275,7 @@ export const SessionGroup = HttpApiGroup.make("v2.session")
       params: { sessionID: SessionID },
       query: WorkspaceRoutingQuery,
       success: SessionV2.Info,
-      error: [HttpApiError.InternalServerError, SessionV2.NotFoundError],
+      error: [HttpApiError.InternalServerError, ApiNotFoundError],
     }).annotateMerge(
       OpenApi.annotations({
         identifier: "v2.session.unshare",
@@ -275,7 +290,7 @@ export const SessionGroup = HttpApiGroup.make("v2.session")
       query: WorkspaceRoutingQuery,
       payload: SummarizePayload,
       success: Schema.Boolean,
-      error: SessionV2.NotFoundError,
+      error: ApiNotFoundError,
     }).annotateMerge(
       OpenApi.annotations({
         identifier: "v2.session.summarize",
@@ -343,7 +358,7 @@ export const SessionGroup = HttpApiGroup.make("v2.session")
     HttpApiEndpoint.post("shell", "/api/session/:sessionID/shell", {
       params: { sessionID: SessionID },
       query: WorkspaceRoutingQuery,
-      payload: Schema.Struct({ command: Schema.String }),
+      payload: ShellPayload,
       success: HttpApiSchema.NoContent,
     }).annotateMerge(
       OpenApi.annotations({
@@ -359,7 +374,7 @@ export const SessionGroup = HttpApiGroup.make("v2.session")
       query: WorkspaceRoutingQuery,
       payload: RevertPayload,
       success: SessionV2.Info,
-      error: SessionV2.NotFoundError,
+      error: ApiNotFoundError,
     }).annotateMerge(
       OpenApi.annotations({
         identifier: "v2.session.revert",
@@ -373,7 +388,7 @@ export const SessionGroup = HttpApiGroup.make("v2.session")
       params: { sessionID: SessionID },
       query: WorkspaceRoutingQuery,
       success: SessionV2.Info,
-      error: SessionV2.NotFoundError,
+      error: ApiNotFoundError,
     }).annotateMerge(
       OpenApi.annotations({
         identifier: "v2.session.unrevert",

@@ -1279,7 +1279,7 @@ export default function Layout(props: ParentProps) {
         navigateWithSidebarReset(`/${base64Encode(target.directory)}/session/${target.id}`)
         return true
       }
-      const resolved = await globalSDK.client.session
+      const resolved = await globalSDK.client.v2.session
         .get({ sessionID: target.id })
         .then((x) => x.data)
         .catch(() => undefined)
@@ -1310,9 +1310,9 @@ export default function Layout(props: ParentProps) {
       await Promise.all(
         dirs.map(async (item) => ({
           path: { directory: item },
-          session: await globalSDK.client.session
-            .list({ directory: item })
-            .then((x) => x.data ?? [])
+          session: await globalSDK.client.v2.session
+            .list({ directory: item, limit: 100 })
+            .then((x) => x.data?.items ?? [])
             .catch(() => []),
         })),
       ),
@@ -1529,9 +1529,9 @@ export default function Layout(props: ParentProps) {
     })
     const dismiss = () => toaster.dismiss(progress)
 
-    const sessions: Session[] = await globalSDK.client.session
-      .list({ directory })
-      .then((x) => x.data ?? [])
+    const sessions: Session[] = await globalSDK.client.v2.session
+      .list({ directory, limit: 100 })
+      .then((x) => x.data?.items ?? [])
       .catch(() => [])
 
     clearWorkspaceTerminals(
@@ -1663,9 +1663,9 @@ export default function Layout(props: ParentProps) {
     })
 
     const refresh = async () => {
-      const sessions = await globalSDK.client.session
-        .list({ directory: props.directory })
-        .then((x) => x.data ?? [])
+      const sessions = await globalSDK.client.v2.session
+        .list({ directory: props.directory, limit: 100 })
+        .then((x) => x.data?.items ?? [])
         .catch(() => [])
       const active = sessions.filter((session) => session.time.archived === undefined)
       setState({ sessions: active })

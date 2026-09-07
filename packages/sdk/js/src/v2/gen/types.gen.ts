@@ -83,6 +83,13 @@ export type Event =
   | EventSessionNextCompactionStarted
   | EventSessionNextCompactionDelta
   | EventSessionNextCompactionEnded
+  | EventSessionNextUpdated
+  | EventSessionNextDeleted
+  | EventSessionNextStatus
+  | EventSessionNextTodo
+  | EventSessionNextDiff
+  | EventSessionNextPermissionAsked
+  | EventSessionNextPermissionReplied
 
 export type OAuth = {
   type: "oauth"
@@ -832,6 +839,13 @@ export type GlobalEvent = {
     | EventSessionNextCompactionStarted
     | EventSessionNextCompactionDelta
     | EventSessionNextCompactionEnded
+    | EventSessionNextUpdated
+    | EventSessionNextDeleted
+    | EventSessionNextStatus
+    | EventSessionNextTodo
+    | EventSessionNextDiff
+    | EventSessionNextPermissionAsked
+    | EventSessionNextPermissionReplied
     | SyncEventMessageUpdated
     | SyncEventMessageRemoved
     | SyncEventMessagePartUpdated
@@ -867,6 +881,13 @@ export type GlobalEvent = {
     | SyncEventSessionNextCompactionStarted
     | SyncEventSessionNextCompactionDelta
     | SyncEventSessionNextCompactionEnded
+    | SyncEventSessionNextUpdated
+    | SyncEventSessionNextDeleted
+    | SyncEventSessionNextStatus
+    | SyncEventSessionNextTodo
+    | SyncEventSessionNextDiff
+    | SyncEventSessionNextPermissionAsked
+    | SyncEventSessionNextPermissionReplied
 }
 
 /**
@@ -2314,6 +2335,98 @@ export type SyncEventSessionNextCompactionEnded = {
   }
 }
 
+export type SyncEventSessionNextUpdated = {
+  type: "sync"
+  name: "session.next.updated.1"
+  id: string
+  seq: number
+  aggregateID: "sessionID"
+  data: {
+    timestamp: number
+    sessionID: string
+    info: unknown
+  }
+}
+
+export type SyncEventSessionNextDeleted = {
+  type: "sync"
+  name: "session.next.deleted.1"
+  id: string
+  seq: number
+  aggregateID: "sessionID"
+  data: {
+    timestamp: number
+    sessionID: string
+    info: unknown
+  }
+}
+
+export type SyncEventSessionNextStatus = {
+  type: "sync"
+  name: "session.next.status.1"
+  id: string
+  seq: number
+  aggregateID: "sessionID"
+  data: {
+    timestamp: number
+    sessionID: string
+    status: unknown
+  }
+}
+
+export type SyncEventSessionNextTodo = {
+  type: "sync"
+  name: "session.next.todo.1"
+  id: string
+  seq: number
+  aggregateID: "sessionID"
+  data: {
+    timestamp: number
+    sessionID: string
+    todos: Array<unknown>
+  }
+}
+
+export type SyncEventSessionNextDiff = {
+  type: "sync"
+  name: "session.next.diff.1"
+  id: string
+  seq: number
+  aggregateID: "sessionID"
+  data: {
+    timestamp: number
+    sessionID: string
+    diff: Array<SnapshotFileDiff>
+  }
+}
+
+export type SyncEventSessionNextPermissionAsked = {
+  type: "sync"
+  name: "session.next.permission.asked.1"
+  id: string
+  seq: number
+  aggregateID: "sessionID"
+  data: {
+    timestamp: number
+    sessionID: string
+    request: unknown
+  }
+}
+
+export type SyncEventSessionNextPermissionReplied = {
+  type: "sync"
+  name: "session.next.permission.replied.1"
+  id: string
+  seq: number
+  aggregateID: "sessionID"
+  data: {
+    timestamp: number
+    sessionID: string
+    requestID: string
+    reply: string
+  }
+}
+
 export type EventTuiPromptAppend = {
   id: string
   type: "tui.prompt.append"
@@ -3156,6 +3269,77 @@ export type EventSessionNextCompactionEnded = {
   }
 }
 
+export type EventSessionNextUpdated = {
+  id: string
+  type: "session.next.updated"
+  properties: {
+    timestamp: number
+    sessionID: string
+    info: unknown
+  }
+}
+
+export type EventSessionNextDeleted = {
+  id: string
+  type: "session.next.deleted"
+  properties: {
+    timestamp: number
+    sessionID: string
+    info: unknown
+  }
+}
+
+export type EventSessionNextStatus = {
+  id: string
+  type: "session.next.status"
+  properties: {
+    timestamp: number
+    sessionID: string
+    status: unknown
+  }
+}
+
+export type EventSessionNextTodo = {
+  id: string
+  type: "session.next.todo"
+  properties: {
+    timestamp: number
+    sessionID: string
+    todos: Array<unknown>
+  }
+}
+
+export type EventSessionNextDiff = {
+  id: string
+  type: "session.next.diff"
+  properties: {
+    timestamp: number
+    sessionID: string
+    diff: Array<SnapshotFileDiff>
+  }
+}
+
+export type EventSessionNextPermissionAsked = {
+  id: string
+  type: "session.next.permission.asked"
+  properties: {
+    timestamp: number
+    sessionID: string
+    request: unknown
+  }
+}
+
+export type EventSessionNextPermissionReplied = {
+  id: string
+  type: "session.next.permission.replied"
+  properties: {
+    timestamp: number
+    sessionID: string
+    requestID: string
+    reply: string
+  }
+}
+
 export type SessionInfo = {
   id: string
   parentID?: string
@@ -3397,11 +3581,6 @@ export type SessionMessage =
   | SessionMessageShell
   | SessionMessageAssistant
   | SessionMessageCompaction
-
-export type SessionNotFoundError = {
-  _tag: "Session.NotFoundError"
-  sessionID: string
-}
 
 export type BadRequestError = {
   name: "BadRequest"
@@ -6472,6 +6651,7 @@ export type V2SessionListData = {
     order?: "asc" | "desc"
     path?: string
     roots?: boolean | "true" | "false"
+    scope?: "project"
     start?: number
     search?: string
     /**
@@ -6527,9 +6707,9 @@ export type V2SessionCreateErrors = {
    */
   400: BadRequestError
   /**
-   * Session.NotFoundError
+   * NotFoundError
    */
-  404: SessionNotFoundError
+  404: NotFoundError
 }
 
 export type V2SessionCreateError = V2SessionCreateErrors[keyof V2SessionCreateErrors]
@@ -6547,6 +6727,13 @@ export type V2SessionPromptData = {
   body?: {
     prompt: Prompt
     delivery?: SessionDelivery
+    agent?: string
+    model?: {
+      providerID: string
+      modelID: string
+    }
+    variant?: string
+    messageID?: string
   }
   path: {
     sessionID: string
@@ -6644,9 +6831,9 @@ export type V2SessionRemoveData = {
 
 export type V2SessionRemoveErrors = {
   /**
-   * Session.NotFoundError
+   * NotFoundError
    */
-  404: SessionNotFoundError
+  404: NotFoundError
 }
 
 export type V2SessionRemoveError = V2SessionRemoveErrors[keyof V2SessionRemoveErrors]
@@ -6674,9 +6861,9 @@ export type V2SessionGetData = {
 
 export type V2SessionGetErrors = {
   /**
-   * Session.NotFoundError
+   * NotFoundError
    */
-  404: SessionNotFoundError
+  404: NotFoundError
 }
 
 export type V2SessionGetError = V2SessionGetErrors[keyof V2SessionGetErrors]
@@ -6710,9 +6897,9 @@ export type V2SessionUpdateData = {
 
 export type V2SessionUpdateErrors = {
   /**
-   * Session.NotFoundError
+   * NotFoundError
    */
-  404: SessionNotFoundError
+  404: NotFoundError
 }
 
 export type V2SessionUpdateError = V2SessionUpdateErrors[keyof V2SessionUpdateErrors]
@@ -6740,9 +6927,9 @@ export type V2SessionChildrenData = {
 
 export type V2SessionChildrenErrors = {
   /**
-   * Session.NotFoundError
+   * NotFoundError
    */
-  404: SessionNotFoundError
+  404: NotFoundError
 }
 
 export type V2SessionChildrenError = V2SessionChildrenErrors[keyof V2SessionChildrenErrors]
@@ -6814,9 +7001,9 @@ export type V2SessionForkData = {
 
 export type V2SessionForkErrors = {
   /**
-   * Session.NotFoundError
+   * NotFoundError
    */
-  404: SessionNotFoundError
+  404: NotFoundError
 }
 
 export type V2SessionForkError = V2SessionForkErrors[keyof V2SessionForkErrors]
@@ -6844,9 +7031,9 @@ export type V2SessionUnshareData = {
 
 export type V2SessionUnshareErrors = {
   /**
-   * Session.NotFoundError
+   * NotFoundError
    */
-  404: SessionNotFoundError
+  404: NotFoundError
   /**
    * InternalServerError
    */
@@ -6878,9 +7065,9 @@ export type V2SessionShareData = {
 
 export type V2SessionShareErrors = {
   /**
-   * Session.NotFoundError
+   * NotFoundError
    */
-  404: SessionNotFoundError
+  404: NotFoundError
   /**
    * InternalServerError
    */
@@ -6916,9 +7103,9 @@ export type V2SessionSummarizeData = {
 
 export type V2SessionSummarizeErrors = {
   /**
-   * Session.NotFoundError
+   * NotFoundError
    */
-  404: SessionNotFoundError
+  404: NotFoundError
 }
 
 export type V2SessionSummarizeError = V2SessionSummarizeErrors[keyof V2SessionSummarizeErrors]
@@ -7038,6 +7225,12 @@ export type V2SessionCommandResponse = V2SessionCommandResponses[keyof V2Session
 
 export type V2SessionShellData = {
   body?: {
+    messageID?: string
+    agent: string
+    model?: {
+      providerID: string
+      modelID: string
+    }
     command: string
   }
   path: {
@@ -7076,9 +7269,9 @@ export type V2SessionRevertData = {
 
 export type V2SessionRevertErrors = {
   /**
-   * Session.NotFoundError
+   * NotFoundError
    */
-  404: SessionNotFoundError
+  404: NotFoundError
 }
 
 export type V2SessionRevertError = V2SessionRevertErrors[keyof V2SessionRevertErrors]
@@ -7106,9 +7299,9 @@ export type V2SessionUnrevertData = {
 
 export type V2SessionUnrevertErrors = {
   /**
-   * Session.NotFoundError
+   * NotFoundError
    */
-  404: SessionNotFoundError
+  404: NotFoundError
 }
 
 export type V2SessionUnrevertError = V2SessionUnrevertErrors[keyof V2SessionUnrevertErrors]

@@ -17,6 +17,7 @@ import type {
   ProviderListResponse,
   ProviderAuthMethod,
   VcsInfo,
+  SessionMessage,
 } from "@opencode-ai/sdk/v2"
 import type { Snapshot } from "@/snapshot"
 import type { ConsoleState } from "@/config/console-state"
@@ -62,4 +63,7 @@ export type SyncStore = {
   }
   formatter: FormatterStatus[]
   vcs: VcsInfo | undefined
+  messages: {
+    [sessionID: string]: SessionMessage[]
+  }
 }

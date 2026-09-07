@@ -36,10 +36,17 @@ export function createFetch(override?: FetchHandler) {
   const session = [] as URL[]
   const fetch = (async (input: RequestInfo | URL) => {
     const url = new URL(input instanceof Request ? input.url : String(input))
-    if (url.pathname === "/session") session.push(url)
+    if (url.pathname === "/session" || url.pathname === "/api/session") session.push(url)
 
     const overridden = await override?.(url)
     if (overridden) return overridden
+
+    // v2 session sub-resources (exact /api/session list is handled below)
+    if (url.pathname.startsWith("/api/session/")) {
+      if (url.pathname.endsWith("/todo") || url.pathname.endsWith("/diff")) return json([])
+      if (url.pathname.endsWith("/messages")) return json({ items: [] })
+      return json({})
+    }
 
     switch (url.pathname) {
       case "/agent":
@@ -54,6 +61,7 @@ export function createFetch(override?: FetchHandler) {
       case "/mcp":
       case "/provider/auth":
       case "/session/status":
+      case "/api/session/status":
         return json({})
       case "/config/providers":
         return json({ providers: {}, default: {} })
@@ -67,6 +75,8 @@ export function createFetch(override?: FetchHandler) {
         return json({ all: [], default: {}, connected: [] })
       case "/session":
         return json([])
+      case "/api/session":
+        return json({ items: [] })
       case "/vcs":
         return json({ branch: "main" })
     }

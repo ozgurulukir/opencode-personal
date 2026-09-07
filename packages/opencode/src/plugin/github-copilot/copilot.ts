@@ -373,7 +373,7 @@ export async function CopilotAuthPlugin(input: PluginInput): Promise<Hooks> {
         return
       }
 
-      const session = await sdk.session
+      const session = await sdk.v2.session
         .get(
           {
             sessionID: incoming.sessionID,

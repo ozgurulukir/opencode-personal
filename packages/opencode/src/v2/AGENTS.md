@@ -31,9 +31,12 @@ inversion — see the `_plan/` blueprint Step 4. Do not assume the current code 
 V1 and V2 share the `ModelID`/`ProviderID` brands — single authority in
 `provider/schema.ts`; `v2/model.ts` re-exports them as `Modelv2.ID`/`Modelv2.ProviderID`.
 No brand casts are needed at the delegation boundary. `VariantID` remains V2-local
-(no V1 counterpart). The only remaining reshape is field naming: V1 `PromptInput.model`
-uses `{ modelID, providerID }` while V2 `Modelv2.Ref` uses `{ id, providerID, variant }` —
-handled by the small `toPromptModel` helper in `v2/session.ts`.
+(no V1 counterpart). The remaining reshape is field naming: V2 `Modelv2.Ref` uses
+`{ id, providerID, variant }` while V1 callers (`SessionCompaction.create`, subagent
+prompt) need `{ modelID, providerID }` — handled by the small `toPromptModel` helper
+in `v2/session.ts`. The V2 service `prompt()` input takes the V1 model shape directly
+(`{ providerID, modelID }` + separate `variant`), so no conversion happens on the
+prompt path.
 
 ## V2 prompt() must pass agent to V1
 
@@ -69,9 +72,10 @@ compaction (V1 HTTP handler parity). `fork()`/`summarize()` fail with the V2
 ## V1 PromptInput.model field names differ from V2 Modelv2.Ref
 
 V1 `PromptInput.model` uses `{ modelID, providerID }` (no `id` or `variant`). V2
-`Modelv2.Ref` uses `{ id, providerID, variant }`. When passing model from V2 to V1,
-map `model.id` → `modelID` and drop `variant`. See `v2/session.ts` `prompt()`
-implementation (uses the `toPromptModel` helper).
+`Modelv2.Ref` uses `{ id, providerID, variant }`. When passing a `Modelv2.Ref` to a V1
+caller (compaction, subagent's inner prompt), map `model.id` → `modelID` and drop
+`variant` via the `toPromptModel` helper. The V2 service `prompt()` input already uses
+the V1 shape, so its delegation passes `model`/`variant`/`messageID` straight through.
 
 ## V1 SessionPrompt.prompt blocks until loop finishes
 

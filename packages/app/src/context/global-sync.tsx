@@ -244,7 +244,8 @@ function createGlobalSync() {
           loadRootSessionsWithFallback({
             directory,
             limit,
-            list: (query) => globalSDK.client.session.list(query),
+            list: (query) =>
+              globalSDK.client.v2.session.list(query).then((r) => ({ data: r.data?.items ?? [] })),
           })
             .then((x) => {
               const nonArchived = (x.data ?? [])

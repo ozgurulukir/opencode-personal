@@ -952,7 +952,7 @@ export class Agent implements ACPAgent {
 
     switch (cmd.name) {
       case "compact":
-        await this.config.sdk.session.summarize(
+        await this.config.sdk.v2.session.summarize(
           {
             sessionID,
             directory,
@@ -974,7 +974,7 @@ export class Agent implements ACPAgent {
 
   async cancel(params: CancelNotification) {
     const session = await this.sessionManager.getOrLoad(params.sessionId)
-    await this.config.sdk.session.abort(
+    await this.config.sdk.v2.session.abort(
       {
         sessionID: params.sessionId,
         directory: session.cwd,

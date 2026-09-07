@@ -1,6 +1,6 @@
 import type { TuiPlugin, TuiPluginApi } from "@opencode-ai/plugin/tui"
 import type { InternalTuiPlugin } from "../../plugin/internal-types"
-import { useSyncV2 } from "@tui/context/sync-v2"
+import { useSyncV2 } from "@tui/context/sync"
 import { SplitBorder } from "@tui/component/border"
 import { Spinner } from "@tui/component/spinner"
 import { ThemedDiff } from "@tui/component/diff-block"

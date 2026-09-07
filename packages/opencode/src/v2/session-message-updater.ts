@@ -448,6 +448,16 @@ export function update<Result>(adapter: Adapter<Result>, event: SessionEvent.Eve
         )
       }
     },
+    // Lifecycle events forwarded by the V1→V2 event bridge carry session
+    // metadata (info/status/todo/diff/permission) — they do not project into
+    // SessionMessageTable.
+    "session.next.updated": () => {},
+    "session.next.deleted": () => {},
+    "session.next.status": () => {},
+    "session.next.todo": () => {},
+    "session.next.diff": () => {},
+    "session.next.permission.asked": () => {},
+    "session.next.permission.replied": () => {},
   })
 
   return adapter.finish()

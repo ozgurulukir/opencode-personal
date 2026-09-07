@@ -369,6 +369,33 @@ describe("v2.session", () => {
     }),
   )
 
+  it.instance("shell passes explicit agent, model, and messageID through to V1", () =>
+    Effect.gen(function* () {
+      const before = promptStub.calls.shell.length
+      const session = yield* SessionV2.Service
+      const info = yield* session.create({ agent: "build" })
+
+      yield* session.shell({
+        sessionID: info.id,
+        command: "bun test",
+        agent: "plan",
+        model: { providerID: ref.providerID, modelID: ref.modelID },
+        messageID: MessageID.ascending(),
+      })
+
+      const call = promptStub.calls.shell.at(-1) as {
+        command: string
+        agent: string
+        model: { providerID: string; modelID: string }
+        messageID: MessageID
+      }
+      expect(call.command).toBe("bun test")
+      expect(call.agent).toBe("plan")
+      expect(call.model).toEqual({ providerID: ref.providerID, modelID: ref.modelID })
+      expect(call.messageID).toBeDefined()
+    }),
+  )
+
   it.instance("skill delegates to V1 SessionPrompt.prompt with /skill prefix", () =>
     Effect.gen(function* () {
       const before = promptStub.calls.prompt.length
