@@ -5,6 +5,7 @@ import { EventV2 } from "../../src/v2/event"
 import { Modelv2 } from "../../src/v2/model"
 import { SessionEvent } from "../../src/v2/session-event"
 import { SessionMessageUpdater } from "../../src/v2/session-message-updater"
+import { SubtaskAttachment } from "../../src/v2/session-prompt"
 
 test("step snapshots carry over to assistant messages", () => {
   const state: SessionMessageUpdater.MemoryState = { messages: [] }
@@ -212,5 +213,44 @@ test("compaction events reduce to compaction message", () => {
     summary: "final summary",
     include: "recent context",
     time: { created: DateTime.makeUnsafe(1) },
+  })
+})
+
+test("prompted event with subtask stores subtask on user message", () => {
+  const state: SessionMessageUpdater.MemoryState = { messages: [] }
+  const sessionID = SessionID.make("session")
+  const id = EventV2.ID.create()
+
+  SessionMessageUpdater.update(SessionMessageUpdater.memory(state), {
+    id,
+    type: "session.next.prompted",
+    data: {
+      sessionID,
+      timestamp: DateTime.makeUnsafe(1),
+      prompt: {
+        text: "explore the codebase",
+        subtask: new SubtaskAttachment({
+          agent: "explore",
+          description: "find call sites",
+          prompt: "explore the codebase",
+          model: { providerID: "anthropic", modelID: "claude-sonnet-4" },
+          command: "/explore",
+        }),
+      },
+    },
+  } satisfies SessionEvent.Event)
+
+  expect(state.messages).toHaveLength(1)
+  expect(state.messages[0]).toMatchObject({
+    id,
+    type: "user",
+    text: "explore the codebase",
+    subtask: {
+      agent: "explore",
+      description: "find call sites",
+      prompt: "explore the codebase",
+      model: { providerID: "anthropic", modelID: "claude-sonnet-4" },
+      command: "/explore",
+    },
   })
 })

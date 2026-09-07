@@ -754,6 +754,7 @@ export type Prompt = {
   text: string
   files?: Array<PromptFileAttachment>
   agents?: Array<PromptAgentAttachment>
+  subtask?: PromptSubtaskAttachment
 }
 
 export type GlobalEvent = {
@@ -2943,6 +2944,17 @@ export type PromptAgentAttachment = {
   source?: PromptSource
 }
 
+export type PromptSubtaskAttachment = {
+  agent: string
+  description: string
+  prompt: string
+  model?: {
+    providerID: string
+    modelID: string
+  }
+  command?: string
+}
+
 export type EventSessionNextPrompted = {
   id: string
   type: "session.next.prompted"
@@ -3419,6 +3431,7 @@ export type SessionMessageUser = {
   text: string
   files?: Array<PromptFileAttachment>
   agents?: Array<PromptAgentAttachment>
+  subtask?: PromptSubtaskAttachment
   type: "user"
 }
 

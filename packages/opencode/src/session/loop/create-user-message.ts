@@ -13,7 +13,7 @@ import { MessageV2 } from "../message-v2"
 import { MessageID, PartID } from "../schema"
 import { SessionEvent } from "@/v2/session-event"
 import { Modelv2 } from "@/v2/model"
-import { AgentAttachment, FileAttachment, Source } from "@/v2/session-prompt"
+import { AgentAttachment, FileAttachment, Source, SubtaskAttachment } from "@/v2/session-prompt"
 import * as Session from "../session"
 import { Agent } from "@/agent/agent"
 import { Provider } from "@/provider/provider"
@@ -473,12 +473,24 @@ export const createUserMessage = Effect.fn("SessionPrompt.createUserMessage")(
             }),
           )
         }
+        if (part.type === "subtask") {
+          result.subtask = new SubtaskAttachment({
+            agent: part.agent,
+            description: part.description,
+            prompt: part.prompt,
+            model: part.model
+              ? { providerID: part.model.providerID, modelID: part.model.modelID }
+              : undefined,
+            command: part.command,
+          })
+        }
         return result
       },
       {
         text: [] as string[],
         files: [] as FileAttachment[],
         agents: [] as AgentAttachment[],
+        subtask: undefined as SubtaskAttachment | undefined,
         synthetic: [] as string[],
       },
     )
@@ -491,6 +503,7 @@ export const createUserMessage = Effect.fn("SessionPrompt.createUserMessage")(
         text: nextPrompt.text.join("\n"),
         files: nextPrompt.files,
         agents: nextPrompt.agents,
+        subtask: nextPrompt.subtask,
       },
     })
     for (const text of nextPrompt.synthetic) {
