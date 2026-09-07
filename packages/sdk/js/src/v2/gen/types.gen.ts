@@ -755,6 +755,8 @@ export type Prompt = {
   files?: Array<PromptFileAttachment>
   agents?: Array<PromptAgentAttachment>
   subtask?: PromptSubtaskAttachment
+  synthetic?: Array<string>
+  ignored?: Array<string>
 }
 
 export type GlobalEvent = {
@@ -1709,6 +1711,16 @@ export type V2SessionsResponse = {
     previous?: string
     next?: string
   }
+}
+
+export type V2PromptResponse = {
+  user?: SessionMessageUser
+  assistant?: SessionMessageAssistant
+}
+
+export type V2CommandResponse = {
+  user?: SessionMessageUser
+  assistant?: SessionMessageAssistant
 }
 
 export type V2SessionMessagesResponse = {
@@ -3404,34 +3416,6 @@ export type SessionInfo = {
 
 export type SessionDelivery = "immediate" | "deferred"
 
-export type SessionMessageAgentSwitched = {
-  id: string
-  metadata?: {
-    [key: string]: unknown
-  }
-  time: {
-    created: number
-  }
-  type: "agent-switched"
-  agent: string
-}
-
-export type SessionMessageModelSwitched = {
-  id: string
-  metadata?: {
-    [key: string]: unknown
-  }
-  time: {
-    created: number
-  }
-  type: "model-switched"
-  model: {
-    id: string
-    providerID: string
-    variant: string
-  }
-}
-
 export type SessionMessageUser = {
   id: string
   metadata?: {
@@ -3451,34 +3435,6 @@ export type SessionMessageUser = {
     providerID: string
     variant: string
   }
-}
-
-export type SessionMessageSynthetic = {
-  id: string
-  metadata?: {
-    [key: string]: unknown
-  }
-  time: {
-    created: number
-  }
-  sessionID: string
-  text: string
-  type: "synthetic"
-}
-
-export type SessionMessageShell = {
-  id: string
-  metadata?: {
-    [key: string]: unknown
-  }
-  time: {
-    created: number
-    completed?: number
-  }
-  type: "shell"
-  callID: string
-  command: string
-  output: string
 }
 
 export type SessionMessageAssistantText = {
@@ -3588,6 +3544,62 @@ export type SessionMessageAssistant = {
     }
   }
   error?: SessionErrorUnknown
+}
+
+export type SessionMessageAgentSwitched = {
+  id: string
+  metadata?: {
+    [key: string]: unknown
+  }
+  time: {
+    created: number
+  }
+  type: "agent-switched"
+  agent: string
+}
+
+export type SessionMessageModelSwitched = {
+  id: string
+  metadata?: {
+    [key: string]: unknown
+  }
+  time: {
+    created: number
+  }
+  type: "model-switched"
+  model: {
+    id: string
+    providerID: string
+    variant: string
+  }
+}
+
+export type SessionMessageSynthetic = {
+  id: string
+  metadata?: {
+    [key: string]: unknown
+  }
+  time: {
+    created: number
+  }
+  sessionID: string
+  text: string
+  type: "synthetic"
+}
+
+export type SessionMessageShell = {
+  id: string
+  metadata?: {
+    [key: string]: unknown
+  }
+  time: {
+    created: number
+    completed?: number
+  }
+  type: "shell"
+  callID: string
+  command: string
+  output: string
 }
 
 export type SessionMessageCompaction = {
@@ -6778,9 +6790,9 @@ export type V2SessionPromptData = {
 
 export type V2SessionPromptResponses = {
   /**
-   * Session.Message
+   * V2PromptResponse
    */
-  200: SessionMessage
+  200: V2PromptResponse
 }
 
 export type V2SessionPromptResponse = V2SessionPromptResponses[keyof V2SessionPromptResponses]
@@ -7247,9 +7259,9 @@ export type V2SessionCommandData = {
 
 export type V2SessionCommandResponses = {
   /**
-   * <No Content>
+   * V2CommandResponse
    */
-  204: void
+  200: V2CommandResponse
 }
 
 export type V2SessionCommandResponse = V2SessionCommandResponses[keyof V2SessionCommandResponses]

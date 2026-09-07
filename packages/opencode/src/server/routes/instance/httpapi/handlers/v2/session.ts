@@ -288,8 +288,7 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "v2.session
       .handle(
         "command",
         Effect.fn(function* (ctx) {
-          yield* session.command({ ...ctx.payload, sessionID: ctx.params.sessionID })
-          return HttpApiSchema.NoContent.make()
+          return yield* session.command({ ...ctx.payload, sessionID: ctx.params.sessionID })
         }),
       )
       .handle(

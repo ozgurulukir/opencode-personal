@@ -45,4 +45,10 @@ export class Prompt extends Schema.Class<Prompt>("Prompt")({
   files: Schema.Array(FileAttachment).pipe(Schema.optional),
   agents: Schema.Array(AgentAttachment).pipe(Schema.optional),
   subtask: SubtaskAttachment.pipe(Schema.optional),
+  // Audience routing (ACP parity): assistant-only context blocks and
+  // user-only display blocks. The projector emits synthetic blocks as
+  // separate Synthetic messages; ignored blocks stay display-only on the
+  // V1 parts (excluded from the LLM payload).
+  synthetic: Schema.Array(Schema.String).pipe(Schema.optional),
+  ignored: Schema.Array(Schema.String).pipe(Schema.optional),
 }) {}

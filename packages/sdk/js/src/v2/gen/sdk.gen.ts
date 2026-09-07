@@ -4451,7 +4451,7 @@ export class Session3 extends HeyApiClient {
   /**
    * Send v2 message
    *
-   * Create a v2 session message and queue it for the agent loop.
+   * Create a v2 session message and queue it for the agent loop. Returns the projected user message and, for synchronous delivery, the final assistant message.
    */
   public prompt<ThrowOnError extends boolean = false>(
     parameters: {
@@ -5057,7 +5057,7 @@ export class Session3 extends HeyApiClient {
   /**
    * Run v2 session command
    *
-   * Run a command in a v2 session. Output is delivered through session events.
+   * Run a command in a v2 session. Output is delivered through session events; the response carries the projected user and final assistant messages.
    */
   public command<ThrowOnError extends boolean = false>(
     parameters: {
