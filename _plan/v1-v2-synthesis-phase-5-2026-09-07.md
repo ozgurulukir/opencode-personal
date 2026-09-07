@@ -1,7 +1,7 @@
 # V1/V2 Synthesis — Phase 5: message model adoption, engine re-homing, V1 deletion
 
 Date: 2026-09-07
-Status: IN PROGRESS — 5a done, 5b/5c/5d/5e/5f pending
+Status: IN PROGRESS — 5a done, 5b done, 5c/5d/5e/5f pending
 Depends on: Phase 4 (complete — commit `9d9fe54bc`, build verified)
 
 ## Goal
@@ -87,16 +87,52 @@ live behind `V2Session` emitting `SessionEvent.*` natively.
   `test:unit` 469/469; full `test/server/` retains only the documented pre-existing
   pair + provider parallel-load flakes.
 
-### 5b — V2 message model gap closure
+### 5b — V2 message model gap closure — DONE (2026-09-07, narrowed scope)
 
-- Census what the 18 `part[]` consumers actually read (per part type) before
-  deciding representations.
-- Extend `SessionMessage` content: assistant `file` items; `subtask` item (agent
-  part + nested session link); `retry` item; decide `agent` part representation
-  (likely a content item with agent name, mirroring `agent-switched`).
-- Wire the projectors/message-updater: consume the corresponding `session.next.*`
-  events (extend the bridge if a V1 event has no V2 translation — e.g. retry).
-- Keep V1 slices untouched in this batch (additive only).
+**Census result (per part type, creation sites × consumers × V2 representation):**
+
+| V1 part | Created | UI consumers | V2 representation | Verdict |
+|---|---|---|---|---|
+| text/file/agent (user) | `create-user-message.ts` reduce | TUI index/dialogs, app prompt | `User.text`/`files`/`agents` | covered |
+| subtask (user) | `loop/command.ts:118` | `cli/cmd/export.ts` ONLY (no TUI/app renderer) | **DROPPED** — reduce has no subtask branch | **REAL GAP** |
+| text/reasoning/tool (assistant) | processor | everywhere | `Assistant.content` | covered |
+| step-start/step-finish/patch (assistant) | processor | app explicitly SKIPS (`SKIP_PARTS`) | none | no consumer → skip |
+| compaction (assistant part) | `compaction.ts:686` | TUI index:1331 presence-check only | `Compaction` message class (started/delta/ended events, direct from V1) | covered (auto/overflow/tail_start_id unread by anyone) |
+| retry (part) | **DEAD** — zero creation sites | none | `session.next.retried` event + status | N/A |
+| snapshot (part) | **DEAD** | none | none | N/A |
+
+**Plan corrections (the census was the decision procedure — it overruled 4 of 5 claims):**
+- "assistant `file` items" — wrong: both file-part creation sites are USER messages;
+  `User.files` covers them. No work.
+- "`retry` item" — YAGNI: `RetryPart` is a dead type; retry UX flows via the
+  `session.next.retried` event + session status, both already in V2. No work.
+- "`agent` part representation" — already done: `User.agents` + `AgentSwitched`
+  message class. No work.
+- compaction part fields (`auto`/`overflow`/`tail_start_id`) — no consumer reads
+  them (TUI renders a divider on presence). No work.
+- "nested session link" in subtask — speculative: `SubtaskPart` carries no session
+  ID (child link lives on the child session's `parent`).
+
+**Remaining 5b work (one change): subtask preservation in the V2 prompt projection** — SHIPPED
+- `session-prompt.ts`: `SubtaskAttachment` class (agent/description/prompt +
+  optional model/command) + optional `subtask` on `Prompt`.
+- `create-user-message.ts`: `subtask` branch in the prompt reduce (mirrors the
+  file/agent branches; builds a `SubtaskAttachment` instance).
+- `v2/session-message.ts`: optional `subtask` on the `User` class.
+- `v2/session-message-updater.ts`: passes `subtask` through in the prompted handler.
+- SDK regenerated; typecheck clean in both `opencode` and `app` (stale
+  tsbuildinfo cleared first).
+- Characterization test: `prompted event with subtask stores subtask on user
+  message` (`test/v2/session-message-updater.test.ts`, 5/5). Note: the event
+  payload must carry a `SubtaskAttachment` INSTANCE — `new SessionMessage.User()`
+  validates nested class fields strictly (plain objects throw; same latent
+  replay caveat as files/agents, pre-existing).
+- No bridge extension needed: subtask rides the existing `session.next.prompted`
+  event; compaction/retry events already flow directly from V1 code.
+- Suite status: `test/v2/` + `test/session/` show only pre-existing timing flakes
+  (baseline-verified via stash: identical failure sets, different victims per
+  run); server key suites retain only the documented 404-responseStyle failure;
+  run+tui 336/336.
 
 ### 5c — Message model adoption (consumers)
 
