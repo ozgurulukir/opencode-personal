@@ -25,10 +25,8 @@ export const layer = Layer.effect(
     const bus = yield* Bus.Service
 
     const translate = (type: string, props: any): Effect.Effect<void> => {
-      // NOTE: the schema declares V2Schema.DateTimeUtcFromMillis (millis on the
-      // wire) but sync.run publishes raw values, so this DateTime JSON-serializes
-      // as an ISO string over SSE. The TUI sync context normalizes both shapes.
-      // Root fix (encode at publish) is deferred to phase 5.
+      // The schema declares V2Schema.DateTimeUtcFromMillis (millis on the
+      // wire); SyncEvent.process encodes this DateTime to millis at publish.
       const timestamp = DateTime.makeUnsafe(Date.now())
       switch (type) {
         case "session.updated":

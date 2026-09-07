@@ -12,17 +12,8 @@ import { Schema } from "effect"
 const decodeMessage = Schema.decodeUnknownSync(SessionMessage.Message)
 type SessionMessageData = NonNullable<(typeof SessionMessageTable.$inferInsert)["data"]>
 
-function encodeDateTimes(value: unknown): unknown {
-  if (DateTime.isDateTime(value)) return DateTime.toEpochMillis(value)
-  if (Array.isArray(value)) return value.map(encodeDateTimes)
-  if (typeof value === "object" && value !== null) {
-    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, encodeDateTimes(item)]))
-  }
-  return value
-}
-
 function encodeMessageData(value: unknown): SessionMessageData {
-  return encodeDateTimes(value) as SessionMessageData
+  return SyncEvent.encodeDateTimes(value) as SessionMessageData
 }
 
 function sqlite(db: Database.TxOrDb, sessionID: SessionID): SessionMessageUpdater.Adapter<void> {
