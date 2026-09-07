@@ -45,12 +45,13 @@ when the caller knows the intended agent (e.g., `subagent()` passes `input.agent
 
 ## V2 Info schema — wiring new fields
 
-The V2 `Info` schema (`v2/session.ts`) is a partial projection of V1 `Session.Info`
-(some V1 fields are intentionally not surfaced: `permission`, `revert`, `summary`,
-`share`, `version`). When adding support for a new field, add it to the schema AND
-wire it in both `fromRow()` (DB row → V2 Info) and `toV2Info()` (V1 Info → V2 Info).
-Missing `toV2Info` causes the field to be lost when V1 `Session.create` returns data
-through the delegation bridge.
+The V2 `Info` schema (`v2/session.ts`) is a near-complete projection of V1 `Session.Info`.
+The only intentionally omitted field is `summary.diffs` (lives in session_diff storage,
+assembled by V1 separately). `revert` IS projected — it is a SessionTable JSON column and
+its field schema is reused from `Session.Info.fields.revert` so both projections stay in
+sync. When adding support for a new field, add it to the schema AND wire it in both
+`fromRow()` (DB row → V2 Info) and `toV2Info()` (V1 Info → V2 Info). Missing `toV2Info`
+causes the field to be lost when V1 `Session.create` returns data through the delegation bridge.
 
 ## V2 subagent() service dependencies
 

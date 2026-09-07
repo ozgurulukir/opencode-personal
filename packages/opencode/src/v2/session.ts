@@ -1,5 +1,5 @@
 import { SessionMessageTable, SessionTable } from "@/session/session.sql"
-import { MessageID, SessionID } from "@/session/schema"
+import { MessageID, PartID, SessionID } from "@/session/schema"
 import { ModelID, ProviderID } from "@/provider/schema"
 import { WorkspaceID } from "@/control-plane/schema"
 import { and, asc, desc, eq, gt, gte, isNull, like, lt, or, type SQL } from "@/storage/db"
@@ -65,8 +65,9 @@ export class Info extends Schema.Class<Info>("Session.Info")({
     }),
   ),
   share: optionalOmitUndefined(Schema.Struct({ url: Schema.String })),
-  // `revert` is intentionally omitted: transient revert state, not a SessionTable
-  // column. Revisit with the revert/unrevert endpoints (phase 3c).
+  // Revert state is a SessionTable JSON column; the field schema is reused from
+  // V1 `Session.Info` so both projections stay in sync (SSOT).
+  revert: Session.Info.fields.revert,
   // `summary.diffs` is intentionally omitted from the row projection — it lives in
   // session_diff storage and is assembled by V1 separately.
 }) {}
@@ -161,6 +162,9 @@ export interface Interface {
     providerID: ProviderID
     modelID: ModelID
   }) => Effect.Effect<boolean, never>
+  readonly command: (input: SessionPrompt.CommandInput) => Effect.Effect<void, never>
+  readonly revert: (input: { sessionID: SessionID; messageID: MessageID; partID?: PartID }) => Effect.Effect<Info, NotFoundError>
+  readonly unrevert: (sessionID: SessionID) => Effect.Effect<Info, NotFoundError>
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/v2/Session") {}
@@ -203,6 +207,7 @@ function toV2Info(info: Session.Info): Info {
         }
       : undefined,
     share: info.share,
+    revert: info.revert,
   })
 }
 
@@ -281,6 +286,7 @@ export const layer = Layer.effect(
               }
             : undefined,
         share: row.share_url ? { url: row.share_url } : undefined,
+        revert: row.revert ?? undefined,
         time: {
           created: DateTime.makeUnsafe(row.time_created),
           updated: DateTime.makeUnsafe(row.time_updated),
@@ -770,6 +776,24 @@ export const layer = Layer.effect(
           arguments: "",
         })
         return true
+      }),
+      command: Effect.fn("V2Session.command")(function* (input) {
+        // Mirrors the V2 shell style: stage the command message through V1 and
+        // discard the loop result — consumers observe output via events.
+        const promptSvc = yield* requireV1(promptV1, "SessionPrompt")
+        yield* promptSvc.command(input)
+      }),
+      revert: Effect.fn("V2Session.revert")(function* (input) {
+        const revert = yield* requireV1(revertV1, "SessionRevert")
+        yield* result.get(input.sessionID)
+        const info = yield* revert.revert(input)
+        return toV2Info(info)
+      }),
+      unrevert: Effect.fn("V2Session.unrevert")(function* (sessionID) {
+        const revert = yield* requireV1(revertV1, "SessionRevert")
+        yield* result.get(sessionID)
+        const info = yield* revert.unrevert({ sessionID })
+        return toV2Info(info)
       }),
     }
 

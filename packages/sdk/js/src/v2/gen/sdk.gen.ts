@@ -216,10 +216,12 @@ import type {
   V2SessionAbortResponses,
   V2SessionChildrenErrors,
   V2SessionChildrenResponses,
+  V2SessionCommandResponses,
   V2SessionCompactResponses,
   V2SessionContextResponses,
   V2SessionCreateErrors,
   V2SessionCreateResponses,
+  V2SessionDiffResponses,
   V2SessionForkErrors,
   V2SessionForkResponses,
   V2SessionGetErrors,
@@ -229,14 +231,21 @@ import type {
   V2SessionListResponses,
   V2SessionMessagesErrors,
   V2SessionMessagesResponses,
+  V2SessionPredictResponses,
   V2SessionPromptResponses,
   V2SessionRemoveErrors,
   V2SessionRemoveResponses,
+  V2SessionRevertErrors,
+  V2SessionRevertResponses,
   V2SessionShareErrors,
   V2SessionShareResponses,
+  V2SessionShellResponses,
   V2SessionStatusResponses,
   V2SessionSummarizeErrors,
   V2SessionSummarizeResponses,
+  V2SessionTodoResponses,
+  V2SessionUnrevertErrors,
+  V2SessionUnrevertResponses,
   V2SessionUnshareErrors,
   V2SessionUnshareResponses,
   V2SessionUpdateErrors,
@@ -4956,6 +4965,274 @@ export class Session3 extends HeyApiClient {
         ...options?.headers,
         ...params.headers,
       },
+    })
+  }
+
+  /**
+   * Get v2 session todo list
+   *
+   * Retrieve the todo list items for a v2 session.
+   */
+  public todo<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ): RequestResult<V2SessionTodoResponses, unknown, ThrowOnError> {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<V2SessionTodoResponses, unknown, ThrowOnError>({
+      url: "/api/session/{sessionID}/todo",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Get v2 session diff
+   *
+   * Retrieve the file diffs recorded for a v2 session, optionally up to a specific message.
+   */
+  public diff<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+      workspace?: string
+      messageID?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ): RequestResult<V2SessionDiffResponses, unknown, ThrowOnError> {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "query", key: "messageID" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<V2SessionDiffResponses, unknown, ThrowOnError>({
+      url: "/api/session/{sessionID}/diff",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Run v2 session command
+   *
+   * Run a command in a v2 session. Output is delivered through session events.
+   */
+  public command<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+      workspace?: string
+      messageID?: string
+      agent?: string
+      model?: string
+      arguments: string
+      command: string
+      variant?: string
+      parts?: Array<{
+        id?: string
+        type: "file"
+        mime: string
+        filename?: string
+        url: string
+        source?: FilePartSource
+      }>
+    },
+    options?: Options<never, ThrowOnError>,
+  ): RequestResult<V2SessionCommandResponses, unknown, ThrowOnError> {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "messageID" },
+            { in: "body", key: "agent" },
+            { in: "body", key: "model" },
+            { in: "body", key: "arguments" },
+            { in: "body", key: "command" },
+            { in: "body", key: "variant" },
+            { in: "body", key: "parts" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<V2SessionCommandResponses, unknown, ThrowOnError>({
+      url: "/api/session/{sessionID}/command",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Run v2 session shell command
+   *
+   * Run a shell command in a v2 session. Output is delivered through session events.
+   */
+  public shell<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+      workspace?: string
+      command: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ): RequestResult<V2SessionShellResponses, unknown, ThrowOnError> {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "command" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<V2SessionShellResponses, unknown, ThrowOnError>({
+      url: "/api/session/{sessionID}/shell",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Revert v2 session
+   *
+   * Revert a v2 session back to a previous message.
+   */
+  public revert<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+      workspace?: string
+      messageID: string
+      partID?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ): RequestResult<V2SessionRevertResponses, V2SessionRevertErrors, ThrowOnError> {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "messageID" },
+            { in: "body", key: "partID" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<V2SessionRevertResponses, V2SessionRevertErrors, ThrowOnError>({
+      url: "/api/session/{sessionID}/revert",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Unrevert v2 session
+   *
+   * Restore a v2 session that was previously reverted.
+   */
+  public unrevert<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ): RequestResult<V2SessionUnrevertResponses, V2SessionUnrevertErrors, ThrowOnError> {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<V2SessionUnrevertResponses, V2SessionUnrevertErrors, ThrowOnError>({
+      url: "/api/session/{sessionID}/unrevert",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Predict next v2 prompt
+   *
+   * Predict the next prompt for a v2 session. Returns an empty string when no suggestion is available.
+   */
+  public predict<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ): RequestResult<V2SessionPredictResponses, unknown, ThrowOnError> {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<V2SessionPredictResponses, unknown, ThrowOnError>({
+      url: "/api/session/{sessionID}/predict",
+      ...options,
+      ...params,
     })
   }
 

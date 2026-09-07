@@ -1,6 +1,8 @@
 import { SessionID } from "@/session/schema"
 import { SessionStatus } from "@/session/status"
 import { Session } from "@/session/session"
+import { Todo } from "@/session/todo"
+import { Snapshot } from "@/snapshot"
 import { Permission } from "@/permission"
 import { SessionMessage } from "@/v2/session-message"
 import { Prompt } from "@/v2/session-prompt"
@@ -10,7 +12,7 @@ import { HttpApiEndpoint, HttpApiError, HttpApiGroup, HttpApiSchema, OpenApi } f
 import { Authorization } from "../../middleware/authorization"
 import { InstanceContextMiddleware } from "../../middleware/instance-context"
 import { WorkspaceRoutingMiddleware, WorkspaceRoutingQuery, WorkspaceRoutingQueryFields } from "../../middleware/workspace-routing"
-import { ForkPayload, InitPayload, SummarizePayload } from "../session"
+import { CommandPayload, DiffQuery, ForkPayload, InitPayload, RevertPayload, SummarizePayload } from "../session"
 import { QueryBoolean } from "../query"
 
 export const SessionsQuery = Schema.Struct({
@@ -282,6 +284,102 @@ export const SessionGroup = HttpApiGroup.make("v2.session")
         summary: "Initialize v2 session",
         description:
           "Analyze the current application and create an AGENTS.md file with project-specific agent configurations.",
+      }),
+    ),
+  )
+  .add(
+    HttpApiEndpoint.get("todo", "/api/session/:sessionID/todo", {
+      params: { sessionID: SessionID },
+      query: WorkspaceRoutingQuery,
+      success: Schema.Array(Todo.Info),
+    }).annotateMerge(
+      OpenApi.annotations({
+        identifier: "v2.session.todo",
+        summary: "Get v2 session todo list",
+        description: "Retrieve the todo list items for a v2 session.",
+      }),
+    ),
+  )
+  .add(
+    HttpApiEndpoint.get("diff", "/api/session/:sessionID/diff", {
+      params: { sessionID: SessionID },
+      query: DiffQuery,
+      success: Schema.Array(Snapshot.FileDiff),
+    }).annotateMerge(
+      OpenApi.annotations({
+        identifier: "v2.session.diff",
+        summary: "Get v2 session diff",
+        description: "Retrieve the file diffs recorded for a v2 session, optionally up to a specific message.",
+      }),
+    ),
+  )
+  .add(
+    HttpApiEndpoint.post("command", "/api/session/:sessionID/command", {
+      params: { sessionID: SessionID },
+      query: WorkspaceRoutingQuery,
+      payload: CommandPayload,
+      success: HttpApiSchema.NoContent,
+    }).annotateMerge(
+      OpenApi.annotations({
+        identifier: "v2.session.command",
+        summary: "Run v2 session command",
+        description: "Run a command in a v2 session. Output is delivered through session events.",
+      }),
+    ),
+  )
+  .add(
+    HttpApiEndpoint.post("shell", "/api/session/:sessionID/shell", {
+      params: { sessionID: SessionID },
+      query: WorkspaceRoutingQuery,
+      payload: Schema.Struct({ command: Schema.String }),
+      success: HttpApiSchema.NoContent,
+    }).annotateMerge(
+      OpenApi.annotations({
+        identifier: "v2.session.shell",
+        summary: "Run v2 session shell command",
+        description: "Run a shell command in a v2 session. Output is delivered through session events.",
+      }),
+    ),
+  )
+  .add(
+    HttpApiEndpoint.post("revert", "/api/session/:sessionID/revert", {
+      params: { sessionID: SessionID },
+      query: WorkspaceRoutingQuery,
+      payload: RevertPayload,
+      success: SessionV2.Info,
+      error: SessionV2.NotFoundError,
+    }).annotateMerge(
+      OpenApi.annotations({
+        identifier: "v2.session.revert",
+        summary: "Revert v2 session",
+        description: "Revert a v2 session back to a previous message.",
+      }),
+    ),
+  )
+  .add(
+    HttpApiEndpoint.post("unrevert", "/api/session/:sessionID/unrevert", {
+      params: { sessionID: SessionID },
+      query: WorkspaceRoutingQuery,
+      success: SessionV2.Info,
+      error: SessionV2.NotFoundError,
+    }).annotateMerge(
+      OpenApi.annotations({
+        identifier: "v2.session.unrevert",
+        summary: "Unrevert v2 session",
+        description: "Restore a v2 session that was previously reverted.",
+      }),
+    ),
+  )
+  .add(
+    HttpApiEndpoint.post("predict", "/api/session/:sessionID/predict", {
+      params: { sessionID: SessionID },
+      query: WorkspaceRoutingQuery,
+      success: Schema.Struct({ prediction: Schema.String }),
+    }).annotateMerge(
+      OpenApi.annotations({
+        identifier: "v2.session.predict",
+        summary: "Predict next v2 prompt",
+        description: "Predict the next prompt for a v2 session. Returns an empty string when no suggestion is available.",
       }),
     ),
   )

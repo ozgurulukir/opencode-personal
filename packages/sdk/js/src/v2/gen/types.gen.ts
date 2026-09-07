@@ -3186,6 +3186,12 @@ export type SessionInfo = {
   share?: {
     url: string
   }
+  revert?: {
+    messageID: string
+    partID?: string
+    snapshot?: string
+    diff?: string
+  }
 }
 
 export type SessionDelivery = "immediate" | "deferred"
@@ -6950,6 +6956,194 @@ export type V2SessionInitResponses = {
 }
 
 export type V2SessionInitResponse = V2SessionInitResponses[keyof V2SessionInitResponses]
+
+export type V2SessionTodoData = {
+  body?: never
+  path: {
+    sessionID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/api/session/{sessionID}/todo"
+}
+
+export type V2SessionTodoResponses = {
+  /**
+   * Success
+   */
+  200: Array<Todo>
+}
+
+export type V2SessionTodoResponse = V2SessionTodoResponses[keyof V2SessionTodoResponses]
+
+export type V2SessionDiffData = {
+  body?: never
+  path: {
+    sessionID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+    messageID?: string
+  }
+  url: "/api/session/{sessionID}/diff"
+}
+
+export type V2SessionDiffResponses = {
+  /**
+   * Success
+   */
+  200: Array<SnapshotFileDiff>
+}
+
+export type V2SessionDiffResponse = V2SessionDiffResponses[keyof V2SessionDiffResponses]
+
+export type V2SessionCommandData = {
+  body?: {
+    messageID?: string
+    agent?: string
+    model?: string
+    arguments: string
+    command: string
+    variant?: string
+    parts?: Array<{
+      id?: string
+      type: "file"
+      mime: string
+      filename?: string
+      url: string
+      source?: FilePartSource
+    }>
+  }
+  path: {
+    sessionID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/api/session/{sessionID}/command"
+}
+
+export type V2SessionCommandResponses = {
+  /**
+   * <No Content>
+   */
+  204: void
+}
+
+export type V2SessionCommandResponse = V2SessionCommandResponses[keyof V2SessionCommandResponses]
+
+export type V2SessionShellData = {
+  body?: {
+    command: string
+  }
+  path: {
+    sessionID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/api/session/{sessionID}/shell"
+}
+
+export type V2SessionShellResponses = {
+  /**
+   * <No Content>
+   */
+  204: void
+}
+
+export type V2SessionShellResponse = V2SessionShellResponses[keyof V2SessionShellResponses]
+
+export type V2SessionRevertData = {
+  body?: {
+    messageID: string
+    partID?: string
+  }
+  path: {
+    sessionID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/api/session/{sessionID}/revert"
+}
+
+export type V2SessionRevertErrors = {
+  /**
+   * Session.NotFoundError
+   */
+  404: SessionNotFoundError
+}
+
+export type V2SessionRevertError = V2SessionRevertErrors[keyof V2SessionRevertErrors]
+
+export type V2SessionRevertResponses = {
+  /**
+   * Session.Info
+   */
+  200: SessionInfo
+}
+
+export type V2SessionRevertResponse = V2SessionRevertResponses[keyof V2SessionRevertResponses]
+
+export type V2SessionUnrevertData = {
+  body?: never
+  path: {
+    sessionID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/api/session/{sessionID}/unrevert"
+}
+
+export type V2SessionUnrevertErrors = {
+  /**
+   * Session.NotFoundError
+   */
+  404: SessionNotFoundError
+}
+
+export type V2SessionUnrevertError = V2SessionUnrevertErrors[keyof V2SessionUnrevertErrors]
+
+export type V2SessionUnrevertResponses = {
+  /**
+   * Session.Info
+   */
+  200: SessionInfo
+}
+
+export type V2SessionUnrevertResponse = V2SessionUnrevertResponses[keyof V2SessionUnrevertResponses]
+
+export type V2SessionPredictData = {
+  body?: never
+  path: {
+    sessionID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/api/session/{sessionID}/predict"
+}
+
+export type V2SessionPredictResponses = {
+  /**
+   * Success
+   */
+  200: {
+    prediction: string
+  }
+}
+
+export type V2SessionPredictResponse = V2SessionPredictResponses[keyof V2SessionPredictResponses]
 
 export type V2SessionMessagesData = {
   body?: never

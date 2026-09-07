@@ -1,5 +1,10 @@
 import { WorkspaceID } from "@/control-plane/schema"
+import * as InstanceState from "@/effect/instance-state"
+import { InstanceRef, WorkspaceRef } from "@/effect/instance-ref"
+import { SessionPrompt } from "@/session/prompt"
 import { SessionStatus } from "@/session/status"
+import { SessionSummary } from "@/session/summary"
+import { Todo } from "@/session/todo"
 import { SessionShare } from "@/share/session"
 import { SessionV2 } from "@/v2/session"
 import { Effect, Schema } from "effect"
@@ -70,6 +75,9 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "v2.session
     const session = yield* SessionV2.Service
     const statusSvc = yield* SessionStatus.Service
     const shareSvc = yield* SessionShare.Service
+    const todoSvc = yield* Todo.Service
+    const summarySvc = yield* SessionSummary.Service
+    const promptSvc = yield* SessionPrompt.Service
 
     return handlers
       .handle(
@@ -234,6 +242,65 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "v2.session
             providerID: ctx.payload.providerID,
             modelID: ctx.payload.modelID,
           })
+        }),
+      )
+      .handle(
+        "todo",
+        Effect.fn(function* (ctx) {
+          return yield* todoSvc.get(ctx.params.sessionID)
+        }),
+      )
+      .handle(
+        "diff",
+        Effect.fn(function* (ctx) {
+          return yield* summarySvc.diff({ sessionID: ctx.params.sessionID, messageID: ctx.query.messageID })
+        }),
+      )
+      .handle(
+        "command",
+        Effect.fn(function* (ctx) {
+          yield* session.command({ ...ctx.payload, sessionID: ctx.params.sessionID })
+          return HttpApiSchema.NoContent.make()
+        }),
+      )
+      .handle(
+        "shell",
+        Effect.fn(function* (ctx) {
+          yield* session.shell({ sessionID: ctx.params.sessionID, command: ctx.payload.command })
+          return HttpApiSchema.NoContent.make()
+        }),
+      )
+      .handle(
+        "revert",
+        Effect.fn(function* (ctx) {
+          return yield* session.revert({
+            sessionID: ctx.params.sessionID,
+            messageID: ctx.payload.messageID,
+            partID: ctx.payload.partID,
+          })
+        }),
+      )
+      .handle(
+        "unrevert",
+        Effect.fn(function* (ctx) {
+          return yield* session.unrevert(ctx.params.sessionID)
+        }),
+      )
+      .handle(
+        "predict",
+        Effect.fn(function* (ctx) {
+          const instance = yield* InstanceState.context
+          const workspace = yield* InstanceState.workspaceID
+          // Best-effort: predict never throws upward — the TUI treats an empty
+          // string the same as a hidden suggestion.
+          const prediction = yield* promptSvc
+            .predict({ sessionID: ctx.params.sessionID })
+            .pipe(
+              Effect.provideService(InstanceRef, instance),
+              Effect.provideService(WorkspaceRef, workspace),
+              Effect.catch(() => Effect.succeed("")),
+            )
+          return { prediction }
         }),
       )
   }),
