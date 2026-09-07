@@ -215,7 +215,7 @@ export function DialogSessionList() {
               setDeletingID(option.value)
 
               try {
-                const result = await sdk.client.session.delete({
+                const result = await sdk.client.v2.session.remove({
                   sessionID: option.value,
                 })
                 if (result.error) {

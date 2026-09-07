@@ -508,7 +508,7 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
 
           const key = keyFor(directory, sessionID)
           return runInflight(inflightDiff, key, () =>
-            retry(() => client.session.diff({ sessionID })).then((diff) => {
+            retry(() => client.v2.session.diff({ sessionID })).then((diff) => {
               if (!tracked(directory, sessionID)) return
               setStore("session_diff", sessionID, reconcile(list(diff.data), { key: "file" }))
             }),
@@ -534,7 +534,7 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
 
           const key = keyFor(directory, sessionID)
           return runInflight(inflightTodo, key, () =>
-            retry(() => client.session.todo({ sessionID })).then((todo) => {
+            retry(() => client.v2.session.todo({ sessionID })).then((todo) => {
               if (!tracked(directory, sessionID)) return
               const list = todo.data ?? []
               setStore("todo", sessionID, reconcile(list, { key: "id" }))
@@ -601,7 +601,7 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
           const directory = sdk.directory
           const client = sdk.client
           const [, setStore] = globalSync.child(directory)
-          await client.session.update({ sessionID, time: { archived: Date.now() } })
+          await client.v2.session.update({ sessionID, time: { archived: Date.now() } })
           setStore(
             produce((draft) => {
               const match = Binary.search(draft.session, sessionID, (s) => s.id)

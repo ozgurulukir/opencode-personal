@@ -78,14 +78,16 @@ describe("sendFollowupDraft", () => {
   const commands = [{ name: "test" }]
 
   const createClient = (overrides: { commandError?: Error; promptError?: Error } = {}) => ({
-    session: {
-      command: async () => {
-        if (overrides.commandError) throw overrides.commandError
-        return { data: undefined }
-      },
-      promptAsync: async () => {
-        if (overrides.promptError) throw overrides.promptError
-        return { data: undefined }
+    v2: {
+      session: {
+        command: async () => {
+          if (overrides.commandError) throw overrides.commandError
+          return { data: undefined }
+        },
+        promptAsync: async () => {
+          if (overrides.promptError) throw overrides.promptError
+          return { data: undefined }
+        },
       },
     },
   })

@@ -48,9 +48,13 @@ const clientFor = (directory: string) => {
         return { data: undefined }
       },
       prompt: async () => ({ data: undefined }),
-      promptAsync: async () => ({ data: undefined }),
-      command: async () => ({ data: undefined }),
-      abort: async () => ({ data: undefined }),
+    },
+    v2: {
+      session: {
+        promptAsync: async () => ({ data: undefined }),
+        command: async () => ({ data: undefined }),
+        abort: async () => ({ data: undefined }),
+      },
     },
     worktree: {
       create: async () => ({ data: { directory: `${directory}/new` } }),

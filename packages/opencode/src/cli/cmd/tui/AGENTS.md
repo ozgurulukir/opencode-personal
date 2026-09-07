@@ -73,7 +73,7 @@ This file covers TUI-specific patterns for `packages/opencode/src/cli/cmd/tui/`.
 - Prompt: `store.interrupt` (SolidJS store, component-local)
 - Footer: `state().interrupt` (class signal, footer-owned)
 
-They have the same name and same two-press pattern, but different substrates, different timer guards, and different second-press actions (`sdk.client.session.abort` vs `options.onInterrupt`). Do not attempt to unify them.
+They have the same name and same two-press pattern, but different substrates, different timer guards, and different second-press actions (`sdk.client.v2.session.abort` vs `options.onInterrupt`). Do not attempt to unify them.
 
 ## Unified TUI Spinner component
 

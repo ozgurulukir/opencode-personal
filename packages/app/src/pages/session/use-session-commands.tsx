@@ -182,8 +182,7 @@ export const useSessionCommands = (actions: SessionCommandContext) => {
       return
     }
 
-    const url = await sdk.client.session
-      .share({ sessionID })
+    const url = await sdk.client.v2.session.share({ sessionID })
       .then((res) => res.data?.share?.url)
       .catch(() => undefined)
     if (!url) {
@@ -202,8 +201,7 @@ export const useSessionCommands = (actions: SessionCommandContext) => {
     const sessionID = params.id
     if (!sessionID) return
 
-    await sdk.client.session
-      .unshare({ sessionID })
+    await sdk.client.v2.session.unshare({ sessionID })
       .then(() =>
         showToast({
           title: language.t("toast.session.unshare.success.title"),
@@ -291,14 +289,14 @@ export const useSessionCommands = (actions: SessionCommandContext) => {
     if (!sessionID) return
 
     if (status().type !== "idle") {
-      await sdk.client.session.abort({ sessionID }).catch(() => {})
+      await sdk.client.v2.session.abort({ sessionID }).catch(() => {})
     }
 
     const revert = info()?.revert?.messageID
     const message = findLast(userMessages(), (x) => !revert || x.id < revert)
     if (!message) return
 
-    await sdk.client.session.revert({ sessionID, messageID: message.id })
+    await sdk.client.v2.session.revert({ sessionID, messageID: message.id })
     const parts = sync.data.part[message.id]
     if (parts) {
       const restored = extractPromptFromParts(parts, { directory: sdk.directory })
@@ -318,14 +316,14 @@ export const useSessionCommands = (actions: SessionCommandContext) => {
 
     const next = userMessages().find((x) => x.id > revertMessageID)
     if (!next) {
-      await sdk.client.session.unrevert({ sessionID })
+      await sdk.client.v2.session.unrevert({ sessionID })
       prompt.reset()
       const last = findLast(userMessages(), (x) => x.id >= revertMessageID)
       setActiveMessage(last)
       return
     }
 
-    await sdk.client.session.revert({ sessionID, messageID: next.id })
+    await sdk.client.v2.session.revert({ sessionID, messageID: next.id })
     const prev = findLast(userMessages(), (x) => x.id < next.id)
     setActiveMessage(prev)
   }
@@ -343,7 +341,7 @@ export const useSessionCommands = (actions: SessionCommandContext) => {
       return
     }
 
-    await sdk.client.session.summarize({
+    await sdk.client.v2.session.summarize({
       sessionID,
       modelID: model.id,
       providerID: model.provider.id,

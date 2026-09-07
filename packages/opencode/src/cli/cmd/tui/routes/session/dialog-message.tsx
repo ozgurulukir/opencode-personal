@@ -29,7 +29,7 @@ export function DialogMessage(props: {
             const msg = message()
             if (!msg) return
 
-            void sdk.client.session.revert({
+            void sdk.client.v2.session.revert({
               sessionID: props.sessionID,
               messageID: msg.id,
             })
@@ -77,7 +77,7 @@ export function DialogMessage(props: {
           value: "session.fork",
           description: "create a new session",
           onSelect: async (dialog) => {
-            const result = await sdk.client.session.fork({
+            const result = await sdk.client.v2.session.fork({
               sessionID: props.sessionID,
               messageID: props.messageID,
             })

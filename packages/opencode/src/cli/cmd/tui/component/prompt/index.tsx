@@ -232,7 +232,7 @@ export function Prompt(props: PromptProps) {
     }, 5000)
 
     if (store.interrupt >= 2) {
-      void sdk.client.session.abort({
+      void sdk.client.v2.session.abort({
         sessionID: props.sessionID,
       })
       setStore("interrupt", 0)
@@ -369,7 +369,7 @@ export function Prompt(props: PromptProps) {
     if (props.showPlaceholder === false) return
     const token = ++ghostRequest
     const userMessageID = lastUserMessage()?.id
-    const res = await sdk.client.session.predict({ sessionID }).catch(() => undefined)
+    const res = await sdk.client.v2.session.predict({ sessionID }).catch(() => undefined)
     const text = res?.data?.prediction?.trim()
     if (!text) return
     // Drop the result if anything that defined its context changed while the
@@ -1275,7 +1275,7 @@ export function Prompt(props: PromptProps) {
       const restOfInput = firstLineEnd === -1 ? "" : inputText.slice(firstLineEnd + 1)
       const args = firstLineArgs.join(" ") + (restOfInput ? "\n" + restOfInput : "")
 
-      void sdk.client.session.command({
+      void sdk.client.v2.session.command({
         sessionID,
         command: command.slice(1),
         arguments: args,

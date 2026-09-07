@@ -605,7 +605,7 @@ function createLayer(input: StreamInput) {
             [
               messages(input.sessionID, SUBAGENT_BOOTSTRAP_LIMIT),
               Effect.promise(() =>
-                input.sdk.session.children({
+                input.sdk.v2.session.children({
                   sessionID: input.sessionID,
                 }),
               ).pipe(
@@ -707,7 +707,7 @@ function createLayer(input: StreamInput) {
         })
 
         const idle = Effect.fn("RunStreamTransport.idle")((fallback: boolean) =>
-          Effect.promise(() => input.sdk.session.status()).pipe(
+          Effect.promise(() => input.sdk.v2.session.status()).pipe(
             Effect.map((out) => {
               const item = out.data?.[input.sessionID]
               return !item || item.type === "idle"
@@ -974,23 +974,21 @@ const reconnect = Effect.fn("RunStreamTransport.reconnect")(function* () {
               }).pipe(
                 Effect.andThen(
                   Effect.promise(() =>
-                    input.sdk.session.command(
-                      {
-                        sessionID: input.sessionID,
-                        agent: next.agent,
-                        model: next.model ? `${next.model.providerID}/${next.model.modelID}` : undefined,
-                        variant: next.variant,
-                        command: command.name,
-                        arguments: command.arguments,
-                        parts: [
-                          ...(next.includeFiles ? next.files : []),
-                          ...next.prompt.parts.filter(
-                            (item): item is Extract<RunPromptPart, { type: "file" }> => item.type === "file",
-                          ),
-                        ],
-                      },
-                      { signal: turn.signal },
-                    ),
+                    input.sdk.v2.session.command({
+                      sessionID: input.sessionID,
+                      agent: next.agent,
+                      model: next.model ? `${next.model.providerID}/${next.model.modelID}` : undefined,
+                      variant: next.variant,
+                      command: command.name,
+                      arguments: command.arguments,
+                      parts: [
+                        ...(next.includeFiles ? next.files : []),
+                        ...next.prompt.parts.filter(
+                          (item): item is Extract<RunPromptPart, { type: "file" }> => item.type === "file",
+                        ),
+                      ],
+                    },
+                    { signal: turn.signal },),
                   ).pipe(
                     Effect.tap(() =>
                       Effect.sync(() => {
@@ -1014,7 +1012,7 @@ const reconnect = Effect.fn("RunStreamTransport.reconnect")(function* () {
               }).pipe(
                 Effect.andThen(
                   Effect.promise(() =>
-                    input.sdk.session.promptAsync(req, {
+                    input.sdk.v2.session.promptAsync(req, {
                       signal: turn.signal,
                     }),
                   ),

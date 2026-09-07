@@ -447,10 +447,9 @@ export function Session() {
           if (ok !== true) return
           kv.set("share_consent", true)
         }
-        await sdk.client.session
-          .share({
-            sessionID: route.sessionID,
-          })
+        await sdk.client.v2.session.share({
+          sessionID: route.sessionID,
+        })
           .then((res) => copy(res.data!.share!.url))
           .catch((error) => {
             toast.show({
@@ -549,7 +548,7 @@ export function Session() {
         })
 
         try {
-          const result = await sdk.client.session.summarize({
+          const result = await sdk.client.v2.session.summarize({
             sessionID: route.sessionID,
             modelID: selectedModel.modelID,
             providerID: selectedModel.providerID,
@@ -587,10 +586,9 @@ export function Session() {
         name: "unshare",
       },
       run: async () => {
-        await sdk.client.session
-          .unshare({
-            sessionID: route.sessionID,
-          })
+        await sdk.client.v2.session.unshare({
+          sessionID: route.sessionID,
+        })
           .then(() => toast.show({ message: "Session unshared successfully", variant: "success" }))
           .catch((error) => {
             toast.show({
@@ -610,15 +608,14 @@ export function Session() {
       },
       run: async () => {
         const status = sync.data.session_status?.[route.sessionID]
-        if (status?.type !== "idle") await sdk.client.session.abort({ sessionID: route.sessionID }).catch(() => {})
+        if (status?.type !== "idle") await sdk.client.v2.session.abort({ sessionID: route.sessionID }).catch(() => {})
         const revert = session()?.revert?.messageID
         const message = messages().findLast((x) => (!revert || x.id < revert) && x.role === "user")
         if (!message) return
-        void sdk.client.session
-          .revert({
-            sessionID: route.sessionID,
-            messageID: message.id,
-          })
+        void sdk.client.v2.session.revert({
+          sessionID: route.sessionID,
+          messageID: message.id,
+        })
           .then(() => {
             toBottom()
           })
@@ -652,13 +649,13 @@ export function Session() {
         if (!messageID) return
         const message = messages().find((x) => x.role === "user" && x.id > messageID)
         if (!message) {
-          void sdk.client.session.unrevert({
+          void sdk.client.v2.session.unrevert({
             sessionID: route.sessionID,
           })
           prompt?.set({ input: "", parts: [] })
           return
         }
-        void sdk.client.session.revert({
+        void sdk.client.v2.session.revert({
           sessionID: route.sessionID,
           messageID: message.id,
         })
