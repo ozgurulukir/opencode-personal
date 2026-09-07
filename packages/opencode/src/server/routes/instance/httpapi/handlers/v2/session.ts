@@ -1,15 +1,23 @@
 import { WorkspaceID } from "@/control-plane/schema"
+import { Bus } from "@/bus"
 import * as InstanceState from "@/effect/instance-state"
 import { InstanceRef, WorkspaceRef } from "@/effect/instance-ref"
+import { Permission } from "@/permission"
 import { SessionPrompt } from "@/session/prompt"
+import { MessageV2 } from "@/session/message-v2"
+import { SessionRunState } from "@/session/run-state"
 import { SessionStatus } from "@/session/status"
 import { SessionSummary } from "@/session/summary"
 import { Todo } from "@/session/todo"
+import { Session as SessionV1 } from "@/session/session"
 import { SessionShare } from "@/share/session"
+import { NotFoundError as StorageNotFoundError } from "@/storage/storage"
 import { SessionV2 } from "@/v2/session"
-import { Effect, Schema } from "effect"
+import { NamedError } from "@opencode-ai/core/util/error"
+import { Cause, Effect, Schema, Scope } from "effect"
 import { HttpApiBuilder, HttpApiError, HttpApiSchema } from "effect/unstable/httpapi"
 import { InstanceHttpApi } from "../../api"
+import { notFound } from "../../errors"
 
 const DefaultSessionsLimit = 50
 
@@ -78,6 +86,11 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "v2.session
     const todoSvc = yield* Todo.Service
     const summarySvc = yield* SessionSummary.Service
     const promptSvc = yield* SessionPrompt.Service
+    const sessionV1 = yield* SessionV1.Service
+    const runState = yield* SessionRunState.Service
+    const permissionSvc = yield* Permission.Service
+    const bus = yield* Bus.Service
+    const scope = yield* Scope.Scope
 
     return handlers
       .handle(
@@ -301,6 +314,78 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "v2.session
               Effect.catch(() => Effect.succeed("")),
             )
           return { prediction }
+        }),
+      )
+      .handle(
+        "message",
+        Effect.fn(function* (ctx) {
+          return yield* Effect.try({
+            try: () => MessageV2.get({ sessionID: ctx.params.sessionID, messageID: ctx.params.messageID }),
+            catch: (error) => error,
+          }).pipe(
+            Effect.catch((error) => (StorageNotFoundError.isInstance(error) ? Effect.fail(error) : Effect.die(error))),
+            Effect.mapError((error) => notFound(error.data.message)),
+          )
+        }),
+      )
+      .handle(
+        "deleteMessage",
+        Effect.fn(function* (ctx) {
+          yield* runState.assertNotBusy(ctx.params.sessionID)
+          yield* sessionV1.removeMessage(ctx.params)
+          return true
+        }),
+      )
+      .handle(
+        "deletePart",
+        Effect.fn(function* (ctx) {
+          yield* sessionV1.removePart(ctx.params)
+          return true
+        }),
+      )
+      .handle(
+        "updatePart",
+        Effect.fn(function* (ctx) {
+          // Schema decode produces readonly attachment arrays; the V1 handler
+          // bridges the same decode artifact with this assertion.
+          const payload = ctx.payload as MessageV2.Part
+          if (
+            payload.id !== ctx.params.partID ||
+            payload.messageID !== ctx.params.messageID ||
+            payload.sessionID !== ctx.params.sessionID
+          ) {
+            throw new Error(
+              `Part mismatch: body.id='${payload.id}' vs partID='${ctx.params.partID}', body.messageID='${payload.messageID}' vs messageID='${ctx.params.messageID}', body.sessionID='${payload.sessionID}' vs sessionID='${ctx.params.sessionID}'`,
+            )
+          }
+          return yield* sessionV1.updatePart(payload)
+        }),
+      )
+      .handle(
+        "permission",
+        Effect.fn(function* (ctx) {
+          yield* permissionSvc.reply({ requestID: ctx.params.permissionID, reply: ctx.payload.response })
+          return true
+        }),
+      )
+      .handle(
+        "promptAsync",
+        Effect.fn(function* (ctx) {
+          yield* promptSvc
+            .prompt({ ...ctx.payload, sessionID: ctx.params.sessionID })
+            .pipe(
+              Effect.catchCause((cause) =>
+                Effect.gen(function* () {
+                  yield* Effect.logError("prompt_async failed", { sessionID: ctx.params.sessionID, cause })
+                  yield* bus.publish(SessionV1.Event.Error, {
+                    sessionID: ctx.params.sessionID,
+                    error: new NamedError.Unknown({ message: Cause.pretty(cause) }).toObject(),
+                  })
+                }),
+              ),
+              Effect.forkIn(scope, { startImmediately: true }),
+            )
+          return HttpApiSchema.NoContent.make()
         }),
       )
   }),
