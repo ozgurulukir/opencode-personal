@@ -200,4 +200,17 @@ export default [
   SyncEvent.project(SessionEvent.Compaction.Ended.Sync, (db, data, event) => {
     update(db, { id: SessionMessage.ID.make(event.id), type: "session.next.compaction.ended", data })
   }),
+
+  // Lifecycle events forwarded by the V1→V2 event bridge (v2/event-bridge.ts).
+  // The V1 side already persisted the state change (SessionTable writes,
+  // todo/diff storage, permission state), so no V2-side projection is needed —
+  // these registrations exist so SyncEvent.run publishes the translated event
+  // instead of throwing "Projector not found".
+  SyncEvent.project(SessionEvent.Updated.Sync, () => {}),
+  SyncEvent.project(SessionEvent.Deleted.Sync, () => {}),
+  SyncEvent.project(SessionEvent.StatusUpdated.Sync, () => {}),
+  SyncEvent.project(SessionEvent.TodoUpdated.Sync, () => {}),
+  SyncEvent.project(SessionEvent.DiffUpdated.Sync, () => {}),
+  SyncEvent.project(SessionEvent.Permission.Asked.Sync, () => {}),
+  SyncEvent.project(SessionEvent.Permission.Replied.Sync, () => {}),
 ]

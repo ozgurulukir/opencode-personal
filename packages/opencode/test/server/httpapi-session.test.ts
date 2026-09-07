@@ -1,7 +1,7 @@
 import { afterEach, describe, expect } from "bun:test"
 import { mkdir } from "node:fs/promises"
 import path from "node:path"
-import { Effect, Layer } from "effect"
+import { Effect, Fiber, Layer } from "effect"
 import { Flag } from "@opencode-ai/core/flag/flag"
 import { registerAdapter } from "../../src/control-plane/adapters"
 import type { WorkspaceAdapter } from "../../src/control-plane/types"
@@ -9,12 +9,17 @@ import { Workspace } from "../../src/control-plane/workspace"
 import { PermissionID } from "../../src/permission/schema"
 import { ModelID, ProviderID } from "../../src/provider/schema"
 import { WithInstance } from "../../src/project/with-instance"
+import { AppRuntime, type AppServices } from "../../src/effect/app-runtime"
 import { InstanceBootstrap } from "../../src/project/bootstrap"
 import { InstanceStore } from "../../src/project/instance-store"
 import { Project } from "../../src/project/project"
 import { Server } from "../../src/server/server"
 import { SessionPaths } from "../../src/server/routes/instance/httpapi/groups/session"
 import { Session } from "@/session/session"
+import { SessionStatus } from "@/session/status"
+import { Todo } from "@/session/todo"
+import { Bus } from "@/bus"
+import { Permission } from "@/permission"
 import { MessageID, PartID, SessionID, type SessionID as SessionIDType } from "../../src/session/schema"
 import { MessageV2 } from "../../src/session/message-v2"
 import { Database } from "@/storage/db"
@@ -140,6 +145,31 @@ function withTmp<A, E, R>(
     Effect.promise(() => tmpdir(options)),
     (tmp) => Effect.promise(() => tmp[Symbol.asyncDispose]()),
   ).pipe(Effect.flatMap(fn))
+}
+
+/** Runs the bridge test inside the shared AppRuntime so the services, the
+ * event bridge, and the test's bus subscription all resolve to the SAME
+ * memoized bus instance (a fresh Effect.provide would build a parallel bus
+ * the bridge never sees). */
+function runWithServices<A, E>(directory: string, fx: Effect.Effect<A, E, AppServices>) {
+  return Effect.promise(() =>
+    WithInstance.provide({
+      directory,
+      fn: () => AppRuntime.runPromise(fx),
+    }),
+  )
+}
+
+function waitForEvent(events: Array<{ type: string }>, type: string) {
+  return Effect.gen(function* () {
+    const deadline = Date.now() + 5_000
+    while (!events.some((event) => event.type === type)) {
+      if (Date.now() > deadline) {
+        throw new Error(`timed out waiting for ${type}; saw: ${events.map((e) => e.type).join(", ") || "nothing"}`)
+      }
+      yield* Effect.sleep(20)
+    }
+  })
 }
 
 afterEach(async () => {
@@ -741,6 +771,95 @@ describe("session HttpApi", () => {
 
         const missing = yield* request(`/api/session/${SessionID.descending()}`, { headers })
         expect(missing.status).toBe(404)
+      }),
+    ),
+  )
+
+  it.live(
+    "bridges V1 session lifecycle events to the V2 event stream",
+    withTmp({ git: true, config: { formatter: false, lsp: false } }, (tmp) =>
+      Effect.gen(function* () {
+        const events: Array<{ type: string; properties: Record<string, any> }> = []
+
+        yield* runWithServices(tmp.path, Effect.gen(function* () {
+          const bus = yield* Bus.Service
+          const unsubscribe = yield* bus.subscribeAllCallback((event) => {
+            if (event.type.startsWith("session.next.")) events.push(event)
+          })
+
+          const session = yield* Session.Service.use((svc) => svc.create({ title: "bridge" }))
+
+                  // setTitle -> session.updated -> session.next.updated (create also
+                  // emits a backwards-compat session.updated, so match the LAST one)
+                  yield* Session.Service.use((svc) => svc.setTitle({ sessionID: session.id, title: "renamed" }))
+                  yield* waitForEvent(events, "session.next.updated")
+                  expect(events.findLast((e) => e.type === "session.next.updated")?.properties).toMatchObject({
+                    sessionID: session.id,
+                    info: { title: "renamed" },
+                  })
+
+                  // SessionStatus.set -> session.status -> session.next.status
+                  yield* SessionStatus.Service.use((svc) => svc.set(session.id, { type: "busy" }))
+                  yield* waitForEvent(events, "session.next.status")
+                  expect(events.find((e) => e.type === "session.next.status")?.properties).toMatchObject({
+                    sessionID: session.id,
+                    status: { type: "busy" },
+                  })
+
+                  // Todo.update -> todo.updated -> session.next.todo
+                  const todos = [{ content: "task", status: "pending" as const, priority: "high" as const }]
+                  yield* Todo.Service.use((svc) => svc.update({ sessionID: session.id, todos }))
+                  yield* waitForEvent(events, "session.next.todo")
+                  expect(events.find((e) => e.type === "session.next.todo")?.properties).toMatchObject({
+                    sessionID: session.id,
+                    todos,
+                  })
+
+                  // session.diff -> session.next.diff (published directly; the full
+                  // revert flow needs snapshot boundaries which this test skips)
+                  yield* bus.publish(Session.Event.Diff, { sessionID: session.id, diff: [] })
+                  yield* waitForEvent(events, "session.next.diff")
+                  expect(events.find((e) => e.type === "session.next.diff")?.properties).toMatchObject({
+                    sessionID: session.id,
+                    diff: [],
+                  })
+
+                  // Permission.ask -> permission.asked -> session.next.permission.asked
+                  const askFiber = yield* Permission.Service.use((svc) =>
+                    svc.ask({
+                      sessionID: session.id,
+                      permission: "bash",
+                      patterns: ["*"],
+                      metadata: {},
+                      always: [],
+                      ruleset: [{ permission: "bash", pattern: "*", action: "ask" }],
+                    }).pipe(Effect.forkChild),
+                  )
+                  yield* waitForEvent(events, "session.next.permission.asked")
+                  const asked = events.find((e) => e.type === "session.next.permission.asked")!
+                  expect(asked.properties).toMatchObject({ sessionID: session.id, request: { permission: "bash" } })
+
+                  // Permission.reply -> permission.replied -> session.next.permission.replied
+                  yield* Permission.Service.use((svc) =>
+                    svc.reply({ requestID: asked.properties.request.id, reply: "once" }),
+                  )
+                  yield* waitForEvent(events, "session.next.permission.replied")
+                  expect(events.find((e) => e.type === "session.next.permission.replied")?.properties).toMatchObject({
+                    sessionID: session.id,
+                    requestID: asked.properties.request.id,
+                    reply: "once",
+                  })
+                  yield* Fiber.await(askFiber)
+
+                  // Session.remove -> session.deleted -> session.next.deleted
+                  yield* Session.Service.use((svc) => svc.remove(session.id))
+                  yield* waitForEvent(events, "session.next.deleted")
+                  expect(events.find((e) => e.type === "session.next.deleted")?.properties).toMatchObject({
+                    sessionID: session.id,
+                  })
+
+                  unsubscribe()
+        }))
       }),
     ),
   )

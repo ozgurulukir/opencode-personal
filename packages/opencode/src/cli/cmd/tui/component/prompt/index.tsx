@@ -1182,7 +1182,7 @@ export function Prompt(props: PromptProps) {
         return undefined
       })
 
-      const res = await sdk.client.session.create({
+      const res = await sdk.client.v2.session.create({
         workspace: workspaceID,
         agent: agent.name,
         model: {
@@ -1250,7 +1250,7 @@ export function Prompt(props: PromptProps) {
         : []
 
     if (store.mode === "shell") {
-      void sdk.client.session.shell({
+      void sdk.client.v2.session.shell({
         sessionID,
         agent: agent.name,
         model: {
@@ -1291,25 +1291,25 @@ export function Prompt(props: PromptProps) {
           })),
       })
     } else {
-      sdk.client.session
-        .prompt({
-          sessionID,
-          ...selectedModel,
-          messageID,
-          agent: agent.name,
-          model: selectedModel,
-          variant,
-          parts: [
-            ...editorParts,
-            {
-              id: PartID.ascending(),
-              type: "text",
-              text: inputText,
-            },
-            ...nonTextParts.map(assign),
-          ],
-        })
-        .catch(() => {})
+      // promptAsync forks the loop server-side: a TUI disconnect no longer
+      // aborts the run, and failures surface as SessionEvent.Error instead of
+      // being swallowed here. Payload shape is the V1 PromptInput (parts).
+      sdk.client.v2.session.promptAsync({
+        sessionID,
+        messageID,
+        agent: agent.name,
+        model: selectedModel,
+        variant,
+        parts: [
+          ...editorParts,
+          {
+            id: PartID.ascending(),
+            type: "text",
+            text: inputText,
+          },
+          ...nonTextParts.map(assign),
+        ],
+      }).catch(() => {})
       if (editorParts.length > 0) editor.markSelectionSent()
     }
     history.append({

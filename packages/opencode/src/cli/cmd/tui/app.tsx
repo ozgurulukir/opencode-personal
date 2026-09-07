@@ -31,7 +31,6 @@ import { useEvent } from "@tui/context/event"
 import { SDKProvider, useSDK } from "@tui/context/sdk"
 import { StartupLoading } from "@tui/component/startup-loading"
 import { SyncProvider, useSync } from "@tui/context/sync"
-import { SyncProviderV2 } from "@tui/context/sync-v2"
 import { LocalProvider, useLocal } from "@tui/context/local"
 import { useConnected } from "@tui/component/use-connected"
 import { DialogMcp } from "@tui/component/dialog-mcp"
@@ -218,8 +217,7 @@ export function tui(input: {
                         >
                           <ProjectProvider>
                             <SyncProvider>
-                              <SyncProviderV2>
-                                <ThemeProvider mode={mode}>
+                              <ThemeProvider mode={mode}>
                                   <LocalProvider>
                                     <PromptStashProvider>
                                       <DialogProvider>
@@ -237,10 +235,9 @@ export function tui(input: {
                                       </DialogProvider>
                                     </PromptStashProvider>
                                   </LocalProvider>
-                                </ThemeProvider>
-                              </SyncProviderV2>
-                            </SyncProvider>
-                          </ProjectProvider>
+                                 </ThemeProvider>
+                               </SyncProvider>
+                             </ProjectProvider>
                         </SDKProvider>
                       </TuiConfigProvider>
                     </RouteProvider>

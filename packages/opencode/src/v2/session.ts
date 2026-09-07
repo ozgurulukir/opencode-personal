@@ -96,6 +96,7 @@ export interface Interface {
     path?: string
     workspaceID?: WorkspaceID
     roots?: boolean
+    scope?: "project"
     start?: number
     search?: string
     cursor?: {
@@ -120,11 +121,20 @@ export interface Interface {
     sessionID: SessionID
     prompt: Prompt
     delivery?: Delivery
-    model?: Modelv2.Ref
+    model?: { providerID: ProviderID; modelID: ModelID }
+    variant?: string
     agent?: string
+    messageID?: MessageID
     tools?: Record<string, boolean>
   }) => Effect.Effect<SessionMessage.User, never>
-  readonly shell: (input: { id?: EventV2.ID; sessionID: SessionID; command: string }) => Effect.Effect<void, never>
+  readonly shell: (input: {
+    id?: EventV2.ID
+    sessionID: SessionID
+    messageID?: MessageID
+    agent?: string
+    model?: { providerID: ProviderID; modelID: ModelID }
+    command: string
+  }) => Effect.Effect<void, never>
   readonly skill: (input: { id?: EventV2.ID; sessionID: SessionID; skill: string }) => Effect.Effect<void, never>
   readonly subagent: (input: {
     id?: EventV2.ID
@@ -326,12 +336,15 @@ export const layer = Layer.effect(
         if (direction === "previous" && order === "asc") order = "desc"
         if (direction === "previous" && order === "desc") order = "asc"
         const conditions: SQL[] = []
-        if (input.directory) conditions.push(eq(SessionTable.directory, input.directory))
+        // scope "project" opts out of the directory filter (V1 listByProject parity)
+        if (input.directory && input.scope !== "project") conditions.push(eq(SessionTable.directory, input.directory))
         if (input.path)
           conditions.push(or(eq(SessionTable.path, input.path), like(SessionTable.path, `${input.path}/%`))!)
         if (input.workspaceID) conditions.push(eq(SessionTable.workspace_id, input.workspaceID))
         if (input.roots) conditions.push(isNull(SessionTable.parent_id))
-        if (input.start) conditions.push(gte(SessionTable.time_created, input.start))
+        // V1 parity: the TUI's 30-day window filters on last-updated time, not
+        // creation time — a long-lived session updated today must still appear.
+        if (input.start) conditions.push(gte(SessionTable.time_updated, input.start))
         if (input.search) conditions.push(like(SessionTable.title, `%${input.search}%`))
         if (input.cursor) {
           conditions.push(
@@ -447,7 +460,9 @@ export const layer = Layer.effect(
           sessionID: input.sessionID,
           parts,
           noReply: delivery === "deferred",
-          model: input.model ? toPromptModel(input.model) : undefined,
+          model: input.model,
+          variant: input.variant,
+          messageID: input.messageID,
           agent: input.agent,
           tools: input.tools,
         })
@@ -468,7 +483,9 @@ export const layer = Layer.effect(
         const session = yield* result.get(input.sessionID).pipe(Effect.orDie)
         yield* promptSvc.shell({
           sessionID: input.sessionID,
-          agent: session.agent ?? "build",
+          messageID: input.messageID,
+          agent: input.agent ?? session.agent ?? "build",
+          model: input.model,
           command: input.command,
         })
       }),
@@ -597,7 +614,7 @@ export const layer = Layer.effect(
               yield* result.prompt({
                 prompt: input.prompt,
                 sessionID: session.id,
-                model: input.model,
+                model: input.model ? toPromptModel(input.model) : undefined,
                 agent: input.agent,
                 tools,
               })

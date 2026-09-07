@@ -252,7 +252,7 @@ const table = sqliteTable("session", {
 - Provider system prompt: `ProviderTransform.systemPromptDelivery(providerID, authInfo)` (`packages/opencode/src/provider/transform.ts:36-39`) returns `{ type: "instructions" }` for OpenAI OAuth (no `system` role support — passed via `instructions` field). Used in `session/llm.ts:118` and `agent/agent.ts:458`.
 - WSL path resolution (historical pattern, `packages/desktop` is now deleted): the `wslPath()` pattern resolved `$HOME` separately (no user input) then passed the path as an `execFileSync` array argument to prevent shell injection. Never interpolate user-controlled paths into `sh -lc` strings — always use the array-argument form of `execFileSync`.
 - Fiber error handling in FiberMap: use `Effect.tapError` (observe + propagate) not `Effect.catch` (swallow) for sync loop errors — the error propagates, the fiber fails, FiberMap auto-removes it. See `packages/opencode/src/control-plane/workspace.ts:515`.
-- V2 session delegation architecture: `packages/opencode/src/v2/session.ts` is a stable two-layer design — read methods (`get`/`list`/`messages`/`context`) query `SessionTable`/`SessionMessageTable` directly; write methods (`create`/`prompt`/`shell`/`skill`/`subagent`/`compact`) delegate to V1 services, which own the agent loop and persistence. V1 dual-writes `SessionEvent.*` behind `OPENCODE_EXPERIMENTAL_EVENT_SYSTEM`; V2 projectors (`session/projectors-next.ts`) populate `SessionMessageTable` from those events. This is the intended architecture, not a migration-in-progress — the earlier `TODO(v2-native)` markers were removed (Option C simplification). The V1/V2 brand mismatch (`ModelID` vs `Modelv2.ID`) is centralized in `v2ModelToV1Session`/`v2ModelToV1Prompt` helpers. See `packages/opencode/src/v2/AGENTS.md`.
+- V2 session delegation architecture: `packages/opencode/src/v2/session.ts` is a stable two-layer design — read methods (`get`/`list`/`messages`/`context`) query `SessionTable`/`SessionMessageTable` directly; write methods (`create`/`prompt`/`shell`/`skill`/`subagent`/`compact`) delegate to V1 services, which own the agent loop and persistence. V1 emits `SessionEvent.*` unconditionally (the former `OPENCODE_EXPERIMENTAL_EVENT_SYSTEM` flag was removed 2026-09); V2 projectors (`session/projectors-next.ts`) populate `SessionMessageTable` from those events. This is the intended architecture, not a migration-in-progress — the earlier `TODO(v2-native)` markers were removed (Option C simplification). V1 and V2 share the `ModelID`/`ProviderID` brands (single authority: `provider/schema.ts`; `v2/model.ts` re-exports them); only the `{modelID, providerID}` vs `{id, providerID, variant}` field-name reshape remains, via the `toPromptModel` helper in `v2/session.ts`. See `packages/opencode/src/v2/AGENTS.md`.
 - `@ts-expect-error` is acceptable for genuine library type-definition bugs that can't be patched. Always include an explanatory comment.
 - Permission system: `packages/opencode/src/permission/AGENTS.md` (`disabled()` semantics, `Wildcard.match`, `fromConfig`); `packages/opencode/src/agent/AGENTS.md` (subagent inheritance, tool restrictions); `packages/opencode/src/mcp/AGENTS.md` (MCP tool permission keys, pattern derivation).
 - V1/V2 subagent parity: `tool/task.ts` (V1 TaskTool) and `v2/session.ts` (V2 subagent) share `subagentSessionPermission()` and `subagentToolRestrictions()` from `agent/subagent-permissions.ts`. Any change to permission derivation or tool restrictions must go through these helpers. V2 `subagent()` requires `Agent.Service` + `Config.Service` in test layers.
@@ -314,30 +314,31 @@ Practical rule:
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **opencode-personal** (40559 symbols, 74779 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **opencode-personal** (60209 symbols, 168291 relationships, 1343 execution flows).
 
-> Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? `npx gitnexus analyze` (npm 11 crash → `npm i -g gitnexus`; #1939).
+> Index stale? Run `node .gitnexus/run.cjs analyze --index-only` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? Bootstrap with `npx`, `bunx`, or `pnpm dlx` — e.g. `bunx gitnexus@latest analyze` (npm 11 npx crash; #1939).
 
 ## Always Do
 
-- **MUST run impact analysis before editing any symbol.** Before modifying a function, class, or method, run `impact({target: "symbolName", direction: "upstream"})` and report the blast radius (direct callers, affected processes, risk level) to the user.
-- **MUST run `detect_changes()` before committing** to verify your changes only affect expected symbols and execution flows. For regression review, compare against the default branch: `detect_changes({scope: "compare", base_ref: "main"})`.
+- **MUST run impact analysis before editing.** Use `impact({target: "symbolName", direction: "upstream"})` (MCP) or `node .gitnexus/run.cjs impact "symbolName" --direction upstream --repo .` (CLI fallback); report callers, processes, and risk. Never substitute grep for graph analysis.
+- **MUST analyze graph changes before committing.** Use `detect_changes({scope: "all"})` (MCP) or `node .gitnexus/run.cjs detect-changes --scope all --repo .` (CLI fallback). `partial: true` or `truncated: true` is not a clean check — a zero means unseen, not unaffected; re-run it. For regression review: `detect_changes({scope: "compare", base_ref: "main"})` or `node .gitnexus/run.cjs detect-changes --scope compare --base-ref "main" --repo .`.
 - **MUST warn the user** if impact analysis returns HIGH or CRITICAL risk before proceeding with edits.
+- **MUST treat `risk: UNKNOWN` as unresolved, not as low.** An empty caller set is not evidence the symbol is unused — it can also mean the callers are not resolvable by the index (plain-object property access, dynamic dispatch, cross-language calls). `impact` pairs `UNKNOWN` with a `riskNote` saying so. Confirm with a text search before treating the symbol as safe to change or delete; do not proceed on the strength of a zero.
 - When exploring unfamiliar code, use `query({search_query: "concept"})` to find execution flows instead of grepping. It returns process-grouped results ranked by relevance.
 - When you need full context on a specific symbol — callers, callees, which execution flows it participates in — use `context({name: "symbolName"})`.
 - For security review, `explain({target: "fileOrSymbol"})` lists taint findings (source→sink flows; needs `analyze --pdg`).
 
 ## Never Do
 
-- NEVER edit a function, class, or method without first running `impact` on it.
-- NEVER ignore HIGH or CRITICAL risk warnings from impact analysis.
+- NEVER edit a function, class, or method before MCP/CLI impact analysis.
+- NEVER ignore HIGH or CRITICAL risk warnings from impact analysis, and never read `UNKNOWN` as an all-clear — it means the walk could not answer, which is the one verdict that requires confirming by other means.
 - NEVER rename symbols with find-and-replace — use `rename` which understands the call graph.
-- NEVER commit changes without running `detect_changes()` to check affected scope.
+- NEVER commit before MCP/CLI graph change analysis.
 
 ## Resources
 
 | Resource | Use for |
-|----------|---------|
+| --- | --- |
 | `gitnexus://repo/opencode-personal/context` | Codebase overview, check index freshness |
 | `gitnexus://repo/opencode-personal/clusters` | All functional areas |
 | `gitnexus://repo/opencode-personal/processes` | All execution flows |
@@ -346,12 +347,12 @@ This project is indexed by GitNexus as **opencode-personal** (40559 symbols, 747
 ## CLI
 
 | Task | Read this skill file |
-|------|---------------------|
-| Understand architecture / "How does X work?" | `.claude/skills/gitnexus/gitnexus-exploring/SKILL.md` |
-| Blast radius / "What breaks if I change X?" | `.claude/skills/gitnexus/gitnexus-impact-analysis/SKILL.md` |
-| Trace bugs / "Why is X failing?" | `.claude/skills/gitnexus/gitnexus-debugging/SKILL.md` |
-| Rename / extract / split / refactor | `.claude/skills/gitnexus/gitnexus-refactoring/SKILL.md` |
-| Tools, resources, schema reference | `.claude/skills/gitnexus/gitnexus-guide/SKILL.md` |
-| Index, status, clean, wiki CLI commands | `.claude/skills/gitnexus/gitnexus-cli/SKILL.md` |
+| --- | --- |
+| Understand architecture / "How does X work?" | `.claude/skills/gitnexus-exploring/SKILL.md` |
+| Blast radius / "What breaks if I change X?" | `.claude/skills/gitnexus-impact-analysis/SKILL.md` |
+| Trace bugs / "Why is X failing?" | `.claude/skills/gitnexus-debugging/SKILL.md` |
+| Rename / extract / split / refactor | `.claude/skills/gitnexus-refactoring/SKILL.md` |
+| Tools, resources, schema reference | `.claude/skills/gitnexus-guide/SKILL.md` |
+| Index, status, clean, wiki CLI commands | `.claude/skills/gitnexus-cli/SKILL.md` |
 
 <!-- gitnexus:end -->

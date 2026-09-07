@@ -1,4 +1,5 @@
 import { SessionID } from "@/session/schema"
+import { Snapshot } from "@/snapshot"
 import { NonNegativeInt } from "@opencode-ai/core/schema"
 import { EventV2 } from "./event"
 import { FileAttachment, Prompt } from "./session-prompt"
@@ -358,6 +359,93 @@ export namespace Compaction {
   export type Ended = Schema.Schema.Type<typeof Ended>
 }
 
+/**
+ * Lifecycle events forwarded by the V1→V2 event bridge (`v2/event-bridge.ts`).
+ * They mirror the V1 bus vocabulary so the TUI sync store can migrate to the
+ * V2 stream without server-side reshaping. `info`/`status`/`request` stay
+ * intentionally loose (`Schema.Any`): the bridge forwards V1 payloads verbatim
+ * and the consumer-side types land with the sync unification (phase 4c).
+ */
+export const Updated = EventV2.define({
+  type: "session.next.updated",
+  aggregate: "sessionID",
+  version: 1,
+  schema: {
+    ...Base,
+    info: Schema.Any,
+  },
+})
+export type Updated = Schema.Schema.Type<typeof Updated>
+
+export const Deleted = EventV2.define({
+  type: "session.next.deleted",
+  aggregate: "sessionID",
+  version: 1,
+  schema: {
+    ...Base,
+    info: Schema.Any,
+  },
+})
+export type Deleted = Schema.Schema.Type<typeof Deleted>
+
+export const StatusUpdated = EventV2.define({
+  type: "session.next.status",
+  aggregate: "sessionID",
+  version: 1,
+  schema: {
+    ...Base,
+    status: Schema.Any,
+  },
+})
+export type StatusUpdated = Schema.Schema.Type<typeof StatusUpdated>
+
+export const TodoUpdated = EventV2.define({
+  type: "session.next.todo",
+  aggregate: "sessionID",
+  version: 1,
+  schema: {
+    ...Base,
+    todos: Schema.Array(Schema.Unknown),
+  },
+})
+export type TodoUpdated = Schema.Schema.Type<typeof TodoUpdated>
+
+export const DiffUpdated = EventV2.define({
+  type: "session.next.diff",
+  aggregate: "sessionID",
+  version: 1,
+  schema: {
+    ...Base,
+    diff: Schema.Array(Snapshot.FileDiff),
+  },
+})
+export type DiffUpdated = Schema.Schema.Type<typeof DiffUpdated>
+
+export namespace Permission {
+  export const Asked = EventV2.define({
+    type: "session.next.permission.asked",
+    aggregate: "sessionID",
+    version: 1,
+    schema: {
+      ...Base,
+      request: Schema.Any,
+    },
+  })
+  export type Asked = Schema.Schema.Type<typeof Asked>
+
+  export const Replied = EventV2.define({
+    type: "session.next.permission.replied",
+    aggregate: "sessionID",
+    version: 1,
+    schema: {
+      ...Base,
+      requestID: Schema.String,
+      reply: Schema.String,
+    },
+  })
+  export type Replied = Schema.Schema.Type<typeof Replied>
+}
+
 export const All = Schema.Union(
   [
     AgentSwitched,
@@ -386,6 +474,13 @@ export const All = Schema.Union(
     Compaction.Started,
     Compaction.Delta,
     Compaction.Ended,
+    Updated,
+    Deleted,
+    StatusUpdated,
+    TodoUpdated,
+    DiffUpdated,
+    Permission.Asked,
+    Permission.Replied,
   ],
   {
     mode: "oneOf",

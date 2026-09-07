@@ -169,7 +169,7 @@ function warmSessions(input: {
   if (ids.length === 0) return Promise.resolve()
   return Promise.all(
     ids.map((sessionID) =>
-      retry(() => input.sdk.session.get({ sessionID })).then((x) => {
+      retry(() => input.sdk.v2.session.get({ sessionID })).then((x) => {
         const session = x.data
         if (!session?.id) return
         mergeSession(input.setStore, session)

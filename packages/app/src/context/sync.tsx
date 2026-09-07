@@ -468,7 +468,7 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
             const sessionReq =
               hasSession && !opts?.force
                 ? Promise.resolve()
-                : retry(() => client.session.get({ sessionID })).then((session) => {
+                : retry(() => client.v2.session.get({ sessionID })).then((session) => {
                     if (!tracked(directory, sessionID)) return
                     const data = session.data
                     if (!data) return
@@ -588,8 +588,9 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
           const client = sdk.client
           const [store, setStore] = globalSync.child(directory)
           setStore("limit", (x) => x + count)
-          await client.session.list().then((x) => {
-            const sessions = (x.data ?? [])
+          // limit 100 preserves the V1 list default (the v2 route caps at 50)
+          await client.v2.session.list({ limit: 100 }).then((x) => {
+            const sessions = (x.data?.items ?? [])
               .filter((s) => !!s?.id)
               .sort((a, b) => cmp(a.id, b.id))
               .slice(0, store.limit)

@@ -4364,6 +4364,7 @@ export class Session3 extends HeyApiClient {
       order?: "asc" | "desc"
       path?: string
       roots?: boolean | "true" | "false"
+      scope?: "project"
       start?: number
       search?: string
       cursor?: string
@@ -4381,6 +4382,7 @@ export class Session3 extends HeyApiClient {
             { in: "query", key: "order" },
             { in: "query", key: "path" },
             { in: "query", key: "roots" },
+            { in: "query", key: "scope" },
             { in: "query", key: "start" },
             { in: "query", key: "search" },
             { in: "query", key: "cursor" },
@@ -4458,6 +4460,13 @@ export class Session3 extends HeyApiClient {
       workspace?: string
       prompt: Prompt
       delivery?: SessionDelivery
+      agent?: string
+      model?: {
+        providerID: string
+        modelID: string
+      }
+      variant?: string
+      messageID?: string
     },
     options?: Options<never, ThrowOnError>,
   ): RequestResult<V2SessionPromptResponses, unknown, ThrowOnError> {
@@ -4471,6 +4480,10 @@ export class Session3 extends HeyApiClient {
             { in: "query", key: "workspace" },
             { in: "body", key: "prompt" },
             { in: "body", key: "delivery" },
+            { in: "body", key: "agent" },
+            { in: "body", key: "model" },
+            { in: "body", key: "variant" },
+            { in: "body", key: "messageID" },
           ],
         },
       ],
@@ -5109,6 +5122,12 @@ export class Session3 extends HeyApiClient {
       sessionID: string
       directory?: string
       workspace?: string
+      messageID?: string
+      agent: string
+      model?: {
+        providerID: string
+        modelID: string
+      }
       command: string
     },
     options?: Options<never, ThrowOnError>,
@@ -5121,6 +5140,9 @@ export class Session3 extends HeyApiClient {
             { in: "path", key: "sessionID" },
             { in: "query", key: "directory" },
             { in: "query", key: "workspace" },
+            { in: "body", key: "messageID" },
+            { in: "body", key: "agent" },
+            { in: "body", key: "model" },
             { in: "body", key: "command" },
           ],
         },

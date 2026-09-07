@@ -19,6 +19,13 @@ import { HttpApiBuilder, HttpApiError, HttpApiSchema } from "effect/unstable/htt
 import { InstanceHttpApi } from "../../api"
 import { notFound } from "../../errors"
 
+// V1 error-shape parity: the V2 service's typed NotFoundError serializes as
+// `{_tag, sessionID}` (no `message`), which the SDK's error wrapper cannot
+// turn into a useful message. Map to the V1 `ApiNotFoundError` body
+// (`data.message`) so consumers see "Session not found: ses_..." as before.
+const withNotFound = <A, R>(self: Effect.Effect<A, SessionV2.NotFoundError, R>) =>
+  Effect.mapError(self, (error) => notFound(`Session not found: ${error.sessionID}`))
+
 const DefaultSessionsLimit = 50
 
 const SessionCursor = Schema.Struct({
@@ -30,6 +37,7 @@ const SessionCursor = Schema.Struct({
   path: Schema.String.pipe(Schema.optional),
   workspaceID: WorkspaceID.pipe(Schema.optional),
   roots: Schema.Boolean.pipe(Schema.optional),
+  scope: Schema.Literal("project").pipe(Schema.optional),
   start: Schema.Finite.pipe(Schema.optional),
   search: Schema.String.pipe(Schema.optional),
 })
@@ -41,6 +49,7 @@ function hasCursorFilter(query: {
   readonly order?: unknown
   readonly path?: unknown
   readonly roots?: unknown
+  readonly scope?: unknown
   readonly start?: unknown
   readonly search?: unknown
 }) {
@@ -48,6 +57,7 @@ function hasCursorFilter(query: {
     query.order !== undefined ||
     query.path !== undefined ||
     query.roots !== undefined ||
+    query.scope !== undefined ||
     query.start !== undefined ||
     query.search !== undefined
   )
@@ -67,7 +77,7 @@ const sessionCursor = {
     session: SessionV2.Info,
     order: "asc" | "desc",
     direction: "previous" | "next",
-    filters: Pick<SessionCursor, "directory" | "path" | "workspaceID" | "roots" | "start" | "search">,
+    filters: Pick<SessionCursor, "directory" | "path" | "workspaceID" | "roots" | "scope" | "start" | "search">,
   ) {
     return Buffer.from(
       JSON.stringify({ id: session.id, time: session.time.created, order, direction, ...filters }),
@@ -108,6 +118,7 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "v2.session
             path: ctx.query.path,
             workspaceID: ctx.query.workspace ? WorkspaceID.make(ctx.query.workspace) : undefined,
             roots: ctx.query.roots,
+            scope: ctx.query.scope,
             start: ctx.query.start,
             search: ctx.query.search,
           }
@@ -118,6 +129,7 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "v2.session
             path: filters.path,
             workspaceID: filters.workspaceID,
             roots: filters.roots,
+            scope: filters.scope,
             start: filters.start,
             search: filters.search,
             cursor: decoded ? { id: decoded.id, time: decoded.time, direction: decoded.direction } : undefined,
@@ -140,6 +152,10 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "v2.session
             sessionID: ctx.params.sessionID,
             prompt: ctx.payload.prompt,
             delivery: ctx.payload.delivery ?? SessionV2.DefaultDelivery,
+            agent: ctx.payload.agent,
+            model: ctx.payload.model,
+            variant: ctx.payload.variant,
+            messageID: ctx.payload.messageID,
           })
         }),
       )
@@ -166,31 +182,31 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "v2.session
       .handle(
         "get",
         Effect.fn(function* (ctx) {
-          return yield* session.get(ctx.params.sessionID)
+          return yield* withNotFound(session.get(ctx.params.sessionID))
         }),
       )
       .handle(
         "remove",
         Effect.fn(function* (ctx) {
-          yield* session.remove(ctx.params.sessionID)
+          yield* withNotFound(session.remove(ctx.params.sessionID))
           return true
         }),
       )
       .handle(
         "update",
         Effect.fn(function* (ctx) {
-          return yield* session.update({
+          return yield* withNotFound(session.update({
             sessionID: ctx.params.sessionID,
             title: ctx.payload.title,
             permission: ctx.payload.permission,
             archived: ctx.payload.time?.archived,
-          })
+          }))
         }),
       )
       .handle(
         "children",
         Effect.fn(function* (ctx) {
-          return yield* session.children(ctx.params.sessionID)
+          return yield* withNotFound(session.children(ctx.params.sessionID))
         }),
       )
       .handle(
@@ -212,38 +228,38 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "v2.session
           // payload arm decodes an empty body to undefined.
           const input = ctx.payload === undefined ? undefined : ctx.payload
           const info = yield* shareSvc.create(input)
-          return yield* session.get(info.id)
+          return yield* withNotFound(session.get(info.id))
         }),
       )
       .handle(
         "fork",
         Effect.fn(function* (ctx) {
-          return yield* session.fork({ sessionID: ctx.params.sessionID, messageID: ctx.payload.messageID })
+          return yield* withNotFound(session.fork({ sessionID: ctx.params.sessionID, messageID: ctx.payload.messageID }))
         }),
       )
       .handle(
         "share",
         Effect.fn(function* (ctx) {
           yield* shareSvc.share(ctx.params.sessionID).pipe(Effect.mapError(() => new HttpApiError.InternalServerError({})))
-          return yield* session.get(ctx.params.sessionID)
+          return yield* withNotFound(session.get(ctx.params.sessionID))
         }),
       )
       .handle(
         "unshare",
         Effect.fn(function* (ctx) {
           yield* shareSvc.unshare(ctx.params.sessionID).pipe(Effect.mapError(() => new HttpApiError.InternalServerError({})))
-          return yield* session.get(ctx.params.sessionID)
+          return yield* withNotFound(session.get(ctx.params.sessionID))
         }),
       )
       .handle(
         "summarize",
         Effect.fn(function* (ctx) {
-          return yield* session.summarize({
+          return yield* withNotFound(session.summarize({
             sessionID: ctx.params.sessionID,
             providerID: ctx.payload.providerID,
             modelID: ctx.payload.modelID,
             auto: ctx.payload.auto,
-          })
+          }))
         }),
       )
       .handle(
@@ -279,24 +295,30 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "v2.session
       .handle(
         "shell",
         Effect.fn(function* (ctx) {
-          yield* session.shell({ sessionID: ctx.params.sessionID, command: ctx.payload.command })
+          yield* session.shell({
+            sessionID: ctx.params.sessionID,
+            messageID: ctx.payload.messageID,
+            agent: ctx.payload.agent,
+            model: ctx.payload.model,
+            command: ctx.payload.command,
+          })
           return HttpApiSchema.NoContent.make()
         }),
       )
       .handle(
         "revert",
         Effect.fn(function* (ctx) {
-          return yield* session.revert({
+          return yield* withNotFound(session.revert({
             sessionID: ctx.params.sessionID,
             messageID: ctx.payload.messageID,
             partID: ctx.payload.partID,
-          })
+          }))
         }),
       )
       .handle(
         "unrevert",
         Effect.fn(function* (ctx) {
-          return yield* session.unrevert(ctx.params.sessionID)
+          return yield* withNotFound(session.unrevert(ctx.params.sessionID))
         }),
       )
       .handle(
