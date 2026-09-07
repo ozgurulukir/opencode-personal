@@ -1,6 +1,8 @@
-import { SessionID } from "@/session/schema"
+import { MessageID, PartID, SessionID } from "@/session/schema"
+import { PermissionID } from "@/permission/schema"
 import { SessionStatus } from "@/session/status"
 import { Session } from "@/session/session"
+import { MessageV2 } from "@/session/message-v2"
 import { Todo } from "@/session/todo"
 import { Snapshot } from "@/snapshot"
 import { Permission } from "@/permission"
@@ -12,7 +14,17 @@ import { HttpApiEndpoint, HttpApiError, HttpApiGroup, HttpApiSchema, OpenApi } f
 import { Authorization } from "../../middleware/authorization"
 import { InstanceContextMiddleware } from "../../middleware/instance-context"
 import { WorkspaceRoutingMiddleware, WorkspaceRoutingQuery, WorkspaceRoutingQueryFields } from "../../middleware/workspace-routing"
-import { CommandPayload, DiffQuery, ForkPayload, InitPayload, RevertPayload, SummarizePayload } from "../session"
+import { ApiNotFoundError } from "../../errors"
+import {
+  CommandPayload,
+  DiffQuery,
+  ForkPayload,
+  InitPayload,
+  PermissionResponsePayload,
+  PromptPayload,
+  RevertPayload,
+  SummarizePayload,
+} from "../session"
 import { QueryBoolean } from "../query"
 
 export const SessionsQuery = Schema.Struct({
@@ -380,6 +392,89 @@ export const SessionGroup = HttpApiGroup.make("v2.session")
         identifier: "v2.session.predict",
         summary: "Predict next v2 prompt",
         description: "Predict the next prompt for a v2 session. Returns an empty string when no suggestion is available.",
+      }),
+    ),
+  )
+  .add(
+    HttpApiEndpoint.get("message", "/api/session/:sessionID/message/:messageID", {
+      params: { sessionID: SessionID, messageID: MessageID },
+      query: WorkspaceRoutingQuery,
+      success: MessageV2.WithParts,
+      error: ApiNotFoundError,
+    }).annotateMerge(
+      OpenApi.annotations({
+        identifier: "v2.session.message",
+        summary: "Get v2 session message",
+        description: "Retrieve a single message with its parts from a v2 session.",
+      }),
+    ),
+  )
+  .add(
+    HttpApiEndpoint.delete("deleteMessage", "/api/session/:sessionID/message/:messageID", {
+      params: { sessionID: SessionID, messageID: MessageID },
+      query: WorkspaceRoutingQuery,
+      success: Schema.Boolean,
+    }).annotateMerge(
+      OpenApi.annotations({
+        identifier: "v2.session.deleteMessage",
+        summary: "Delete v2 session message",
+        description: "Delete a message and its parts from a v2 session.",
+      }),
+    ),
+  )
+  .add(
+    HttpApiEndpoint.delete("deletePart", "/api/session/:sessionID/message/:messageID/part/:partID", {
+      params: { sessionID: SessionID, messageID: MessageID, partID: PartID },
+      query: WorkspaceRoutingQuery,
+      success: Schema.Boolean,
+    }).annotateMerge(
+      OpenApi.annotations({
+        identifier: "v2.session.deletePart",
+        summary: "Delete v2 session message part",
+        description: "Delete a single part from a message in a v2 session.",
+      }),
+    ),
+  )
+  .add(
+    HttpApiEndpoint.patch("updatePart", "/api/session/:sessionID/message/:messageID/part/:partID", {
+      params: { sessionID: SessionID, messageID: MessageID, partID: PartID },
+      query: WorkspaceRoutingQuery,
+      payload: MessageV2.Part,
+      success: MessageV2.Part,
+    }).annotateMerge(
+      OpenApi.annotations({
+        identifier: "v2.session.updatePart",
+        summary: "Update v2 session message part",
+        description: "Update a single part of a message in a v2 session.",
+      }),
+    ),
+  )
+  .add(
+    HttpApiEndpoint.post("permission", "/api/session/:sessionID/permissions/:permissionID", {
+      params: { sessionID: SessionID, permissionID: PermissionID },
+      query: WorkspaceRoutingQuery,
+      payload: PermissionResponsePayload,
+      success: Schema.Boolean,
+    }).annotateMerge(
+      OpenApi.annotations({
+        identifier: "v2.session.permission",
+        summary: "Respond to v2 session permission",
+        description: "Respond to a pending permission request in a v2 session.",
+      }),
+    ),
+  )
+  .add(
+    HttpApiEndpoint.post("promptAsync", "/api/session/:sessionID/prompt_async", {
+      params: { sessionID: SessionID },
+      query: WorkspaceRoutingQuery,
+      payload: PromptPayload,
+      success: HttpApiSchema.NoContent,
+    }).annotateMerge(
+      OpenApi.annotations({
+        identifier: "v2.session.promptAsync",
+        summary: "Send v2 message asynchronously",
+        description:
+          "Create a v2 session message and run the agent loop in the background. Failures are published as session error events.",
       }),
     ),
   )

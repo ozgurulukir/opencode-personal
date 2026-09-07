@@ -112,12 +112,27 @@ layer is the widest remaining duality.
   Covered: todo/diff empty reads, revert happy path (real message → revert marker set),
   unrevert (marker cleared), revert/unrevert → 404 on missing session.
 
-### 3d — message/part CRUD + permissions
-- `GET /api/session/:sessionID/message/:messageID`, `DELETE` message/part,
-  `PATCH part`, `POST /api/session/:sessionID/permission/:permissionID`
-- `POST /api/session/:sessionID/prompt_async` (or fold into `prompt` delivery="deferred" —
-  decide; the V2 `prompt` already supports deferred delivery, so promptAsync may be
-  DELETED instead of ported)
+### 3d — message/part CRUD + permissions ✅ (2026-09-07)
+- `GET /api/session/:sessionID/message/:messageID` → `MessageV2.WithParts` (handler-level
+  `MessageV2.get` static + StorageNotFound → shared `ApiNotFoundError` via `notFound()`;
+  same 404 wire shape as V1)
+- `DELETE message` / `DELETE part` → `true` (handler-level V1 `Session.Service`;
+  deleteMessage asserts `SessionRunState.assertNotBusy` first, V1 parity)
+- `PATCH part` → `MessageV2.Part` (handler-level; V1's id/messageID/sessionID mismatch
+  check + the same `as MessageV2.Part` decode-artifact cast)
+- `POST /api/session/:sessionID/permissions/:permissionID` → `true` (handler-level
+  `Permission.Service.reply`; reuses V1 `PermissionResponsePayload`)
+- `POST /api/session/:sessionID/prompt_async` → NoContent (handler-level; forks
+  `promptV1.prompt` in the group scope with `catchCause` → log + `Session.Event.Error`
+  publish — V1 parity. **Plan decision REVERSED**: promptAsync is NOT deleted — it has 3
+  real consumers (`run/stream.transport.ts`, TUI `dialog-workspace-create.tsx`, app
+  `sendFollowupDraft.ts`) that need fire-and-forget loop semantics, which V2 `prompt`'s
+  `delivery: "deferred"` does NOT provide (deferred stages for `runDeferred`, no worker
+  wired). Reuses V1 `PromptPayload` shape for mechanical migration.)
+- Test note: the promptAsync integration test sends `noReply: true` so the forked prompt
+  stages without running the LLM loop — a bare prompt fork starved parallel test files
+  (suite 62s→177s, timeout flakes in unrelated files). Full-suite failure variance is
+  environmental (baseline 3c also fluctuates 1–3 fails); isolated runs are stable.
 
 ### 3e — consumer migration + V1 shutdown prep
 - Switch TUI/app call sites from `client.session.*` to `client.v2.session.*` per endpoint

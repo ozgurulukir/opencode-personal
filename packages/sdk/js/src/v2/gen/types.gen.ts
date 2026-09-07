@@ -7145,6 +7145,168 @@ export type V2SessionPredictResponses = {
 
 export type V2SessionPredictResponse = V2SessionPredictResponses[keyof V2SessionPredictResponses]
 
+export type V2SessionDeleteMessageData = {
+  body?: never
+  path: {
+    sessionID: string
+    messageID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/api/session/{sessionID}/message/{messageID}"
+}
+
+export type V2SessionDeleteMessageResponses = {
+  /**
+   * Success
+   */
+  200: boolean
+}
+
+export type V2SessionDeleteMessageResponse = V2SessionDeleteMessageResponses[keyof V2SessionDeleteMessageResponses]
+
+export type V2SessionMessageData = {
+  body?: never
+  path: {
+    sessionID: string
+    messageID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/api/session/{sessionID}/message/{messageID}"
+}
+
+export type V2SessionMessageErrors = {
+  /**
+   * NotFoundError
+   */
+  404: NotFoundError
+}
+
+export type V2SessionMessageError = V2SessionMessageErrors[keyof V2SessionMessageErrors]
+
+export type V2SessionMessageResponses = {
+  /**
+   * Success
+   */
+  200: {
+    info: Message
+    parts: Array<Part>
+  }
+}
+
+export type V2SessionMessageResponse = V2SessionMessageResponses[keyof V2SessionMessageResponses]
+
+export type V2SessionDeletePartData = {
+  body?: never
+  path: {
+    sessionID: string
+    messageID: string
+    partID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/api/session/{sessionID}/message/{messageID}/part/{partID}"
+}
+
+export type V2SessionDeletePartResponses = {
+  /**
+   * Success
+   */
+  200: boolean
+}
+
+export type V2SessionDeletePartResponse = V2SessionDeletePartResponses[keyof V2SessionDeletePartResponses]
+
+export type V2SessionUpdatePartData = {
+  body?: Part
+  path: {
+    sessionID: string
+    messageID: string
+    partID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/api/session/{sessionID}/message/{messageID}/part/{partID}"
+}
+
+export type V2SessionUpdatePartResponses = {
+  /**
+   * Part
+   */
+  200: Part
+}
+
+export type V2SessionUpdatePartResponse = V2SessionUpdatePartResponses[keyof V2SessionUpdatePartResponses]
+
+export type V2SessionPermissionData = {
+  body?: {
+    response: "once" | "always" | "reject"
+  }
+  path: {
+    sessionID: string
+    permissionID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/api/session/{sessionID}/permissions/{permissionID}"
+}
+
+export type V2SessionPermissionResponses = {
+  /**
+   * Success
+   */
+  200: boolean
+}
+
+export type V2SessionPermissionResponse = V2SessionPermissionResponses[keyof V2SessionPermissionResponses]
+
+export type V2SessionPromptAsyncData = {
+  body?: {
+    messageID?: string
+    model?: {
+      providerID: string
+      modelID: string
+    }
+    agent?: string
+    noReply?: boolean
+    tools?: {
+      [key: string]: boolean
+    }
+    format?: OutputFormat
+    system?: string
+    variant?: string
+    parts: Array<TextPartInput | FilePartInput | AgentPartInput | SubtaskPartInput>
+  }
+  path: {
+    sessionID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/api/session/{sessionID}/prompt_async"
+}
+
+export type V2SessionPromptAsyncResponses = {
+  /**
+   * <No Content>
+   */
+  204: void
+}
+
+export type V2SessionPromptAsyncResponse = V2SessionPromptAsyncResponses[keyof V2SessionPromptAsyncResponses]
+
 export type V2SessionMessagesData = {
   body?: never
   path: {

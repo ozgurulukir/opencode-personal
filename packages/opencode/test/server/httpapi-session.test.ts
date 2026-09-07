@@ -679,6 +679,61 @@ describe("session HttpApi", () => {
         })
         expect(missingUnrevert.status).toBe(404)
 
+        // message read/mutate routes keep the V1 wire shapes
+        const target = yield* createTextMessage(tmp.path, parent.id, "v2 message")
+        const gotMessage = yield* requestJson<Record<string, any>>(
+          `/api/session/${parent.id}/message/${target.info.id}`,
+          { headers },
+        )
+        expect(gotMessage.info).toMatchObject({ id: target.info.id })
+        expect(gotMessage.parts[0]).toMatchObject({ type: "text", text: "v2 message" })
+
+        const missingMessageID = MessageID.ascending()
+        const missingMessage = yield* request(`/api/session/${parent.id}/message/${missingMessageID}`, { headers })
+        expect(missingMessage.status).toBe(404)
+        expect(yield* responseJson(missingMessage)).toEqual({
+          name: "NotFoundError",
+          data: { message: `Message not found: ${missingMessageID}` },
+        })
+
+        const updatedPart = yield* requestJson<Record<string, any>>(
+          `/api/session/${parent.id}/message/${target.info.id}/part/${target.part.id}`,
+          { headers, method: "PATCH", body: JSON.stringify({ ...target.part, text: "v2 updated" }) },
+        )
+        expect(updatedPart).toMatchObject({ id: target.part.id, type: "text", text: "v2 updated" })
+
+        expect(
+          yield* requestJson<boolean>(
+            `/api/session/${parent.id}/message/${target.info.id}/part/${target.part.id}`,
+            { headers, method: "DELETE" },
+          ),
+        ).toBe(true)
+        expect(
+          yield* requestJson<boolean>(`/api/session/${parent.id}/message/${target.info.id}`, {
+            headers,
+            method: "DELETE",
+          }),
+        ).toBe(true)
+
+        // permission respond mirrors the V1 contract
+        expect(
+          yield* requestJson<boolean>(`/api/session/${parent.id}/permissions/${String(PermissionID.ascending())}`, {
+            headers,
+            method: "POST",
+            body: JSON.stringify({ response: "once" }),
+          }),
+        ).toBe(true)
+
+        // prompt_async accepts the message and runs the loop in the background.
+        // noReply stages the message without running the loop, keeping the test
+        // free of LLM provider work that would starve parallel test files.
+        const asyncResponse = yield* request(`/api/session/${parent.id}/prompt_async`, {
+          headers,
+          method: "POST",
+          body: JSON.stringify({ parts: [{ type: "text", text: "async" }], noReply: true }),
+        })
+        expect(asyncResponse.status).toBe(204)
+
         // remove deletes the child; subsequent get is 404 with the v2 error tag
         expect(yield* requestJson<boolean>(`/api/session/${child.id}`, { headers, method: "DELETE" })).toBe(true)
         const missingChild = yield* request(`/api/session/${child.id}`, { headers })
