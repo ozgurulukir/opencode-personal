@@ -1,7 +1,7 @@
 # V1/V2 Synthesis — Phase 5: message model adoption, engine re-homing, V1 deletion
 
 Date: 2026-09-07
-Status: IN PROGRESS — 5a/5b done, 5c batches 1-3 done (dialogs, small routes, run history, status, plugin API), 5c batch 4 pending (session/index.tsx — last TUI V1 consumer), app pipeline batch pending, 5d/5e/5f pending
+Status: IN PROGRESS — 5a/5b/5d done, 5c batches 1-3 done, 5c batch 4 pending (session/index.tsx — last TUI V1 consumer), app pipeline batch pending, 5e/5f pending
 Depends on: Phase 4 (complete — commit `9d9fe54bc`, build verified)
 
 ## Goal
@@ -232,14 +232,38 @@ broken on this branch independent of this work.
 session.shared+variant.shared 11/11; `test/cli/cmd/run/` 287/287; tui 49/49;
 v2 33/33.
 
-### 5d — acp prompt/command (last 2 V1 prompt sites)
+### 5d — acp prompt/command (last 2 V1 prompt sites) — DONE (2026-09-07)
 
-- Extend the V2 sync `prompt` response to carry the final assistant message
-  (tokens/cost/finish) — e.g. success becomes the assistant `SessionMessage` or an
-  `{user, assistant}` pair; OR restructure ACP to read usage via
-  `sendUsageUpdate`'s data source. Decide by what `buildUsage` minimally needs.
-- Migrate `acp/agent.ts` prompt + command; V1 `prompt`/`prompt_async` endpoints then
-  have zero HTTP consumers.
+**Design decision (Option A — pair response):** `buildUsage` needs only the final
+assistant message's tokens, and the V2 sync prompt runs the loop synchronously —
+the assistant message is already projected when the call returns. Both the V2
+`prompt` and `command` endpoints now return `{user?, assistant?}` (projected
+user message + final assistant message). Zero consumers read the old shapes
+(`run.ts` ignores the response; command was `NoContent`), so the change is
+consumer-safe.
+
+- **`v2/session.ts`** — `prompt()`/`command()` read back messages once and
+  return `{user, assistant}`; the Service interface types updated.
+- **`session-prompt.ts`** — `Prompt` gains optional `synthetic: string[]` and
+  `ignored: string[]` (ACP audience-routing parity): assistant-only context
+  blocks and user-only display blocks. `promptToParts` emits them as
+  synthetic/ignored text parts; the existing reduce routes synthetic →
+  `Synthetic.Sync` events and ignored stays display-only on the V1 parts
+  (excluded from the LLM payload) — no reduce change needed.
+- **HTTP schemas** — prompt success `SessionMessage.Message` →
+  `V2PromptResponse{user?, assistant?}`; command success `NoContent` →
+  `V2CommandResponse{user?, assistant?}`; command handler returns the pair.
+- **`acp/agent.ts`** — prompt + command migrated to `sdk.v2.session.*`:
+  V1 parts array → `Prompt{text, files, synthetic, ignored}` conversion
+  (text blocks joined "\n", audience-routed blocks into the arrays);
+  `buildUsage` reads `response.data?.assistant` with `?? 0` token guards
+  (V2 tokens optional); `SessionMessageAssistant` type.
+- **SDK regenerated**; both packages typecheck clean (tsbuildinfo cleared).
+- **Tests**: v2 session prompt test extended to assert the assistant member
+  (28/28); v2 + bridge + sdk + acp suites 156/156.
+- **Result: V1 `prompt`/`prompt_async`/`command` HTTP endpoints now have ZERO
+  consumers** (TUI run.ts → v2 since 4d; TUI prompt → v2 promptAsync since 4d;
+  ACP → v2 now).
 
 ### 5e — Engine re-homing (highest risk)
 

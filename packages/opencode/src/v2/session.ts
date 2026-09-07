@@ -126,7 +126,10 @@ export interface Interface {
     agent?: string
     messageID?: MessageID
     tools?: Record<string, boolean>
-  }) => Effect.Effect<SessionMessage.User, never>
+  }) => Effect.Effect<
+    { user: SessionMessage.User | undefined; assistant: SessionMessage.Assistant | undefined },
+    never
+  >
   readonly shell: (input: {
     id?: EventV2.ID
     sessionID: SessionID
@@ -171,7 +174,10 @@ export interface Interface {
     providerID: ProviderID
     modelID: ModelID
   }) => Effect.Effect<boolean, never>
-  readonly command: (input: SessionPrompt.CommandInput) => Effect.Effect<void, never>
+  readonly command: (input: SessionPrompt.CommandInput) => Effect.Effect<
+    { user: SessionMessage.User | undefined; assistant: SessionMessage.Assistant | undefined },
+    never
+  >
   readonly revert: (input: { sessionID: SessionID; messageID: MessageID; partID?: PartID }) => Effect.Effect<Info, NotFoundError>
   readonly unrevert: (sessionID: SessionID) => Effect.Effect<Info, NotFoundError>
 }
@@ -228,6 +234,8 @@ function toV2Info(info: Session.Info): Info {
 function promptToParts(prompt: Prompt): SessionPrompt.PromptInput["parts"] {
   return [
     { type: "text", text: prompt.text },
+    ...(prompt.synthetic ?? []).map((text) => ({ type: "text", text, synthetic: true }) as const),
+    ...(prompt.ignored ?? []).map((text) => ({ type: "text", text, ignored: true }) as const),
     ...(prompt.files ?? []).map(
       (file) => ({ type: "file", url: file.uri, mime: file.mime, filename: file.name }) as const,
     ),
@@ -471,10 +479,14 @@ export const layer = Layer.effect(
           deferredQueue.add(input.sessionID)
         }
 
-        // Read back the projected user message (the Prompted event wrote it).
+        // Read back the projected messages: the user message the Prompted
+        // event wrote, plus the final assistant message (the loop ran
+        // synchronously for immediate delivery) so callers like ACP can
+        // report per-turn usage without an extra round-trip.
         const messages = yield* result.messages({ sessionID: input.sessionID, order: "asc" })
         const user = messages.findLast((m): m is SessionMessage.User => m.type === "user")
-        return user ?? ({} as SessionMessage.User)
+        const assistant = messages.findLast((m): m is SessionMessage.Assistant => m.type === "assistant")
+        return { user, assistant }
       }),
       shell: Effect.fn("V2Session.shell")(function* (input) {
         // V1 SessionPrompt.shell already emits Shell.Started/Ended at
@@ -794,10 +806,15 @@ export const layer = Layer.effect(
         return true
       }),
       command: Effect.fn("V2Session.command")(function* (input) {
-        // Mirrors the V2 shell style: stage the command message through V1 and
-        // discard the loop result — consumers observe output via events.
+        // Mirrors the V2 prompt style: stage the command message through V1
+        // (which runs the loop synchronously) and read back the projected
+        // user + final assistant messages for per-turn usage reporting.
         const promptSvc = yield* requireV1(promptV1, "SessionPrompt")
         yield* promptSvc.command(input)
+        const messages = yield* result.messages({ sessionID: input.sessionID, order: "asc" })
+        const user = messages.findLast((m): m is SessionMessage.User => m.type === "user")
+        const assistant = messages.findLast((m): m is SessionMessage.Assistant => m.type === "assistant")
+        return { user, assistant }
       }),
       revert: Effect.fn("V2Session.revert")(function* (input) {
         const revert = yield* requireV1(revertV1, "SessionRevert")

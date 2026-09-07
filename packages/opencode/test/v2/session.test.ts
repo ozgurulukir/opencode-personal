@@ -290,8 +290,11 @@ describe("v2.session", () => {
         prompt: { text: "hello world" },
       })
 
-      expect(user.type).toBe("user")
-      expect(user.text).toBe("hello world")
+      expect(user.user?.type).toBe("user")
+      expect(user.user?.text).toBe("hello world")
+      // Immediate delivery runs the loop synchronously — the stub emits an
+      // assistant message, so the response carries it for usage reporting.
+      expect(user.assistant?.type).toBe("assistant")
     }),
   )
 
@@ -308,8 +311,8 @@ describe("v2.session", () => {
       })
 
       // The user message is still created and readable
-      expect(user.type).toBe("user")
-      expect(user.text).toBe("deferred hello")
+      expect(user.user?.type).toBe("user")
+      expect(user.user?.text).toBe("deferred hello")
       // loop was NOT called (deferred doesn't run the loop synchronously)
       expect(promptStub.calls.loop.length).toBe(loopBefore)
     }),

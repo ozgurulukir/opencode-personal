@@ -93,12 +93,16 @@ export const SessionGroup = HttpApiGroup.make("v2.session")
         variant: Schema.String.pipe(Schema.optional),
         messageID: MessageID.pipe(Schema.optional),
       }),
-      success: SessionMessage.Message,
+      success: Schema.Struct({
+        user: SessionMessage.User.pipe(Schema.optional),
+        assistant: SessionMessage.Assistant.pipe(Schema.optional),
+      }).annotate({ identifier: "V2PromptResponse" }),
     }).annotateMerge(
       OpenApi.annotations({
         identifier: "v2.session.prompt",
         summary: "Send v2 message",
-        description: "Create a v2 session message and queue it for the agent loop.",
+        description:
+          "Create a v2 session message and queue it for the agent loop. Returns the projected user message and, for synchronous delivery, the final assistant message.",
       }),
     ),
   )
@@ -345,12 +349,16 @@ export const SessionGroup = HttpApiGroup.make("v2.session")
       params: { sessionID: SessionID },
       query: WorkspaceRoutingQuery,
       payload: CommandPayload,
-      success: HttpApiSchema.NoContent,
+      success: Schema.Struct({
+        user: SessionMessage.User.pipe(Schema.optional),
+        assistant: SessionMessage.Assistant.pipe(Schema.optional),
+      }).annotate({ identifier: "V2CommandResponse" }),
     }).annotateMerge(
       OpenApi.annotations({
         identifier: "v2.session.command",
         summary: "Run v2 session command",
-        description: "Run a command in a v2 session. Output is delivered through session events.",
+        description:
+          "Run a command in a v2 session. Output is delivered through session events; the response carries the projected user and final assistant messages.",
       }),
     ),
   )

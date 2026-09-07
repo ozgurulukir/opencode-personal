@@ -37,7 +37,7 @@ import { AppRuntime } from "@/effect/app-runtime"
 import { MessageV2 } from "@/session/message-v2"
 import { ConfigMCP } from "@/config/mcp"
 import { LoadAPIKeyError } from "ai"
-import type { AssistantMessage, Event, OpencodeClient, SessionMessageResponse, ToolPart } from "@opencode-ai/sdk/v2"
+import type { Event, OpencodeClient, SessionMessageAssistant, SessionMessageResponse, ToolPart } from "@opencode-ai/sdk/v2"
 import { InstallationVersion } from "@opencode-ai/core/installation/version"
 import { handleToolPartUpdate, toToolKind, toLocations } from "./tool-dispatch"
 import { getContextLimit, sendUsageUpdate, defaultModel, lastUsedModel } from "./model-resolution"
@@ -890,33 +890,47 @@ export class Agent implements ACPAgent {
       return { name, args: rest.join(" ").trim() }
     })()
 
-    const buildUsage = (msg: AssistantMessage): Usage => ({
+    const buildUsage = (msg: SessionMessageAssistant): Usage => ({
       totalTokens:
-        msg.tokens.input +
-        msg.tokens.output +
-        msg.tokens.reasoning +
-        (msg.tokens.cache?.read ?? 0) +
-        (msg.tokens.cache?.write ?? 0),
-      inputTokens: msg.tokens.input,
-      outputTokens: msg.tokens.output,
-      thoughtTokens: msg.tokens.reasoning || undefined,
-      cachedReadTokens: msg.tokens.cache?.read || undefined,
-      cachedWriteTokens: msg.tokens.cache?.write || undefined,
+        (msg.tokens?.input ?? 0) +
+        (msg.tokens?.output ?? 0) +
+        (msg.tokens?.reasoning ?? 0) +
+        (msg.tokens?.cache?.read ?? 0) +
+        (msg.tokens?.cache?.write ?? 0),
+      inputTokens: msg.tokens?.input ?? 0,
+      outputTokens: msg.tokens?.output ?? 0,
+      thoughtTokens: msg.tokens?.reasoning || undefined,
+      cachedReadTokens: msg.tokens?.cache?.read || undefined,
+      cachedWriteTokens: msg.tokens?.cache?.write || undefined,
     })
 
     if (!cmd) {
-      const response = await this.sdk.session.prompt({
-        sessionID,
-        model: {
-          providerID: model.providerID,
-          modelID: model.modelID,
+      const response = await this.sdk.v2.session.prompt(
+        {
+          sessionID,
+          model: {
+            providerID: model.providerID,
+            modelID: model.modelID,
+          },
+          variant: this.sessionManager.getVariant(sessionID),
+          prompt: {
+            text: parts
+              .filter((p): p is { type: "text"; text: string; synthetic?: boolean; ignored?: boolean } => p.type === "text")
+              .filter((p) => !p.synthetic && !p.ignored)
+              .map((p) => p.text)
+              .join("\n"),
+            files: parts.flatMap((p) =>
+              p.type === "file" ? [{ uri: p.url, mime: p.mime, name: p.filename }] : [],
+            ),
+            synthetic: parts.flatMap((p) => (p.type === "text" && p.synthetic ? [p.text] : [])),
+            ignored: parts.flatMap((p) => (p.type === "text" && p.ignored ? [p.text] : [])),
+          },
+          agent,
+          directory,
         },
-        variant: this.sessionManager.getVariant(sessionID),
-        parts,
-        agent,
-        directory,
-      })
-      const msg = response.data?.info
+        { throwOnError: true },
+      )
+      const msg = response.data?.assistant
 
       await sendUsageUpdate(this.connection, this.sdk, sessionID, directory)
 
@@ -931,15 +945,18 @@ export class Agent implements ACPAgent {
       .list({ directory }, { throwOnError: true })
       .then((x) => x.data!.find((c) => c.name === cmd.name))
     if (command) {
-      const response = await this.sdk.session.command({
-        sessionID,
-        command: command.name,
-        arguments: cmd.args,
-        model: model.providerID + "/" + model.modelID,
-        agent,
-        directory,
-      })
-      const msg = response.data?.info
+      const response = await this.sdk.v2.session.command(
+        {
+          sessionID,
+          command: command.name,
+          arguments: cmd.args,
+          model: model.providerID + "/" + model.modelID,
+          agent,
+          directory,
+        },
+        { throwOnError: true },
+      )
+      const msg = response.data?.assistant
 
       await sendUsageUpdate(this.connection, this.sdk, sessionID, directory)
 
