@@ -6,8 +6,7 @@ import type {
   LspStatus,
   McpStatus,
   Todo,
-  Message,
-  Part,
+  SessionMessage,
   Provider,
   PermissionRequest,
   QuestionRequest,
@@ -312,12 +311,11 @@ export type TuiState = {
     count: () => number
     diff: (sessionID: string) => ReadonlyArray<TuiSidebarFileItem>
     todo: (sessionID: string) => ReadonlyArray<TuiSidebarTodoItem>
-    messages: (sessionID: string) => ReadonlyArray<Message>
+    messages: (sessionID: string) => ReadonlyArray<SessionMessage>
     status: (sessionID: string) => SessionStatus | undefined
     permission: (sessionID: string) => ReadonlyArray<PermissionRequest>
     question: (sessionID: string) => ReadonlyArray<QuestionRequest>
   }
-  part: (messageID: string) => ReadonlyArray<Part>
   lsp: () => ReadonlyArray<TuiSidebarLspItem>
   mcp: () => ReadonlyArray<TuiSidebarMcpItem>
 }
