@@ -439,7 +439,7 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
               .list({ workspace })
               .then((x) => setStore("mcp_resource", reconcile(x.data ?? {}))),
             sdk.client.formatter.status({ workspace }).then((x) => setStore("formatter", reconcile(x.data ?? []))),
-            sdk.client.session.status({ workspace }).then((x) => {
+            sdk.client.v2.session.status({ workspace }).then((x) => {
               setStore("session_status", reconcile(x.data ?? {}))
             }),
             sdk.client.provider.auth({ workspace }).then((x) => setStore("provider_auth", reconcile(x.data ?? {}))),
@@ -508,8 +508,8 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
           const [session, messages, todo, diff] = await Promise.all([
             sdk.client.session.get({ sessionID }, { throwOnError: true }),
             sdk.client.session.messages({ sessionID, limit: 100 }),
-            sdk.client.session.todo({ sessionID }),
-            sdk.client.session.diff({ sessionID }),
+            sdk.client.v2.session.todo({ sessionID }),
+            sdk.client.v2.session.diff({ sessionID }),
           ])
           setStore(
             produce((draft) => {

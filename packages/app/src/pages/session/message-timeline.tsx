@@ -227,14 +227,14 @@ export function MessageTimeline(props: {
   }
 
   const shareMutation = useMutation(() => ({
-    mutationFn: (id: string) => globalSDK.client.session.share({ sessionID: id, directory: sdk.directory }),
+    mutationFn: (id: string) => globalSDK.client.v2.session.share({ sessionID: id, directory: sdk.directory }),
     onError: (err) => {
       console.error("Failed to share session", err)
     },
   }))
 
   const unshareMutation = useMutation(() => ({
-    mutationFn: (id: string) => globalSDK.client.session.unshare({ sessionID: id, directory: sdk.directory }),
+    mutationFn: (id: string) => globalSDK.client.v2.session.unshare({ sessionID: id, directory: sdk.directory }),
     onError: (err) => {
       console.error("Failed to unshare session", err)
     },
@@ -242,7 +242,7 @@ export function MessageTimeline(props: {
 
   const titleMutation = useMutation(() => ({
     mutationFn: (input: { id: string; title: string }) =>
-      sdk.client.session.update({ sessionID: input.id, title: input.title }),
+      sdk.client.v2.session.update({ sessionID: input.id, title: input.title }),
     onSuccess: (_, input) => {
       sync.set(
         produce((draft) => {
@@ -350,8 +350,7 @@ export function MessageTimeline(props: {
     const index = sessions.findIndex((s) => s.id === sessionID)
     const nextSession = index === -1 ? undefined : (sessions[index + 1] ?? sessions[index - 1])
 
-    await sdk.client.session
-      .update({ sessionID, time: { archived: Date.now() } })
+    await sdk.client.v2.session.update({ sessionID, time: { archived: Date.now() } })
       .then(() => {
         sync.set(
           produce((draft) => {
@@ -377,8 +376,7 @@ export function MessageTimeline(props: {
     const index = sessions.findIndex((s) => s.id === sessionID)
     const nextSession = index === -1 ? undefined : (sessions[index + 1] ?? sessions[index - 1])
 
-    const result = await sdk.client.session
-      .delete({ sessionID })
+    const result = await sdk.client.v2.session.remove({ sessionID })
       .then((x) => x.data)
       .catch((err) => {
         showToast({

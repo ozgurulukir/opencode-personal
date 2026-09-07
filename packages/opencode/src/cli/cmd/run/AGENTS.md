@@ -102,7 +102,7 @@ export function handleEventName(
 - Footer timer guards on `isGone` / `phase !== "running"` — deliberately does NOT reset if session is gone
 - Prompt timer unconditionally resets `store.interrupt` to 0 after 5s
 - Footer patches status text on first press (`"${interruptHint} again to interrupt"`); prompt does not
-- Footer delegates action to `options.onInterrupt` callback; prompt calls `sdk.client.session.abort` directly
+- Footer delegates action to `options.onInterrupt` callback; prompt calls `sdk.client.v2.session.abort` directly
 
 **Do not unify these implementations.** They operate on different state substrates (class signals vs SolidJS store), have different guard requirements, and different action targets. The only shared value is the 5s timeout duration.
 

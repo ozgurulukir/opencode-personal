@@ -134,11 +134,28 @@ layer is the widest remaining duality.
   (suite 62s→177s, timeout flakes in unrelated files). Full-suite failure variance is
   environmental (baseline 3c also fluctuates 1–3 fails); isolated runs are stable.
 
-### 3e — consumer migration + V1 shutdown prep
-- Switch TUI/app call sites from `client.session.*` to `client.v2.session.*` per endpoint
-  (traffic order: abort, revert, fork, update, unrevert, command, todo, summarize, diff…)
-- TUI `sync.tsx` → `sync-v2.tsx` migration is the long pole (21 `useSync()` files) —
-  likely its own phase (4) before V1 route deletion (5).
+### 3e — consumer migration + V1 shutdown prep ✅ (2026-09-07, partial by design)
+- Migrated 63 call sites across 18 files (app + TUI + run) from `client.session.*` /
+  `sdk.session.*` to `client.v2.session.*` / `sdk.v2.session.*` via ast-grep
+  (`$OBJ.session.$M($$$A)` → `$OBJ.v2.session.$M($$$A)`), methods: abort, revert,
+  unrevert, fork, update, command, todo, summarize, diff, share, unshare, children,
+  status, predict, promptAsync, plus `session.delete` → `v2.session.remove` rename.
+- ast-grep false positives (3): `props.api.state.session.todo/diff` (TuiState plugin API)
+  and `sync.session.todo/diff` (app sync store) — caught by typecheck, reverted. Typecheck
+  passing is the receiver-type guarantee: every surviving rewrite landed on a real
+  `OpencodeClient`.
+- Test mocks updated: `sendFollowupDraft.test.ts` + `submit.test.ts` client stubs grew a
+  `v2: {session: {...}}` branch (V1 branch kept for create/shell/prompt).
+- NOT migrated (follow-up, Phase 4 coherent with sync store unification):
+  - `prompt` (~55 sites) — body reshape `{parts}` → `{prompt: Prompt}` + response
+    `WithParts` → `Message`; non-mechanical
+  - `messages` (5 sites) — no V2 HTTP endpoint (paginated list; V2 has `context` only)
+  - `shell` (1 site) — V2 payload is `{command}` only; V1 caller passes `agent`
+  - `get`/`list`/`create` (~27 sites) — V2 `list` response is `{items, cursor}` (reshape);
+    `get`/`create` responses are structurally compatible but belong with the sync-store
+    type unification to avoid mixed Info generations in one store
+  - `packages/web` docs (10 locale mdx files) — documentation, separate task
+- AGENTS.md abort references updated (run + tui).
 
 ## Verification (per batch)
 

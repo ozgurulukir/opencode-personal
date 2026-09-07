@@ -1625,7 +1625,7 @@ export default function Page() {
   }
 
   const halt = (sessionID: string) =>
-    busy(sessionID) ? sdk.client.session.abort({ sessionID }).catch(() => {}) : Promise.resolve()
+    busy(sessionID) ? sdk.client.v2.session.abort({ sessionID }).catch(() => {}) : Promise.resolve()
 
   const revertMutation = useMutation(() => ({
     mutationFn: async (input: { sessionID: string; messageID: string }) => {
@@ -1637,7 +1637,7 @@ export default function Page() {
         prompt.set(value)
       })
       await halt(input.sessionID)
-        .then(() => sdk.client.session.revert(input))
+        .then(() => sdk.client.v2.session.revert(input))
         .then((result) => {
           if (result.data) merge(result.data)
         })
@@ -1670,9 +1670,9 @@ export default function Page() {
       })
 
       const task = !next
-        ? halt(sessionID).then(() => sdk.client.session.unrevert({ sessionID }))
+        ? halt(sessionID).then(() => sdk.client.v2.session.unrevert({ sessionID }))
         : halt(sessionID).then(() =>
-            sdk.client.session.revert({
+            sdk.client.v2.session.revert({
               sessionID,
               messageID: next.id,
             }),

@@ -360,10 +360,9 @@ async function runInteractiveRuntime(input: RunRuntimeInput): Promise<void> {
           }
 
           state.aborting = true
-          void ctx.sdk.session
-            .abort({
-              sessionID: state.sessionID,
-            })
+          void ctx.sdk.v2.session.abort({
+            sessionID: state.sessionID,
+          })
             .catch(() => {})
             .finally(() => {
               state.aborting = false

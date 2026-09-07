@@ -63,7 +63,7 @@ export async function sendFollowupDraft(input: FollowupSendInput) {
         return false
       }
 
-      await input.client.session.command({
+      await input.client.v2.session.command({
         sessionID: input.draft.sessionID,
         command: cmd.name,
         arguments: cmd.arguments,
@@ -119,7 +119,7 @@ export async function sendFollowupDraft(input: FollowupSendInput) {
       return false
     }
 
-    await input.client.session.promptAsync({
+    await input.client.v2.session.promptAsync({
       sessionID: input.draft.sessionID,
       agent: input.draft.agent,
       model: input.draft.model,

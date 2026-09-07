@@ -375,7 +375,7 @@ export const RunCommand = effectCmd({
           }
 
           if (args.fork) {
-            const forked = await sdk.session.fork({
+            const forked = await sdk.v2.session.fork({
               sessionID: args.session,
             })
             const id = forked.data?.id
@@ -400,7 +400,7 @@ export const RunCommand = effectCmd({
         const base = args.continue ? (await sdk.session.list()).data?.find((item) => !item.parentID) : undefined
 
         if (base && args.fork) {
-          const forked = await sdk.session.fork({
+          const forked = await sdk.v2.session.fork({
             sessionID: base.id,
           })
           const id = forked.data?.id
@@ -444,7 +444,7 @@ export const RunCommand = effectCmd({
         const cfg = await sdk.config.get()
         if (!cfg.data) return
         if (cfg.data.share !== "auto" && !Flag.OPENCODE_AUTO_SHARE && !args.share) return
-        const res = await sdk.session.share({ sessionID }).catch((error) => {
+        const res = await sdk.v2.session.share({ sessionID }).catch((error) => {
           if (error instanceof Error && error.message.includes("disabled")) {
             UI.println(UI.Style.TEXT_DANGER_BOLD + "!  " + error.message)
           }
@@ -625,7 +625,7 @@ export const RunCommand = effectCmd({
           })
 
           if (args.command) {
-            await client.session.command({
+            await client.v2.session.command({
               sessionID,
               agent,
               model: args.model,
