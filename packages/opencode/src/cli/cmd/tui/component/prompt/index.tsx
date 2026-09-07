@@ -36,7 +36,7 @@ import { useRenderer, useTerminalDimensions, type JSX } from "@opentui/solid"
 import * as Editor from "@tui/util/editor"
 import { useExit } from "../../context/exit"
 import * as Clipboard from "../../util/clipboard"
-import type { AssistantMessage, FilePart, UserMessage } from "@opencode-ai/sdk/v2"
+import type { FilePart, SessionMessageAssistant, SessionMessageUser } from "@opencode-ai/sdk/v2"
 import { TuiEvent } from "../../event"
 import { iife } from "@/util/iife"
 import { Locale } from "@/util/locale"
@@ -352,9 +352,10 @@ export function Prompt(props: PromptProps) {
 
   const lastUserMessage = createMemo(() => {
     if (!props.sessionID) return undefined
-    const messages = sync.data.message[props.sessionID]
+    // V2 slice is newest-first, so the latest user message comes first.
+    const messages = sync.data.messages[props.sessionID]
     if (!messages) return undefined
-    return messages.findLast((m): m is UserMessage => m.role === "user")
+    return messages.find((m): m is SessionMessageUser => m.type === "user")
   })
 
   // Ghost-text suggested next prompt. After the agent finishes a turn, ask
@@ -483,17 +484,23 @@ export function Prompt(props: PromptProps) {
 
   const usage = createMemo(() => {
     if (!props.sessionID) return
-    const msg = sync.data.message[props.sessionID] ?? []
-    const last = msg.findLast((item): item is AssistantMessage => item.role === "assistant" && item.tokens.output > 0)
+    const msg = sync.data.messages[props.sessionID] ?? []
+    const last = msg.findLast(
+      (item): item is SessionMessageAssistant => item.type === "assistant" && (item.tokens?.output ?? 0) > 0,
+    )
     if (!last) return
 
     const tokens =
-      last.tokens.input + last.tokens.output + last.tokens.reasoning + last.tokens.cache.read + last.tokens.cache.write
+      (last.tokens?.input ?? 0) +
+      (last.tokens?.output ?? 0) +
+      (last.tokens?.reasoning ?? 0) +
+      (last.tokens?.cache.read ?? 0) +
+      (last.tokens?.cache.write ?? 0)
     if (tokens <= 0) return
 
-    const model = sync.data.provider.find((item) => item.id === last.providerID)?.models[last.modelID]
+    const model = sync.data.provider.find((item) => item.id === last.model.providerID)?.models[last.model.id]
     const pct = model?.limit.context ? `${Math.round((tokens / model.limit.context) * 100)}%` : undefined
-    const cost = msg.reduce((sum, item) => sum + (item.role === "assistant" ? item.cost : 0), 0)
+    const cost = msg.reduce((sum, item) => sum + (item.type === "assistant" ? (item.cost ?? 0) : 0), 0)
     return {
       context: pct ? `${Locale.number(tokens)} (${pct})` : Locale.number(tokens),
       cost: cost > 0 ? money.format(cost) : undefined,
@@ -544,7 +551,8 @@ export function Prompt(props: PromptProps) {
         // Keep command line --agent if specified.
         if (!args.agent) local.agent.set(msg.agent)
         if (msg.model) {
-          local.model.set(msg.model)
+          // V2 model ref is {id, providerID, variant}; local state wants {providerID, modelID}.
+          local.model.set({ providerID: msg.model.providerID, modelID: msg.model.id })
           local.model.variant.set(msg.model.variant)
         }
       }

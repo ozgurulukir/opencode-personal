@@ -87,6 +87,12 @@ function stubPromptLayer(opts?: {
             yield* sync.run(SessionEvent.Prompted.Sync, {
               sessionID: input.sessionID,
               timestamp: ts,
+              agent: input.agent ?? "general",
+              model: {
+                id: Modelv2.ID.make("test-model"),
+                providerID: Modelv2.ProviderID.make("test"),
+                variant: Modelv2.VariantID.make("default"),
+              },
               prompt: {
                 text: textPart?.text ?? "",
                 // Prompt schema: files have {uri, mime, name?}, agents have {name, source?}

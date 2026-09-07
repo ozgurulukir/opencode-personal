@@ -1978,6 +1978,12 @@ export type SyncEventSessionNextPrompted = {
     timestamp: number
     sessionID: string
     prompt: Prompt
+    agent: string
+    model: {
+      id: string
+      providerID: string
+      variant: string
+    }
   }
 }
 
@@ -2962,6 +2968,12 @@ export type EventSessionNextPrompted = {
     timestamp: number
     sessionID: string
     prompt: Prompt
+    agent: string
+    model: {
+      id: string
+      providerID: string
+      variant: string
+    }
   }
 }
 
@@ -3433,6 +3445,12 @@ export type SessionMessageUser = {
   agents?: Array<PromptAgentAttachment>
   subtask?: PromptSubtaskAttachment
   type: "user"
+  agent: string
+  model: {
+    id: string
+    providerID: string
+    variant: string
+  }
 }
 
 export type SessionMessageSynthetic = {

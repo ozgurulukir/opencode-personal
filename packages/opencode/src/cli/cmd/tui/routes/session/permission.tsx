@@ -108,11 +108,13 @@ export function PermissionPrompt(props: { request: PermissionRequest }) {
   const input = createMemo(() => {
     const tool = props.request.tool
     if (!tool) return {}
-    const parts = sync.data.part[tool.messageID] ?? []
-    for (const part of parts) {
-      if (part.type === "tool" && part.callID === tool.callID && part.state.status !== "pending") {
-        return part.state.input ?? {}
-      }
+    const msg = sync.data.messages[props.request.sessionID]?.find((m) => m.id === tool.messageID)
+    if (msg?.type !== "assistant") return {}
+    for (const content of msg.content) {
+      if (content.type !== "tool" || content.id !== tool.callID) continue
+      if (content.state.status === "pending") continue
+      // Input is a streamed string while pending; an object once the call starts.
+      return typeof content.state.input === "string" ? {} : (content.state.input ?? {})
     }
     return {}
   })

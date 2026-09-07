@@ -5,7 +5,7 @@ import { useSDK } from "@tui/context/sdk"
 import { useRoute } from "@tui/context/route"
 import * as Clipboard from "@tui/util/clipboard"
 import type { PromptInfo } from "@tui/component/prompt/history"
-import { strip } from "@tui/component/prompt/part"
+import { fromUserMessage } from "@tui/component/prompt/part"
 
 export function DialogMessage(props: {
   messageID: string
@@ -14,7 +14,7 @@ export function DialogMessage(props: {
 }) {
   const sync = useSync()
   const sdk = useSDK()
-  const message = createMemo(() => sync.data.message[props.sessionID]?.find((x) => x.id === props.messageID))
+  const message = createMemo(() => sync.data.messages[props.sessionID]?.find((x) => x.id === props.messageID))
   const route = useRoute()
 
   return (
@@ -34,19 +34,8 @@ export function DialogMessage(props: {
               messageID: msg.id,
             })
 
-            if (props.setPrompt) {
-              const parts = sync.data.part[msg.id]
-              const promptInfo = parts.reduce(
-                (agg, part) => {
-                  if (part.type === "text") {
-                    if (!part.synthetic) agg.input += part.text
-                  }
-                  if (part.type === "file") agg.parts.push(strip(part))
-                  return agg
-                },
-                { input: "", parts: [] as PromptInfo["parts"] },
-              )
-              props.setPrompt(promptInfo)
+            if (props.setPrompt && msg.type === "user") {
+              props.setPrompt(fromUserMessage(msg))
             }
 
             dialog.clear()
@@ -60,15 +49,7 @@ export function DialogMessage(props: {
             const msg = message()
             if (!msg) return
 
-            const parts = sync.data.part[msg.id]
-            const text = parts.reduce((agg, part) => {
-              if (part.type === "text" && !part.synthetic) {
-                agg += part.text
-              }
-              return agg
-            }, "")
-
-            await Clipboard.copy(text)
+            await Clipboard.copy(msg.type === "user" ? msg.text : "")
             dialog.clear()
           },
         },
@@ -82,18 +63,7 @@ export function DialogMessage(props: {
               messageID: props.messageID,
             })
             const msg = message()
-            const prompt = msg
-              ? sync.data.part[msg.id].reduce(
-                  (agg, part) => {
-                    if (part.type === "text") {
-                      if (!part.synthetic) agg.input += part.text
-                    }
-                    if (part.type === "file") agg.parts.push(part)
-                    return agg
-                  },
-                  { input: "", parts: [] as PromptInfo["parts"] },
-                )
-              : undefined
+            const prompt = msg?.type === "user" ? fromUserMessage(msg) : undefined
             route.navigate({
               sessionID: result.data!.id,
               type: "session",
