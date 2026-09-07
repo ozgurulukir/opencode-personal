@@ -216,7 +216,21 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
         async getModel(sdk: any, modelID: string, _options?: Record<string, any>) {
           return sdk.responses(modelID)
         },
-        options: {},
+        options: {
+          fetch: (url: RequestInfo | URL, init?: RequestInit) => {
+            if (init?.body && typeof init.body === "string") {
+              try {
+                const body = JSON.parse(init.body)
+                if ("max_output_tokens" in body) {
+                  body.max_completion_tokens = body.max_output_tokens
+                  delete body.max_output_tokens
+                  init.body = JSON.stringify(body)
+                }
+              } catch {}
+            }
+            return fetch(url, init)
+          }
+        },
       }),
     xai: () =>
       Effect.succeed({
@@ -224,7 +238,21 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
         async getModel(sdk: any, modelID: string, _options?: Record<string, any>) {
           return sdk.responses(modelID)
         },
-        options: {},
+        options: {
+          fetch: (url: RequestInfo | URL, init?: RequestInit) => {
+            if (init?.body && typeof init.body === "string") {
+              try {
+                const body = JSON.parse(init.body)
+                if ("max_output_tokens" in body) {
+                  body.max_completion_tokens = body.max_output_tokens
+                  delete body.max_output_tokens
+                  init.body = JSON.stringify(body)
+                }
+              } catch {}
+            }
+            return fetch(url, init)
+          }
+        },
       }),
     "github-copilot": () =>
       Effect.succeed({
