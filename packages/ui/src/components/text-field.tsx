@@ -89,6 +89,22 @@ export function TextField(props: TextFieldProps) {
     inputRef?.focus()
   }
 
+  function handleKeyDown(e: KeyboardEvent) {
+    if (e.key === "Escape" && local.onClear && (local.value || inputRef?.value)) {
+      e.preventDefault()
+      e.stopPropagation()
+      handleClear()
+      return
+    }
+
+    if (typeof local.onKeyDown === "function") {
+      local.onKeyDown(e)
+    } else if (Array.isArray(local.onKeyDown)) {
+      // SolidJS bound event handler tuple: [handler, argument]
+      local.onKeyDown[0](local.onKeyDown[1], e)
+    }
+  }
+
   return (
     <Kobalte
       data-component="input"
@@ -97,7 +113,7 @@ export function TextField(props: TextFieldProps) {
       defaultValue={local.defaultValue}
       value={local.value}
       onChange={local.onChange}
-      onKeyDown={local.onKeyDown}
+      onKeyDown={handleKeyDown}
       onClick={handleClick}
       required={local.required}
       disabled={local.disabled}
