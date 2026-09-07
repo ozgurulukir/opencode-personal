@@ -6494,6 +6494,49 @@ export type V2SessionListResponses = {
 
 export type V2SessionListResponse = V2SessionListResponses[keyof V2SessionListResponses]
 
+export type V2SessionCreateData = {
+  body?: {
+    parentID?: string
+    title?: string
+    agent?: string
+    model?: {
+      id: string
+      providerID: string
+      variant?: string
+    }
+    permission?: PermissionRuleset
+    workspaceID?: string
+  }
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/api/session"
+}
+
+export type V2SessionCreateErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+  /**
+   * Session.NotFoundError
+   */
+  404: SessionNotFoundError
+}
+
+export type V2SessionCreateError = V2SessionCreateErrors[keyof V2SessionCreateErrors]
+
+export type V2SessionCreateResponses = {
+  /**
+   * Session.Info
+   */
+  200: SessionInfo
+}
+
+export type V2SessionCreateResponse = V2SessionCreateResponses[keyof V2SessionCreateResponses]
+
 export type V2SessionPromptData = {
   body?: {
     prompt: Prompt
@@ -6748,6 +6791,165 @@ export type V2SessionStatusResponses = {
 }
 
 export type V2SessionStatusResponse = V2SessionStatusResponses[keyof V2SessionStatusResponses]
+
+export type V2SessionForkData = {
+  body?: {
+    messageID?: string
+  }
+  path: {
+    sessionID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/api/session/{sessionID}/fork"
+}
+
+export type V2SessionForkErrors = {
+  /**
+   * Session.NotFoundError
+   */
+  404: SessionNotFoundError
+}
+
+export type V2SessionForkError = V2SessionForkErrors[keyof V2SessionForkErrors]
+
+export type V2SessionForkResponses = {
+  /**
+   * Session.Info
+   */
+  200: SessionInfo
+}
+
+export type V2SessionForkResponse = V2SessionForkResponses[keyof V2SessionForkResponses]
+
+export type V2SessionUnshareData = {
+  body?: never
+  path: {
+    sessionID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/api/session/{sessionID}/share"
+}
+
+export type V2SessionUnshareErrors = {
+  /**
+   * Session.NotFoundError
+   */
+  404: SessionNotFoundError
+  /**
+   * InternalServerError
+   */
+  500: EffectHttpApiErrorInternalServerError
+}
+
+export type V2SessionUnshareError = V2SessionUnshareErrors[keyof V2SessionUnshareErrors]
+
+export type V2SessionUnshareResponses = {
+  /**
+   * Session.Info
+   */
+  200: SessionInfo
+}
+
+export type V2SessionUnshareResponse = V2SessionUnshareResponses[keyof V2SessionUnshareResponses]
+
+export type V2SessionShareData = {
+  body?: never
+  path: {
+    sessionID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/api/session/{sessionID}/share"
+}
+
+export type V2SessionShareErrors = {
+  /**
+   * Session.NotFoundError
+   */
+  404: SessionNotFoundError
+  /**
+   * InternalServerError
+   */
+  500: EffectHttpApiErrorInternalServerError
+}
+
+export type V2SessionShareError = V2SessionShareErrors[keyof V2SessionShareErrors]
+
+export type V2SessionShareResponses = {
+  /**
+   * Session.Info
+   */
+  200: SessionInfo
+}
+
+export type V2SessionShareResponse = V2SessionShareResponses[keyof V2SessionShareResponses]
+
+export type V2SessionSummarizeData = {
+  body?: {
+    providerID: string
+    modelID: string
+    auto?: boolean
+  }
+  path: {
+    sessionID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/api/session/{sessionID}/summarize"
+}
+
+export type V2SessionSummarizeErrors = {
+  /**
+   * Session.NotFoundError
+   */
+  404: SessionNotFoundError
+}
+
+export type V2SessionSummarizeError = V2SessionSummarizeErrors[keyof V2SessionSummarizeErrors]
+
+export type V2SessionSummarizeResponses = {
+  /**
+   * Success
+   */
+  200: boolean
+}
+
+export type V2SessionSummarizeResponse = V2SessionSummarizeResponses[keyof V2SessionSummarizeResponses]
+
+export type V2SessionInitData = {
+  body?: {
+    modelID: string
+    providerID: string
+    messageID: string
+  }
+  path: {
+    sessionID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/api/session/{sessionID}/init"
+}
+
+export type V2SessionInitResponses = {
+  /**
+   * Success
+   */
+  200: boolean
+}
+
+export type V2SessionInitResponse = V2SessionInitResponses[keyof V2SessionInitResponses]
 
 export type V2SessionMessagesData = {
   body?: never

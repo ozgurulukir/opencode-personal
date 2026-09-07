@@ -56,9 +56,14 @@ through the delegation bridge.
 
 `subagent()` requires `Agent.Service` and `Config.Service` in addition to the V1
 services already captured (`Session`, `SessionPrompt`, `SessionCompaction`,
-`SessionStatus`, `Bus`). They are captured via `Effect.serviceOption` at layer build
-time. Tests must include `Agent.defaultLayer` in the infra layers — otherwise
-`subagent()` dies with "V2Session.Agent requires the V1 Agent service to be provided".
+`SessionStatus`, `Bus`, `SessionRevert`). They are captured via `Effect.serviceOption`
+at layer build time. Tests must include `Agent.defaultLayer` in the infra layers —
+otherwise `subagent()` dies with "V2Session.Agent requires the V1 Agent service to be provided".
+
+`summarize()` uses the captured `SessionRevert.Service` for revert cleanup before
+compaction (V1 HTTP handler parity). `fork()`/`summarize()` fail with the V2
+`NotFoundError` when the session is missing; `init()` has no typed error channel
+(`SessionPrompt.command` is infallible — V1's `mapError(BadRequest)` was dead code).
 
 ## V1 PromptInput.model field names differ from V2 Modelv2.Ref
 

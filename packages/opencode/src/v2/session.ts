@@ -1,5 +1,5 @@
 import { SessionMessageTable, SessionTable } from "@/session/session.sql"
-import { SessionID } from "@/session/schema"
+import { MessageID, SessionID } from "@/session/schema"
 import { ModelID, ProviderID } from "@/provider/schema"
 import { WorkspaceID } from "@/control-plane/schema"
 import { and, asc, desc, eq, gt, gte, isNull, like, lt, or, type SQL } from "@/storage/db"
@@ -25,6 +25,8 @@ import { Config } from "@/config/config"
 import { Permission } from "@/permission"
 import { subagentSessionPermission, subagentToolRestrictions, MAX_SUBAGENT_NESTING_LEVELS } from "@/agent/subagent-permissions"
 import { NotFoundError as StorageNotFoundError } from "@/storage/storage"
+import { SessionRevert } from "@/session/revert"
+import { Command } from "@/command"
 import * as Log from "@opencode-ai/core/util/log"
 import { EffectBridge } from "@/effect/bridge"
 
@@ -146,6 +148,19 @@ export interface Interface {
     archived?: number
   }) => Effect.Effect<Info, NotFoundError>
   readonly abort: (sessionID: SessionID) => Effect.Effect<void, never>
+  readonly fork: (input: { sessionID: SessionID; messageID?: MessageID }) => Effect.Effect<Info, NotFoundError>
+  readonly summarize: (input: {
+    sessionID: SessionID
+    providerID: ProviderID
+    modelID: ModelID
+    auto?: boolean
+  }) => Effect.Effect<boolean, NotFoundError>
+  readonly init: (input: {
+    sessionID: SessionID
+    messageID: MessageID
+    providerID: ProviderID
+    modelID: ModelID
+  }) => Effect.Effect<boolean, never>
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/v2/Session") {}
@@ -229,6 +244,7 @@ export const layer = Layer.effect(
     const bus = yield* Effect.serviceOption(Bus.Service)
     const agentsV1 = yield* Effect.serviceOption(Agent.Service)
     const configV1 = yield* Effect.serviceOption(Config.Service)
+    const revertV1 = yield* Effect.serviceOption(SessionRevert.Service)
 
     const requireV1 = <A>(svc: Option.Option<A>, name: string) =>
       Option.isNone(svc) ? Effect.die(`V2Session.${name} requires the V1 ${name} service to be provided`) : Effect.succeed(svc.value)
@@ -711,6 +727,49 @@ export const layer = Layer.effect(
       abort: Effect.fn("V2Session.abort")(function* (sessionID) {
         const promptSvc = yield* requireV1(promptV1, "SessionPrompt")
         yield* promptSvc.cancel(sessionID)
+      }),
+      fork: Effect.fn("V2Session.fork")(function* (input) {
+        const sessions = yield* requireV1(sessionsV1, "Session")
+        const info = yield* sessions.fork(input).pipe(
+          Effect.catchIf(StorageNotFoundError.isInstance, () => Effect.fail(new NotFoundError({ sessionID: input.sessionID }))),
+        )
+        return toV2Info(info)
+      }),
+      summarize: Effect.fn("V2Session.summarize")(function* (input) {
+        // Same orchestration as the V1 HTTP summarize handler: clean revert
+        // state, compact from the last user agent's perspective, then run the
+        // loop so the summary is produced immediately.
+        const sessions = yield* requireV1(sessionsV1, "Session")
+        const revert = yield* requireV1(revertV1, "SessionRevert")
+        const compactionSvc = yield* requireV1(compactionV1, "SessionCompaction")
+        const promptSvc = yield* requireV1(promptV1, "SessionPrompt")
+        const agents = yield* requireV1(agentsV1, "Agent")
+        const info = yield* sessions.get(input.sessionID).pipe(
+          Effect.catchIf(StorageNotFoundError.isInstance, () => Effect.fail(new NotFoundError({ sessionID: input.sessionID }))),
+        )
+        yield* revert.cleanup(info)
+        const messages = yield* sessions.messages({ sessionID: input.sessionID })
+        const defaultAgent = yield* agents.defaultAgent()
+        const currentAgent = messages.findLast((message) => message.info.role === "user")?.info.agent ?? defaultAgent
+        yield* compactionSvc.create({
+          sessionID: input.sessionID,
+          agent: currentAgent,
+          model: { providerID: input.providerID, modelID: input.modelID },
+          auto: input.auto ?? false,
+        })
+        yield* promptSvc.loop({ sessionID: input.sessionID })
+        return true
+      }),
+      init: Effect.fn("V2Session.init")(function* (input) {
+        const promptSvc = yield* requireV1(promptV1, "SessionPrompt")
+        yield* promptSvc.command({
+          sessionID: input.sessionID,
+          messageID: input.messageID,
+          model: `${input.providerID}/${input.modelID}`,
+          command: Command.Default.INIT,
+          arguments: "",
+        })
+        return true
       }),
     }
 

@@ -1,5 +1,6 @@
 import { WorkspaceID } from "@/control-plane/schema"
 import { SessionStatus } from "@/session/status"
+import { SessionShare } from "@/share/session"
 import { SessionV2 } from "@/v2/session"
 import { Effect, Schema } from "effect"
 import { HttpApiBuilder, HttpApiError, HttpApiSchema } from "effect/unstable/httpapi"
@@ -68,6 +69,7 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "v2.session
   Effect.gen(function* () {
     const session = yield* SessionV2.Service
     const statusSvc = yield* SessionStatus.Service
+    const shareSvc = yield* SessionShare.Service
 
     return handlers
       .handle(
@@ -180,5 +182,59 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "v2.session
       .handle("status", Effect.fn(function* () {
         return Object.fromEntries(yield* statusSvc.list())
       }))
+      .handle(
+        "create",
+        Effect.fn(function* (ctx) {
+          // Same as the V1 handler: create through the share service so root
+          // sessions are auto-shared when auto-share is enabled, then project
+          // the created session through the V2 read model. The NoContent
+          // payload arm decodes an empty body to undefined.
+          const input = ctx.payload === undefined ? undefined : ctx.payload
+          const info = yield* shareSvc.create(input)
+          return yield* session.get(info.id)
+        }),
+      )
+      .handle(
+        "fork",
+        Effect.fn(function* (ctx) {
+          return yield* session.fork({ sessionID: ctx.params.sessionID, messageID: ctx.payload.messageID })
+        }),
+      )
+      .handle(
+        "share",
+        Effect.fn(function* (ctx) {
+          yield* shareSvc.share(ctx.params.sessionID).pipe(Effect.mapError(() => new HttpApiError.InternalServerError({})))
+          return yield* session.get(ctx.params.sessionID)
+        }),
+      )
+      .handle(
+        "unshare",
+        Effect.fn(function* (ctx) {
+          yield* shareSvc.unshare(ctx.params.sessionID).pipe(Effect.mapError(() => new HttpApiError.InternalServerError({})))
+          return yield* session.get(ctx.params.sessionID)
+        }),
+      )
+      .handle(
+        "summarize",
+        Effect.fn(function* (ctx) {
+          return yield* session.summarize({
+            sessionID: ctx.params.sessionID,
+            providerID: ctx.payload.providerID,
+            modelID: ctx.payload.modelID,
+            auto: ctx.payload.auto,
+          })
+        }),
+      )
+      .handle(
+        "init",
+        Effect.fn(function* (ctx) {
+          return yield* session.init({
+            sessionID: ctx.params.sessionID,
+            messageID: ctx.payload.messageID,
+            providerID: ctx.payload.providerID,
+            modelID: ctx.payload.modelID,
+          })
+        }),
+      )
   }),
 )

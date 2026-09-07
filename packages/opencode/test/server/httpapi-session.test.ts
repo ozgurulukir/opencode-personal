@@ -572,7 +572,7 @@ describe("session HttpApi", () => {
 
   it.live(
     "serves v2 session lifecycle routes",
-    withTmp({ git: true, config: { formatter: false, lsp: false } }, (tmp) =>
+    withTmp({ git: true, config: { formatter: false, lsp: false, share: "disabled" } }, (tmp) =>
       Effect.gen(function* () {
         const headers = { "x-opencode-directory": tmp.path }
         const parent = yield* createSession(tmp.path, { title: "v2 parent" })
@@ -602,6 +602,43 @@ describe("session HttpApi", () => {
 
         // abort on an idle session is a no-op returning true
         expect(yield* requestJson<boolean>(`/api/session/${parent.id}/abort`, { headers, method: "POST" })).toBe(true)
+
+        // create accepts an empty body and a payload, projecting through the v2 read model
+        const createdEmpty = yield* requestJson<Record<string, any>>("/api/session", { headers, method: "POST" })
+        expect(createdEmpty.id).toBeTruthy()
+        const created = yield* requestJson<Record<string, any>>("/api/session", {
+          headers,
+          method: "POST",
+          body: JSON.stringify({ title: "v2 created" }),
+        })
+        expect(created).toMatchObject({ title: "v2 created" })
+        expect(created.time.created).toBeTypeOf("number")
+
+        // fork copies the session under a new id
+        const forked = yield* requestJson<Record<string, any>>(`/api/session/${created.id}/fork`, {
+          headers,
+          method: "POST",
+          body: JSON.stringify({}),
+        })
+        expect(forked.id).not.toBe(created.id)
+
+        // share with sharing disabled maps the service error to 500
+        const shared = yield* request(`/api/session/${created.id}/share`, { headers, method: "POST" })
+        expect(shared.status).toBe(500)
+
+        // fork and summarize on a missing session return the v2 404 shape
+        const missingFork = yield* request(`/api/session/${SessionID.descending()}/fork`, {
+          headers,
+          method: "POST",
+          body: JSON.stringify({}),
+        })
+        expect(missingFork.status).toBe(404)
+        const missingSummarize = yield* request(`/api/session/${SessionID.descending()}/summarize`, {
+          headers,
+          method: "POST",
+          body: JSON.stringify({ providerID: "test", modelID: "test" }),
+        })
+        expect(missingSummarize.status).toBe(404)
 
         // remove deletes the child; subsequent get is 404 with the v2 error tag
         expect(yield* requestJson<boolean>(`/api/session/${child.id}`, { headers, method: "DELETE" })).toBe(true)
