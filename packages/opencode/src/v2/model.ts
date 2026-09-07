@@ -1,29 +1,15 @@
-import { withStatics } from "@opencode-ai/core/schema"
+import { ModelID, ProviderID as V1ProviderID } from "@/provider/schema"
 import { ModelStatus } from "@/provider/model-status"
 import { Array, Context, Effect, HashMap, Layer, Option, Order, pipe, Schema } from "effect"
 import { DateTimeUtcFromMillis } from "effect/Schema"
 
-export const ID = Schema.String.pipe(Schema.brand("Model.ID"))
-export type ID = typeof ID.Type
+// Model identity brands are shared with V1 — single authority in provider/schema.ts.
+// VariantID and Family remain V2-local concepts.
+export const ID = ModelID
+export type ID = ModelID
 
-export const ProviderID = Schema.String.pipe(
-  Schema.brand("Model.ProviderID"),
-  withStatics((schema) => ({
-    // Well-known providers
-    opencode: schema.make("opencode"),
-    anthropic: schema.make("anthropic"),
-    openai: schema.make("openai"),
-    google: schema.make("google"),
-    googleVertex: schema.make("google-vertex"),
-    githubCopilot: schema.make("github-copilot"),
-    amazonBedrock: schema.make("amazon-bedrock"),
-    azure: schema.make("azure"),
-    openrouter: schema.make("openrouter"),
-    mistral: schema.make("mistral"),
-    gitlab: schema.make("gitlab"),
-  })),
-)
-export type ProviderID = typeof ProviderID.Type
+export const ProviderID = V1ProviderID
+export type ProviderID = V1ProviderID
 
 export const VariantID = Schema.String.pipe(Schema.brand("VariantID"))
 export type VariantID = typeof VariantID.Type

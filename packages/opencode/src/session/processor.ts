@@ -25,7 +25,6 @@ import { SyncEvent } from "@/sync"
 import { SessionEvent } from "@/v2/session-event"
 import { Modelv2 } from "@/v2/model"
 import * as DateTime from "effect/DateTime"
-import { Flag } from "@opencode-ai/core/flag/flag"
 
 const DOOM_LOOP_THRESHOLD = 3
 const log = Log.create({ service: "session.processor" })
@@ -232,13 +231,11 @@ export const layer: Layer.Layer<
           case "reasoning-start":
             if (value.id in ctx.reasoningMap) return
             // V2 read-model projection: emit the SessionEvent so V2 projectors populate SessionMessageTable.
-            if (Flag.OPENCODE_EXPERIMENTAL_EVENT_SYSTEM) {
-              yield* sync.run(SessionEvent.Reasoning.Started.Sync, {
-                sessionID: ctx.sessionID,
-                reasoningID: value.id,
-                timestamp: DateTime.makeUnsafe(Date.now()),
-              })
-            }
+            yield* sync.run(SessionEvent.Reasoning.Started.Sync, {
+              sessionID: ctx.sessionID,
+              reasoningID: value.id,
+              timestamp: DateTime.makeUnsafe(Date.now()),
+            })
             ctx.reasoningMap[value.id] = {
               id: PartID.ascending(),
               messageID: ctx.assistantMessage.id,
@@ -267,14 +264,12 @@ export const layer: Layer.Layer<
           case "reasoning-end":
             if (!(value.id in ctx.reasoningMap)) return
             // V2 read-model projection: emit the SessionEvent so V2 projectors populate SessionMessageTable.
-            if (Flag.OPENCODE_EXPERIMENTAL_EVENT_SYSTEM) {
-              yield* sync.run(SessionEvent.Reasoning.Ended.Sync, {
-                sessionID: ctx.sessionID,
-                reasoningID: value.id,
-                text: ctx.reasoningMap[value.id].text,
-                timestamp: DateTime.makeUnsafe(Date.now()),
-              })
-            }
+            yield* sync.run(SessionEvent.Reasoning.Ended.Sync, {
+              sessionID: ctx.sessionID,
+              reasoningID: value.id,
+              text: ctx.reasoningMap[value.id].text,
+              timestamp: DateTime.makeUnsafe(Date.now()),
+            })
             // oxlint-disable-next-line no-self-assign -- reactivity trigger
             ctx.reasoningMap[value.id].text = ctx.reasoningMap[value.id].text
             ctx.reasoningMap[value.id].time = { ...ctx.reasoningMap[value.id].time, end: Date.now() }
@@ -288,14 +283,12 @@ export const layer: Layer.Layer<
               throw new Error(`Tool call not allowed while generating summary: ${value.toolName}`)
             }
             // V2 read-model projection: emit the SessionEvent so V2 projectors populate SessionMessageTable.
-            if (Flag.OPENCODE_EXPERIMENTAL_EVENT_SYSTEM) {
-              yield* sync.run(SessionEvent.Tool.Input.Started.Sync, {
-                sessionID: ctx.sessionID,
-                callID: value.id,
-                name: value.toolName,
-                timestamp: DateTime.makeUnsafe(Date.now()),
-              })
-            }
+            yield* sync.run(SessionEvent.Tool.Input.Started.Sync, {
+              sessionID: ctx.sessionID,
+              callID: value.id,
+              name: value.toolName,
+              timestamp: DateTime.makeUnsafe(Date.now()),
+            })
             const part = yield* session.updatePart({
               id: ctx.toolcalls[value.id]?.partID ?? PartID.ascending(),
               messageID: ctx.assistantMessage.id,
@@ -319,14 +312,12 @@ export const layer: Layer.Layer<
 
           case "tool-input-end": {
             // V2 read-model projection: emit the SessionEvent so V2 projectors populate SessionMessageTable.
-            if (Flag.OPENCODE_EXPERIMENTAL_EVENT_SYSTEM) {
-              yield* sync.run(SessionEvent.Tool.Input.Ended.Sync, {
-                sessionID: ctx.sessionID,
-                callID: value.id,
-                text: "",
-                timestamp: DateTime.makeUnsafe(Date.now()),
-              })
-            }
+            yield* sync.run(SessionEvent.Tool.Input.Ended.Sync, {
+              sessionID: ctx.sessionID,
+              callID: value.id,
+              text: "",
+              timestamp: DateTime.makeUnsafe(Date.now()),
+            })
             return
           }
 
@@ -336,19 +327,17 @@ export const layer: Layer.Layer<
             }
             const toolCall = yield* readToolCall(value.toolCallId)
             // V2 read-model projection: emit the SessionEvent so V2 projectors populate SessionMessageTable.
-            if (Flag.OPENCODE_EXPERIMENTAL_EVENT_SYSTEM) {
-              yield* sync.run(SessionEvent.Tool.Called.Sync, {
-                sessionID: ctx.sessionID,
-                callID: value.toolCallId,
-                tool: value.toolName,
-                input: value.input,
-                provider: {
-                  executed: toolCall?.part.metadata?.providerExecuted === true,
-                  ...(value.providerMetadata ? { metadata: value.providerMetadata } : {}),
-                },
-                timestamp: DateTime.makeUnsafe(Date.now()),
-              })
-            }
+            yield* sync.run(SessionEvent.Tool.Called.Sync, {
+              sessionID: ctx.sessionID,
+              callID: value.toolCallId,
+              tool: value.toolName,
+              input: value.input,
+              provider: {
+                executed: toolCall?.part.metadata?.providerExecuted === true,
+                ...(value.providerMetadata ? { metadata: value.providerMetadata } : {}),
+              },
+              timestamp: DateTime.makeUnsafe(Date.now()),
+            })
             yield* updateToolCall(value.toolCallId, (match) => ({
               ...match,
               tool: value.toolName,
@@ -418,29 +407,27 @@ export const layer: Layer.Layer<
               attachments: attachments?.length ? attachments : undefined,
             }
             // V2 read-model projection: emit the SessionEvent so V2 projectors populate SessionMessageTable.
-            if (Flag.OPENCODE_EXPERIMENTAL_EVENT_SYSTEM) {
-              yield* sync.run(SessionEvent.Tool.Success.Sync, {
-                sessionID: ctx.sessionID,
-                callID: value.toolCallId,
-                structured: output.metadata,
-                content: [
-                  {
-                    type: "text",
-                    text: output.output,
-                  },
-                  ...(output.attachments?.map((item: MessageV2.FilePart) => ({
-                    type: "file",
-                    uri: item.url,
-                    mime: item.mime,
-                    name: item.filename,
-                  })) ?? []),
-                ],
-                provider: {
-                  executed: toolCall?.part.metadata?.providerExecuted === true,
+            yield* sync.run(SessionEvent.Tool.Success.Sync, {
+              sessionID: ctx.sessionID,
+              callID: value.toolCallId,
+              structured: output.metadata,
+              content: [
+                {
+                  type: "text",
+                  text: output.output,
                 },
-                timestamp: DateTime.makeUnsafe(Date.now()),
-              })
-            }
+                ...(output.attachments?.map((item: MessageV2.FilePart) => ({
+                  type: "file",
+                  uri: item.url,
+                  mime: item.mime,
+                  name: item.filename,
+                })) ?? []),
+              ],
+              provider: {
+                executed: toolCall?.part.metadata?.providerExecuted === true,
+              },
+              timestamp: DateTime.makeUnsafe(Date.now()),
+            })
             yield* completeToolCall(value.toolCallId, output)
             return
           }
@@ -448,20 +435,18 @@ export const layer: Layer.Layer<
           case "tool-error": {
             const toolCall = yield* readToolCall(value.toolCallId)
             // V2 read-model projection: emit the SessionEvent so V2 projectors populate SessionMessageTable.
-            if (Flag.OPENCODE_EXPERIMENTAL_EVENT_SYSTEM) {
-              yield* sync.run(SessionEvent.Tool.Failed.Sync, {
-                sessionID: ctx.sessionID,
-                callID: value.toolCallId,
-                error: {
-                  type: "unknown",
-                  message: errorMessage(value.error),
-                },
-                provider: {
-                  executed: toolCall?.part.metadata?.providerExecuted === true,
-                },
-                timestamp: DateTime.makeUnsafe(Date.now()),
-              })
-            }
+            yield* sync.run(SessionEvent.Tool.Failed.Sync, {
+              sessionID: ctx.sessionID,
+              callID: value.toolCallId,
+              error: {
+                type: "unknown",
+                message: errorMessage(value.error),
+              },
+              provider: {
+                executed: toolCall?.part.metadata?.providerExecuted === true,
+              },
+              timestamp: DateTime.makeUnsafe(Date.now()),
+            })
             yield* failToolCall(value.toolCallId, value.error)
             return
           }
@@ -473,19 +458,17 @@ export const layer: Layer.Layer<
             if (!ctx.snapshot) ctx.snapshot = yield* snapshot.track()
             if (!ctx.assistantMessage.summary) {
               // V2 read-model projection: emit the SessionEvent so V2 projectors populate SessionMessageTable.
-              if (Flag.OPENCODE_EXPERIMENTAL_EVENT_SYSTEM) {
-                yield* sync.run(SessionEvent.Step.Started.Sync, {
-                  sessionID: ctx.sessionID,
-                  agent: input.assistantMessage.agent,
-                  model: {
-                    id: Modelv2.ID.make(ctx.model.id),
-                    providerID: Modelv2.ProviderID.make(ctx.model.providerID),
-                    variant: Modelv2.VariantID.make(input.assistantMessage.variant ?? "default"),
-                  },
-                  snapshot: ctx.snapshot,
-                  timestamp: DateTime.makeUnsafe(Date.now()),
-                })
-              }
+              yield* sync.run(SessionEvent.Step.Started.Sync, {
+                sessionID: ctx.sessionID,
+                agent: input.assistantMessage.agent,
+                model: {
+                  id: Modelv2.ID.make(ctx.model.id),
+                  providerID: Modelv2.ProviderID.make(ctx.model.providerID),
+                  variant: Modelv2.VariantID.make(input.assistantMessage.variant ?? "default"),
+                },
+                snapshot: ctx.snapshot,
+                timestamp: DateTime.makeUnsafe(Date.now()),
+              })
             }
             yield* session.updatePart({
               id: PartID.ascending(),
@@ -505,16 +488,14 @@ export const layer: Layer.Layer<
             })
             if (!ctx.assistantMessage.summary) {
               // V2 read-model projection: emit the SessionEvent so V2 projectors populate SessionMessageTable.
-              if (Flag.OPENCODE_EXPERIMENTAL_EVENT_SYSTEM) {
-                yield* sync.run(SessionEvent.Step.Ended.Sync, {
-                  sessionID: ctx.sessionID,
-                  finish: value.finishReason,
-                  cost: usage.cost,
-                  tokens: usage.tokens,
-                  snapshot: completedSnapshot,
-                  timestamp: DateTime.makeUnsafe(Date.now()),
-                })
-              }
+              yield* sync.run(SessionEvent.Step.Ended.Sync, {
+                sessionID: ctx.sessionID,
+                finish: value.finishReason,
+                cost: usage.cost,
+                tokens: usage.tokens,
+                snapshot: completedSnapshot,
+                timestamp: DateTime.makeUnsafe(Date.now()),
+              })
             }
             ctx.assistantMessage.finish = value.finishReason
             ctx.assistantMessage.cost += usage.cost
@@ -567,12 +548,10 @@ export const layer: Layer.Layer<
           case "text-start":
             if (!ctx.assistantMessage.summary) {
               // V2 read-model projection: emit the SessionEvent so V2 projectors populate SessionMessageTable.
-              if (Flag.OPENCODE_EXPERIMENTAL_EVENT_SYSTEM) {
-                yield* sync.run(SessionEvent.Text.Started.Sync, {
-                  sessionID: ctx.sessionID,
-                  timestamp: DateTime.makeUnsafe(Date.now()),
-                })
-              }
+              yield* sync.run(SessionEvent.Text.Started.Sync, {
+                sessionID: ctx.sessionID,
+                timestamp: DateTime.makeUnsafe(Date.now()),
+              })
             }
             ctx.currentText = {
               id: PartID.ascending(),
@@ -619,13 +598,11 @@ export const layer: Layer.Layer<
             ctx.currentText.text = ctx.currentText.text.replace(/<\/?mm:think>/g, "")
             if (!ctx.assistantMessage.summary) {
               // V2 read-model projection: emit the SessionEvent so V2 projectors populate SessionMessageTable.
-              if (Flag.OPENCODE_EXPERIMENTAL_EVENT_SYSTEM) {
-                yield* sync.run(SessionEvent.Text.Ended.Sync, {
-                  sessionID: ctx.sessionID,
-                  text: ctx.currentText.text,
-                  timestamp: DateTime.makeUnsafe(Date.now()),
-                })
-              }
+              yield* sync.run(SessionEvent.Text.Ended.Sync, {
+                sessionID: ctx.sessionID,
+                text: ctx.currentText.text,
+                timestamp: DateTime.makeUnsafe(Date.now()),
+              })
             }
             {
               const end = Date.now()
@@ -716,16 +693,14 @@ export const layer: Layer.Layer<
         }
         if (!ctx.assistantMessage.summary) {
           // V2 read-model projection: emit the SessionEvent so V2 projectors populate SessionMessageTable.
-          if (Flag.OPENCODE_EXPERIMENTAL_EVENT_SYSTEM) {
-            yield* sync.run(SessionEvent.Step.Failed.Sync, {
-              sessionID: ctx.sessionID,
-              error: {
-                type: "unknown",
-                message: errorMessage(e),
-              },
-              timestamp: DateTime.makeUnsafe(Date.now()),
-            })
-          }
+          yield* sync.run(SessionEvent.Step.Failed.Sync, {
+            sessionID: ctx.sessionID,
+            error: {
+              type: "unknown",
+              message: errorMessage(e),
+            },
+            timestamp: DateTime.makeUnsafe(Date.now()),
+          })
         }
         ctx.assistantMessage.error = error
         yield* bus.publish(Session.Event.Error, {
@@ -770,18 +745,15 @@ export const layer: Layer.Layer<
                 parse,
                 set: (info) => {
                   // V2 read-model projection: emit the SessionEvent so V2 projectors populate SessionMessageTable.
-                  const event = Flag.OPENCODE_EXPERIMENTAL_EVENT_SYSTEM
-                    ? sync.run(SessionEvent.Retried.Sync, {
-                        sessionID: ctx.sessionID,
-                        attempt: info.attempt,
-                        error: {
-                          message: info.message,
-                          isRetryable: true,
-                        },
-                        timestamp: DateTime.makeUnsafe(Date.now()),
-                      })
-                    : Effect.void
-                  return event.pipe(
+                  return sync.run(SessionEvent.Retried.Sync, {
+                    sessionID: ctx.sessionID,
+                    attempt: info.attempt,
+                    error: {
+                      message: info.message,
+                      isRetryable: true,
+                    },
+                    timestamp: DateTime.makeUnsafe(Date.now()),
+                  }).pipe(
                     Effect.andThen(
                       status.set(ctx.sessionID, {
                         type: "retry",

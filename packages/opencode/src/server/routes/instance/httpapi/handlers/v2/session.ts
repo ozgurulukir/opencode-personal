@@ -1,4 +1,5 @@
 import { WorkspaceID } from "@/control-plane/schema"
+import { SessionStatus } from "@/session/status"
 import { SessionV2 } from "@/v2/session"
 import { Effect, Schema } from "effect"
 import { HttpApiBuilder, HttpApiError, HttpApiSchema } from "effect/unstable/httpapi"
@@ -66,6 +67,7 @@ const sessionCursor = {
 export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "v2.session", (handlers) =>
   Effect.gen(function* () {
     const session = yield* SessionV2.Service
+    const statusSvc = yield* SessionStatus.Service
 
     return handlers
       .handle(
@@ -138,5 +140,45 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "v2.session
           return yield* session.context(ctx.params.sessionID)
         }),
       )
+      .handle(
+        "get",
+        Effect.fn(function* (ctx) {
+          return yield* session.get(ctx.params.sessionID)
+        }),
+      )
+      .handle(
+        "remove",
+        Effect.fn(function* (ctx) {
+          yield* session.remove(ctx.params.sessionID)
+          return true
+        }),
+      )
+      .handle(
+        "update",
+        Effect.fn(function* (ctx) {
+          return yield* session.update({
+            sessionID: ctx.params.sessionID,
+            title: ctx.payload.title,
+            permission: ctx.payload.permission,
+            archived: ctx.payload.time?.archived,
+          })
+        }),
+      )
+      .handle(
+        "children",
+        Effect.fn(function* (ctx) {
+          return yield* session.children(ctx.params.sessionID)
+        }),
+      )
+      .handle(
+        "abort",
+        Effect.fn(function* (ctx) {
+          yield* session.abort(ctx.params.sessionID)
+          return true
+        }),
+      )
+      .handle("status", Effect.fn(function* () {
+        return Object.fromEntries(yield* statusSvc.list())
+      }))
   }),
 )

@@ -1,11 +1,15 @@
 import { SessionID } from "@/session/schema"
+import { SessionStatus } from "@/session/status"
+import { Session } from "@/session/session"
+import { Permission } from "@/permission"
 import { SessionMessage } from "@/v2/session-message"
 import { Prompt } from "@/v2/session-prompt"
 import { SessionV2 } from "@/v2/session"
 import { Schema } from "effect"
 import { HttpApiEndpoint, HttpApiError, HttpApiGroup, HttpApiSchema, OpenApi } from "effect/unstable/httpapi"
 import { Authorization } from "../../middleware/authorization"
-import { WorkspaceRoutingQuery, WorkspaceRoutingQueryFields } from "../../middleware/workspace-routing"
+import { InstanceContextMiddleware } from "../../middleware/instance-context"
+import { WorkspaceRoutingMiddleware, WorkspaceRoutingQuery, WorkspaceRoutingQueryFields } from "../../middleware/workspace-routing"
 import { QueryBoolean } from "../query"
 
 export const SessionsQuery = Schema.Struct({
@@ -107,10 +111,98 @@ export const SessionGroup = HttpApiGroup.make("v2.session")
       }),
     ),
   )
+  .add(
+    HttpApiEndpoint.get("get", "/api/session/:sessionID", {
+      params: { sessionID: SessionID },
+      query: WorkspaceRoutingQuery,
+      success: SessionV2.Info,
+      error: SessionV2.NotFoundError,
+    }).annotateMerge(
+      OpenApi.annotations({
+        identifier: "v2.session.get",
+        summary: "Get v2 session",
+        description: "Retrieve a single v2 session by id.",
+      }),
+    ),
+  )
+  .add(
+    HttpApiEndpoint.delete("remove", "/api/session/:sessionID", {
+      params: { sessionID: SessionID },
+      query: WorkspaceRoutingQuery,
+      success: Schema.Boolean,
+      error: SessionV2.NotFoundError,
+    }).annotateMerge(
+      OpenApi.annotations({
+        identifier: "v2.session.remove",
+        summary: "Remove v2 session",
+        description: "Remove a v2 session and its children.",
+      }),
+    ),
+  )
+  .add(
+    HttpApiEndpoint.patch("update", "/api/session/:sessionID", {
+      params: { sessionID: SessionID },
+      query: WorkspaceRoutingQuery,
+      payload: Schema.Struct({
+        title: Schema.optional(Schema.String),
+        permission: Schema.optional(Permission.Ruleset),
+        time: Schema.optional(Schema.Struct({ archived: Schema.optional(Session.ArchivedTimestamp) })),
+      }),
+      success: SessionV2.Info,
+      error: SessionV2.NotFoundError,
+    }).annotateMerge(
+      OpenApi.annotations({
+        identifier: "v2.session.update",
+        summary: "Update v2 session",
+        description: "Update properties of an existing v2 session, such as title, permission, or archived time.",
+      }),
+    ),
+  )
+  .add(
+    HttpApiEndpoint.get("children", "/api/session/:sessionID/children", {
+      params: { sessionID: SessionID },
+      query: WorkspaceRoutingQuery,
+      success: Schema.Array(SessionV2.Info),
+      error: SessionV2.NotFoundError,
+    }).annotateMerge(
+      OpenApi.annotations({
+        identifier: "v2.session.children",
+        summary: "Get v2 session children",
+        description: "Retrieve the child sessions of a v2 session.",
+      }),
+    ),
+  )
+  .add(
+    HttpApiEndpoint.post("abort", "/api/session/:sessionID/abort", {
+      params: { sessionID: SessionID },
+      query: WorkspaceRoutingQuery,
+      success: Schema.Boolean,
+    }).annotateMerge(
+      OpenApi.annotations({
+        identifier: "v2.session.abort",
+        summary: "Abort v2 session",
+        description: "Abort the running agent loop for a v2 session.",
+      }),
+    ),
+  )
+  .add(
+    HttpApiEndpoint.get("status", "/api/session/status", {
+      query: WorkspaceRoutingQuery,
+      success: Schema.Record(Schema.String, SessionStatus.Info),
+    }).annotateMerge(
+      OpenApi.annotations({
+        identifier: "v2.session.status",
+        summary: "Get v2 session statuses",
+        description: "Retrieve the agent-loop status for all sessions in the instance.",
+      }),
+    ),
+  )
   .annotateMerge(
     OpenApi.annotations({
       title: "v2",
       description: "Experimental v2 routes.",
     }),
   )
+  .middleware(InstanceContextMiddleware)
+  .middleware(WorkspaceRoutingMiddleware)
   .middleware(Authorization)

@@ -16,7 +16,6 @@ import { Config } from "@/config/config"
 import { Plugin } from "@/plugin"
 import { Agent } from "@/agent/agent"
 import { Provider } from "@/provider/provider"
-import { Flag } from "@opencode-ai/core/flag/flag"
 import { NamedError } from "@opencode-ai/core/util/error"
 import { SyncEvent } from "@/sync"
 import { SessionEvent } from "@/v2/session-event"
@@ -111,14 +110,12 @@ export const shellImpl = Effect.fn("SessionPrompt.shellImpl")(
             },
           }
           yield* deps.sessions.updatePart(part)
-          if (Flag.OPENCODE_EXPERIMENTAL_EVENT_SYSTEM) {
-            yield* deps.sync.run(SessionEvent.Shell.Started.Sync, {
-              sessionID: input.sessionID,
-              timestamp: DateTime.makeUnsafe(started),
-              callID,
-              command: input.command,
-            })
-          }
+          yield* deps.sync.run(SessionEvent.Shell.Started.Sync, {
+            sessionID: input.sessionID,
+            timestamp: DateTime.makeUnsafe(started),
+            callID,
+            command: input.command,
+          })
           return { msg, part, cwd: ctx.directory }
         }).pipe(Effect.ensuring(markReady))
 
@@ -134,14 +131,12 @@ export const shellImpl = Effect.fn("SessionPrompt.shellImpl")(
               output += "\n\n" + ["<metadata>", "User aborted the command", "</metadata>"].join("\n")
             }
             const completed = Date.now()
-            if (Flag.OPENCODE_EXPERIMENTAL_EVENT_SYSTEM) {
-              yield* deps.sync.run(SessionEvent.Shell.Ended.Sync, {
-                sessionID: input.sessionID,
-                timestamp: DateTime.makeUnsafe(completed),
-                callID: part.callID,
-                output,
-              })
-            }
+            yield* deps.sync.run(SessionEvent.Shell.Ended.Sync, {
+              sessionID: input.sessionID,
+              timestamp: DateTime.makeUnsafe(completed),
+              callID: part.callID,
+              output,
+            })
             if (!msg.time.completed) {
               msg.time.completed = completed
               yield* deps.sessions.updateMessage(msg)

@@ -27,7 +27,6 @@ import { AppFileSystem } from "@opencode-ai/core/filesystem"
 import { Instruction } from "../instruction"
 import { SyncEvent } from "@/sync"
 import { NamedError } from "@opencode-ai/core/util/error"
-import { Flag } from "@opencode-ai/core/flag/flag"
 import { decodeDataUrl } from "@/util/data-url"
 import { Database, eq } from "@/storage/db"
 import { SessionTable } from "../session.sql"
@@ -485,27 +484,23 @@ export const createUserMessage = Effect.fn("SessionPrompt.createUserMessage")(
     )
     // V2 read-model projection: emit the SessionEvent so the V2 projectors
     // (session/projectors-next.ts) populate SessionMessageTable for V2 reads.
-    if (Flag.OPENCODE_EXPERIMENTAL_EVENT_SYSTEM) {
-      yield* deps.sync.run(SessionEvent.Prompted.Sync, {
-        sessionID: input.sessionID,
-        timestamp: DateTime.makeUnsafe(info.time.created),
-        prompt: {
-          text: nextPrompt.text.join("\n"),
-          files: nextPrompt.files,
-          agents: nextPrompt.agents,
-        },
-      })
-    }
+    yield* deps.sync.run(SessionEvent.Prompted.Sync, {
+      sessionID: input.sessionID,
+      timestamp: DateTime.makeUnsafe(info.time.created),
+      prompt: {
+        text: nextPrompt.text.join("\n"),
+        files: nextPrompt.files,
+        agents: nextPrompt.agents,
+      },
+    })
     for (const text of nextPrompt.synthetic) {
       // V2 read-model projection: emit the SessionEvent so the V2 projectors
       // (session/projectors-next.ts) populate SessionMessageTable for V2 reads.
-      if (Flag.OPENCODE_EXPERIMENTAL_EVENT_SYSTEM) {
-        yield* deps.sync.run(SessionEvent.Synthetic.Sync, {
-          sessionID: input.sessionID,
-          timestamp: DateTime.makeUnsafe(info.time.created),
-          text,
-        })
-      }
+      yield* deps.sync.run(SessionEvent.Synthetic.Sync, {
+        sessionID: input.sessionID,
+        timestamp: DateTime.makeUnsafe(info.time.created),
+        text,
+      })
     }
 
     return { info, parts }
