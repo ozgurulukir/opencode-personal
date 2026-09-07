@@ -78,7 +78,7 @@ export function DialogUsage() {
 
   const sessionStats = createMemo(() => {
     if (!route) return null
-    const messages = sync.data.message[route.sessionID] ?? []
+    const messages = sync.data.messages[route.sessionID] ?? []
 
     let totalCost = 0
     let totalInput = 0
@@ -91,7 +91,7 @@ export function DialogUsage() {
     const toolMap: Record<string, number> = {}
 
     for (const msg of messages) {
-      if (msg.role === "assistant") {
+      if (msg.type === "assistant") {
         assistantCount++
         totalCost += msg.cost ?? 0
         const tokens = msg.tokens
@@ -103,7 +103,7 @@ export function DialogUsage() {
           totalCacheWrite += tokens.cache?.write ?? 0
         }
 
-        const modelKey = `${msg.providerID}/${msg.modelID}`
+        const modelKey = `${msg.model.providerID}/${msg.model.id}`
         if (!modelMap[modelKey]) {
           modelMap[modelKey] = {
             model: modelKey,
@@ -124,10 +124,10 @@ export function DialogUsage() {
         }
       }
 
-      const parts = sync.data.part[msg.id] ?? []
-      for (const part of parts) {
-        if (part.type === "tool" && part.tool) {
-          toolMap[part.tool] = (toolMap[part.tool] ?? 0) + 1
+      if (msg.type !== "assistant") continue
+      for (const content of msg.content) {
+        if (content.type === "tool") {
+          toolMap[content.name] = (toolMap[content.name] ?? 0) + 1
         }
       }
     }

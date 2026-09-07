@@ -1,7 +1,7 @@
 # V1/V2 Synthesis — Phase 5: message model adoption, engine re-homing, V1 deletion
 
 Date: 2026-09-07
-Status: IN PROGRESS — 5a done, 5b done, 5c/5d/5e/5f pending
+Status: IN PROGRESS — 5a done, 5b done, 5c batch 1 done (dialogs + small routes), 5c batch 2+ pending (session route, plugin api, run/app), 5d/5e/5f pending
 Depends on: Phase 4 (complete — commit `9d9fe54bc`, build verified)
 
 ## Goal
@@ -134,17 +134,48 @@ live behind `V2Session` emitting `SessionEvent.*` natively.
   run); server key suites retain only the documented 404-responseStyle failure;
   run+tui 336/336.
 
-### 5c — Message model adoption (consumers)
+### 5c — Message model adoption (consumers) — IN PROGRESS (2026-09-07)
 
-- Migrate the 5 `messages` call sites to `v2.session.messages` (`{items}` unwrap;
-  app prefetch: `x-next-cursor` header → body `cursor`).
-- Rebuild TUI `message`/`part` slices on the V2 model fed by `session.next.*`
-  events; delete the V1 `message.*` handlers; per-file adoption for the 18
-  part-reading consumers (dialogs, session route, run scrollback).
-- Migrate run-package `RunSession` reducers (`session.shared.ts`,
-  `stream.transport.ts`) to the V2 model.
-- Batch per file group (dialogs → routes → run transport), build + TUI smoke
-  between groups (4c lesson).
+**Shipped in batch 1 (5c-0 + 5c-1 + 5c-2 + small routes):**
+- **5c-0 model extension (prerequisite found by consumer census):** the TUI reads
+  `message.agent`/`message.model` (agent color rendering, prompt state restore) —
+  V2 `User` lacked both. `session.next.prompted` now carries `agent` + `model`
+  (`Modelv2.Ref`); `User` class + updater + TUI handler pass them through; SDK
+  regenerated. `create-user-message.ts` publishes them (same reshape as
+  ModelSwitched: `{id: modelID, providerID, variant: variant ?? "default"}`).
+- **5c-1 dual-load (strangler fig):** `sync()` now also loads
+  `v2.session.messages` into the `messages` slice (newest-first, matching the
+  `session.next.*` unshift order) alongside the V1 `message`/`part` load. V1
+  consumers unaffected.
+- **5c-2 dialog group:** `dialog-message`, `dialog-timeline`,
+  `dialog-fork-from-timeline`, `dialog-usage` all read the V2 slice now. Shared
+  `fromUserMessage()` helper in `component/prompt/part.ts` restores a V2 user
+  message into the composer (text + files + agents). Known data loss: V2
+  `FileAttachment` drops the `path`/`type` the V1 `FileSource` union requires, so
+  file-part `source` ranges are not restored (the @-mention text survives inside
+  `msg.text`). dialog-usage maps `state.structured`→tool counts via
+  `content[].name`; model key from `model.providerID`/`model.id`.
+- **Small routes:** `subagent-footer` (tokens/cost with `?? 0` guards — V2 tokens
+  optional), `permission` (tool input lookup via message content; string-input
+  guard for pending state), `prompt/index` (lastUserMessage = first user item in
+  newest-first slice; model reshape `{id}`→`{modelID}` for `local.model.set`).
+
+**Remaining for 5c (next batches):**
+- `routes/session/index.tsx` — the big one: UserMessage/AssistantMessage rebuild
+  on V2 shapes, tool-renderer adapter (V2 `AssistantTool` → V1 `ToolPart`:
+  `structured`→`metadata`, `content[].text` join→`output`, `time.pruned`→
+  `time.compacted`), transcript formatter (`formatTranscript` takes V1
+  `{info, parts}` pairs), scroll navigation, Task subagent view, revert prompt
+  restore (→ `fromUserMessage`).
+- `plugin/api.tsx` — public plugin surface (`messages()`/`part()`): decide V2
+  shapes vs adapter; own batch.
+- `context/sync.tsx` `status()` — reads `store.message` for last-message role.
+- Run reducers (`session.shared.ts`, `stream.transport.ts`) + app
+  (`context/sync.tsx:301`, `pages/layout.tsx:745` prefetch).
+- Delete V1 `message.*` handlers + `message`/`part` slices + V1 load (last).
+
+**Verification (batch 1):** typecheck clean in `opencode` + `app` (tsbuildinfo
+cleared after SDK regen); tui+run+v2+bridge suites 381/381.
 
 ### 5d — acp prompt/command (last 2 V1 prompt sites)
 

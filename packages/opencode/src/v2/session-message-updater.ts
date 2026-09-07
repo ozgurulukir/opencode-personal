@@ -164,6 +164,8 @@ export function update<Result>(adapter: Adapter<Result>, event: SessionEvent.Eve
           files: event.data.prompt.files,
           agents: event.data.prompt.agents,
           subtask: event.data.prompt.subtask,
+          agent: event.data.agent,
+          model: event.data.model,
           time: { created: event.data.timestamp },
         }),
       )

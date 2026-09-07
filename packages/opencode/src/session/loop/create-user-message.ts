@@ -499,6 +499,12 @@ export const createUserMessage = Effect.fn("SessionPrompt.createUserMessage")(
     yield* deps.sync.run(SessionEvent.Prompted.Sync, {
       sessionID: input.sessionID,
       timestamp: DateTime.makeUnsafe(info.time.created),
+      agent: info.agent,
+      model: {
+        id: Modelv2.ID.make(info.model.modelID),
+        providerID: Modelv2.ProviderID.make(info.model.providerID),
+        variant: Modelv2.VariantID.make(info.model.variant ?? "default"),
+      },
       prompt: {
         text: nextPrompt.text.join("\n"),
         files: nextPrompt.files,

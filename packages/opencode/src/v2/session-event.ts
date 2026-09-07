@@ -60,6 +60,8 @@ export const Prompted = EventV2.define({
   schema: {
     ...Base,
     prompt: Prompt,
+    agent: Schema.String,
+    model: Modelv2.Ref,
   },
 })
 export type Prompted = Schema.Schema.Type<typeof Prompted>

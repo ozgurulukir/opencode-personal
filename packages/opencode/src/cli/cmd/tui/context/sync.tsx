@@ -289,6 +289,9 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
               text: event.properties.prompt.text,
               files: event.properties.prompt.files,
               agents: event.properties.prompt.agents,
+              subtask: event.properties.prompt.subtask,
+              agent: event.properties.agent,
+              model: event.properties.model,
               time: { created: eventTime(event.properties.timestamp) },
             })
           })
@@ -786,11 +789,12 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
         },
         async sync(sessionID: string) {
           if (fullSyncedSessions.has(sessionID)) return
-          const [session, messages, todo, diff] = await Promise.all([
+          const [session, messages, todo, diff, v2messages] = await Promise.all([
             sdk.client.v2.session.get({ sessionID }, { throwOnError: true }),
             sdk.client.session.messages({ sessionID, limit: 100 }),
             sdk.client.v2.session.todo({ sessionID }),
             sdk.client.v2.session.diff({ sessionID }),
+            sdk.client.v2.session.messages({ sessionID }),
           ])
           setStore(
             produce((draft) => {
@@ -805,6 +809,11 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
               }
               draft.message[sessionID] = infos
               draft.session_diff[sessionID] = diff.data ?? []
+              // V2 read model: newest-first, same order the session.next.*
+              // handlers maintain via unshift. Feeds the consumer migration
+              // (phase 5c) — the V1 message/part slices go away once all
+              // readers are off them.
+              draft.messages[sessionID] = v2messages.data?.items ?? []
             }),
           )
           fullSyncedSessions.add(sessionID)

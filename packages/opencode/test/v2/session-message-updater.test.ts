@@ -227,6 +227,12 @@ test("prompted event with subtask stores subtask on user message", () => {
     data: {
       sessionID,
       timestamp: DateTime.makeUnsafe(1),
+      agent: "build",
+      model: {
+        id: Modelv2.ID.make("claude-sonnet-4"),
+        providerID: Modelv2.ProviderID.make("anthropic"),
+        variant: Modelv2.VariantID.make("default"),
+      },
       prompt: {
         text: "explore the codebase",
         subtask: new SubtaskAttachment({
@@ -245,6 +251,12 @@ test("prompted event with subtask stores subtask on user message", () => {
     id,
     type: "user",
     text: "explore the codebase",
+    agent: "build",
+    model: {
+      id: "claude-sonnet-4",
+      providerID: "anthropic",
+      variant: "default",
+    },
     subtask: {
       agent: "explore",
       description: "find call sites",
