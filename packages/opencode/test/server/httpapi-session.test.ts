@@ -640,6 +640,45 @@ describe("session HttpApi", () => {
         })
         expect(missingSummarize.status).toBe(404)
 
+        // todo and diff are empty reads on a fresh session
+        expect(
+          yield* requestJson<unknown[]>(`/api/session/${parent.id}/todo`, { headers }),
+        ).toEqual([])
+        expect(
+          yield* requestJson<unknown[]>(`/api/session/${parent.id}/diff`, { headers }),
+        ).toEqual([])
+
+        // revert marks the session when the message exists (V1 parity: a
+        // not-yet-existing messageID is a no-op returning the session unchanged),
+        // unrevert clears it; both project through the v2 read model
+        const revertTarget = yield* createTextMessage(tmp.path, parent.id, "revert me")
+        const reverted = yield* requestJson<Record<string, any>>(`/api/session/${parent.id}/revert`, {
+          headers,
+          method: "POST",
+          body: JSON.stringify({ messageID: revertTarget.info.id }),
+        })
+        expect(reverted).toMatchObject({ id: parent.id, revert: { messageID: revertTarget.info.id } })
+
+        const unreverted = yield* requestJson<Record<string, any>>(`/api/session/${parent.id}/unrevert`, {
+          headers,
+          method: "POST",
+        })
+        expect(unreverted).toMatchObject({ id: parent.id })
+        expect(unreverted.revert).toBeUndefined()
+
+        // revert and unrevert on a missing session return the v2 404 shape
+        const missingRevert = yield* request(`/api/session/${SessionID.descending()}/revert`, {
+          headers,
+          method: "POST",
+          body: JSON.stringify({ messageID: MessageID.ascending() }),
+        })
+        expect(missingRevert.status).toBe(404)
+        const missingUnrevert = yield* request(`/api/session/${SessionID.descending()}/unrevert`, {
+          headers,
+          method: "POST",
+        })
+        expect(missingUnrevert.status).toBe(404)
+
         // remove deletes the child; subsequent get is 404 with the v2 error tag
         expect(yield* requestJson<boolean>(`/api/session/${child.id}`, { headers, method: "DELETE" })).toBe(true)
         const missingChild = yield* request(`/api/session/${child.id}`, { headers })

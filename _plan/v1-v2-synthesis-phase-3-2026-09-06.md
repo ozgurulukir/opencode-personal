@@ -89,11 +89,28 @@ layer is the widest remaining duality.
   summarize/init happy path (needs LLM). Covered: create empty+payload, fork, share→500
   (disabled config), fork/summarize→404 on missing session.
 
-### 3c — domain ops
-- `GET /api/session/:sessionID/todo`, `GET /api/session/:sessionID/diff`
-- `POST /api/session/:sessionID/revert`, `/unrevert` (decide `revert` field on Info here)
-- `POST /api/session/:sessionID/command`, `/shell` (service method exists, HTTP missing),
-  `/predict`
+### 3c — domain ops ✅ (2026-09-07)
+- `GET /api/session/:sessionID/todo` → `Todo.Info[]` (handler-level `Todo.Service.get`)
+- `GET /api/session/:sessionID/diff` → `Snapshot.FileDiff[]` (handler-level
+  `SessionSummary.Service.diff`; reuses V1 `DiffQuery`)
+- `POST /api/session/:sessionID/revert` + `/unrevert` → `SessionV2.Info` (service methods;
+  resolve session first → real 404s, then `SessionRevert.Service`; **`revert` field ADDED to
+  V2 Info** — it IS a SessionTable JSON column, the old "intentionally omitted" comment was
+  stale; field schema reused from `Session.Info.fields.revert` (SSOT), wired in
+  `fromRow` + `toV2Info`)
+- `POST /api/session/:sessionID/command` → NoContent (NEW service method `command`;
+  mirrors V2 `shell` style: stage through `promptV1.command`, discard loop result —
+  consumers observe output via events. **Shape change vs V1** which returned
+  `MessageV2.WithParts`; reuses V1 `CommandPayload`)
+- `POST /api/session/:sessionID/shell` → NoContent (service method existed; payload is
+  `{command}` only — V2 shell derives agent from the session, V1's `agent`/`model`
+  overrides are not exposed. Extend the service in 3e if consumers need them)
+- `POST /api/session/:sessionID/predict` → `{prediction}` (handler-level
+  `SessionPrompt.Service.predict` with `InstanceRef`/`WorkspaceRef` provided; catch → ""
+  like V1)
+- Not covered by integration tests: command/shell/predict happy paths (LLM-dependent).
+  Covered: todo/diff empty reads, revert happy path (real message → revert marker set),
+  unrevert (marker cleared), revert/unrevert → 404 on missing session.
 
 ### 3d — message/part CRUD + permissions
 - `GET /api/session/:sessionID/message/:messageID`, `DELETE` message/part,
