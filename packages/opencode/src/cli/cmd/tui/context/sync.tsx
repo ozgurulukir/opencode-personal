@@ -781,10 +781,12 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
           const session = result.session.get(sessionID)
           if (!session) return "idle"
           if (session.time.compacting) return "compacting"
-          const messages = store.message[sessionID] ?? []
-          const last = messages.at(-1)
+          // V2 slice is newest-first and also carries shell/synthetic/compaction
+          // records the V1 message slice never had — consider only user/assistant
+          // messages so the working/idle semantics stay identical.
+          const last = (store.messages[sessionID] ?? []).find((m) => m.type === "user" || m.type === "assistant")
           if (!last) return "idle"
-          if (last.role === "user") return "working"
+          if (last.type === "user") return "working"
           return last.time.completed ? "idle" : "working"
         },
         async sync(sessionID: string) {

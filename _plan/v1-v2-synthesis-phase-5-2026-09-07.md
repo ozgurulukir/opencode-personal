@@ -177,6 +177,46 @@ live behind `V2Session` emitting `SessionEvent.*` natively.
 **Verification (batch 1):** typecheck clean in `opencode` + `app` (tsbuildinfo
 cleared after SDK regen); tui+run+v2+bridge suites 381/381.
 
+**Shipped in batch 2 (2026-09-07):**
+- **TUI `context/sync.tsx` `status()`** — reads the V2 `messages` slice now.
+  Parity note: the V1 slice only held user/assistant messages; the V2 slice also
+  holds shell/synthetic/compaction records, so `status()` filters to the newest
+  user/assistant message to keep working/idle semantics identical.
+- **run `session.shared.ts`** — `resolveSession` fetches `v2.session.messages`
+  (newest-first, no limit param — `sessionHistory()` slices); `SessionMessages`
+  type is now `SessionMessage[]`; `turn()`/`prompt()` read the inline V2 fields
+  (`text`/`files`/`agents`, `model.{id,providerID,variant}`). Span derivation
+  (`take`/`add`) kept as fallback; stored V2 `FileAttachment.source` ranges are
+  reused directly (new fidelity win — covered by a new test). Part emission
+  order is now files-then-agents (V2 schema field order — V1's part-array
+  interleaving order is not preserved by the V2 model).
+- **Tests**: `test/cli/run/session.shared.test.ts` + `variant.shared.test.ts`
+  fixtures ported V1→V2 with assertions unchanged (parity proof); new test for
+  stored-source reuse. A duplicate characterization file written during the
+  migration was deleted — the existing suite is the canonical coverage (DRY).
+
+**Deferred with reasons (census-driven scope corrections):**
+- **run `stream.transport.ts:562`** — the fetch feeds `bootstrapSubagentCalls`,
+  whose downstream replay pipeline is V1 event vocabulary end-to-end
+  (`message.updated`/`message.part.updated` child events). Converting the fetch
+  alone would be cosmetic; the pipeline re-vocabularies with 5e/5f.
+- **app `context/sync.tsx:301` + `pages/layout.tsx:745`** — the app message
+  pipeline is V1-shaped end-to-end (`{info, parts}` pairs, `message`/`part`
+  slices, optimistic merge, `x-next-cursor` prefetch). This is the app's
+  equivalent of the TUI session-route migration — its own batch, not a
+  mechanical swap. The plan's original "5 mechanical call sites" assumption was
+  wrong; the census overruled it.
+- **TUI `sync.tsx:791` V1 load** — still feeds the V1 slices until
+  `session/index.tsx` migrates (5c final deletes it).
+
+**Pre-existing breakage noted:** `test/cli/run/stream.transport.test.ts` fails
+with 8 timeout failures IDENTICAL with and without batch 2 (stash-verified) —
+broken on this branch independent of this work.
+
+**Verification (batch 2):** typecheck clean in `opencode` + `app`;
+session.shared+variant.shared 11/11; `test/cli/cmd/run/` 287/287; tui 49/49;
+v2 33/33.
+
 ### 5d — acp prompt/command (last 2 V1 prompt sites)
 
 - Extend the V2 sync `prompt` response to carry the final assistant message
