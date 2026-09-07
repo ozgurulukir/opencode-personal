@@ -1,14 +1,15 @@
 // Session message extraction and prompt history.
 //
-// Fetches session messages from the SDK and extracts user turn text for
+// Fetches session messages from the V2 SDK and extracts user turn text for
 // the prompt history ring. Also finds the most recently used variant for
 // the current model so the footer can pre-select it.
 import { promptCopy, promptSame } from "./prompt.shared"
 import type { RunInput, RunPrompt } from "./types"
+import type { SessionMessage, SessionMessageUser } from "@opencode-ai/sdk/v2"
 
 const LIMIT = 200
 
-export type SessionMessages = NonNullable<Awaited<ReturnType<RunInput["sdk"]["session"]["messages"]>>["data"]>
+export type SessionMessages = SessionMessage[]
 
 type Turn = {
   prompt: RunPrompt
@@ -42,32 +43,20 @@ function fileName(url: string, filename?: string) {
   return url
 }
 
-function fileSource(
-  part: Extract<SessionMessages[number]["parts"][number], { type: "file" }>,
-  text: { start: number; end: number; value: string },
-) {
-  if (part.source) {
-    return {
-      ...structuredClone(part.source),
-      text,
-    }
-  }
-
+function fileSource(file: NonNullable<SessionMessageUser["files"]>[number], text: { start: number; end: number; value: string }) {
+  // V2 FileAttachment keeps a flat {start, end, text} range — the V1 FilePart
+  // union's path/type detail is not preserved, so always emit a file source.
   return {
     type: "file" as const,
-    path: part.filename ?? part.url,
+    path: file.name ?? file.uri,
     text,
   }
 }
 
-function prompt(msg: SessionMessages[number]): RunPrompt {
+function prompt(msg: SessionMessageUser): RunPrompt {
   const parts: RunPrompt["parts"] = []
-  let text = msg.parts
-    .filter((part): part is Extract<SessionMessages[number]["parts"][number], { type: "text" }> => {
-      return part.type === "text" && !part.synthetic
-    })
-    .map((part) => part.text)
-    .join("")
+  // V2 keeps the prompt text inline (non-synthetic, mentions included).
+  let text = msg.text
   let cursor = Bun.stringWidth(text)
   const used: Array<{ start: number; end: number }> = []
 
@@ -98,30 +87,30 @@ function prompt(msg: SessionMessages[number]): RunPrompt {
     return { start, end, value }
   }
 
-  for (const part of msg.parts) {
-    if (part.type === "file") {
-      const next = part.source?.text ? structuredClone(part.source.text) : take("@" + fileName(part.url, part.filename))
-      const span = next ?? add("@" + fileName(part.url, part.filename))
-      used.push({ start: span.start, end: span.end })
-      parts.push({
-        type: "file",
-        mime: part.mime,
-        filename: part.filename,
-        url: part.url,
-        source: fileSource(part, span),
-      })
-      continue
-    }
+  for (const file of msg.files ?? []) {
+    const mention = "@" + fileName(file.uri, file.name)
+    const span = file.source
+      ? { start: file.source.start, end: file.source.end, value: file.source.text }
+      : (take(mention) ?? add(mention))
+    used.push({ start: span.start, end: span.end })
+    parts.push({
+      type: "file",
+      mime: file.mime,
+      filename: file.name,
+      url: file.uri,
+      source: fileSource(file, span),
+    })
+  }
 
-    if (part.type !== "agent") {
-      continue
-    }
-
-    const span = part.source ? structuredClone(part.source) : (take("@" + part.name) ?? add("@" + part.name))
+  for (const agent of msg.agents ?? []) {
+    const mention = "@" + agent.name
+    const span = agent.source
+      ? { start: agent.source.start, end: agent.source.end, value: agent.source.text }
+      : (take(mention) ?? add(mention))
     used.push({ start: span.start, end: span.end })
     parts.push({
       type: "agent",
-      name: part.name,
+      name: agent.name,
       source: span,
     })
   }
@@ -130,15 +119,15 @@ function prompt(msg: SessionMessages[number]): RunPrompt {
 }
 
 function turn(msg: SessionMessages[number]): Turn | undefined {
-  if (msg.info.role !== "user") {
+  if (msg.type !== "user") {
     return undefined
   }
 
   return {
     prompt: prompt(msg),
-    provider: msg.info.model.providerID,
-    model: msg.info.model.modelID,
-    variant: msg.info.model.variant,
+    provider: msg.model.providerID,
+    model: msg.model.id,
+    variant: msg.model.variant,
   }
 }
 
@@ -153,11 +142,9 @@ export function createSession(messages: SessionMessages): RunSession {
 }
 
 export async function resolveSession(sdk: RunInput["sdk"], sessionID: string, limit = LIMIT): Promise<RunSession> {
-  const response = await sdk.session.messages({
-    sessionID,
-    limit,
-  })
-  return createSession(response.data ?? [])
+  // V2 read model: newest-first, no limit param — sessionHistory() slices.
+  const response = await sdk.v2.session.messages({ sessionID })
+  return createSession(response.data?.items ?? [])
 }
 
 export function sessionHistory(session: RunSession, limit = LIMIT): RunPrompt[] {

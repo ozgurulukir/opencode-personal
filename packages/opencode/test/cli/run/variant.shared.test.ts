@@ -84,18 +84,20 @@ function userMessage(
   input: { providerID: string; modelID: string; variant?: string },
 ): SessionMessages[number] {
   return {
-    info: {
-      id,
-      sessionID: "session-1",
-      role: "user",
-      time: {
-        created: 1,
-      },
-      agent: "build",
-      model: input,
+    id,
+    type: "user",
+    sessionID: "session-1",
+    text: "",
+    agent: "build",
+    model: {
+      id: input.modelID,
+      providerID: input.providerID,
+      variant: input.variant,
     },
-    parts: [],
-  }
+    time: {
+      created: 1,
+    },
+  } as SessionMessages[number]
 }
 
 const it = testEffect(Layer.mergeAll(AppFileSystem.defaultLayer, NodeFileSystem.layer))
