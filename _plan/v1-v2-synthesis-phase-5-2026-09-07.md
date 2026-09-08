@@ -348,16 +348,79 @@ consumer-safe.
 
 ### 5e — Engine re-homing (highest risk)
 
-- Port `runLoop`/`processor`/`compaction` behind `V2Session` so the loop emits
-  `SessionEvent.*` natively (deletes the bridge's reason to exist).
-- Wire the deferred-delivery background worker (drain `runDeferred` queue on
-  instance start; `promptAsync` fork moves from HTTP-handler scope to the worker
-  scope so it survives request completion).
-- Characterization tests first (Rule 3): the loop has partial coverage via
-  `test/session/` + `test/v2/`; extend before moving code.
-- The blueprint in the phase-4 plan's `_plan/` reference decomposes runLoop into
-  `ToolExecutor` + `CompactionPolicy` + `PromptAssembler` + `SubtaskRouter` +
-  `AgentLoop` orchestrator — reuse it.
+**Census (2026-09-08, pre-work):**
+
+- The loop machinery ALREADY emits message-lifecycle `SessionEvent.*` natively
+  (`processor.ts`, `create-user-message.ts` → `sync.run`: Prompted, Tool.*,
+  Text.*, Reasoning.*, Step.*, Shell.*, Compaction.*, Synthetic, AgentSwitched,
+  ModelSwitched). The TUI consumes all of these via `session.next.*`.
+- The event bridge (`v2/event-bridge.ts`, 87 lines, wired in
+  `project/bootstrap.ts`) translates only 7 NON-loop families from the V1 bus:
+  `session.updated/deleted/status`, `todo.updated`, `session.diff`,
+  `permission.asked/replied` → `session.next.*`.
+- Sources today: `session.ts` patch() → `sync.run(Event.Updated)` (V1
+  vocabulary "session.updated", dual-publishes to the V1 bus via `busSchema`);
+  `status.ts`/`todo.ts`/`summary.ts`/`revert.ts`/`permission/index.ts` → manual
+  `bus.publish` (V1 BusEvent only — the bridge is their ONLY path to the V2
+  stream).
+- `SyncEvent.run` IS the dual-publish mechanism (projector + V1 bus via
+  `busSchema ?? schema` + GlobalBus "sync" → V2 SSE). The V1-vocabulary
+  sync events and their projectors are load-bearing (SessionTable) — native
+  `session.next.*` publishes are ADDED alongside; V1-vocabulary removal is 5f.
+- V1 bus keeps permanent consumers: plugins (`subscribeAll`), V1 SSE endpoint
+  (app batch), github.ts, llm.ts (Permission.Replied), share-next, project/vcs/lsp.
+- `promptAsync` handler forks `promptSvc.prompt` into a handler-yielded
+  `Scope.Scope` (per-request scope in effect httpapi) — the loop may be
+  orphaned/dropped at request completion; moves to the worker scope in 5e-1.
+- `runDeferred` exists on the V2 service (in-memory `deferredQueue` Set) but no
+  background worker drains it; tests/callers trigger it explicitly.
+- The "blueprint" (ToolExecutor/CompactionPolicy/PromptAssembler/SubtaskRouter/
+  AgentLoop) is a naming in this plan + root AGENTS.md, not a document — 5e-3
+  defines its own decomposition after characterization tests.
+- `SessionPrompt.Service` consumers: V2 bridge, V1 HTTP handlers (dead
+  endpoints, 5f), `cli/cmd/github.ts:434`, `control-plane/workspace.ts:173` —
+  the service survives 5f unless those migrate; 5e-3 re-homes only V2Session.
+
+**Batches:**
+
+- **5e-1 — deferred-delivery worker + promptAsync scope — DONE (2026-09-08):**
+  - `v2/session.ts` — the layer captures `Scope.Scope` (layer scope);
+    `prompt(delivery: "deferred")` now forks `runDeferred(sessionID)` into it
+    after the response read-back (fork placed LAST so the drain cannot
+    interleave before the caller's result is built — keeps the
+    "stages without running synchronously" test deterministic). The queue
+    guard makes concurrent drains idempotent; a message staged while the loop
+    is busy is consumed by the running loop's continuation check
+    (`Runner.ensureRunning` awaits the current run; the loop's continuation
+    logic picks up newly staged messages).
+  - `handlers/v2/session.ts` promptAsync — migrated from
+    `promptSvc.prompt(...)` + `Effect.forkIn(requestScope)` to
+    `session.prompt({..., delivery: "deferred"})` (the V2 service). Payload
+    stays the V1 `PromptInput` shape (parts) — converted in-handler to the V2
+    `Prompt` (same mapping as acp/agent.ts: text join with synthetic/ignored
+    split, files flatMap). Staging failures still publish `SessionV1.Event.Error`
+    (loop failures publish it themselves at `run-loop.ts:211`). The handler's
+    `Scope.Scope` capture removed (no longer forked there); `promptSvc` kept
+    (predict handler still uses it).
+  - No SDK regen needed (endpoint payload/response schemas unchanged).
+  - Tests: new `prompt (deferred) drains via the background worker` (polls the
+    stub loop until the worker drains); existing
+    "stages without running synchronously" unchanged and deterministic.
+  - Verification: typecheck clean; v2 session 29/29; httpapi-session 12/12;
+    cmd/run 287/287; tui 91 + known flake; TUI smoke: submit → staged →
+    worker drained → loop ran → quota error + retry surfaced through the new
+    path.
+- **5e-2 — native session-lifecycle events, delete the bridge**: the 5 source
+  services add native `sync.run(SessionEvent.*.Sync)` publishes alongside their
+  V1 bus publishes (V1 payload shapes untouched — plugins/V1-SSE/app keep
+  working); delete `v2/event-bridge.ts` + bootstrap wiring; TUI handlers
+  unchanged. Verify: session list updates, permission prompts, todos, diff.
+- **5e-3 — re-home the engine behind V2Session**: characterization tests for
+  the loop first (Rule 3); extract the `session/prompt.ts` facade body into a
+  shared engine factory consumable by both the V1 service (until 5f) and
+  V2Session; V2 write methods stop delegating via `requireV1(promptV1)`;
+  `SessionCompaction` same. github.ts/workspace.ts migration assessed
+  separately (may keep the V1 service as the engine facade permanently).
 
 ### 5f — V1 deletion
 

@@ -318,6 +318,28 @@ describe("v2.session", () => {
     }),
   )
 
+  it.instance("prompt (deferred) drains via the background worker", () =>
+    Effect.gen(function* () {
+      const session = yield* SessionV2.Service
+      const info = yield* session.create({ agent: "build" })
+
+      yield* session.prompt({
+        sessionID: info.id,
+        prompt: { text: "deferred drain" },
+        delivery: "deferred",
+      })
+
+      // The layer-scoped worker drains the queue without an explicit
+      // runDeferred() call — poll until the stub loop records the session.
+      let drained = false
+      for (let i = 0; i < 100 && !drained; i++) {
+        yield* Effect.sleep(10)
+        drained = promptStub.calls.loop.includes(info.id)
+      }
+      expect(drained).toBe(true)
+    }),
+  )
+
   it.instance("prompt with files translates FileAttachment to file parts", () =>
     Effect.gen(function* () {
       const before = promptStub.calls.prompt.length
