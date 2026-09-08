@@ -136,8 +136,10 @@ describe("sessionMessagesToV1", () => {
                 status: "completed",
                 input: { filePath: "/tmp/a.ts" },
                 structured: {},
-                content: [{ type: "text", text: "done" }],
-                attachments: [{ uri: "file:///tmp/a.ts", mime: "text/plain", name: "a.ts" }],
+                content: [
+                  { type: "text", text: "done" },
+                  { type: "file", uri: "file:///tmp/a.ts", mime: "text/plain", name: "a.ts" },
+                ],
               },
             },
           ],
