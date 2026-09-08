@@ -41,7 +41,12 @@ describe("sessionMessagesToV1", () => {
     const { session, part } = sessionMessagesToV1(
       [
         user("evt_1", "hello", [
-          { uri: "file:///tmp/a%20b.ts?start=1&end=2", mime: "text/plain", name: "a b.ts", source: { start: 0, end: 5, text: "const" } },
+          {
+            uri: "file:///tmp/a%20b.ts?start=1&end=2",
+            mime: "text/plain",
+            name: "a b.ts",
+            source: { start: 0, end: 5, text: "const" },
+          },
         ]),
       ],
       sessionID,
@@ -111,6 +116,66 @@ describe("sessionMessagesToV1", () => {
         metadata: { output: "files" },
         time: { start: 3, end: 4 },
       },
+    })
+  })
+
+  test("preserves subtask, reasoning identity/time, attachments and abort errors", () => {
+    const { session, part } = sessionMessagesToV1(
+      [
+        user("evt_1", "delegate", undefined),
+        assistant(
+          "evt_2",
+          [
+            { type: "reasoning", id: "rsn_1", text: "thinking" },
+            {
+              type: "tool",
+              id: "call_1",
+              name: "read",
+              time: { created: 2, ran: 3, completed: 4 },
+              state: {
+                status: "completed",
+                input: { filePath: "/tmp/a.ts" },
+                structured: {},
+                content: [{ type: "text", text: "done" }],
+                attachments: [{ uri: "file:///tmp/a.ts", mime: "text/plain", name: "a.ts" }],
+              },
+            },
+          ],
+          { error: { type: "aborted", message: "Aborted" } },
+        ),
+      ].map((message, index) => {
+        if (index === 0 && message.type === "user") {
+          return {
+            ...message,
+            subtask: {
+              agent: "explore",
+              description: "inspect the file",
+              prompt: "read a.ts",
+            },
+          }
+        }
+        return message
+      }),
+      sessionID,
+    )
+
+    expect(part["evt_1"]?.[1]).toMatchObject({
+      type: "subtask",
+      agent: "explore",
+      description: "inspect the file",
+      prompt: "read a.ts",
+    })
+    expect(part["evt_2"]?.[0]).toMatchObject({
+      type: "reasoning",
+      id: "evt_2:reasoning:rsn_1",
+      time: { start: 2, end: 3 },
+    })
+    expect(part["evt_2"]?.[1]).toMatchObject({
+      type: "tool",
+      state: { status: "completed", attachments: [{ filename: "a.ts" }] },
+    })
+    expect(session[1]).toMatchObject({
+      error: { name: "MessageAbortedError", data: { message: "Aborted" } },
     })
   })
 
@@ -184,7 +249,12 @@ describe("sessionMessagesToV1", () => {
       [
         user("evt_1", "hello"),
         { id: "evt_2", type: "agent-switched", agent: "build", time: { created: 2 } } as SessionMessage,
-        { id: "evt_3", type: "model-switched", model: { id: "m", providerID: "p", variant: "default" }, time: { created: 3 } } as SessionMessage,
+        {
+          id: "evt_3",
+          type: "model-switched",
+          model: { id: "m", providerID: "p", variant: "default" },
+          time: { created: 3 },
+        } as SessionMessage,
       ],
       sessionID,
     )

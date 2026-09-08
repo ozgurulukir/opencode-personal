@@ -353,11 +353,18 @@ export function update<Result>(adapter: Adapter<Result>, event: SessionEvent.Eve
             if (match && match.state.status === "running") {
               match.provider = event.data.provider
               match.time.completed = event.data.timestamp
+              const attachments = event.data.content
+                .filter(
+                  (item): item is Extract<(typeof event.data.content)[number], { type: "file" }> =>
+                    item.type === "file",
+                )
+                .map((item) => ({ uri: item.uri, mime: item.mime, name: item.name }))
               match.state = {
                 status: "completed",
                 input: match.state.input,
                 structured: event.data.structured,
                 content: [...event.data.content],
+                ...(attachments.length ? { attachments } : {}),
               }
             }
           }),

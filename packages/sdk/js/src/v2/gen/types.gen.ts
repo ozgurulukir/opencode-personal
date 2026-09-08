@@ -48,15 +48,6 @@ export type Event =
   | EventPtyUpdated
   | EventPtyExited
   | EventPtyDeleted
-  | EventMessageUpdated
-  | EventMessageRemoved
-  | EventMessagePartUpdated
-  | EventMessagePartUpdatedBatch
-  | EventMessagePartRemoved
-  | EventMessageUpdatedBatch
-  | EventSessionCreated
-  | EventSessionUpdated
-  | EventSessionDeleted
   | EventSessionNextAgentSwitched
   | EventSessionNextModelSwitched
   | EventSessionNextPrompted
@@ -90,6 +81,15 @@ export type Event =
   | EventSessionNextDiff
   | EventSessionNextPermissionAsked
   | EventSessionNextPermissionReplied
+  | EventMessageUpdated
+  | EventMessageRemoved
+  | EventMessagePartUpdated
+  | EventMessagePartUpdatedBatch
+  | EventMessagePartRemoved
+  | EventMessageUpdatedBatch
+  | EventSessionCreated
+  | EventSessionUpdated
+  | EventSessionDeleted
 
 export type OAuth = {
   type: "oauth"
@@ -350,6 +350,15 @@ export type Pty = {
   cwd: string
   status: "running" | "exited"
   pid: number
+}
+
+export type Prompt = {
+  text: string
+  files?: Array<PromptFileAttachment>
+  agents?: Array<PromptAgentAttachment>
+  subtask?: PromptSubtaskAttachment
+  synthetic?: Array<string>
+  ignored?: Array<string>
 }
 
 export type OutputFormatText = {
@@ -750,15 +759,6 @@ export type Session = {
   }
 }
 
-export type Prompt = {
-  text: string
-  files?: Array<PromptFileAttachment>
-  agents?: Array<PromptAgentAttachment>
-  subtask?: PromptSubtaskAttachment
-  synthetic?: Array<string>
-  ignored?: Array<string>
-}
-
 export type GlobalEvent = {
   directory: string
   project?: string
@@ -807,15 +807,6 @@ export type GlobalEvent = {
     | EventPtyUpdated
     | EventPtyExited
     | EventPtyDeleted
-    | EventMessageUpdated
-    | EventMessageRemoved
-    | EventMessagePartUpdated
-    | EventMessagePartUpdatedBatch
-    | EventMessagePartRemoved
-    | EventMessageUpdatedBatch
-    | EventSessionCreated
-    | EventSessionUpdated
-    | EventSessionDeleted
     | EventSessionNextAgentSwitched
     | EventSessionNextModelSwitched
     | EventSessionNextPrompted
@@ -849,15 +840,15 @@ export type GlobalEvent = {
     | EventSessionNextDiff
     | EventSessionNextPermissionAsked
     | EventSessionNextPermissionReplied
-    | SyncEventMessageUpdated
-    | SyncEventMessageRemoved
-    | SyncEventMessagePartUpdated
-    | SyncEventMessagePartUpdatedBatch
-    | SyncEventMessagePartRemoved
-    | SyncEventMessageUpdatedBatch
-    | SyncEventSessionCreated
-    | SyncEventSessionUpdated
-    | SyncEventSessionDeleted
+    | EventMessageUpdated
+    | EventMessageRemoved
+    | EventMessagePartUpdated
+    | EventMessagePartUpdatedBatch
+    | EventMessagePartRemoved
+    | EventMessageUpdatedBatch
+    | EventSessionCreated
+    | EventSessionUpdated
+    | EventSessionDeleted
     | SyncEventSessionNextAgentSwitched
     | SyncEventSessionNextModelSwitched
     | SyncEventSessionNextPrompted
@@ -891,6 +882,15 @@ export type GlobalEvent = {
     | SyncEventSessionNextDiff
     | SyncEventSessionNextPermissionAsked
     | SyncEventSessionNextPermissionReplied
+    | SyncEventMessageUpdated
+    | SyncEventMessageRemoved
+    | SyncEventMessagePartUpdated
+    | SyncEventMessagePartUpdatedBatch
+    | SyncEventMessagePartRemoved
+    | SyncEventMessageUpdatedBatch
+    | SyncEventSessionCreated
+    | SyncEventSessionUpdated
+    | SyncEventSessionDeleted
 }
 
 /**
@@ -1800,156 +1800,6 @@ export type WorkspaceWarpError = {
   }
 }
 
-export type SyncEventMessageUpdated = {
-  type: "sync"
-  name: "message.updated.1"
-  id: string
-  seq: number
-  aggregateID: "sessionID"
-  data: {
-    sessionID: string
-    info: Message
-  }
-}
-
-export type SyncEventMessageRemoved = {
-  type: "sync"
-  name: "message.removed.1"
-  id: string
-  seq: number
-  aggregateID: "sessionID"
-  data: {
-    sessionID: string
-    messageID: string
-  }
-}
-
-export type SyncEventMessagePartUpdated = {
-  type: "sync"
-  name: "message.part.updated.1"
-  id: string
-  seq: number
-  aggregateID: "sessionID"
-  data: {
-    sessionID: string
-    part: Part
-    time: number
-  }
-}
-
-export type SyncEventMessagePartUpdatedBatch = {
-  type: "sync"
-  name: "message.part.updated.batch.1"
-  id: string
-  seq: number
-  aggregateID: "sessionID"
-  data: {
-    sessionID: string
-    parts: Array<Part>
-    time: number
-  }
-}
-
-export type SyncEventMessagePartRemoved = {
-  type: "sync"
-  name: "message.part.removed.1"
-  id: string
-  seq: number
-  aggregateID: "sessionID"
-  data: {
-    sessionID: string
-    messageID: string
-    partID: string
-  }
-}
-
-export type SyncEventMessageUpdatedBatch = {
-  type: "sync"
-  name: "message.updated.batch.1"
-  id: string
-  seq: number
-  aggregateID: "sessionID"
-  data: {
-    sessionID: string
-    infos: Array<Message>
-    time_created: number
-  }
-}
-
-export type SyncEventSessionCreated = {
-  type: "sync"
-  name: "session.created.1"
-  id: string
-  seq: number
-  aggregateID: "sessionID"
-  data: {
-    sessionID: string
-    info: Session
-  }
-}
-
-export type SyncEventSessionUpdated = {
-  type: "sync"
-  name: "session.updated.1"
-  id: string
-  seq: number
-  aggregateID: "sessionID"
-  data: {
-    sessionID: string
-    info: {
-      id?: string | null
-      slug?: string | null
-      projectID?: string | null
-      workspaceID?: string | null
-      directory?: string | null
-      path?: string | null
-      parentID?: string | null
-      summary?: {
-        additions: number
-        deletions: number
-        files: number
-        diffs?: Array<SnapshotFileDiff>
-      } | null
-      share?: {
-        url?: string | null
-      }
-      title?: string | null
-      agent?: string | null
-      model?: {
-        id: string
-        providerID: string
-        variant?: string
-      } | null
-      version?: string | null
-      time?: {
-        created?: number | null
-        updated?: number | null
-        compacting?: number | null
-        archived?: number | null
-      }
-      permission?: PermissionRuleset | null
-      revert?: {
-        messageID: string
-        partID?: string
-        snapshot?: string
-        diff?: string
-      } | null
-    }
-  }
-}
-
-export type SyncEventSessionDeleted = {
-  type: "sync"
-  name: "session.deleted.1"
-  id: string
-  seq: number
-  aggregateID: "sessionID"
-  data: {
-    sessionID: string
-    info: Session
-  }
-}
-
 export type SyncEventSessionNextAgentSwitched = {
   type: "sync"
   name: "session.next.agent.switched.1"
@@ -2092,7 +1942,7 @@ export type SyncEventSessionNextStepFailed = {
   data: {
     timestamp: number
     sessionID: string
-    error: SessionErrorUnknown
+    error: SessionErrorUnknown | SessionErrorAborted
   }
 }
 
@@ -2443,6 +2293,156 @@ export type SyncEventSessionNextPermissionReplied = {
     sessionID: string
     requestID: string
     reply: string
+  }
+}
+
+export type SyncEventMessageUpdated = {
+  type: "sync"
+  name: "message.updated.1"
+  id: string
+  seq: number
+  aggregateID: "sessionID"
+  data: {
+    sessionID: string
+    info: Message
+  }
+}
+
+export type SyncEventMessageRemoved = {
+  type: "sync"
+  name: "message.removed.1"
+  id: string
+  seq: number
+  aggregateID: "sessionID"
+  data: {
+    sessionID: string
+    messageID: string
+  }
+}
+
+export type SyncEventMessagePartUpdated = {
+  type: "sync"
+  name: "message.part.updated.1"
+  id: string
+  seq: number
+  aggregateID: "sessionID"
+  data: {
+    sessionID: string
+    part: Part
+    time: number
+  }
+}
+
+export type SyncEventMessagePartUpdatedBatch = {
+  type: "sync"
+  name: "message.part.updated.batch.1"
+  id: string
+  seq: number
+  aggregateID: "sessionID"
+  data: {
+    sessionID: string
+    parts: Array<Part>
+    time: number
+  }
+}
+
+export type SyncEventMessagePartRemoved = {
+  type: "sync"
+  name: "message.part.removed.1"
+  id: string
+  seq: number
+  aggregateID: "sessionID"
+  data: {
+    sessionID: string
+    messageID: string
+    partID: string
+  }
+}
+
+export type SyncEventMessageUpdatedBatch = {
+  type: "sync"
+  name: "message.updated.batch.1"
+  id: string
+  seq: number
+  aggregateID: "sessionID"
+  data: {
+    sessionID: string
+    infos: Array<Message>
+    time_created: number
+  }
+}
+
+export type SyncEventSessionCreated = {
+  type: "sync"
+  name: "session.created.1"
+  id: string
+  seq: number
+  aggregateID: "sessionID"
+  data: {
+    sessionID: string
+    info: Session
+  }
+}
+
+export type SyncEventSessionUpdated = {
+  type: "sync"
+  name: "session.updated.1"
+  id: string
+  seq: number
+  aggregateID: "sessionID"
+  data: {
+    sessionID: string
+    info: {
+      id?: string | null
+      slug?: string | null
+      projectID?: string | null
+      workspaceID?: string | null
+      directory?: string | null
+      path?: string | null
+      parentID?: string | null
+      summary?: {
+        additions: number
+        deletions: number
+        files: number
+        diffs?: Array<SnapshotFileDiff>
+      } | null
+      share?: {
+        url?: string | null
+      }
+      title?: string | null
+      agent?: string | null
+      model?: {
+        id: string
+        providerID: string
+        variant?: string
+      } | null
+      version?: string | null
+      time?: {
+        created?: number | null
+        updated?: number | null
+        compacting?: number | null
+        archived?: number | null
+      }
+      permission?: PermissionRuleset | null
+      revert?: {
+        messageID: string
+        partID?: string
+        snapshot?: string
+        diff?: string
+      } | null
+    }
+  }
+}
+
+export type SyncEventSessionDeleted = {
+  type: "sync"
+  name: "session.deleted.1"
+  id: string
+  seq: number
+  aggregateID: "sessionID"
+  data: {
+    sessionID: string
+    info: Session
   }
 }
 
@@ -2834,91 +2834,6 @@ export type EventPtyDeleted = {
   }
 }
 
-export type EventMessageUpdated = {
-  id: string
-  type: "message.updated"
-  properties: {
-    sessionID: string
-    info: Message
-  }
-}
-
-export type EventMessageRemoved = {
-  id: string
-  type: "message.removed"
-  properties: {
-    sessionID: string
-    messageID: string
-  }
-}
-
-export type EventMessagePartUpdated = {
-  id: string
-  type: "message.part.updated"
-  properties: {
-    sessionID: string
-    part: Part
-    time: number
-  }
-}
-
-export type EventMessagePartUpdatedBatch = {
-  id: string
-  type: "message.part.updated.batch"
-  properties: {
-    sessionID: string
-    parts: Array<Part>
-    time: number
-  }
-}
-
-export type EventMessagePartRemoved = {
-  id: string
-  type: "message.part.removed"
-  properties: {
-    sessionID: string
-    messageID: string
-    partID: string
-  }
-}
-
-export type EventMessageUpdatedBatch = {
-  id: string
-  type: "message.updated.batch"
-  properties: {
-    sessionID: string
-    infos: Array<Message>
-    time_created: number
-  }
-}
-
-export type EventSessionCreated = {
-  id: string
-  type: "session.created"
-  properties: {
-    sessionID: string
-    info: Session
-  }
-}
-
-export type EventSessionUpdated = {
-  id: string
-  type: "session.updated"
-  properties: {
-    sessionID: string
-    info: Session
-  }
-}
-
-export type EventSessionDeleted = {
-  id: string
-  type: "session.deleted"
-  properties: {
-    sessionID: string
-    info: Session
-  }
-}
-
 export type EventSessionNextAgentSwitched = {
   id: string
   type: "session.next.agent.switched"
@@ -3063,13 +2978,18 @@ export type SessionErrorUnknown = {
   message: string
 }
 
+export type SessionErrorAborted = {
+  type: "aborted"
+  message: string
+}
+
 export type EventSessionNextStepFailed = {
   id: string
   type: "session.next.step.failed"
   properties: {
     timestamp: number
     sessionID: string
-    error: SessionErrorUnknown
+    error: SessionErrorUnknown | SessionErrorAborted
   }
 }
 
@@ -3376,6 +3296,91 @@ export type EventSessionNextPermissionReplied = {
   }
 }
 
+export type EventMessageUpdated = {
+  id: string
+  type: "message.updated"
+  properties: {
+    sessionID: string
+    info: Message
+  }
+}
+
+export type EventMessageRemoved = {
+  id: string
+  type: "message.removed"
+  properties: {
+    sessionID: string
+    messageID: string
+  }
+}
+
+export type EventMessagePartUpdated = {
+  id: string
+  type: "message.part.updated"
+  properties: {
+    sessionID: string
+    part: Part
+    time: number
+  }
+}
+
+export type EventMessagePartUpdatedBatch = {
+  id: string
+  type: "message.part.updated.batch"
+  properties: {
+    sessionID: string
+    parts: Array<Part>
+    time: number
+  }
+}
+
+export type EventMessagePartRemoved = {
+  id: string
+  type: "message.part.removed"
+  properties: {
+    sessionID: string
+    messageID: string
+    partID: string
+  }
+}
+
+export type EventMessageUpdatedBatch = {
+  id: string
+  type: "message.updated.batch"
+  properties: {
+    sessionID: string
+    infos: Array<Message>
+    time_created: number
+  }
+}
+
+export type EventSessionCreated = {
+  id: string
+  type: "session.created"
+  properties: {
+    sessionID: string
+    info: Session
+  }
+}
+
+export type EventSessionUpdated = {
+  id: string
+  type: "session.updated"
+  properties: {
+    sessionID: string
+    info: Session
+  }
+}
+
+export type EventSessionDeleted = {
+  id: string
+  type: "session.deleted"
+  properties: {
+    sessionID: string
+    info: Session
+  }
+}
+
 export type SessionInfo = {
   id: string
   parentID?: string
@@ -3543,7 +3548,7 @@ export type SessionMessageAssistant = {
       write: number
     }
   }
-  error?: SessionErrorUnknown
+  error?: SessionErrorUnknown | SessionErrorAborted
 }
 
 export type SessionMessageAgentSwitched = {

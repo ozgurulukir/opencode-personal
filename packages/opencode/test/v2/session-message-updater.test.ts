@@ -155,7 +155,10 @@ test("tool completion stores completed timestamp", () => {
       timestamp: DateTime.makeUnsafe(4),
       callID,
       structured: {},
-      content: [{ type: "text", text: "/tmp" }],
+      content: [
+        { type: "text", text: "/tmp" },
+        { type: "file", uri: "file:///tmp/output.png", mime: "image/png", name: "output.png" },
+      ],
       provider: { executed: true, metadata: { status: "done" } },
     },
   } satisfies SessionEvent.Event)
@@ -166,6 +169,45 @@ test("tool completion stores completed timestamp", () => {
   if (state.messages[0].content[0]?.type !== "tool") return
   expect(state.messages[0].content[0].time.completed).toEqual(DateTime.makeUnsafe(4))
   expect(state.messages[0].content[0].provider).toEqual({ executed: true, metadata: { status: "done" } })
+  expect(state.messages[0].content[0].state).toMatchObject({
+    attachments: [{ uri: "file:///tmp/output.png", mime: "image/png", name: "output.png" }],
+  })
+})
+
+test("step failure retains the explicit V2 abort error", () => {
+  const state: SessionMessageUpdater.MemoryState = { messages: [] }
+  const sessionID = SessionID.make("session")
+
+  SessionMessageUpdater.update(SessionMessageUpdater.memory(state), {
+    id: EventV2.ID.create(),
+    type: "session.next.step.started",
+    data: {
+      sessionID,
+      timestamp: DateTime.makeUnsafe(1),
+      agent: "build",
+      model: {
+        id: Modelv2.ID.make("model"),
+        providerID: Modelv2.ProviderID.make("provider"),
+        variant: Modelv2.VariantID.make("default"),
+      },
+    },
+  } satisfies SessionEvent.Event)
+
+  SessionMessageUpdater.update(SessionMessageUpdater.memory(state), {
+    id: EventV2.ID.create(),
+    type: "session.next.step.failed",
+    data: {
+      sessionID,
+      timestamp: DateTime.makeUnsafe(2),
+      error: { type: "aborted", message: "Aborted" },
+    },
+  } satisfies SessionEvent.Event)
+
+  expect(state.messages[0]).toMatchObject({
+    type: "assistant",
+    finish: "error",
+    error: { type: "aborted", message: "Aborted" },
+  })
 })
 
 test("compaction events reduce to compaction message", () => {

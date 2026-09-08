@@ -15,6 +15,7 @@
     "./v2": "./src/v2/index.ts",
     "./v2/client": "./src/v2/client.ts",
     "./v2/gen/client": "./src/v2/gen/client/index.ts",
+    "./v2/legacy": "./src/v2/legacy.ts",
     "./v2/server": "./src/v2/server.ts"
   },
   "files": [
