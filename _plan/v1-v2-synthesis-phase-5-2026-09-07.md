@@ -1,7 +1,7 @@
 # V1/V2 Synthesis — Phase 5: message model adoption, engine re-homing, V1 deletion
 
 Date: 2026-09-07
-Status: IN PROGRESS — 5a/5b/5d done, 5c batches 1-4 done (batch 4 = session/index.tsx, last TUI V1 consumer), app pipeline batch pending, 5e/5f pending
+Status: IN PROGRESS — 5a/5b/5d done, 5c DONE (batches 1-4 + final: V1 message/part slices deleted), app pipeline batch pending, 5e/5f pending
 Depends on: Phase 4 (complete — commit `9d9fe54bc`, build verified)
 
 ## Goal
@@ -161,16 +161,42 @@ live behind `V2Session` emitting `SessionEvent.*` natively.
   newest-first slice; model reshape `{id}`→`{modelID}` for `local.model.set`).
 
 **Remaining for 5c (next batches):**
+
 - ~~`routes/session/index.tsx`~~ — DONE in batch 4 (see below).
-- `plugin/api.tsx` — DONE in batch 3 (V2 shapes; `part()` removed — breaking).
-- `context/sync.tsx` `status()` — DONE in batch 2.
+- ~~`plugin/api.tsx`~~ — DONE in batch 3 (V2 shapes; `part()` removed — breaking).
+- ~~`context/sync.tsx` `status()`~~ — DONE in batch 2.
 - Run reducers (`stream.transport.ts`) + app
-  (`context/sync.tsx:301`, `pages/layout.tsx:745` prefetch).
-- Delete V1 `message.*` handlers + `message`/`part` slices + V1 load (last).
-  NOTE: after batch 4, NOTHING in the TUI reads the V1 `message`/`part`
-  slices anymore — the only remaining V1 client call is the
-  `sync.tsx:796` load itself. 5c final can delete the load + handlers + slices
-  in one sweep.
+  (`context/sync.tsx:301`, `pages/layout.tsx:745` prefetch) — the app pipeline
+  batch (deferred, V1-shaped end-to-end).
+- ~~Delete V1 `message.*` handlers + `message`/`part` slices + V1 load~~ —
+  DONE in 5c final (see below).
+
+**Shipped in 5c final (2026-09-08) — V1 message/part slices deleted:**
+- **`context/sync-schema.ts`** — `message: {[sessionID]: Message[]}` and
+  `part: {[messageID]: Part[]}` removed from `SyncStore`; `Message`/`Part`
+  imports dropped.
+- **`context/sync.tsx`** — six V1 event handlers deleted
+  (`message.updated`, `message.removed`, `message.part.updated`,
+  `message.part.updated.batch`, `message.part.delta`,
+  `message.part.removed`); store init fields removed; `session.sync()` no
+  longer fetches `sdk.client.session.messages` (V1) — V2-only fetch
+  (`v2.session.get/todo/diff/messages`); `Message`/`Part` imports dropped.
+  Note: the deleted V1 `message.updated` handler carried a 100-message cap
+  with part cleanup — the V2 slice has no cap (the V2 load fetches all
+  messages; slice growth is a separate concern, not a regression of this
+  deletion).
+- **Consumer census (pre-deletion):** zero readers of `store.message` /
+  `store.part` / `data.message` / `data.part` outside sync.tsx itself (the
+  run CLI's `data.part` is its own session-data reducer Map, unrelated).
+- **Milestone:** the opencode package now has ZERO consumers of the V1
+  `session.messages`/`session.prompt`/`session.command` HTTP endpoints (app
+  still has 2 `session.messages` calls — the deferred app batch). The V1
+  endpoints themselves are deleted in 5f.
+- **Verification (5c final):** typecheck clean in `opencode`; tui 91 pass +
+  the 1 pre-existing flake; `test/cli/cmd/run/` 287/287; v2+httpapi-session
+  45/45; TUI smoke: fresh boot + `bun dev -c` reopen — prior session history
+  renders via the V2-only `session.sync()` path; log shows only the
+  pre-existing unrelated `[editor-zed] parseJson` errors.
 
 **Verification (batch 1):** typecheck clean in `opencode` + `app` (tsbuildinfo
 cleared after SDK regen); tui+run+v2+bridge suites 381/381.

@@ -1,9 +1,7 @@
 import type {
-  Message,
   Agent,
   Provider,
   Session,
-  Part,
   Config,
   Todo,
   Command,
@@ -47,12 +45,6 @@ export type SyncStore = {
   }
   todo: {
     [sessionID: string]: Todo[]
-  }
-  message: {
-    [sessionID: string]: Message[]
-  }
-  part: {
-    [messageID: string]: Part[]
   }
   lsp: LspStatus[]
   mcp: {
