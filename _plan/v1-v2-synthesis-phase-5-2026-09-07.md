@@ -1,7 +1,7 @@
 # V1/V2 Synthesis — Phase 5: message model adoption, engine re-homing, V1 deletion
 
 Date: 2026-09-07
-Status: IN PROGRESS — 5a/5b/5d done, 5c DONE (batches 1-4 + final: V1 message/part slices deleted), app pipeline batch pending, 5e/5f pending
+Status: IN PROGRESS — 5a/5b/5c/5d done, 5e-1 + 5e-2 done (event bridge deleted, native emission), 5e-3 pending (own session), app pipeline batch pending, 5f pending
 Depends on: Phase 4 (complete — commit `9d9fe54bc`, build verified)
 
 ## Goal
@@ -441,12 +441,19 @@ consumer-safe.
     removeApproved, skills-sort, processor-abort — stash-verified); TUI smoke:
     history render + prompt submit + status/retry transitions flow natively;
     log clean.
-- **5e-3 — re-home the engine behind V2Session**: characterization tests for
-  the loop first (Rule 3); extract the `session/prompt.ts` facade body into a
-  shared engine factory consumable by both the V1 service (until 5f) and
-  V2Session; V2 write methods stop delegating via `requireV1(promptV1)`;
-  `SessionCompaction` same. github.ts/workspace.ts migration assessed
-  separately (may keep the V1 service as the engine facade permanently).
+- **5e-3 — re-home the engine behind V2Session** — PENDING, own session
+  recommended. Post-5e-2 assessment: the EVENT bridge is dead and all loop
+  events are native, so 5e-3's remaining value is the SERVICE delegation
+  (`requireV1(promptV1)` in v2/session.ts). The facade extraction
+  (`session/prompt.ts` body → shared engine factory) touches the
+  highest-risk code (the agent loop) and per Rule 3 needs characterization
+  tests extended first (`test/session/run-loop.characterization.test.ts`
+  exists; processor/compaction coverage partial). The plan's own census note
+  concedes the V1 service may survive as the engine facade permanently
+  (github.ts:434 + control-plane/workspace.ts:173 consume it regardless).
+  Recommendation: fresh-session batch — (1) extend loop characterization
+  tests, (2) extract engine factory, (3) rewire V2Session, (4) decide
+  github/workspace migration vs. permanent facade.
 
 ### 5f — V1 deletion
 
