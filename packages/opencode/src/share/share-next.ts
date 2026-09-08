@@ -9,6 +9,7 @@ import { ModelID, ProviderID } from "@/provider/schema"
 import { Session } from "@/session/session"
 import { MessageV2 } from "@/session/message-v2"
 import type { SessionID } from "@/session/schema"
+import { SessionEvent } from "@/v2/session-event"
 import { Database } from "@/storage/db"
 import { eq } from "drizzle-orm"
 import { Config } from "@/config/config"
@@ -42,6 +43,8 @@ type State = {
   queue: Map<SessionID, Map<string, Data>>
   scope: Scope.Closeable
   shared: Map<SessionID, Share | null>
+  syncing: Set<SessionID>
+  pendingSync: Set<SessionID>
 }
 
 type Data =
@@ -146,9 +149,45 @@ export const layer = Layer.effect(
       })
     }
 
+    const syncMessages = Effect.fn("ShareNext.syncMessages")(function* (sessionID: SessionID) {
+      const s = yield* InstanceState.get(state)
+      if (s.syncing.has(sessionID)) {
+        s.pendingSync.add(sessionID)
+        return
+      }
+
+      s.syncing.add(sessionID)
+      yield* Effect.gen(function* () {
+        while (true) {
+          const messages = yield* session.messages({ sessionID })
+          for (const item of messages) {
+            yield* sync(sessionID, [{ type: "message", data: item.info }])
+            yield* sync(sessionID, item.parts.map((part) => ({ type: "part" as const, data: part })))
+            if (item.info.role !== "user") continue
+            const model = yield* provider.getModel(item.info.model.providerID, item.info.model.modelID)
+            yield* sync(sessionID, [{ type: "model", data: [model] }])
+          }
+          if (!s.pendingSync.delete(sessionID)) return
+        }
+      }).pipe(
+        Effect.ensuring(
+          Effect.sync(() => {
+            s.syncing.delete(sessionID)
+            s.pendingSync.delete(sessionID)
+          }),
+        ),
+      )
+    })
+
     const state: InstanceState.InstanceState<State> = yield* InstanceState.make<State>(
       Effect.fn("ShareNext.state")(function* (_ctx) {
-        const cache: State = { queue: new Map(), scope: yield* Scope.make(), shared: new Map() }
+        const cache: State = {
+          queue: new Map(),
+          scope: yield* Scope.make(),
+          shared: new Map(),
+          syncing: new Set(),
+          pendingSync: new Set(),
+        }
 
         yield* Effect.addFinalizer(() =>
           Scope.close(cache.scope, Exit.void).pipe(
@@ -156,6 +195,8 @@ export const layer = Layer.effect(
               Effect.sync(() => {
                 cache.queue.clear()
                 cache.shared.clear()
+                cache.syncing.clear()
+                cache.pendingSync.clear()
               }),
             ),
           ),
@@ -180,28 +221,32 @@ export const layer = Layer.effect(
             Effect.forkScoped,
           )
 
-        yield* watch(Session.Event.Updated, (evt) =>
+        yield* watch(SessionEvent.Updated.Sync, (evt) =>
           Effect.gen(function* () {
             const info = evt.properties.info
             yield* sync(info.id, [{ type: "session", data: info }])
           }),
         )
-        yield* watch(MessageV2.Event.Updated, (evt) =>
-          Effect.gen(function* () {
-            const info = evt.properties.info
-            yield* sync(info.sessionID, [{ type: "message", data: info }])
-            if (info.role !== "user") return
-            const model = yield* provider.getModel(info.model.providerID, info.model.modelID)
-            yield* sync(info.sessionID, [{ type: "model", data: [model] }])
-          }),
-        )
-        yield* watch(MessageV2.Event.PartUpdated, (evt) =>
-          sync(evt.properties.part.sessionID, [{ type: "part", data: evt.properties.part }]),
-        )
-        yield* watch(Session.Event.Diff, (evt) =>
+        for (const def of [
+          SessionEvent.Prompted.Sync,
+          SessionEvent.Synthetic.Sync,
+          SessionEvent.Shell.Started.Sync,
+          SessionEvent.Shell.Ended.Sync,
+          SessionEvent.Step.Started.Sync,
+          SessionEvent.Step.Ended.Sync,
+          SessionEvent.Step.Failed.Sync,
+          SessionEvent.Text.Ended.Sync,
+          SessionEvent.Reasoning.Ended.Sync,
+          SessionEvent.Tool.Success.Sync,
+          SessionEvent.Tool.Failed.Sync,
+          SessionEvent.Compaction.Ended.Sync,
+        ]) {
+          yield* watch(def, (evt) => syncMessages(evt.properties.sessionID))
+        }
+        yield* watch(SessionEvent.DiffUpdated.Sync, (evt) =>
           sync(evt.properties.sessionID, [{ type: "session_diff", data: evt.properties.diff }]),
         )
-        yield* watch(Session.Event.Deleted, (evt) => remove(evt.properties.sessionID))
+        yield* watch(SessionEvent.Deleted.Sync, (evt) => remove(evt.properties.sessionID))
 
         return cache
       }),

@@ -1,7 +1,7 @@
 # V1/V2 Synthesis — Phase 5: message model adoption, engine re-homing, V1 deletion
 
 Date: 2026-09-07
-Status: IN PROGRESS — 5a/5b/5c/5d done, 5e-1 + 5e-2 done (event bridge deleted, native emission), 5e-3 pending (own session), app pipeline batch pending, 5f pending
+Status: IN PROGRESS — 5a/5b/5c/5d done, 5e-1 + 5e-2 + 5e-3 done (shared engine re-homed behind V2Session, legacy message compatibility added), binary regression guard DONE (2026-09-08), app pipeline batch DONE (2026-09-08, Option A: V1-shaped store + V2→V1 adapter), 5f consumer migration DONE (2026-09-08), 5f deletions explicitly deferred
 Depends on: Phase 4 (complete — commit `9d9fe54bc`, build verified)
 
 ## Goal
@@ -10,34 +10,33 @@ Finish the synthesis: close the V2 message-model gap, re-home the agent loop beh
 `V2Session`, migrate the last V1 consumers, then delete the V1 session surface (HTTP
 routes, bus events, service files) so `session/` is single-vocabulary.
 
-## Current state (post Phase 4, verified 2026-09-07)
+## Current state (post Phase 5 consumer migration, verified 2026-09-08)
 
 - **V2 HTTP surface**: 31+ session endpoints under `/api/session*`; all declare
   `ApiNotFoundError` (V1 error-shape parity via `withNotFound`).
-- **Remaining V1 HTTP client calls (7)**: acp `prompt` + `command` (need the final
-  assistant message with tokens in a synchronous response), and 5 `messages` sites
-  (`run/stream.transport.ts:562`, `run/session.shared.ts:156`, TUI `sync.tsx:790`,
-  app `sync.tsx:301`, app `layout.tsx:745`) — all feed V1 `MessageV2.WithParts`
-  consumers.
-- **TUI sync** (`context/sync.tsx`): session-metadata slices are V2-event-fed
-  (`session.next.*`); 12 V1 event handlers remain — `message.updated/removed`,
-  `message.part.updated(+.batch, .delta, .removed)` feeding the V1 `message`/`part`
-  slices, plus `question.*`, `lsp.updated`, `vcs.branch.updated`,
-  `server.instance.disposed` (shared infrastructure, staying V1 vocabulary).
-- **V2 message model gap**: `SessionMessage` content covers
-  `user/synthetic/shell/tool/text/reasoning/agent-switched/model-switched/compaction`.
-  V1 part types with NO V2 home: assistant `file` parts, `subtask`, `agent`, `retry`,
-  `step-start`/`snapshot` (snapshot survives as assistant `snapshot` field). The
-  projectors/message-updater build `SessionMessageTable` purely from `session.next.*`
-  events — V1 `message.part.updated` is not consumed.
-- **Event wire inconsistency**: `sync.run` publishes raw values; the declared
-  `V2Schema.DateTimeUtcFromMillis` (millis) actually arrives as ISO strings over SSE.
-  TUI normalizes via `eventTime()` (sync.tsx). Root fix deferred from 4c.
-- **Engine**: V1 loop (`session/loop/run-loop.ts` ~279 lines, `processor.ts`,
-  `compaction.ts`) is the writer; V2 write methods delegate. `runDeferred` exists but
-  no background worker drains it. `promptAsync` forks into the HTTP handler scope.
-- **V1 HTTP group**: 28 endpoints still mounted; after Phase 4 their only remaining
-  consumers are the 7 calls above + internal Effect-service callers (not HTTP).
+- **Core V1 HTTP client calls are migrated**: ACP prompt/command, run history
+  bootstrap, run session history, TUI/app message loads, and app layout prefetch
+  now use V2 session endpoints. The standalone `github/` action remains outside
+  the Bun workspace and still uses its own V1 SDK client.
+- **TUI sync** (`context/sync.tsx`): message/session metadata is V2-backed and
+  native `session.next.*`-fed. `question.*`, `lsp.updated`, `vcs.branch.updated`,
+  and `server.instance.disposed` remain V1-vocabulary infrastructure events.
+- **V2 message model gap**: consumer-relevant content is covered by
+  `SessionMessage` (`user/synthetic/shell/tool/text/reasoning/agent-switched/
+  model-switched/compaction`, including user subtask attachments). Legacy-only
+  step parts and retry/snapshot details have no active renderer consumer; native
+  step/retry metadata remains in `session.next.*` events.
+- **Event wire format**: live `sync.run` publication now recursively encodes
+  `DateTime` values to epoch millis. `eventTime()` remains as compatibility insurance
+  for legacy EventTable replay rows that may still contain ISO strings.
+- **Engine**: the shared V1 loop (`session/loop/run-loop.ts` ~279 lines,
+  `processor.ts`, `compaction.ts`) remains the writer behind `SessionPrompt.Engine`;
+  V2 write methods delegate to that engine. Deferred prompts are drained by a
+  layer-scoped worker; `promptAsync` stages through V2 and no longer owns the worker
+  fiber in the HTTP handler scope.
+- **V1 HTTP group**: 28 endpoints remain mounted intentionally. Their consumer
+  migration is complete; the route/service/event deletion pass is deferred by the
+  user and tracked in 5f.
 
 ## Gap analysis
 
@@ -134,7 +133,7 @@ live behind `V2Session` emitting `SessionEvent.*` natively.
   run); server key suites retain only the documented 404-responseStyle failure;
   run+tui 336/336.
 
-### 5c — Message model adoption (consumers) — IN PROGRESS (2026-09-07)
+### 5c — Message model adoption (consumers) — COMPLETE (staged batches through 2026-09-08)
 
 **Shipped in batch 1 (5c-0 + 5c-1 + 5c-2 + small routes):**
 - **5c-0 model extension (prerequisite found by consumer census):** the TUI reads
@@ -188,10 +187,11 @@ live behind `V2Session` emitting `SessionEvent.*` natively.
 - **Consumer census (pre-deletion):** zero readers of `store.message` /
   `store.part` / `data.message` / `data.part` outside sync.tsx itself (the
   run CLI's `data.part` is its own session-data reducer Map, unrelated).
-- **Milestone:** the opencode package now has ZERO consumers of the V1
-  `session.messages`/`session.prompt`/`session.command` HTTP endpoints (app
-  still has 2 `session.messages` calls — the deferred app batch). The V1
-  endpoints themselves are deleted in 5f.
+- **Milestone:** prompt and command consumers were removed from the opencode
+  package, but one V1 `session.messages` consumer remains in
+  `cli/cmd/run/stream.transport.ts` for the interactive run bootstrap. The app's
+  two deferred `session.messages` calls were subsequently migrated by the app
+  pipeline batch below. The V1 endpoints themselves remain pending for 5f.
 - **Verification (5c final):** typecheck clean in `opencode`; tui 91 pass +
   the 1 pre-existing flake; `test/cli/cmd/run/` 287/287; v2+httpapi-session
   45/45; TUI smoke: fresh boot + `bun dev -c` reopen — prior session history
@@ -348,7 +348,7 @@ consumer-safe.
 
 ### 5e — Engine re-homing (highest risk)
 
-**Census (2026-09-08, pre-work):**
+**Census (historical pre-5e snapshot, 2026-09-08):**
 
 - The loop machinery ALREADY emits message-lifecycle `SessionEvent.*` natively
   (`processor.ts`, `create-user-message.ts` → `sync.run`: Prompted, Tool.*,
@@ -406,6 +406,8 @@ consumer-safe.
   - Tests: new `prompt (deferred) drains via the background worker` (polls the
     stub loop until the worker drains); existing
     "stages without running synchronously" unchanged and deterministic.
+    The worker is forked in the layer scope, but a dedicated cancel-on-dispose
+    assertion remains a follow-up verification item before the deletion pass.
   - Verification: typecheck clean; v2 session 29/29; httpapi-session 12/12;
     cmd/run 287/287; tui 91 + known flake; TUI smoke: submit → staged →
     worker drained → loop ran → quota error + retry surfaced through the new
@@ -441,30 +443,184 @@ consumer-safe.
     removeApproved, skills-sort, processor-abort — stash-verified); TUI smoke:
     history render + prompt submit + status/retry transitions flow natively;
     log clean.
-- **5e-3 — re-home the engine behind V2Session** — PENDING, own session
-  recommended. Post-5e-2 assessment: the EVENT bridge is dead and all loop
-  events are native, so 5e-3's remaining value is the SERVICE delegation
-  (`requireV1(promptV1)` in v2/session.ts). The facade extraction
-  (`session/prompt.ts` body → shared engine factory) touches the
-  highest-risk code (the agent loop) and per Rule 3 needs characterization
-  tests extended first (`test/session/run-loop.characterization.test.ts`
-  exists; processor/compaction coverage partial). The plan's own census note
-  concedes the V1 service may survive as the engine facade permanently
-  (github.ts:434 + control-plane/workspace.ts:173 consume it regardless).
-  Recommendation: fresh-session batch — (1) extend loop characterization
-  tests, (2) extract engine factory, (3) rewire V2Session, (4) decide
-  github/workspace migration vs. permanent facade.
+- **5e-3 — re-home the engine behind V2Session** — DONE (2026-09-08):
+  - `session/prompt.ts` now exposes `SessionPrompt.Engine` and `engineLayer`.
+    The existing `SessionPrompt.Service` is a compatibility facade backed by
+    the same engine, so legacy consumers remain supported.
+  - `v2/session.ts` now uses `SessionPrompt.Engine` for prompt, shell, skill,
+    subagent cancellation, abort, summarize, init, command, and deferred-loop
+    execution. V2 no longer requires the V1 `SessionPrompt.Service` facade for
+    engine operations.
+  - Added legacy-message decoding compatibility: old V2 user rows without
+    `agent`/`model` are completed from the session row, with safe fallbacks.
+    This fixes the compiled-binary `Missing key at ["agent"]` failure in
+    `V2Session.messages()`.
+  - **Binary regression guard (2026-09-08):** the post-build
+    `Expected object` failure was traced to an active `session_message` row,
+    not test source embedded in the binary. A provider had persisted an extra
+    JSON-encoded layer in an assistant tool state's `input`, so decoding the
+    row failed at `SessionMessage.ToolStateRunning.input`. New tool events are
+    normalized to records in `session/processor.ts`; V2 reads/projectors use
+    the bounded `SessionMessage.normalizeForDecode()` compatibility pass for
+    existing rows. Malformed input degrades to `{}` instead of taking down the
+    session history endpoint.
+  - Added a regression test for legacy user rows and changed V2 tests to stub
+    only `SessionPrompt.Engine`, proving the facade is not a V2 dependency.
+  - The remaining `SessionPrompt.Service` consumers (`github.ts`,
+    `control-plane/workspace.ts`, and the V1 prediction route) keep the facade
+    intentionally; migrating them is outside 5e-3 and can be handled with the
+    V1 surface removal in 5f.
+  - Verification: opencode/app typechecks passed; V2 session tests 31/31,
+    updater tests 6/6; run-loop characterization tests 4/4; app unit tests
+    469/469; lint passed; single binary build and `--version` smoke test passed
+    (`0.0.0-main-202609081806`).
 
-### 5f — V1 deletion
+### App message pipeline batch — DONE (2026-09-08, Option A)
 
-- Delete the V1 session HTTP group (28 endpoints) + its handlers once 5c/5d land.
+**Design decision (locked after a false start):** the first attempt (Option B)
+migrated the app store to the V2 `SessionMessage` model — but the rendering
+chain (`packages/ui` DataProvider `Data` type, `session-turn.tsx`,
+`message-part.tsx` ~1500 lines) reads the V1 `message`/`part` slices deeply.
+Migrating the renderer is its own future batch. **Option A: the store stays
+V1-shaped; the pipeline (endpoint + events) migrates to V2 through a
+V2→V1 adapter.** Consumers untouched, rendering identical, ~350-line adapter,
+O(1) per delta (direct V1 slice maintenance, no projection layer).
+
+**New `context/global-sync/v2-adapter.ts` (pure, tested):**
+
+- `sessionMessagesToV1(messages, sessionID)` — load-path fold over an
+  ascending V2 list → `{session: Message[], part: Record<string, Part[]>}`.
+  Rebuilds turn structure: assistants get `parentID` = most recent user
+  message; shell messages expand into user-wrapper (id = V2 message id,
+  synthetic "The following tool was executed by the user" text part) +
+  assistant (`${id}:assistant`) + `bash` tool part; compaction messages expand
+  into a user wrapper carrying a `compaction` part (the summary text arrives
+  via the compaction assistant's own text parts, so compaction.delta/ended are
+  no-ops); synthetic comment notes (`parseCommentNote` match) attach as
+  synthetic text parts to the latest user message; agent/model-switched are
+  skipped (no V1 rendering).
+- Part ids: `${messageID}:${index padded to 4}:${kind}` — deterministic across
+  load/event paths and id-sort == content order (the V1 slices sort parts by
+  id; renderers rely on content order).
+- V2→V1 mappings: model `{id, providerID, variant}` → `{providerID, modelID,
+  variant?}` (drops "default"); tool states → V1 `ToolState` (pending keeps
+  `raw`, running/completed/error map `structured` → `metadata`, content texts
+  joined → `output`, timestamps from the tool item); errors `{type, message}`
+  → `{name: "UnknownError", data: {message}}`; file attachments → `FilePart`
+  with reconstructed `FileSource` (path decoded from the uri); agent
+  attachments → `AgentPart`.
+
+**`event-reducer.ts` rewritten:** same `session.next.*` case structure, but
+handlers maintain the V1 `message`/`part` slices via Binary.search inserts
+(HEAD's insert semantics) + adapter factories. `prompted` calls
+`resolveOptimistic(sessionID, text)` BEFORE inserting (evicts the optimistic
+entry first — no transient duplicate). Permission cases re-keyed to
+`session.next.permission.asked/replied` (payload wraps the V1 request as
+`request`). `session.created`, `question.*`, `vcs.branch.updated`, `lsp.updated`,
+`server.instance.disposed` unchanged.
+
+**`sync.tsx`:** `fetchMessages` → `client.v2.session.messages` (order "desc",
+body cursor; `complete: items.length < limit` — the V2 endpoint always encodes
+`cursor.next` for non-empty pages, unlike V1's peek pattern) → adapter → V1
+page. `mergeOptimisticPage` confirms by PROMPT TEXT (`messageText` over
+non-synthetic text parts, mirroring the server's projection) instead of id —
+V2 message ids are event ids, not the client's messageID; one real message
+consumes one optimistic entry. Dead `addOptimisticMessage` deleted. The
+optimistic resolver is registered via `globalSync.setOptimisticResolver`
+(signature: `(directory, sessionID, text)`).
+
+**`layout.tsx` prefetch:** V2 endpoint → adapter → V1 slices + part merging
+restored (HEAD behavior, adapter-converted).
+
+**`global-sdk.tsx` coalescing (kept from the false start):** full-state,
+idempotent events coalesce (`session.next.status/updated/todo/diff`,
+`lsp.updated`, `session.next.tool.progress` per callID). V2 text/reasoning/
+compaction deltas are appends applied in order and are never dropped; no
+coalescable event shares a target with them, so the V1 stale-delta logic is
+gone.
+
+**Known degradations (documented, same as the TUI's V2 behavior):**
+
+- Aborted turns lose the "Interrupted" divider — the V2 `step.failed` payload
+  flattens errors to `{type, message}`, losing `MessageAbortedError`; aborted
+  turns render the UnknownError bubble instead. Fix belongs server-side
+  (carry the error name in Step.Failed) — follow-up.
+- Interleaved reasoning blocks are addressed by position (findLast), not
+  reasoningID — sequential reasoning (the norm) is unaffected.
+- Part-level metadata on synthetic comment notes (preview/origin) is lost;
+  `parseCommentNote` fallback recovers path/selection/comment.
+- Sessions predating the V2 event system have no V2 projections → empty
+  history until the 5f backfill tooling lands (same interim state the
+  migrated TUI accepted).
+
+**Verification:** app typecheck clean; opencode typecheck clean; app unit
+tests 486/486 (event-reducer ported to `session.next.*` inputs with V1
+assertions; new `v2-adapter.test.ts` 8 tests; `sync-optimistic.test.ts`
+ported to text-match confirm); lint clean for changed files (3 new dead
+variables removed; remaining warnings pre-existing).
+
+## Post-implementation audit (2026-09-08)
+
+- 5a–5e-3 and the app pipeline batch are implemented. Their deviations are recorded in the corresponding batch sections, including publish-time date encoding, retained legacy compatibility, native lifecycle emission, the shared-engine facade, and the Option A V2-to-V1 app adapter.
+- 5f consumer migration is complete: `run/stream.transport.ts` reads V2
+  projected history and adapts it only at the legacy renderer boundary;
+  native `session.next.*` events drive the run reducer without re-processing
+  their dual-published V1 counterparts; GitHub and share-next subscribe to V2
+  lifecycle/tool events. Share payloads remain V1-shaped at the external
+  sharing API boundary for compatibility.
+- 5f deletion is intentionally deferred by the user: the V1 HTTP group,
+  dual-published V1 definitions, legacy storage/backfill, and web SDK docs
+  remain in place until a later deletion pass.
+- The binary regressions reported after the build (`Missing key` and `Expected object`) have regression coverage and compatibility normalization. The `Expected object` case was reproduced as a legacy-session boundary issue: `MessageV2.toModelMessages` now normalizes persisted JSON-string tool inputs into records without changing stored rows or new-session object inputs. The build/version smoke passed; a direct `serve` endpoint smoke remains environment-sensitive and is not claimed as passing.
+- No-op lifecycle projectors are intentionally retained while the lifecycle `EventV2` definitions and `SyncEvent.run` calls remain.
+- Verification follow-ups before 5f deletion: add a direct DateTime/millis replay
+  assertion and a dedicated deferred-worker cancel-on-dispose test. Existing replay,
+  scope, and binary smoke coverage remains green; these are coverage gaps, not
+  observed runtime regressions.
+
+### 5f — V1 consumer migration and deferred deletion
+
+**Consumer migration DONE (2026-09-08); deletion deferred.** The deletion
+gate is deliberately left closed because the user requested that 5f
+deletions not be performed yet. The migrated consumers now use V2 reads and
+native `session.next.*` events:
+
+- `cli/cmd/run/stream.transport.ts` fetches
+  `sdk.v2.session.messages({ order: "desc" })`, restores ascending order for
+  bootstrap, and converts projected V2 messages at the existing scrollback
+  reducer boundary.
+- `cli/cmd/run/v2-legacy.ts` adapts native V2 lifecycle/tool/text events to
+  the established reducer commit contract. The transport filters equivalent
+  V1 message/session/permission events, preventing duplicate output while
+  retaining question events and other permanent V1 infrastructure events.
+- `cli/cmd/run/event-loop.ts` runs the production non-interactive path in
+  explicit native mode, so V1 duplicates are filtered even when V1 publishes
+  arrive first; its default mode keeps direct V1 fixture compatibility until
+  deletion.
+- `cli/cmd/github.ts` subscribes to V2 tool/text events.
+- `share/share-next.ts` subscribes to V2 session/lifecycle/tool events and
+  performs a coalesced compatibility read for the externally V1-shaped share
+  payload.
+
+The V1 HTTP group and V1 definitions remain mounted, so deleting them now
+would still be a breaking partial rollout.
+
+- Delete the V1 session HTTP group (28 endpoints) + its handlers once the 5f
+  migration/deletion gate is met; 5c/5d alone do not satisfy that gate.
 - Delete the dual-published V1 bus events the TUI no longer handles
   (`session.updated/deleted/status`, `todo.updated`, `session.diff`,
   `permission.asked/replied`, `message.*`) — keep `question.*`, `lsp.updated`,
   `vcs.branch.updated`, `server.instance.disposed` (permanent V1 vocabulary).
-- Delete the event bridge (5e makes it redundant) and the no-op projectors.
+- Event bridge deletion is already DONE in 5e-2. Remove the lifecycle no-op
+  projector registrations only after the corresponding `EventV2` definitions and
+  `SyncEvent.run` calls are removed; while native lifecycle events exist, those
+  registrations are required by `SyncEvent.run`.
 - Legacy JSON `Storage.Service` removal + backfill tooling.
 - `packages/web` SDK docs (10 locale mdx files) — documentation task.
+
+**Deviation:** 5f consumer migration is landed without the deletion pass by
+explicit user instruction. The remaining deletion items are tracked here,
+not silently marked complete.
 
 ## Verification (per batch)
 

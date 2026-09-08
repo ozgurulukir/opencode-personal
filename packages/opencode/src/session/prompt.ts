@@ -75,8 +75,15 @@ export interface Interface {
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/SessionPrompt") {}
 
-export const layer = Layer.effect(
-  Service,
+/**
+ * Shared prompt engine used by both the V1 compatibility service and V2 session
+ * writes. Keeping the engine behind its own service lets V2 use the same
+ * persistence and loop orchestration without depending on the V1 facade.
+ */
+export class Engine extends Context.Service<Engine, Interface>()("@opencode/SessionPromptEngine") {}
+
+export const engineLayer = Layer.effect(
+  Engine,
   Effect.gen(function* () {
     const bus = yield* Bus.Service
     const status = yield* SessionStatus.Service
@@ -254,7 +261,7 @@ export const layer = Layer.effect(
       )
     })
 
-    return Service.of({
+    return Engine.of({
       cancel,
       prompt,
       loop,
@@ -269,6 +276,14 @@ export const layer = Layer.effect(
     })
   }),
 )
+
+export const layer = Layer.effect(
+  Service,
+  Effect.gen(function* () {
+    const engine = yield* Engine
+    return Service.of(engine)
+  }),
+).pipe(Layer.provideMerge(engineLayer))
 
 export const defaultLayer = Layer.suspend(() =>
   layer.pipe(

@@ -362,11 +362,11 @@ export namespace Compaction {
 }
 
 /**
- * Lifecycle events forwarded by the V1→V2 event bridge (`v2/event-bridge.ts`).
- * They mirror the V1 bus vocabulary so the TUI sync store can migrate to the
- * V2 stream without server-side reshaping. `info`/`status`/`request` stay
- * intentionally loose (`Schema.Any`): the bridge forwards V1 payloads verbatim
- * and the consumer-side types land with the sync unification (phase 4c).
+ * Lifecycle events emitted by the source services on the V2 stream.
+ * They mirror the V1 bus vocabulary so the TUI/app compatibility stores can
+ * consume the V2 stream without server-side reshaping. `info`/`status`/`request`
+ * stay intentionally loose (`Schema.Any`) because the payloads preserve the
+ * established V1 shapes while legacy consumers remain.
  */
 export const Updated = EventV2.define({
   type: "session.next.updated",

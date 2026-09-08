@@ -21,12 +21,14 @@ function createMockSDK(overrides: Record<string, any> = {}): any {
         return { data: configOverrides?.data ?? undefined }
       },
     },
-    session: {
-      async list({ directory, roots, limit }: any) {
-        return { data: sessions ?? [] }
-      },
-      async messages({ sessionID, directory, limit }: any) {
-        return { data: messages ?? [] }
+    v2: {
+      session: {
+        async list({ directory, roots, limit }: any) {
+          return { data: { items: sessions ?? [] } }
+        },
+        async messages({ sessionID, directory, limit }: any) {
+          return { data: { items: messages ?? [] } }
+        },
       },
     },
     ...rest,
@@ -118,14 +120,10 @@ describe("sendUsageUpdate", () => {
     const sdk = createMockSDK({
       messages: [
         {
-          info: {
-            role: "assistant",
-            providerID: "anthropic",
-            modelID: "claude-3-opus",
-            tokens: { input: 1000, cache: { read: 500 } },
-            cost: 0.05,
-          },
-          parts: [],
+          type: "assistant",
+          model: { id: "claude-3-opus", providerID: "anthropic", variant: "default" },
+          tokens: { input: 1000, output: 0, reasoning: 0, cache: { read: 500, write: 0 } },
+          cost: 0.05,
         },
       ],
       providers: [
@@ -166,7 +164,7 @@ describe("sendUsageUpdate", () => {
   test("does nothing when no assistant messages", async () => {
     const { connection, sessionUpdates } = createMockConnection()
     const sdk = createMockSDK({
-      messages: [{ info: { role: "user" }, parts: [] }],
+      messages: [{ type: "user", text: "hi", agent: "build", model: { id: "m", providerID: "p", variant: "default" } }],
     })
 
     const { sendUsageUpdate } = await import("../../src/acp/model-resolution")
@@ -180,14 +178,10 @@ describe("sendUsageUpdate", () => {
     const sdk = createMockSDK({
       messages: [
         {
-          info: {
-            role: "assistant",
-            providerID: "anthropic",
-            modelID: "claude-3-opus",
-            tokens: { input: 1000 },
-            cost: 0.05,
-          },
-          parts: [],
+          type: "assistant",
+          model: { id: "claude-3-opus", providerID: "anthropic", variant: "default" },
+          tokens: { input: 1000, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+          cost: 0.05,
         },
       ],
       providers: [], // No providers → context limit is null
@@ -204,24 +198,16 @@ describe("sendUsageUpdate", () => {
     const sdk = createMockSDK({
       messages: [
         {
-          info: {
-            role: "assistant",
-            providerID: "anthropic",
-            modelID: "claude-3-opus",
-            tokens: { input: 1000 },
-            cost: 0.05,
-          },
-          parts: [],
+          type: "assistant",
+          model: { id: "claude-3-opus", providerID: "anthropic", variant: "default" },
+          tokens: { input: 1000, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+          cost: 0.05,
         },
         {
-          info: {
-            role: "assistant",
-            providerID: "anthropic",
-            modelID: "claude-3-opus",
-            tokens: { input: 500 },
-            cost: 0.03,
-          },
-          parts: [],
+          type: "assistant",
+          model: { id: "claude-3-opus", providerID: "anthropic", variant: "default" },
+          tokens: { input: 500, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+          cost: 0.03,
         },
       ],
       providers: [
@@ -281,10 +267,8 @@ describe("defaultModel", () => {
       sessions: [{ id: "ses_1" }],
       messages: [
         {
-          info: {
-            role: "user",
-            model: { providerID: "anthropic", modelID: "claude-3-opus" },
-          },
+          type: "user",
+          model: { id: "claude-3-opus", providerID: "anthropic", variant: "default" },
         },
       ],
     })
@@ -329,10 +313,8 @@ describe("lastUsedModel", () => {
       sessions: [{ id: "ses_1" }],
       messages: [
         {
-          info: {
-            role: "user",
-            model: { providerID: "anthropic", modelID: "claude-3-opus" },
-          },
+          type: "user",
+          model: { id: "claude-3-opus", providerID: "anthropic", variant: "default" },
         },
       ],
       providers: [{ id: "anthropic", models: { "claude-3-opus": {} } }],
@@ -358,10 +340,8 @@ describe("lastUsedModel", () => {
       sessions: [{ id: "ses_1" }],
       messages: [
         {
-          info: {
-            role: "user",
-            model: { providerID: "openai", modelID: "gpt-4" },
-          },
+          type: "user",
+          model: { id: "gpt-4", providerID: "openai", variant: "default" },
         },
       ],
       providers: [{ id: "anthropic", models: { "claude-3-opus": {} } }],

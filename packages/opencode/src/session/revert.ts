@@ -81,7 +81,7 @@ export const layer = Layer.effect(
       const diffs = yield* summary.computeDiff({ messages: range })
       yield* storage.write(["session_diff", input.sessionID], diffs).pipe(Effect.ignore)
       yield* bus.publish(Session.Event.Diff, { sessionID: input.sessionID, diff: diffs })
-      // Native V2 emission (replaces the v2/event-bridge translation)
+      // Native V2 lifecycle emission is published alongside the V1 event
       yield* sync.run(SessionEvent.DiffUpdated.Sync, {
         sessionID: input.sessionID,
         timestamp: DateTime.makeUnsafe(Date.now()),

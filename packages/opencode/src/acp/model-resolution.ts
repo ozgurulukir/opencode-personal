@@ -1,6 +1,6 @@
 import * as Log from "@opencode-ai/core/util/log"
 import type { AgentSideConnection } from "@agentclientprotocol/sdk"
-import type { OpencodeClient, AssistantMessage, SessionMessageResponse } from "@opencode-ai/sdk/v2"
+import type { OpencodeClient, SessionMessage } from "@opencode-ai/sdk/v2"
 import { ProviderID, ModelID } from "../provider/schema"
 import { Provider } from "@/provider/provider"
 import type { ACPConfig } from "./types"
@@ -32,9 +32,9 @@ export async function sendUsageUpdate(
   sessionID: string,
   directory: string,
 ): Promise<void> {
-  const messages = await sdk.session
+  const messages = await sdk.v2.session
     .messages({ sessionID, directory }, { throwOnError: true })
-    .then((x) => x.data)
+    .then((x) => x.data?.items)
     .catch((error) => {
       log.error("failed to fetch messages for usage update", { error })
       return undefined
@@ -42,24 +42,22 @@ export async function sendUsageUpdate(
 
   if (!messages) return
 
-  const assistantMessages = messages.filter(
-    (m): m is { info: AssistantMessage; parts: SessionMessageResponse["parts"] } => m.info.role === "assistant",
-  )
+  const assistantMessages = messages.filter((m): m is Extract<SessionMessage, { type: "assistant" }> => m.type === "assistant")
 
   const lastAssistant = assistantMessages[assistantMessages.length - 1]
   if (!lastAssistant) return
 
-  const msg = lastAssistant.info
-  if (!msg.providerID || !msg.modelID) return
-  const size = await getContextLimit(sdk, ProviderID.make(msg.providerID), ModelID.make(msg.modelID), directory)
+  const msg = lastAssistant
+  if (!msg.model?.providerID || !msg.model?.id) return
+  const size = await getContextLimit(sdk, ProviderID.make(msg.model.providerID), ModelID.make(msg.model.id), directory)
 
   if (!size) {
     // Cannot calculate usage without known context size
     return
   }
 
-  const used = msg.tokens.input + (msg.tokens.cache?.read ?? 0)
-  const totalCost = assistantMessages.reduce((sum, m) => sum + m.info.cost, 0)
+  const used = (msg.tokens?.input ?? 0) + (msg.tokens?.cache?.read ?? 0)
+  const totalCost = assistantMessages.reduce((sum, m) => sum + (m.cost ?? 0), 0)
 
   await connection
     .sessionUpdate({
@@ -145,28 +143,28 @@ export async function lastUsedModel(
   directory: string,
   providers: Array<{ id: string; models: Record<string, unknown> }>,
 ): Promise<{ providerID: ProviderID; modelID: ModelID } | undefined> {
-  const session = await sdk.session
+  const session = await sdk.v2.session
     .list({ directory, roots: true, limit: 1 }, { throwOnError: true })
-    .then((x) => x.data?.[0])
+    .then((x) => x.data?.items?.[0])
     .catch((error) => {
       log.error("failed to list sessions for default model", { error })
       return undefined
     })
   if (!session) return
 
-  const lastUser = await sdk.session
+  const lastUser = await sdk.v2.session
     .messages({ sessionID: session.id, directory, limit: 20 }, { throwOnError: true })
-    .then((x) => x.data?.findLast((message) => message.info.role === "user")?.info)
+    .then((x) => x.data?.items?.findLast((message) => message.type === "user"))
     .catch((error) => {
       log.error("failed to load session messages for default model", { error, sessionID: session.id })
       return undefined
     })
-  if (lastUser?.role !== "user") return
+  if (lastUser?.type !== "user") return
 
   const provider = providers.find((entry) => entry.id === lastUser.model.providerID)
-  if (!provider?.models[lastUser.model.modelID]) return
+  if (!provider?.models[lastUser.model.id]) return
   return {
     providerID: ProviderID.make(lastUser.model.providerID),
-    modelID: ModelID.make(lastUser.model.modelID),
+    modelID: ModelID.make(lastUser.model.id),
   }
 }

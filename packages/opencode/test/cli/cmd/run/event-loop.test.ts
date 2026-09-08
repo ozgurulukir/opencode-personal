@@ -25,8 +25,8 @@ function makeCtx(overrides: Partial<LoopContext> = {}): LoopContext {
   }
 }
 
-function makeEvent(type: string, properties: Record<string, unknown>) {
-  return { type, properties }
+function makeEvent(type: string, properties: Record<string, unknown>, id = type) {
+  return { id, type, properties }
 }
 
 // Wrap an array as an AsyncIterable so it satisfies the typechecker.
@@ -982,5 +982,64 @@ describe("loop integration", () => {
     await loop(ctx, { stream: asyncStream(events) })
 
     expect(emitted).toContain("error")
+  })
+
+  test("does not replay a dual-published V1 tool event after a native V2 event", async () => {
+    const completed: ToolPart[] = []
+    const ctx = makeCtx({
+      tool: async (part) => {
+        completed.push(part)
+      },
+    })
+
+    const events = [
+      makeEvent("session.next.step.started", {
+        sessionID: "ses_1",
+        timestamp: 100,
+        agent: "build",
+        model: { id: "model", providerID: "provider", variant: "default" },
+      }),
+      makeEvent("session.next.tool.input.started", {
+        sessionID: "ses_1",
+        timestamp: 110,
+        callID: "call_1",
+        name: "read",
+      }),
+      makeEvent("session.next.tool.called", {
+        sessionID: "ses_1",
+        timestamp: 120,
+        callID: "call_1",
+        tool: "read",
+        input: { filePath: "/tmp/test.txt" },
+        provider: { executed: true },
+      }),
+      makeEvent("session.next.tool.success", {
+        sessionID: "ses_1",
+        timestamp: 130,
+        callID: "call_1",
+        structured: {},
+        content: [{ type: "text", text: "file content" }],
+        provider: { executed: true },
+      }),
+      makeEvent("message.part.updated", {
+        sessionID: "ses_1",
+        time: 130,
+        part: makeToolPart({
+          callID: "call_1",
+          state: {
+            status: "completed",
+            input: { filePath: "/tmp/test.txt" },
+            output: "file content",
+            title: "read",
+            metadata: {},
+            time: { start: 120, end: 130 },
+          },
+        }),
+      }),
+    ]
+
+    await loop(ctx, { stream: asyncStream(events) }, { native: true })
+
+    expect(completed).toHaveLength(1)
   })
 })

@@ -1254,6 +1254,58 @@ describe("session.message-v2.toModelMessage", () => {
     ])
   })
 
+  test("normalizes persisted JSON tool inputs before provider conversion", async () => {
+    const userID = "m-user-legacy-input"
+    const assistantID = "m-assistant-legacy-input"
+
+    const input: MessageV2.WithParts[] = [
+      {
+        info: userInfo(userID),
+        parts: [
+          {
+            ...basePart(userID, "u1-legacy-input"),
+            type: "text",
+            text: "run tool",
+          },
+        ],
+      },
+      {
+        info: assistantInfo(assistantID, userID),
+        parts: [
+          {
+            ...basePart(assistantID, "a1-legacy-input"),
+            type: "tool",
+            callID: "call-legacy-input",
+            tool: "bash",
+            state: {
+              status: "completed",
+              // Legacy persisted rows can contain the JSON-encoded value at runtime.
+              input: JSON.stringify({ cmd: "ls" }) as unknown as Record<string, unknown>,
+              output: "ok",
+              title: "Bash",
+              metadata: {},
+              time: { start: 0, end: 1 },
+            },
+          },
+        ],
+      },
+    ]
+
+    const result = await MessageV2.toModelMessages(input, model)
+
+    expect(result[1]).toMatchObject({
+      role: "assistant",
+      content: [
+        {
+          type: "tool-call",
+          toolCallId: "call-legacy-input",
+          toolName: "bash",
+          input: { cmd: "ls" },
+        },
+      ],
+    })
+  })
+
   test("substitutes space for empty text between signed reasoning blocks", async () => {
     // Reproduces the bug pattern: [reasoning(sig), text(""), reasoning(sig), text(full)]
     const assistantID = "m-assistant"

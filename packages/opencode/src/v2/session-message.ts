@@ -6,6 +6,57 @@ import { ToolOutput } from "./tool-output"
 import { V2Schema } from "./schema"
 import { Modelv2 } from "./model"
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+}
+
+function parseRecord(value: string): Record<string, unknown> | undefined {
+  let parsed: unknown = value
+  for (let depth = 0; depth < 3; depth++) {
+    if (typeof parsed !== "string") return isRecord(parsed) ? parsed : undefined
+    try {
+      parsed = JSON.parse(parsed)
+    } catch {
+      return undefined
+    }
+  }
+  return isRecord(parsed) ? parsed : undefined
+}
+
+/**
+ * AI SDK providers can return tool arguments as JSON text, including one
+ * extra JSON-encoding layer. V2 stores parsed tool inputs as records.
+ */
+export function normalizeToolInput(value: unknown): Record<string, unknown> {
+  if (isRecord(value)) return value
+  if (typeof value === "string") return parseRecord(value) ?? {}
+  return {}
+}
+
+/**
+ * Keeps reads tolerant of assistant messages persisted while a tool call was
+ * still streaming. Pending input is intentionally a string; terminal/running
+ * states require the parsed record shape used by the V2 message contract.
+ */
+export function normalizeForDecode(value: unknown): unknown {
+  if (!isRecord(value) || value.type !== "assistant" || !Array.isArray(value.content)) return value
+
+  return {
+    ...value,
+    content: value.content.map((item) => {
+      if (!isRecord(item) || item.type !== "tool" || !isRecord(item.state)) return item
+      if (!["running", "completed", "error"].includes(String(item.state.status))) return item
+      return {
+        ...item,
+        state: {
+          ...item.state,
+          input: normalizeToolInput(item.state.input),
+        },
+      }
+    }),
+  }
+}
+
 export const ID = EventV2.ID
 export type ID = Schema.Schema.Type<typeof ID>
 

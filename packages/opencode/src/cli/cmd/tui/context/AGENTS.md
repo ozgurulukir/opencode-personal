@@ -1,13 +1,17 @@
 # TUI event context
 
-## `useEvent()` filters sync envelope, not all SyncEvents
+## `useEvent()` filters the replay envelope
 
-`event.ts:11-13` drops events where `payload.type === "sync"`. This only filters the versioned sync envelope copy (path 2 of SyncEvent dual delivery). SyncEvents also arrive as raw `{ type, properties }` payloads via the Bus publish path (path 1), so handlers for `message.updated`, `message.part.updated`, etc. in `sync.tsx` are reachable.
+`event.ts` drops events where `payload.type === "sync"`. This filters only the
+versioned replay envelope; native `session.next.*` events arrive through the
+raw global event path and are handled directly by `sync.tsx`.
 
-## `message.part.updated.batch` is in the SDK Event type
+## Native permission payloads
 
-The batch variant of part updates (`message.part.updated.batch`, emitted by `sessions.updateParts()`) is part of the SDK's `Event` union type (`types.gen.ts`). The `sync.tsx` handler reads `event.properties.parts` directly (`Array<Part>`) without any `@ts-expect-error` or `as unknown` casts, relying on discriminated-union narrowing. It is delivered at runtime through the Bus path and handled in `sync.tsx`.
+`session.next.permission.asked` keeps the established `PermissionRequest`
+object under `event.properties.request`. The V2 schema intentionally exposes
+that field as `unknown`, so the TUI narrows it once at the event boundary.
 
-## `message.part.updated.batch` handler is easy to miss in `sync.tsx`
-
-`sessions.updateParts()` fires `MessageV2.Event.PartUpdatedBatch` (a single batch event with a `parts` array), NOT individual `message.part.updated` events per part. The TUI sync store at `sync.tsx` had a handler for single `message.part.updated` but not the batch variant. When adding a new SyncEvent that publishes parts in batch, check both the single and batch handler exist.
+The TUI message and part slices are V2-backed now. `question.*`, `lsp.updated`,
+`vcs.branch.updated`, and `server.instance.disposed` remain V1-vocabulary
+infrastructure events until their separate migration is scheduled.

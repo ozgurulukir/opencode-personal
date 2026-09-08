@@ -84,6 +84,18 @@ const baseState = (input: Partial<State> = {}) =>
     ...input,
   }) as State
 
+const promptedEvent = (id: string, sessionID: string, text: string) => ({
+  id,
+  type: "session.next.prompted",
+  properties: {
+    sessionID,
+    timestamp: 1,
+    prompt: { text },
+    agent: "assistant",
+    model: { id: "gpt", providerID: "openai" },
+  },
+})
+
 describe("applyGlobalEvent", () => {
   test("upserts project.updated in sorted position", () => {
     const project = [{ id: "a" }, { id: "c" }] as Project[]
@@ -214,7 +226,7 @@ describe("applyDirectoryEvent", () => {
     )
 
     applyDirectoryEvent({
-      event: { type: "session.updated", properties: { info: rootSession({ id: "ses_1", archived: 10 }) } },
+      event: { type: "session.next.updated", properties: { info: rootSession({ id: "ses_1", archived: 10 }) } },
       store,
       setStore,
       push() {},
@@ -260,7 +272,7 @@ describe("applyDirectoryEvent", () => {
       )
 
       applyDirectoryEvent({
-        event: { type: "session.deleted", properties: { info: item.info } },
+        event: { type: "session.next.deleted", properties: { info: item.info } },
         store,
         setStore,
         push() {},
@@ -336,85 +348,81 @@ describe("applyDirectoryEvent", () => {
     expect(store.part.msg_1).toBeUndefined()
   })
 
-  test("upserts and removes messages while clearing orphaned parts", () => {
+  test("prompted inserts user message with text and file parts and resolves optimistic entries", () => {
     const sessionID = "ses_1"
-    const [store, setStore] = createStore(
-      baseState({
-        message: { [sessionID]: [userMessage("msg_1", sessionID), userMessage("msg_3", sessionID)] },
-        part: { msg_2: [textPart("prt_1", sessionID, "msg_2")] },
-      }),
-    )
+    const [store, setStore] = createStore(baseState())
+    const resolved: string[] = []
 
     applyDirectoryEvent({
-      event: { type: "message.updated", properties: { info: userMessage("msg_2", sessionID) } },
+      event: promptedEvent("evt_2", sessionID, "hello"),
       store,
       setStore,
       push() {},
       directory: "/tmp",
       loadLsp() {},
-    })
-
-    expect(store.message[sessionID]?.map((x) => x.id)).toEqual(["msg_1", "msg_2", "msg_3"])
-
-    applyDirectoryEvent({
-      event: {
-        type: "message.updated",
-        properties: {
-          info: {
-            ...userMessage("msg_2", sessionID),
-            role: "assistant",
-          } as Message,
-        },
+      resolveOptimistic(sessionID_, text) {
+        resolved.push(`${sessionID_}:${text}`)
       },
-      store,
-      setStore,
-      push() {},
-      directory: "/tmp",
-      loadLsp() {},
     })
 
-    expect(store.message[sessionID]?.find((x) => x.id === "msg_2")?.role).toBe("assistant")
+    expect(store.message[sessionID]?.map((x) => x.id)).toEqual(["evt_2"])
+    expect(resolved).toEqual([`${sessionID}:hello`])
+    const parts = store.part["evt_2"] ?? []
+    expect(parts).toHaveLength(1)
+    expect(parts[0]).toMatchObject({ type: "text", text: "hello" })
 
+    // Re-delivering the same event id upserts instead of duplicating.
     applyDirectoryEvent({
-      event: { type: "message.removed", properties: { sessionID, messageID: "msg_2" } },
+      event: promptedEvent("evt_2", sessionID, "hello"),
       store,
       setStore,
       push() {},
       directory: "/tmp",
       loadLsp() {},
     })
-
-    expect(store.message[sessionID]?.map((x) => x.id)).toEqual(["msg_1", "msg_3"])
-    expect(store.part.msg_2).toBeUndefined()
+    expect(store.message[sessionID]?.map((x) => x.id)).toEqual(["evt_2"])
   })
 
-  test("upserts and prunes message parts", () => {
+  test("prompted inserts in sorted position between existing messages", () => {
     const sessionID = "ses_1"
-    const messageID = "msg_1"
     const [store, setStore] = createStore(
       baseState({
-        part: { [messageID]: [textPart("prt_1", sessionID, messageID), textPart("prt_3", sessionID, messageID)] },
+        message: { [sessionID]: [userMessage("evt_1", sessionID), userMessage("evt_3", sessionID)] },
       }),
     )
 
     applyDirectoryEvent({
-      event: { type: "message.part.updated", properties: { part: textPart("prt_2", sessionID, messageID) } },
+      event: promptedEvent("evt_2", sessionID, "hello"),
       store,
       setStore,
       push() {},
       directory: "/tmp",
       loadLsp() {},
     })
-    expect(store.part[messageID]?.map((x) => x.id)).toEqual(["prt_1", "prt_2", "prt_3"])
+
+    expect(store.message[sessionID]?.map((x) => x.id)).toEqual(["evt_1", "evt_2", "evt_3"])
+  })
+
+  test("synthetic comment notes attach to the latest user message and others are skipped", () => {
+    const sessionID = "ses_1"
+    const [store, setStore] = createStore(baseState())
 
     applyDirectoryEvent({
+      event: promptedEvent("evt_1", sessionID, "hello"),
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+    applyDirectoryEvent({
       event: {
-        type: "message.part.updated",
+        id: "evt_2",
+        type: "session.next.synthetic",
         properties: {
-          part: {
-            ...textPart("prt_2", sessionID, messageID),
-            text: "changed",
-          } as Part,
+          sessionID,
+          timestamp: 2,
+          text: "The user made the following comment regarding line 3 of src/a.ts: fix this",
         },
       },
       store,
@@ -423,28 +431,8 @@ describe("applyDirectoryEvent", () => {
       directory: "/tmp",
       loadLsp() {},
     })
-    const updated = store.part[messageID]?.find((x) => x.id === "prt_2")
-    expect(updated?.type).toBe("text")
-    if (updated?.type === "text") expect(updated.text).toBe("changed")
-
     applyDirectoryEvent({
-      event: { type: "message.part.removed", properties: { messageID, partID: "prt_1" } },
-      store,
-      setStore,
-      push() {},
-      directory: "/tmp",
-      loadLsp() {},
-    })
-    applyDirectoryEvent({
-      event: { type: "message.part.removed", properties: { messageID, partID: "prt_2" } },
-      store,
-      setStore,
-      push() {},
-      directory: "/tmp",
-      loadLsp() {},
-    })
-    applyDirectoryEvent({
-      event: { type: "message.part.removed", properties: { messageID, partID: "prt_3" } },
+      event: { id: "evt_3", type: "session.next.synthetic", properties: { sessionID, timestamp: 3, text: "subagent result" } },
       store,
       setStore,
       push() {},
@@ -452,7 +440,432 @@ describe("applyDirectoryEvent", () => {
       loadLsp() {},
     })
 
-    expect(store.part[messageID]).toBeUndefined()
+    expect(store.message[sessionID]).toHaveLength(1)
+    const parts = store.part["evt_1"] ?? []
+    expect(parts).toHaveLength(2)
+    expect(parts[0]).toMatchObject({ type: "text", text: "hello" })
+    expect(parts[1]).toMatchObject({ type: "text", synthetic: true })
+  })
+
+  test("shell events build the user wrapper, assistant and bash tool lifecycle", () => {
+    const sessionID = "ses_1"
+    const [store, setStore] = createStore(baseState())
+
+    applyDirectoryEvent({
+      event: promptedEvent("evt_1", sessionID, "run it"),
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+    applyDirectoryEvent({
+      event: {
+        id: "evt_2",
+        type: "session.next.shell.started",
+        properties: { sessionID, timestamp: 2, callID: "call_9", command: "ls" },
+      },
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+
+    expect(store.message[sessionID]?.map((x) => x.id)).toEqual(["evt_1", "evt_2", "evt_2:assistant"])
+    expect(store.part["evt_2"]?.[0]).toMatchObject({ type: "text", text: "The following tool was executed by the user", synthetic: true })
+    const tool = store.part["evt_2:assistant"]?.[0]
+    expect(tool).toMatchObject({
+      type: "tool",
+      tool: "bash",
+      callID: "call_9",
+      state: { status: "running", input: { command: "ls" } },
+    })
+
+    applyDirectoryEvent({
+      event: {
+        id: "evt_3",
+        type: "session.next.shell.ended",
+        properties: { sessionID, timestamp: 3, callID: "call_9", output: "out" },
+      },
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+
+    const completed = store.part["evt_2:assistant"]?.[0]
+    expect(completed).toMatchObject({
+      state: { status: "completed", output: "out", metadata: { output: "out", description: "" } },
+    })
+    const assistant = store.message[sessionID]?.find((x) => x.id === "evt_2:assistant")
+    expect(assistant?.role === "assistant" && assistant.time.completed).toBe(3)
+  })
+
+  test("step events drive the assistant lifecycle", () => {
+    const sessionID = "ses_1"
+    const [store, setStore] = createStore(baseState())
+
+    applyDirectoryEvent({
+      event: promptedEvent("evt_1", sessionID, "hello"),
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+    applyDirectoryEvent({
+      event: {
+        id: "evt_2",
+        type: "session.next.step.started",
+        properties: { sessionID, timestamp: 2, agent: "assistant", model: { id: "gpt", providerID: "openai" } },
+      },
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+
+    const assistant = store.message[sessionID]?.find((x) => x.id === "evt_2")
+    expect(assistant).toMatchObject({ role: "assistant", parentID: "evt_1", agent: "assistant", mode: "assistant" })
+
+    applyDirectoryEvent({
+      event: {
+        id: "evt_3",
+        type: "session.next.step.ended",
+        properties: {
+          sessionID,
+          timestamp: 3,
+          finish: "stop",
+          cost: 0.5,
+          tokens: { input: 1, output: 2, reasoning: 0, cache: { read: 0, write: 0 } },
+        },
+      },
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+
+    const ended = store.message[sessionID]?.find((x) => x.id === "evt_2")
+    expect(ended).toMatchObject({
+      time: { created: 2, completed: 3 },
+      finish: "stop",
+      cost: 0.5,
+      tokens: { input: 1, output: 2 },
+    })
+  })
+
+  test("step failed records the error on the active assistant", () => {
+    const sessionID = "ses_1"
+    const [store, setStore] = createStore(baseState())
+
+    applyDirectoryEvent({
+      event: promptedEvent("evt_1", sessionID, "hello"),
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+    applyDirectoryEvent({
+      event: {
+        id: "evt_2",
+        type: "session.next.step.started",
+        properties: { sessionID, timestamp: 2, agent: "assistant", model: { id: "gpt", providerID: "openai" } },
+      },
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+    applyDirectoryEvent({
+      event: {
+        id: "evt_3",
+        type: "session.next.step.failed",
+        properties: { sessionID, timestamp: 3, error: { type: "unknown", message: "boom" } },
+      },
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+
+    const failed = store.message[sessionID]?.find((x) => x.id === "evt_2")
+    expect(failed).toMatchObject({
+      time: { completed: 3 },
+      finish: "error",
+      error: { name: "UnknownError", data: { message: "boom" } },
+    })
+  })
+
+  test("text events stream into the active assistant's text part", () => {
+    const sessionID = "ses_1"
+    const [store, setStore] = createStore(baseState())
+
+    applyDirectoryEvent({
+      event: promptedEvent("evt_1", sessionID, "hello"),
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+    applyDirectoryEvent({
+      event: { id: "evt_2", type: "session.next.step.started", properties: { sessionID, timestamp: 2, agent: "assistant", model: { id: "gpt", providerID: "openai" } } },
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+    applyDirectoryEvent({
+      event: { type: "session.next.text.started", properties: { sessionID, timestamp: 2 } },
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+    applyDirectoryEvent({
+      event: { type: "session.next.text.delta", properties: { sessionID, delta: "hi" } },
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+    applyDirectoryEvent({
+      event: { type: "session.next.text.delta", properties: { sessionID, delta: " there" } },
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+    applyDirectoryEvent({
+      event: { type: "session.next.text.ended", properties: { sessionID, text: "hi there" } },
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+
+    const parts = store.part["evt_2"] ?? []
+    expect(parts).toHaveLength(1)
+    expect(parts[0]).toMatchObject({ type: "text", text: "hi there" })
+  })
+
+  test("tool events drive the tool part state machine", () => {
+    const sessionID = "ses_1"
+    const [store, setStore] = createStore(baseState())
+
+    applyDirectoryEvent({
+      event: promptedEvent("evt_1", sessionID, "hello"),
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+    applyDirectoryEvent({
+      event: { id: "evt_2", type: "session.next.step.started", properties: { sessionID, timestamp: 2, agent: "assistant", model: { id: "gpt", providerID: "openai" } } },
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+    applyDirectoryEvent({
+      event: { type: "session.next.tool.input.started", properties: { sessionID, timestamp: 2, callID: "call_1", name: "bash" } },
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+    applyDirectoryEvent({
+      event: { type: "session.next.tool.input.delta", properties: { sessionID, callID: "call_1", delta: '{"command"' } },
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+
+    let tool = store.part["evt_2"]?.[0]
+    expect(tool).toMatchObject({ type: "tool", tool: "bash", callID: "call_1", state: { status: "pending", raw: '{"command"' } })
+
+    applyDirectoryEvent({
+      event: { type: "session.next.tool.called", properties: { sessionID, timestamp: 3, callID: "call_1", input: { command: "ls" } } },
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+    applyDirectoryEvent({
+      event: { type: "session.next.tool.progress", properties: { sessionID, callID: "call_1", structured: { partial: true }, content: [] } },
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+
+    tool = store.part["evt_2"]?.[0]
+    expect(tool).toMatchObject({
+      state: { status: "running", input: { command: "ls" }, metadata: { partial: true } },
+    })
+
+    applyDirectoryEvent({
+      event: {
+        type: "session.next.tool.success",
+        properties: { sessionID, timestamp: 4, callID: "call_1", structured: { done: true }, content: [{ type: "text", text: "out" }] },
+      },
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+
+    tool = store.part["evt_2"]?.[0]
+    expect(tool).toMatchObject({
+      state: { status: "completed", output: "out", metadata: { done: true }, time: { start: 3, end: 4 } },
+    })
+  })
+
+  test("tool failure records the error state", () => {
+    const sessionID = "ses_1"
+    const [store, setStore] = createStore(baseState())
+
+    applyDirectoryEvent({
+      event: promptedEvent("evt_1", sessionID, "hello"),
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+    applyDirectoryEvent({
+      event: { id: "evt_2", type: "session.next.step.started", properties: { sessionID, timestamp: 2, agent: "assistant", model: { id: "gpt", providerID: "openai" } } },
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+    applyDirectoryEvent({
+      event: { type: "session.next.tool.input.started", properties: { sessionID, timestamp: 2, callID: "call_1", name: "bash" } },
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+    applyDirectoryEvent({
+      event: { type: "session.next.tool.called", properties: { sessionID, timestamp: 3, callID: "call_1", input: { command: "ls" } } },
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+    applyDirectoryEvent({
+      event: {
+        type: "session.next.tool.failed",
+        properties: { sessionID, timestamp: 4, callID: "call_1", error: { type: "unknown", message: "nope" } },
+      },
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+
+    expect(store.part["evt_2"]?.[0]).toMatchObject({
+      state: { status: "error", error: "nope", time: { start: 3, end: 4 } },
+    })
+  })
+
+  test("reasoning events stream into the active assistant's reasoning part", () => {
+    const sessionID = "ses_1"
+    const [store, setStore] = createStore(baseState())
+
+    applyDirectoryEvent({
+      event: promptedEvent("evt_1", sessionID, "hello"),
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+    applyDirectoryEvent({
+      event: { id: "evt_2", type: "session.next.step.started", properties: { sessionID, timestamp: 2, agent: "assistant", model: { id: "gpt", providerID: "openai" } } },
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+    applyDirectoryEvent({
+      event: { type: "session.next.reasoning.started", properties: { sessionID, reasoningID: "rsn_1" } },
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+    applyDirectoryEvent({
+      event: { type: "session.next.reasoning.delta", properties: { sessionID, reasoningID: "rsn_1", delta: "think" } },
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+    applyDirectoryEvent({
+      event: { type: "session.next.reasoning.ended", properties: { sessionID, reasoningID: "rsn_1", text: "thinking" } },
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+
+    expect(store.part["evt_2"]?.[0]).toMatchObject({ type: "reasoning", text: "thinking" })
+  })
+
+  test("compaction started builds a user wrapper with a compaction part", () => {
+    const sessionID = "ses_1"
+    const [store, setStore] = createStore(baseState())
+
+    applyDirectoryEvent({
+      event: promptedEvent("evt_1", sessionID, "hello"),
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+    applyDirectoryEvent({
+      event: { id: "evt_2", type: "session.next.compaction.started", properties: { sessionID, timestamp: 2, reason: "auto" } },
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+
+    expect(store.message[sessionID]?.map((x) => x.id)).toEqual(["evt_1", "evt_2"])
+    expect(store.part["evt_2"]?.[0]).toMatchObject({ type: "compaction", auto: true })
   })
 
   test("tracks permission and question request lifecycles", () => {
@@ -465,7 +878,7 @@ describe("applyDirectoryEvent", () => {
     )
 
     applyDirectoryEvent({
-      event: { type: "permission.asked", properties: permissionRequest("perm_2", sessionID) },
+      event: { type: "session.next.permission.asked", properties: { timestamp: 1, sessionID, request: permissionRequest("perm_2", sessionID) } },
       store,
       setStore,
       push() {},
@@ -475,7 +888,7 @@ describe("applyDirectoryEvent", () => {
     expect(store.permission[sessionID]?.map((x) => x.id)).toEqual(["perm_1", "perm_2", "perm_3"])
 
     applyDirectoryEvent({
-      event: { type: "permission.asked", properties: permissionRequest("perm_2", sessionID, "updated") },
+      event: { type: "session.next.permission.asked", properties: { timestamp: 1, sessionID, request: permissionRequest("perm_2", sessionID, "updated") } },
       store,
       setStore,
       push() {},
@@ -485,7 +898,7 @@ describe("applyDirectoryEvent", () => {
     expect(store.permission[sessionID]?.find((x) => x.id === "perm_2")?.permission).toBe("updated")
 
     applyDirectoryEvent({
-      event: { type: "permission.replied", properties: { sessionID, requestID: "perm_2" } },
+      event: { type: "session.next.permission.replied", properties: { timestamp: 1, sessionID, requestID: "perm_2", reply: "once" } },
       store,
       setStore,
       push() {},
@@ -560,7 +973,7 @@ describe("applyDirectoryEvent", () => {
     )
 
     applyDirectoryEvent({
-      event: { type: "session.diff", properties: { sessionID, diff: [diffB] } },
+      event: { type: "session.next.diff", properties: { sessionID, diff: [diffB] } },
       store,
       setStore,
       push() {},
@@ -581,7 +994,7 @@ describe("applyDirectoryEvent", () => {
     )
 
     applyDirectoryEvent({
-      event: { type: "todo.updated", properties: { sessionID, todos: [{ content: "new", status: "pending", priority: "medium" } as Todo] } },
+      event: { type: "session.next.todo", properties: { sessionID, todos: [{ content: "new", status: "pending", priority: "medium" } as Todo] } },
       store,
       setStore,
       push() {},
@@ -606,7 +1019,7 @@ describe("applyDirectoryEvent", () => {
     )
 
     applyDirectoryEvent({
-      event: { type: "session.status", properties: { sessionID, status: { type: "busy" } } },
+      event: { type: "session.next.status", properties: { sessionID, status: { type: "busy" } } },
       store,
       setStore,
       push() {},
@@ -617,37 +1030,11 @@ describe("applyDirectoryEvent", () => {
     expect(store.session_status[sessionID]).toEqual({ type: "busy" })
   })
 
-  test("appends deltas to existing message.part fields", () => {
-    const sessionID = "ses_1"
-    const messageID = "msg_1"
-    const partID = "prt_1"
-    const [store, setStore] = createStore(
-      baseState({
-        part: {
-          [messageID]: [
-            { id: partID, sessionID, messageID, type: "text", text: "hello" } as Part,
-          ],
-        },
-      }),
-    )
-
-    applyDirectoryEvent({
-      event: { type: "message.part.delta", properties: { messageID, partID, field: "text", delta: " world" } },
-      store,
-      setStore,
-      push() {},
-      directory: "/tmp",
-      loadLsp() {},
-    })
-
-    expect((store.part[messageID]?.[0] as { text?: string } | undefined)?.text).toBe("hello world")
-  })
-
-  test("ignores message.part.delta when part is missing", () => {
+  test("ignores text deltas when no assistant is active", () => {
     const [store, setStore] = createStore(baseState())
 
     applyDirectoryEvent({
-      event: { type: "message.part.delta", properties: { messageID: "msg_missing", partID: "prt_missing", field: "text", delta: "x" } },
+      event: { type: "session.next.text.delta", properties: { sessionID: "ses_1", delta: "x" } },
       store,
       setStore,
       push() {},
@@ -682,7 +1069,7 @@ describe("applyDirectoryEvent", () => {
     expect(store.sessionTotal).toBe(1)
   })
 
-  test("reconciles existing session on session.updated without archiving", () => {
+  test("reconciles existing session on session.next.updated without archiving", () => {
     const existing = rootSession({ id: "ses_1" })
     const updated = { ...existing, time: { ...existing.time, updated: 2 } } as Session
     const [store, setStore] = createStore(
@@ -692,7 +1079,7 @@ describe("applyDirectoryEvent", () => {
     )
 
     applyDirectoryEvent({
-      event: { type: "session.updated", properties: { info: updated } },
+      event: { type: "session.next.updated", properties: { info: updated } },
       store,
       setStore,
       push() {},
@@ -708,7 +1095,7 @@ describe("applyDirectoryEvent", () => {
     const [store, setStore] = createStore(baseState())
 
     applyDirectoryEvent({
-      event: { type: "permission.replied", properties: { sessionID: "ses_1", requestID: "perm_1" } },
+      event: { type: "session.next.permission.replied", properties: { timestamp: 1, sessionID: "ses_1", requestID: "perm_1", reply: "once" } },
       store,
       setStore,
       push() {},

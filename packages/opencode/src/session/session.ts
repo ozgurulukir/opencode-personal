@@ -504,8 +504,8 @@ export const layer: Layer.Layer<Service, never, Bus.Service | Storage.Service | 
       )
 
       yield* sync.run(Event.Deleted, { sessionID, info: session }, { publish: hasInstance })
-      // Native V2 emission (replaces the v2/event-bridge translation); gated
-      // on instance presence exactly like the V1 publish above.
+      // Native V2 lifecycle emission is published only when instance context is
+      // available, matching the V1 publish above.
       if (hasInstance) {
         yield* sync.run(SessionEvent.Deleted.Sync, {
           sessionID,
@@ -642,7 +642,7 @@ export const layer: Layer.Layer<Service, never, Bus.Service | Storage.Service | 
     const patch = (sessionID: SessionID, info: Patch) =>
       Effect.gen(function* () {
         yield* sync.run(Event.Updated, { sessionID, info })
-        // Native V2 emission (replaces the v2/event-bridge translation)
+        // Native V2 lifecycle emission is published alongside the V1 event
         yield* sync.run(SessionEvent.Updated.Sync, {
           sessionID,
           timestamp: DateTime.makeUnsafe(Date.now()),

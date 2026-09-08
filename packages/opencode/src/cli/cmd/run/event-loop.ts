@@ -5,8 +5,9 @@
 // `loop` function orchestrates them.
 import { EOL } from "os"
 import { UI } from "../../ui"
-import type { OpencodeClient, ToolPart, Part } from "@opencode-ai/sdk/v2"
+import type { Part } from "@opencode-ai/sdk/v2"
 import type { LoopContext } from "./types"
+import { createV2EventAdapter, isMigratedLegacyEvent } from "./v2-legacy"
 
 function handleMessageUpdated(
   ctx: LoopContext,
@@ -141,34 +142,43 @@ async function handlePermissionAsked(
 export async function loop(
   ctx: LoopContext,
   events: { stream: AsyncIterable<{ type: string; properties: Record<string, unknown> }> },
+  options: { native?: boolean } = {},
 ) {
   let error: string | undefined
+  const adapter = createV2EventAdapter()
 
-  for await (const event of events.stream) {
-    if (event.type === "message.updated") {
-      handleMessageUpdated(ctx, event as unknown as Parameters<typeof handleMessageUpdated>[1])
+  for await (const rawEvent of events.stream) {
+    const sessionID = rawEvent.properties.sessionID
+    if (options.native && isMigratedLegacyEvent(rawEvent.type) && typeof sessionID === "string") {
+      continue
     }
 
-    if (event.type === "message.part.updated") {
-      const part = (event.properties as { part: Part }).part
-      handleToolPart(ctx, part)
-    }
-
-    if (event.type === "session.error") {
-      const props = event.properties as Parameters<typeof handleSessionError>[1]
-      error = handleSessionError(ctx, props, error)
-    }
-
-    if (event.type === "session.status") {
-      const props = event.properties as { sessionID: string; status: { type: string } }
-      if (handleSessionStatus(ctx, props)) {
-        break
+    for (const event of adapter.adapt(rawEvent as unknown as Parameters<typeof adapter.adapt>[0])) {
+      if (event.type === "message.updated") {
+        handleMessageUpdated(ctx, event as unknown as Parameters<typeof handleMessageUpdated>[1])
       }
-    }
 
-    if (event.type === "permission.asked") {
-      const permission = event.properties as Parameters<typeof handlePermissionAsked>[1]
-      await handlePermissionAsked(ctx, permission)
+      if (event.type === "message.part.updated") {
+        const part = (event.properties as { part: Part }).part
+        handleToolPart(ctx, part)
+      }
+
+      if (event.type === "session.error") {
+        const props = event.properties as Parameters<typeof handleSessionError>[1]
+        error = handleSessionError(ctx, props, error)
+      }
+
+      if (event.type === "session.status") {
+        const props = event.properties as { sessionID: string; status: { type: string } }
+        if (handleSessionStatus(ctx, props)) {
+          return
+        }
+      }
+
+      if (event.type === "permission.asked") {
+        const permission = event.properties as Parameters<typeof handlePermissionAsked>[1]
+        await handlePermissionAsked(ctx, permission)
+      }
     }
   }
 }

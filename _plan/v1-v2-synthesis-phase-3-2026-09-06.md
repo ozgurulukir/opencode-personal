@@ -1,12 +1,16 @@
 # V1/V2 Synthesis — Phase 3 (HTTP API Unification) — 2026-09-06
 
+Status: COMPLETE for the planned 3a–3e implementation, with 3e intentionally partial by design; post-implementation audit recorded 2026-09-08.
+
+> This document preserves the 2026-09-06 planning baseline. Later phases supersede selected migration decisions; those changes are recorded in the batch notes and the audit below.
+
 ## Goal
 
 Port the V1 HTTP session surface (`/session/*`) to the V2 API (`/api/session/*`) so the
 public contract becomes single. After Phase 1 (brands) and Phase 2 (events), the HTTP
 layer is the widest remaining duality.
 
-## Current state (verified 2026-09-06)
+## Current state (historical baseline verified 2026-09-06)
 
 | Fact | Anchor |
 |---|---|
@@ -57,7 +61,7 @@ layer is the widest remaining duality.
 > `v2.message`. SDK regenerated (6 new methods on `client.v2.session`).
 > Verified: typecheck opencode+app clean; httpapi-session 11/11 (new v2 lifecycle test);
 > v2 service tests 31/31; server dir 237 pass / 2 fails both confirmed pre-existing
-> (present in Phase 2 baseline). Not committed.
+> (present in Phase 2 baseline). The implementation was later committed as part of `cb7fbd990` and its descendants.
 
 - Complete `SessionV2.Info`: add `slug`, `directory`, `version`, `summary`, `share`;
   wire `fromRow()` + `toV2Info()`.
@@ -183,3 +187,10 @@ cd packages/opencode && bun test test/v2/     # + new handler tests
 - TUI `useSync()` → `useSyncV2()` migration (21 files) — Phase 4
 - V1 route group deletion — Phase 5
 - `promptAsync` deletion decision — batch 3d
+
+## Post-implementation audit (2026-09-08)
+
+- 3a–3d are implemented. The 3e consumer migration is intentionally partial, as recorded in its batch status; prompt/message/shell and remaining V1 consumers were not silently treated as complete.
+- The documented deviations are valid and remain part of the contract: `revert` was added to V2 `Info`, `command` returns `NoContent`, V2 `shell` keeps the `{command}` payload, and `promptAsync` was retained because three real fire-and-forget consumers required it.
+- Integration coverage gaps remain documented for real share/unshare, LLM-backed summarize/init/command/shell/predict paths. They are not implementation failures inferred from unit/typecheck success.
+- The historical “Not committed” wording in 3a is corrected above; implementation landed in the subsequent commit lineage.

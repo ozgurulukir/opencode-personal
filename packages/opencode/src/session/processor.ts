@@ -23,6 +23,7 @@ import * as Log from "@opencode-ai/core/util/log"
 import { isRecord } from "@/util/record"
 import { SyncEvent } from "@/sync"
 import { SessionEvent } from "@/v2/session-event"
+import { SessionMessage } from "@/v2/session-message"
 import { Modelv2 } from "@/v2/model"
 import * as DateTime from "effect/DateTime"
 
@@ -325,13 +326,14 @@ export const layer: Layer.Layer<
             if (ctx.assistantMessage.summary) {
               throw new Error(`Tool call not allowed while generating summary: ${value.toolName}`)
             }
+            const input = SessionMessage.normalizeToolInput(value.input)
             const toolCall = yield* readToolCall(value.toolCallId)
             // V2 read-model projection: emit the SessionEvent so V2 projectors populate SessionMessageTable.
             yield* sync.run(SessionEvent.Tool.Called.Sync, {
               sessionID: ctx.sessionID,
               callID: value.toolCallId,
               tool: value.toolName,
-              input: value.input,
+              input,
               provider: {
                 executed: toolCall?.part.metadata?.providerExecuted === true,
                 ...(value.providerMetadata ? { metadata: value.providerMetadata } : {}),
@@ -344,7 +346,7 @@ export const layer: Layer.Layer<
               state: {
                 ...match.state,
                 status: "running",
-                input: value.input,
+                input,
                 time: { start: Date.now() },
               },
               metadata: match.metadata?.providerExecuted
@@ -362,7 +364,7 @@ export const layer: Layer.Layer<
                   part.type === "tool" &&
                   part.tool === value.toolName &&
                   part.state.status !== "pending" &&
-                  JSON.stringify(part.state.input) === JSON.stringify(value.input),
+                  JSON.stringify(part.state.input) === JSON.stringify(input),
               )
             ) {
               return
@@ -373,7 +375,7 @@ export const layer: Layer.Layer<
               permission: "doom_loop",
               patterns: [value.toolName],
               sessionID: ctx.assistantMessage.sessionID,
-              metadata: { tool: value.toolName, input: value.input },
+              metadata: { tool: value.toolName, input },
               always: [value.toolName],
               ruleset: agent.permission,
             })
@@ -745,25 +747,27 @@ export const layer: Layer.Layer<
                 parse,
                 set: (info) => {
                   // V2 read-model projection: emit the SessionEvent so V2 projectors populate SessionMessageTable.
-                  return sync.run(SessionEvent.Retried.Sync, {
-                    sessionID: ctx.sessionID,
-                    attempt: info.attempt,
-                    error: {
-                      message: info.message,
-                      isRetryable: true,
-                    },
-                    timestamp: DateTime.makeUnsafe(Date.now()),
-                  }).pipe(
-                    Effect.andThen(
-                      status.set(ctx.sessionID, {
-                        type: "retry",
-                        attempt: info.attempt,
+                  return sync
+                    .run(SessionEvent.Retried.Sync, {
+                      sessionID: ctx.sessionID,
+                      attempt: info.attempt,
+                      error: {
                         message: info.message,
-                        action: info.action,
-                        next: info.next,
-                      }),
-                    ),
-                  )
+                        isRetryable: true,
+                      },
+                      timestamp: DateTime.makeUnsafe(Date.now()),
+                    })
+                    .pipe(
+                      Effect.andThen(
+                        status.set(ctx.sessionID, {
+                          type: "retry",
+                          attempt: info.attempt,
+                          message: info.message,
+                          action: info.action,
+                          next: info.next,
+                        }),
+                      ),
+                    )
                 },
               }),
             ),

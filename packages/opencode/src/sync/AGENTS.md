@@ -2,7 +2,7 @@
 
 ## Global event stream wraps events in a `sync` envelope
 
-`SyncEvent.process()` (`sync/index.ts:322-333`) wraps every event in `{ type: "sync", syncEvent: { type: "message.part.updated.1", ...event } }` before emitting to `GlobalBus`. The `type` field has a version suffix (`.1`) from `versionedType()`. Consumers of the global SSE stream (`/global/event`) must unwrap this envelope and strip the version suffix — the instance SSE stream (`/event`) delivers unwrapped events directly from the per-instance PubSub.
+`SyncEvent.process()` (`sync/index.ts:327-356`) wraps every event in `{ type: "sync", syncEvent: { type: "message.part.updated.1", ...event } }` before emitting to `GlobalBus`. The `type` field has a dot-version suffix (`.1`) from `versionedType()`. Consumers of the global SSE stream (`/global/event`) must unwrap this envelope and strip the version suffix — the instance SSE stream (`/event`) delivers unwrapped events directly from the per-instance PubSub.
 
 ## `convertEvent` transforms bus payloads
 
@@ -16,10 +16,10 @@ The `convertEvent` callback (`sync/index.ts:197, 221`) transforms event data bef
 
 `SyncEvent.process()` (`sync/index.ts:308-333`) publishes SyncEvents to `GlobalBus` through **two paths**:
 
-1. **Raw Bus path** (line 315): `ProjectBus.publish(def, data)` → `Bus.publish()` → `GlobalBus.emit({ payload: { type: def.type, properties: data } })` — delivers unwrapped `{ type, properties }` just like a BusEvent.
-2. **Sync envelope path** (line 322-333): Direct `GlobalBus.emit({ payload: { type: "sync", syncEvent: { ... } } })` — delivers the versioned sync envelope.
+1. **Raw Bus path** (`sync/index.ts:338`): `ProjectBus.publish(def, data)` → `Bus.publish()` → `GlobalBus.emit({ payload: { type: def.type, properties: data } })` — delivers unwrapped `{ type, properties }` just like a BusEvent.
+2. **Sync envelope path** (`sync/index.ts:345-356`): Direct `GlobalBus.emit({ payload: { type: "sync", syncEvent: { ... } } })` — delivers the versioned sync envelope.
 
-TUI's `event.ts:useEvent()` filters out path 2 (`if (payload.type === "sync") return`), but path 1 passes through. This means SyncEvent handlers in `sync.tsx` for `message.updated`, `message.part.updated`, etc. ARE reachable at runtime — they are not dead code. The `sync` envelope filtering in the TUI only suppresses the versioned copy.
+TUI's `event.ts:useEvent()` filters out path 2 (`if (payload.type === "sync") return`), but path 1 passes through. `sync.tsx` consumes the native `session.next.*` lifecycle/message events on this raw path; its old `message.*` handlers were removed during the consumer migration. The `sync` envelope filtering in the TUI only suppresses the versioned copy. Keep both delivery paths while legacy-compatible consumers still exist.
 
 Each newly defined SyncEvent type is also registered as a BusEvent at init time (`sync/index.ts:212-215`: `BusEvent.define(def.type, def.properties)`), which enables path 1 delivery.
 
