@@ -31,6 +31,17 @@ export const UnknownError = Schema.Struct({
 })
 export type UnknownError = Schema.Schema.Type<typeof UnknownError>
 
+export const AbortedError = Schema.Struct({
+  type: Schema.Literal("aborted"),
+  message: Schema.String,
+}).annotate({
+  identifier: "Session.Error.Aborted",
+})
+export type AbortedError = Schema.Schema.Type<typeof AbortedError>
+
+export const SessionError = Schema.Union([UnknownError, AbortedError]).pipe(Schema.toTaggedUnion("type"))
+export type SessionError = Schema.Schema.Type<typeof SessionError>
+
 export const AgentSwitched = EventV2.define({
   type: "session.next.agent.switched",
   aggregate: "sessionID",
@@ -139,7 +150,7 @@ export namespace Step {
     aggregate: "sessionID",
     schema: {
       ...Base,
-      error: UnknownError,
+      error: SessionError,
     },
   })
   export type Failed = Schema.Schema.Type<typeof Failed>

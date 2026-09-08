@@ -8,6 +8,7 @@ import type {
   Project,
   PromptAgentAttachment,
   PromptFileAttachment,
+  PromptSubtaskAttachment,
   QuestionRequest,
   Session,
   SessionStatus,
@@ -16,9 +17,11 @@ import type {
   UserMessage,
 } from "@opencode-ai/sdk/v2/client"
 import type { State, VcsCache } from "./types"
+import { legacyFilePart, toLegacyError } from "@opencode-ai/sdk/v2/legacy"
 import { trimSessions } from "./session-trim"
 import { dropSessionCaches } from "./session-cache"
 import { diffs as list } from "@/utils/diffs"
+import { decodeFilePath, stripFileProtocol, stripQueryAndHash } from "@/context/file/path"
 import {
   SHELL_SYNTHETIC_TEXT,
   agentPart,
@@ -27,6 +30,7 @@ import {
   compactionPart,
   filePart,
   reasoningPart,
+  subtaskPart,
   textPart,
   toolPart,
   userMessage,
@@ -323,6 +327,7 @@ function handlePrompted(input: MessageHandlerInput, event: MessageEvent) {
       text: string
       files?: PromptFileAttachment[]
       agents?: PromptAgentAttachment[]
+      subtask?: PromptSubtaskAttachment
     }
     agent: string
     model: { id: string; providerID: string; variant?: string }
@@ -342,6 +347,7 @@ function handlePrompted(input: MessageHandlerInput, event: MessageEvent) {
     parts.push(filePart({ messageID: id, sessionID: props.sessionID, index: index++, file }))
   for (const agent of props.prompt.agents ?? [])
     parts.push(agentPart({ messageID: id, sessionID: props.sessionID, index: index++, agent }))
+  if (props.prompt.subtask) parts.push(subtaskPart({ messageID: id, sessionID: props.sessionID, index: index++, subtask: props.prompt.subtask }))
 
   // Evict the optimistic entry matching this text before inserting, so the
   // timeline never shows both. V2 message ids are event ids, not the client's
@@ -484,10 +490,7 @@ function handleStepFailed(input: MessageHandlerInput, event: MessageEvent) {
   updateAssistant(input, props.sessionID, active.assistant.id, (assistant) => {
     assistant.time.completed = completed
     assistant.finish = "error"
-    // The V2 projection flattens errors to {type, message}; reconstruct the
-    // V1 UnknownError shape the renderer reads. Abort typing
-    // (MessageAbortedError) is lost in the V2 event payload.
-    assistant.error = { name: "UnknownError", data: { message: props.error.message } }
+    assistant.error = toLegacyError(props.error)
   })
 }
 
@@ -612,6 +615,17 @@ function handleToolSuccess(input: MessageHandlerInput, event: MessageEvent) {
   input.setStore("part", active.assistant.id, produce((draft) => {
     const match = findToolPart(draft, props.callID)
     if (match?.state.status !== "running") return
+    const attachments = props.content
+      .filter((item): item is Extract<(typeof props.content)[number], { type: "file" }> => item.type === "file")
+      .map((file, index) =>
+        legacyFilePart({
+          id: `${match.id}:attachment:${index}`,
+          sessionID: props.sessionID,
+          messageID: active.assistant.id,
+          file,
+          resolveFilePath: (uri) => decodeFilePath(stripQueryAndHash(stripFileProtocol(uri))),
+        }),
+      )
     match.state = {
       status: "completed",
       input: match.state.input,
@@ -619,6 +633,7 @@ function handleToolSuccess(input: MessageHandlerInput, event: MessageEvent) {
       title: "",
       metadata: props.structured,
       time: { ...match.state.time, end: eventTime(props.timestamp) },
+      ...(attachments.length ? { attachments } : {}),
     }
   }))
 }
@@ -646,11 +661,9 @@ function handleToolFailed(input: MessageHandlerInput, event: MessageEvent) {
 }
 
 function handleReasoningStarted(input: MessageHandlerInput, event: MessageEvent) {
-  const props = event.properties as { sessionID: string; reasoningID: string }
+  const props = event.properties as { sessionID: string; timestamp?: number; reasoningID: string }
   const active = activeAssistantParts(input, props.sessionID)
   if (!active) return
-  // Reasoning parts are addressed by position (findLast) in the V1 slices;
-  // interleaved reasoning blocks are not distinguishable.
   insertPart(
     input,
     reasoningPart({
@@ -658,6 +671,8 @@ function handleReasoningStarted(input: MessageHandlerInput, event: MessageEvent)
       sessionID: props.sessionID,
       index: active.parts?.length ?? 0,
       text: "",
+      reasoningID: props.reasoningID,
+      start: eventTime(props.timestamp),
     }),
   )
 }
@@ -667,20 +682,21 @@ function handleReasoningDelta(input: MessageHandlerInput, event: MessageEvent) {
   const active = activeAssistantParts(input, props.sessionID)
   if (!active) return
   input.setStore("part", active.assistant.id, produce((draft) => {
-    const target = draft.findLast((part) => part.type === "reasoning")
+    const target = draft.find((part) => part.type === "reasoning" && part.id === `${active.assistant.id}:reasoning:${props.reasoningID}`)
     if (target?.type !== "reasoning") return
     target.text += props.delta
   }))
 }
 
 function handleReasoningEnded(input: MessageHandlerInput, event: MessageEvent) {
-  const props = event.properties as { sessionID: string; reasoningID: string; text: string }
+  const props = event.properties as { sessionID: string; timestamp?: number; reasoningID: string; text: string }
   const active = activeAssistantParts(input, props.sessionID)
   if (!active) return
   input.setStore("part", active.assistant.id, produce((draft) => {
-    const target = draft.findLast((part) => part.type === "reasoning")
+    const target = draft.find((part) => part.type === "reasoning" && part.id === `${active.assistant.id}:reasoning:${props.reasoningID}`)
     if (target?.type !== "reasoning") return
     target.text = props.text
+    if (typeof props.timestamp === "number") target.time.end = props.timestamp
   }))
 }
 

@@ -698,7 +698,7 @@ export const layer: Layer.Layer<
           yield* sync.run(SessionEvent.Step.Failed.Sync, {
             sessionID: ctx.sessionID,
             error: {
-              type: "unknown",
+              type: aborted ? "aborted" : "unknown",
               message: errorMessage(e),
             },
             timestamp: DateTime.makeUnsafe(Date.now()),

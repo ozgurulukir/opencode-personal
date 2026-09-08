@@ -535,7 +535,7 @@ export function Session() {
           })
           return
         }
-        
+
         const confirmed = await DialogConfirm.show(
           dialog,
           "Compact Session",
@@ -555,7 +555,7 @@ export function Session() {
             modelID: selectedModel.modelID,
             providerID: selectedModel.providerID,
           })
-          
+
           if (result.error) {
             toast.show({
               variant: "error",
@@ -1378,11 +1378,14 @@ function AssistantMessage(props: { message: SessionMessageAssistant; sessionID: 
     return props.message.finish && !["tool-calls", "unknown"].includes(props.message.finish)
   })
 
-  // V2 errors are {type: "unknown", message} — the V1 model's stable
-  // "MessageAbortedError" name is gone. Match the DOMException abort wording
-  // case-insensitively ("This operation was aborted" / "The operation was
-  // aborted"); a false positive only restyles the footer as "interrupted".
-  const aborted = createMemo(() => props.message.error?.message.toLowerCase().includes("abort") ?? false)
+  // Prefer the explicit V2 error tag. The text fallback keeps sessions written
+  // before the tagged error was introduced rendering as interrupted.
+  const aborted = createMemo(() => {
+    const error = props.message.error
+    if (!error) return false
+    if (error.type === "aborted") return true
+    return error.type === "unknown" && error.message.toLowerCase().includes("abort")
+  })
 
   const duration = createMemo(() => {
     if (!final()) return 0

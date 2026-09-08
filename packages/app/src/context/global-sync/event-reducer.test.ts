@@ -1,5 +1,14 @@
 import { describe, expect, test } from "bun:test"
-import type { Message, Part, PermissionRequest, Project, QuestionRequest, Session, SnapshotFileDiff, Todo } from "@opencode-ai/sdk/v2/client"
+import type {
+  Message,
+  Part,
+  PermissionRequest,
+  Project,
+  QuestionRequest,
+  Session,
+  SnapshotFileDiff,
+  Todo,
+} from "@opencode-ai/sdk/v2/client"
 import { createStore } from "solid-js/store"
 import type { State } from "./types"
 import { applyDirectoryEvent, applyGlobalEvent, cleanupDroppedSessionCaches } from "./event-reducer"
@@ -84,13 +93,13 @@ const baseState = (input: Partial<State> = {}) =>
     ...input,
   }) as State
 
-const promptedEvent = (id: string, sessionID: string, text: string) => ({
+const promptedEvent = (id: string, sessionID: string, text: string, subtask?: Record<string, unknown>) => ({
   id,
   type: "session.next.prompted",
   properties: {
     sessionID,
     timestamp: 1,
-    prompt: { text },
+    prompt: { text, ...(subtask ? { subtask } : {}) },
     agent: "assistant",
     model: { id: "gpt", providerID: "openai" },
   },
@@ -383,6 +392,26 @@ describe("applyDirectoryEvent", () => {
     expect(store.message[sessionID]?.map((x) => x.id)).toEqual(["evt_2"])
   })
 
+  test("prompted preserves the subtask attachment", () => {
+    const sessionID = "ses_1"
+    const [store, setStore] = createStore(baseState())
+
+    applyDirectoryEvent({
+      event: promptedEvent("evt_2", sessionID, "delegate", {
+        agent: "explore",
+        description: "inspect",
+        prompt: "read",
+      }),
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+
+    expect(store.part["evt_2"]?.[1]).toMatchObject({ type: "subtask", agent: "explore", prompt: "read" })
+  })
+
   test("prompted inserts in sorted position between existing messages", () => {
     const sessionID = "ses_1"
     const [store, setStore] = createStore(
@@ -432,7 +461,11 @@ describe("applyDirectoryEvent", () => {
       loadLsp() {},
     })
     applyDirectoryEvent({
-      event: { id: "evt_3", type: "session.next.synthetic", properties: { sessionID, timestamp: 3, text: "subagent result" } },
+      event: {
+        id: "evt_3",
+        type: "session.next.synthetic",
+        properties: { sessionID, timestamp: 3, text: "subagent result" },
+      },
       store,
       setStore,
       push() {},
@@ -473,7 +506,11 @@ describe("applyDirectoryEvent", () => {
     })
 
     expect(store.message[sessionID]?.map((x) => x.id)).toEqual(["evt_1", "evt_2", "evt_2:assistant"])
-    expect(store.part["evt_2"]?.[0]).toMatchObject({ type: "text", text: "The following tool was executed by the user", synthetic: true })
+    expect(store.part["evt_2"]?.[0]).toMatchObject({
+      type: "text",
+      text: "The following tool was executed by the user",
+      synthetic: true,
+    })
     const tool = store.part["evt_2:assistant"]?.[0]
     expect(tool).toMatchObject({
       type: "tool",
@@ -604,6 +641,28 @@ describe("applyDirectoryEvent", () => {
     })
   })
 
+  test("step failed preserves the explicit V2 abort error", () => {
+    const sessionID = "ses_1"
+    const [store, setStore] = createStore(baseState())
+    const apply = (event: { type: string; id?: string; properties: Record<string, unknown> }) =>
+      applyDirectoryEvent({ event, store, setStore, push() {}, directory: "/tmp", loadLsp() {} })
+
+    apply(promptedEvent("evt_1", sessionID, "hello"))
+    apply({
+      id: "evt_2",
+      type: "session.next.step.started",
+      properties: { sessionID, timestamp: 2, agent: "assistant", model: { id: "gpt", providerID: "openai" } },
+    })
+    apply({
+      type: "session.next.step.failed",
+      properties: { sessionID, timestamp: 3, error: { type: "aborted", message: "Aborted" } },
+    })
+
+    expect(store.message[sessionID]?.find((item) => item.id === "evt_2")).toMatchObject({
+      error: { name: "MessageAbortedError", data: { message: "Aborted" } },
+    })
+  })
+
   test("text events stream into the active assistant's text part", () => {
     const sessionID = "ses_1"
     const [store, setStore] = createStore(baseState())
@@ -617,7 +676,11 @@ describe("applyDirectoryEvent", () => {
       loadLsp() {},
     })
     applyDirectoryEvent({
-      event: { id: "evt_2", type: "session.next.step.started", properties: { sessionID, timestamp: 2, agent: "assistant", model: { id: "gpt", providerID: "openai" } } },
+      event: {
+        id: "evt_2",
+        type: "session.next.step.started",
+        properties: { sessionID, timestamp: 2, agent: "assistant", model: { id: "gpt", providerID: "openai" } },
+      },
       store,
       setStore,
       push() {},
@@ -675,7 +738,11 @@ describe("applyDirectoryEvent", () => {
       loadLsp() {},
     })
     applyDirectoryEvent({
-      event: { id: "evt_2", type: "session.next.step.started", properties: { sessionID, timestamp: 2, agent: "assistant", model: { id: "gpt", providerID: "openai" } } },
+      event: {
+        id: "evt_2",
+        type: "session.next.step.started",
+        properties: { sessionID, timestamp: 2, agent: "assistant", model: { id: "gpt", providerID: "openai" } },
+      },
       store,
       setStore,
       push() {},
@@ -683,7 +750,10 @@ describe("applyDirectoryEvent", () => {
       loadLsp() {},
     })
     applyDirectoryEvent({
-      event: { type: "session.next.tool.input.started", properties: { sessionID, timestamp: 2, callID: "call_1", name: "bash" } },
+      event: {
+        type: "session.next.tool.input.started",
+        properties: { sessionID, timestamp: 2, callID: "call_1", name: "bash" },
+      },
       store,
       setStore,
       push() {},
@@ -691,7 +761,10 @@ describe("applyDirectoryEvent", () => {
       loadLsp() {},
     })
     applyDirectoryEvent({
-      event: { type: "session.next.tool.input.delta", properties: { sessionID, callID: "call_1", delta: '{"command"' } },
+      event: {
+        type: "session.next.tool.input.delta",
+        properties: { sessionID, callID: "call_1", delta: '{"command"' },
+      },
       store,
       setStore,
       push() {},
@@ -700,10 +773,18 @@ describe("applyDirectoryEvent", () => {
     })
 
     let tool = store.part["evt_2"]?.[0]
-    expect(tool).toMatchObject({ type: "tool", tool: "bash", callID: "call_1", state: { status: "pending", raw: '{"command"' } })
+    expect(tool).toMatchObject({
+      type: "tool",
+      tool: "bash",
+      callID: "call_1",
+      state: { status: "pending", raw: '{"command"' },
+    })
 
     applyDirectoryEvent({
-      event: { type: "session.next.tool.called", properties: { sessionID, timestamp: 3, callID: "call_1", input: { command: "ls" } } },
+      event: {
+        type: "session.next.tool.called",
+        properties: { sessionID, timestamp: 3, callID: "call_1", input: { command: "ls" } },
+      },
       store,
       setStore,
       push() {},
@@ -711,7 +792,10 @@ describe("applyDirectoryEvent", () => {
       loadLsp() {},
     })
     applyDirectoryEvent({
-      event: { type: "session.next.tool.progress", properties: { sessionID, callID: "call_1", structured: { partial: true }, content: [] } },
+      event: {
+        type: "session.next.tool.progress",
+        properties: { sessionID, callID: "call_1", structured: { partial: true }, content: [] },
+      },
       store,
       setStore,
       push() {},
@@ -727,7 +811,16 @@ describe("applyDirectoryEvent", () => {
     applyDirectoryEvent({
       event: {
         type: "session.next.tool.success",
-        properties: { sessionID, timestamp: 4, callID: "call_1", structured: { done: true }, content: [{ type: "text", text: "out" }] },
+        properties: {
+          sessionID,
+          timestamp: 4,
+          callID: "call_1",
+          structured: { done: true },
+          content: [
+            { type: "text", text: "out" },
+            { type: "file", uri: "file:///tmp/output.png", mime: "image/png", name: "output.png" },
+          ],
+        },
       },
       store,
       setStore,
@@ -738,7 +831,13 @@ describe("applyDirectoryEvent", () => {
 
     tool = store.part["evt_2"]?.[0]
     expect(tool).toMatchObject({
-      state: { status: "completed", output: "out", metadata: { done: true }, time: { start: 3, end: 4 } },
+      state: {
+        status: "completed",
+        output: "out",
+        metadata: { done: true },
+        time: { start: 3, end: 4 },
+        attachments: [{ filename: "output.png", url: "file:///tmp/output.png" }],
+      },
     })
   })
 
@@ -755,7 +854,11 @@ describe("applyDirectoryEvent", () => {
       loadLsp() {},
     })
     applyDirectoryEvent({
-      event: { id: "evt_2", type: "session.next.step.started", properties: { sessionID, timestamp: 2, agent: "assistant", model: { id: "gpt", providerID: "openai" } } },
+      event: {
+        id: "evt_2",
+        type: "session.next.step.started",
+        properties: { sessionID, timestamp: 2, agent: "assistant", model: { id: "gpt", providerID: "openai" } },
+      },
       store,
       setStore,
       push() {},
@@ -763,7 +866,10 @@ describe("applyDirectoryEvent", () => {
       loadLsp() {},
     })
     applyDirectoryEvent({
-      event: { type: "session.next.tool.input.started", properties: { sessionID, timestamp: 2, callID: "call_1", name: "bash" } },
+      event: {
+        type: "session.next.tool.input.started",
+        properties: { sessionID, timestamp: 2, callID: "call_1", name: "bash" },
+      },
       store,
       setStore,
       push() {},
@@ -771,7 +877,10 @@ describe("applyDirectoryEvent", () => {
       loadLsp() {},
     })
     applyDirectoryEvent({
-      event: { type: "session.next.tool.called", properties: { sessionID, timestamp: 3, callID: "call_1", input: { command: "ls" } } },
+      event: {
+        type: "session.next.tool.called",
+        properties: { sessionID, timestamp: 3, callID: "call_1", input: { command: "ls" } },
+      },
       store,
       setStore,
       push() {},
@@ -808,7 +917,11 @@ describe("applyDirectoryEvent", () => {
       loadLsp() {},
     })
     applyDirectoryEvent({
-      event: { id: "evt_2", type: "session.next.step.started", properties: { sessionID, timestamp: 2, agent: "assistant", model: { id: "gpt", providerID: "openai" } } },
+      event: {
+        id: "evt_2",
+        type: "session.next.step.started",
+        properties: { sessionID, timestamp: 2, agent: "assistant", model: { id: "gpt", providerID: "openai" } },
+      },
       store,
       setStore,
       push() {},
@@ -832,7 +945,10 @@ describe("applyDirectoryEvent", () => {
       loadLsp() {},
     })
     applyDirectoryEvent({
-      event: { type: "session.next.reasoning.ended", properties: { sessionID, reasoningID: "rsn_1", text: "thinking" } },
+      event: {
+        type: "session.next.reasoning.ended",
+        properties: { sessionID, reasoningID: "rsn_1", text: "thinking" },
+      },
       store,
       setStore,
       push() {},
@@ -841,6 +957,31 @@ describe("applyDirectoryEvent", () => {
     })
 
     expect(store.part["evt_2"]?.[0]).toMatchObject({ type: "reasoning", text: "thinking" })
+  })
+
+  test("updates interleaved reasoning parts by reasoning ID", () => {
+    const sessionID = "ses_1"
+    const [store, setStore] = createStore(baseState())
+    const apply = (event: { type: string; id?: string; properties: Record<string, unknown> }) =>
+      applyDirectoryEvent({ event, store, setStore, push() {}, directory: "/tmp", loadLsp() {} })
+
+    apply(promptedEvent("evt_1", sessionID, "hello"))
+    apply({
+      id: "evt_2",
+      type: "session.next.step.started",
+      properties: { sessionID, timestamp: 2, agent: "assistant", model: { id: "gpt", providerID: "openai" } },
+    })
+    apply({ type: "session.next.reasoning.started", properties: { sessionID, timestamp: 3, reasoningID: "rsn_a" } })
+    apply({ type: "session.next.reasoning.started", properties: { sessionID, timestamp: 4, reasoningID: "rsn_b" } })
+    apply({ type: "session.next.reasoning.delta", properties: { sessionID, reasoningID: "rsn_a", delta: "A" } })
+    apply({ type: "session.next.reasoning.delta", properties: { sessionID, reasoningID: "rsn_b", delta: "B" } })
+
+    expect(store.part["evt_2"]).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ type: "reasoning", id: "evt_2:reasoning:rsn_a", text: "A" }),
+        expect.objectContaining({ type: "reasoning", id: "evt_2:reasoning:rsn_b", text: "B" }),
+      ]),
+    )
   })
 
   test("compaction started builds a user wrapper with a compaction part", () => {
@@ -856,7 +997,11 @@ describe("applyDirectoryEvent", () => {
       loadLsp() {},
     })
     applyDirectoryEvent({
-      event: { id: "evt_2", type: "session.next.compaction.started", properties: { sessionID, timestamp: 2, reason: "auto" } },
+      event: {
+        id: "evt_2",
+        type: "session.next.compaction.started",
+        properties: { sessionID, timestamp: 2, reason: "auto" },
+      },
       store,
       setStore,
       push() {},
@@ -878,7 +1023,10 @@ describe("applyDirectoryEvent", () => {
     )
 
     applyDirectoryEvent({
-      event: { type: "session.next.permission.asked", properties: { timestamp: 1, sessionID, request: permissionRequest("perm_2", sessionID) } },
+      event: {
+        type: "session.next.permission.asked",
+        properties: { timestamp: 1, sessionID, request: permissionRequest("perm_2", sessionID) },
+      },
       store,
       setStore,
       push() {},
@@ -888,7 +1036,10 @@ describe("applyDirectoryEvent", () => {
     expect(store.permission[sessionID]?.map((x) => x.id)).toEqual(["perm_1", "perm_2", "perm_3"])
 
     applyDirectoryEvent({
-      event: { type: "session.next.permission.asked", properties: { timestamp: 1, sessionID, request: permissionRequest("perm_2", sessionID, "updated") } },
+      event: {
+        type: "session.next.permission.asked",
+        properties: { timestamp: 1, sessionID, request: permissionRequest("perm_2", sessionID, "updated") },
+      },
       store,
       setStore,
       push() {},
@@ -898,7 +1049,10 @@ describe("applyDirectoryEvent", () => {
     expect(store.permission[sessionID]?.find((x) => x.id === "perm_2")?.permission).toBe("updated")
 
     applyDirectoryEvent({
-      event: { type: "session.next.permission.replied", properties: { timestamp: 1, sessionID, requestID: "perm_2", reply: "once" } },
+      event: {
+        type: "session.next.permission.replied",
+        properties: { timestamp: 1, sessionID, requestID: "perm_2", reply: "once" },
+      },
       store,
       setStore,
       push() {},
@@ -964,7 +1118,13 @@ describe("applyDirectoryEvent", () => {
 
   test("reconciles session.diff by file key", () => {
     const sessionID = "ses_1"
-    const diffA = { file: "a.ts", status: "modified" as const, additions: 1, deletions: 0, patch: "p" } as SnapshotFileDiff
+    const diffA = {
+      file: "a.ts",
+      status: "modified" as const,
+      additions: 1,
+      deletions: 0,
+      patch: "p",
+    } as SnapshotFileDiff
     const diffB = { file: "b.ts", status: "added" as const, additions: 0, deletions: 1, patch: "p" } as SnapshotFileDiff
     const [store, setStore] = createStore(
       baseState({
@@ -994,7 +1154,10 @@ describe("applyDirectoryEvent", () => {
     )
 
     applyDirectoryEvent({
-      event: { type: "session.next.todo", properties: { sessionID, todos: [{ content: "new", status: "pending", priority: "medium" } as Todo] } },
+      event: {
+        type: "session.next.todo",
+        properties: { sessionID, todos: [{ content: "new", status: "pending", priority: "medium" } as Todo] },
+      },
       store,
       setStore,
       push() {},
@@ -1095,7 +1258,10 @@ describe("applyDirectoryEvent", () => {
     const [store, setStore] = createStore(baseState())
 
     applyDirectoryEvent({
-      event: { type: "session.next.permission.replied", properties: { timestamp: 1, sessionID: "ses_1", requestID: "perm_1", reply: "once" } },
+      event: {
+        type: "session.next.permission.replied",
+        properties: { timestamp: 1, sessionID: "ses_1", requestID: "perm_1", reply: "once" },
+      },
       store,
       setStore,
       push() {},
