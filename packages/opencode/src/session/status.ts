@@ -6,6 +6,9 @@ import { zod } from "@opencode-ai/core/effect-zod"
 import { NonNegativeInt, withStatics } from "@opencode-ai/core/schema"
 import { Effect, Layer, Context, Schema } from "effect"
 import z from "zod"
+import { SyncEvent } from "@/sync"
+import { SessionEvent } from "@/v2/session-event"
+import * as DateTime from "effect/DateTime"
 
 export const Info = Schema.Union([
   Schema.Struct({
@@ -64,6 +67,7 @@ export const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
     const bus = yield* Bus.Service
+    const sync = yield* SyncEvent.Service
 
     const state = yield* InstanceState.make(
       Effect.fn("SessionStatus.state")(() => Effect.succeed(new Map<SessionID, Info>())),
@@ -81,6 +85,12 @@ export const layer = Layer.effect(
     const set = Effect.fn("SessionStatus.set")(function* (sessionID: SessionID, status: Info) {
       const data = yield* InstanceState.get(state)
       yield* bus.publish(Event.Status, { sessionID, status })
+      // Native V2 emission (replaces the v2/event-bridge translation)
+      yield* sync.run(SessionEvent.StatusUpdated.Sync, {
+        sessionID,
+        timestamp: DateTime.makeUnsafe(Date.now()),
+        status,
+      })
       if (status.type === "idle") {
         yield* bus.publish(Event.Idle, { sessionID })
         data.delete(sessionID)
@@ -93,6 +103,6 @@ export const layer = Layer.effect(
   }),
 )
 
-export const defaultLayer = layer.pipe(Layer.provide(Bus.layer))
+export const defaultLayer = layer.pipe(Layer.provide(Bus.layer), Layer.provide(SyncEvent.defaultLayer))
 
 export * as SessionStatus from "./status"

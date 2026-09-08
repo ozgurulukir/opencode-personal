@@ -410,11 +410,37 @@ consumer-safe.
     cmd/run 287/287; tui 91 + known flake; TUI smoke: submit → staged →
     worker drained → loop ran → quota error + retry surfaced through the new
     path.
-- **5e-2 — native session-lifecycle events, delete the bridge**: the 5 source
-  services add native `sync.run(SessionEvent.*.Sync)` publishes alongside their
-  V1 bus publishes (V1 payload shapes untouched — plugins/V1-SSE/app keep
-  working); delete `v2/event-bridge.ts` + bootstrap wiring; TUI handlers
-  unchanged. Verify: session list updates, permission prompts, todos, diff.
+- **5e-2 — native session-lifecycle events, delete the bridge — DONE
+  (2026-09-08):**
+  - Sources now emit `session.next.*` natively via `sync.run(SessionEvent.*.Sync)`
+    alongside their V1 bus publishes (V1 payload shapes untouched — plugins/
+    V1-SSE/app keep working): `status.ts` set() → StatusUpdated; `todo.ts`
+    update() → TodoUpdated; `summary.ts` summarize() + `revert.ts` →
+    DiffUpdated; `permission/index.ts` ask()/reply()/timeout-reject/
+    reject-cancels-all/always-approve → Permission.Asked/Replied (local
+    `publishReplied` helper for the 4 reply sites; PermissionID Newtype →
+    plain string via double cast — the V2 def declares plain string);
+    `session.ts` patch() → Updated, remove() → Deleted (gated on instance
+    presence exactly like the V1 publish).
+  - **Layer ripple handled at the source**: the 4 modified services require
+    `SyncEvent.Service`, so their `defaultLayer`s self-provide
+    `SyncEvent.defaultLayer` (memoMap dedups to one instance per build) —
+    zero ripple for existing compositions. The 6 test files using RAW
+    `layer` got explicit `Layer.provide(SyncEvent.defaultLayer)` pipes.
+  - **`v2/event-bridge.ts` DELETED** (87 lines) + bootstrap wiring removed
+    (init list + defaultLayer provide). The 7 lifecycle projectors in
+    `projectors-next.ts` remain (no-ops — required by SyncEvent.run).
+  - **Test updates**: `bridges V1 session lifecycle events to the V2 event
+    stream` now exercises the REAL sources — the diff section triggers
+    `SessionSummary.summarize()` (seeding a user message row via
+    `Session.updateMessage` to pass the `hasMessages` guard) instead of a
+    direct V1 bus publish (which no longer reaches the V2 stream — correct
+    new behavior).
+  - Verification: typecheck clean; httpapi-session 12/12; v2+cmd/run+permission
+    green (only the documented pre-existing flakes: reject-cancels,
+    removeApproved, skills-sort, processor-abort — stash-verified); TUI smoke:
+    history render + prompt submit + status/retry transitions flow natively;
+    log clean.
 - **5e-3 — re-home the engine behind V2Session**: characterization tests for
   the loop first (Rule 3); extract the `session/prompt.ts` facade body into a
   shared engine factory consumable by both the V1 service (until 5f) and

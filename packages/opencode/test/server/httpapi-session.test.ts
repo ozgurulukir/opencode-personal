@@ -17,6 +17,7 @@ import { Server } from "../../src/server/server"
 import { SessionPaths } from "../../src/server/routes/instance/httpapi/groups/session"
 import { Session } from "@/session/session"
 import { SessionStatus } from "@/session/status"
+import { SessionSummary } from "@/session/summary"
 import { Todo } from "@/session/todo"
 import { Bus } from "@/bus"
 import { Permission } from "@/permission"
@@ -821,9 +822,23 @@ describe("session HttpApi", () => {
                     todos,
                   })
 
-                  // session.diff -> session.next.diff (published directly; the full
-                  // revert flow needs snapshot boundaries which this test skips)
-                  yield* bus.publish(Session.Event.Diff, { sessionID: session.id, diff: [] })
+                  // session.diff -> session.next.diff — the V2 emission lives in
+                  // the summary service (the former event-bridge translation is
+                  // gone). Seed a message row so summarize() passes its
+                  // hasMessages guard and publishes an empty diff.
+                  yield* Session.Service.use((svc) =>
+                    svc.updateMessage({
+                      id: MessageID.ascending(),
+                      sessionID: session.id,
+                      role: "user",
+                      agent: "build",
+                      model: { providerID: ProviderID.make("test"), modelID: ModelID.make("test-model") },
+                      time: { created: Date.now() },
+                    }),
+                  )
+                  yield* SessionSummary.Service.use((svc) =>
+                    svc.summarize({ sessionID: session.id, messageID: MessageID.ascending() }),
+                  )
                   yield* waitForEvent(events, "session.next.diff")
                   expect(events.find((e) => e.type === "session.next.diff")?.properties).toMatchObject({
                     sessionID: session.id,

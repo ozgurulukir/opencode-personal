@@ -1,5 +1,7 @@
-import { Effect, Layer, Context, Schema } from "effect"
+import { Effect, Layer, Context, Schema, DateTime } from "effect"
 import { Bus } from "@/bus"
+import { SyncEvent } from "@/sync"
+import { SessionEvent } from "@/v2/session-event"
 import { Snapshot } from "@/snapshot"
 import { Storage } from "@/storage/storage"
 import { zod } from "@opencode-ai/core/effect-zod"
@@ -79,6 +81,7 @@ export const layer = Layer.effect(
     const snapshot = yield* Snapshot.Service
     const storage = yield* Storage.Service
     const bus = yield* Bus.Service
+    const sync = yield* SyncEvent.Service
 
     const computeDiff = Effect.fn("SessionSummary.computeDiff")(function* (input: { messages: MessageV2.WithParts[] }) {
       let from: string | undefined
@@ -118,6 +121,12 @@ export const layer = Layer.effect(
       })
       yield* storage.write(["session_diff", input.sessionID], diffs).pipe(Effect.ignore)
       yield* bus.publish(Session.Event.Diff, { sessionID: input.sessionID, diff: diffs })
+      // Native V2 emission (replaces the v2/event-bridge translation)
+      yield* sync.run(SessionEvent.DiffUpdated.Sync, {
+        sessionID: input.sessionID,
+        timestamp: DateTime.makeUnsafe(Date.now()),
+        diff: diffs,
+      })
 
       const messages = MessageV2.messagesForSummary(input)
       const target = messages.find((m) => m.info.id === input.messageID)
@@ -152,6 +161,7 @@ export const defaultLayer = Layer.suspend(() =>
     Layer.provide(Snapshot.defaultLayer),
     Layer.provide(Storage.defaultLayer),
     Layer.provide(Bus.layer),
+    Layer.provide(SyncEvent.defaultLayer),
   ),
 )
 

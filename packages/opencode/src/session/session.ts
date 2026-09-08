@@ -17,6 +17,8 @@ import { inArray } from "drizzle-orm"
 import { lt } from "drizzle-orm"
 import { or } from "drizzle-orm"
 import { SyncEvent } from "../sync"
+import { SessionEvent } from "@/v2/session-event"
+import * as DateTime from "effect/DateTime"
 import type { SQL } from "drizzle-orm"
 import { PartTable, SessionTable } from "./session.sql"
 import { ProjectTable } from "../project/project.sql"
@@ -502,6 +504,15 @@ export const layer: Layer.Layer<Service, never, Bus.Service | Storage.Service | 
       )
 
       yield* sync.run(Event.Deleted, { sessionID, info: session }, { publish: hasInstance })
+      // Native V2 emission (replaces the v2/event-bridge translation); gated
+      // on instance presence exactly like the V1 publish above.
+      if (hasInstance) {
+        yield* sync.run(SessionEvent.Deleted.Sync, {
+          sessionID,
+          timestamp: DateTime.makeUnsafe(Date.now()),
+          info: session,
+        })
+      }
       yield* sync.remove(sessionID)
     })
 
@@ -628,7 +639,16 @@ export const layer: Layer.Layer<Service, never, Bus.Service | Storage.Service | 
       return session
     })
 
-    const patch = (sessionID: SessionID, info: Patch) => sync.run(Event.Updated, { sessionID, info })
+    const patch = (sessionID: SessionID, info: Patch) =>
+      Effect.gen(function* () {
+        yield* sync.run(Event.Updated, { sessionID, info })
+        // Native V2 emission (replaces the v2/event-bridge translation)
+        yield* sync.run(SessionEvent.Updated.Sync, {
+          sessionID,
+          timestamp: DateTime.makeUnsafe(Date.now()),
+          info,
+        })
+      })
 
     const touch = Effect.fn("Session.touch")(function* (sessionID: SessionID) {
       yield* patch(sessionID, { time: { updated: Date.now() } })

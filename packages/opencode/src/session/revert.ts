@@ -1,8 +1,9 @@
-import { Effect, Layer, Context, Schema } from "effect"
+import { Effect, Layer, Context, Schema, DateTime } from "effect"
 import { Bus } from "../bus"
 import { Snapshot } from "../snapshot"
 import { Storage } from "@/storage/storage"
 import { SyncEvent } from "../sync"
+import { SessionEvent } from "@/v2/session-event"
 import * as Log from "@opencode-ai/core/util/log"
 import { zod } from "@opencode-ai/core/effect-zod"
 import { withStatics } from "@opencode-ai/core/schema"
@@ -80,6 +81,12 @@ export const layer = Layer.effect(
       const diffs = yield* summary.computeDiff({ messages: range })
       yield* storage.write(["session_diff", input.sessionID], diffs).pipe(Effect.ignore)
       yield* bus.publish(Session.Event.Diff, { sessionID: input.sessionID, diff: diffs })
+      // Native V2 emission (replaces the v2/event-bridge translation)
+      yield* sync.run(SessionEvent.DiffUpdated.Sync, {
+        sessionID: input.sessionID,
+        timestamp: DateTime.makeUnsafe(Date.now()),
+        diff: diffs,
+      })
       yield* sessions.setRevert({
         sessionID: input.sessionID,
         revert: rev,
