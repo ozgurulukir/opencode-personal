@@ -8,6 +8,9 @@ import z from "zod"
 import { Database } from "@/storage/db"
 import { eq } from "drizzle-orm"
 import { asc } from "drizzle-orm"
+import { SyncEvent } from "@/sync"
+import { SessionEvent } from "@/v2/session-event"
+import * as DateTime from "effect/DateTime"
 import { TodoTable } from "./session.sql"
 import { applyAutoclose } from "./todo-autoclose"
 
@@ -79,6 +82,7 @@ export const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
     const bus = yield* Bus.Service
+    const sync = yield* SyncEvent.Service
 
     const update = Effect.fn("Todo.update")(function* (input: { sessionID: SessionID; todos: Info[] }) {
       yield* Effect.sync(() =>
@@ -99,6 +103,12 @@ export const layer = Layer.effect(
         }),
       )
       yield* bus.publish(Event.Updated, input)
+      // Native V2 emission (replaces the v2/event-bridge translation)
+      yield* sync.run(SessionEvent.TodoUpdated.Sync, {
+        sessionID: input.sessionID,
+        timestamp: DateTime.makeUnsafe(Date.now()),
+        todos: input.todos,
+      })
     })
 
     const get = Effect.fn("Todo.get")(function* (sessionID: SessionID) {
@@ -125,6 +135,6 @@ export const layer = Layer.effect(
   }),
 )
 
-export const defaultLayer = layer.pipe(Layer.provide(Bus.layer))
+export const defaultLayer = layer.pipe(Layer.provide(Bus.layer), Layer.provide(SyncEvent.defaultLayer))
 
 export * as Todo from "./todo"

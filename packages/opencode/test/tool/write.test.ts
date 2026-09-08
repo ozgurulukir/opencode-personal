@@ -6,6 +6,7 @@ import { WriteTool } from "../../src/tool/write"
 import { Instance } from "../../src/project/instance"
 import { LSP } from "@/lsp/lsp"
 import { AppFileSystem } from "@opencode-ai/core/filesystem"
+import { SyncEvent } from "@/sync"
 import { Bus } from "../../src/bus"
 import { Format } from "../../src/format"
 import { Truncate } from "@/tool/truncate"
@@ -43,7 +44,7 @@ const it = testEffect(
     CrossSpawnSpawner.defaultLayer,
     Truncate.defaultLayer,
     Agent.defaultLayer,
-    Layer.provideMerge(Todo.layer, Bus.layer),
+    Layer.provideMerge(Todo.layer, Bus.layer).pipe(Layer.provide(SyncEvent.defaultLayer)),
   ),
 )
 

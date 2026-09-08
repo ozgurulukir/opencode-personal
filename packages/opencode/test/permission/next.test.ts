@@ -4,6 +4,7 @@ import { Cause, Effect, Exit, Fiber, Layer } from "effect"
 import { Bus } from "../../src/bus"
 import { CrossSpawnSpawner } from "@opencode-ai/core/cross-spawn-spawner"
 import { Permission } from "../../src/permission"
+import { SyncEvent } from "@/sync"
 import { PermissionID } from "../../src/permission/schema"
 import { Instance } from "../../src/project/instance"
 import { WithInstance } from "../../src/project/with-instance"
@@ -19,7 +20,11 @@ import { testEffect } from "../lib/effect"
 import { MessageID, SessionID } from "../../src/session/schema"
 
 const bus = Bus.layer
-const env = Layer.mergeAll(Permission.layer.pipe(Layer.provide(bus)), bus, CrossSpawnSpawner.defaultLayer)
+const env = Layer.mergeAll(
+  Permission.layer.pipe(Layer.provide(bus), Layer.provide(SyncEvent.defaultLayer)),
+  bus,
+  CrossSpawnSpawner.defaultLayer,
+)
 const it = testEffect(env)
 
 afterEach(async () => {

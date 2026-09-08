@@ -11,7 +11,9 @@ import { zod } from "@opencode-ai/core/effect-zod"
 import * as Log from "@opencode-ai/core/util/log"
 import { withStatics } from "@opencode-ai/core/schema"
 import { Wildcard } from "@/util/wildcard"
-import { Deferred, Duration, Effect, Layer, Schema, Context } from "effect"
+import { Deferred, Duration, Effect, Layer, Schema, Context, DateTime } from "effect"
+import { SyncEvent } from "@/sync"
+import { SessionEvent } from "@/v2/session-event"
 import os from "os"
 import { evaluate as evalRule, evaluateWithSource as evalWithSource } from "./evaluate"
 import { PermissionID } from "./schema"
@@ -205,6 +207,17 @@ export const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
     const bus = yield* Bus.Service
+    const sync = yield* SyncEvent.Service
+    // Native V2 emission (replaces the v2/event-bridge translation)
+    const publishReplied = (sessionID: SessionID, requestID: PermissionID, reply: Reply) =>
+      sync.run(SessionEvent.Permission.Replied.Sync, {
+        sessionID,
+        timestamp: DateTime.makeUnsafe(Date.now()),
+        // The V2 def declares a plain string; PermissionID is a Newtype over
+        // string (make() casts string→Self, so the reverse needs the double cast)
+        requestID: requestID as unknown as string,
+        reply,
+      })
     const state = yield* InstanceState.make<State>(
       Effect.fn("Permission.state")(function* (ctx) {
         const row = Database.use((db) =>
@@ -270,6 +283,11 @@ export const layer = Layer.effect(
       const deferred = yield* Deferred.make<void, RejectedError | CorrectedError | TimedOutError>()
       pending.set(id, { info, deferred })
       yield* bus.publish(Event.Asked, info)
+      yield* sync.run(SessionEvent.Permission.Asked.Sync, {
+        sessionID: info.sessionID,
+        timestamp: DateTime.makeUnsafe(Date.now()),
+        request: info,
+      })
       return yield* Effect.ensuring(
         // raceFirst returns whichever branch completes FIRST (success or failure), so the
         // failing timeout branch wins over a still-pending Deferred.await. Effect.race would
@@ -280,6 +298,7 @@ export const layer = Layer.effect(
             yield* Effect.sleep(Duration.millis(timeout))
             // Broadcast a synthetic "reject" so the TUI/run/web stores remove the stale prompt.
             yield* bus.publish(Event.Replied, { sessionID: info.sessionID, requestID: id, reply: "reject" })
+            yield* publishReplied(info.sessionID, id, "reject")
             return yield* Effect.fail(new TimedOutError({ timeoutMs: timeout }))
           }),
         ),
@@ -300,6 +319,7 @@ export const layer = Layer.effect(
         requestID: existing.info.id,
         reply: input.reply,
       })
+      yield* publishReplied(existing.info.sessionID, existing.info.id, input.reply)
 
       if (input.reply === "reject") {
         yield* Deferred.fail(
@@ -315,6 +335,7 @@ export const layer = Layer.effect(
             requestID: item.info.id,
             reply: "reject",
           })
+          yield* publishReplied(item.info.sessionID, item.info.id, "reject")
           yield* Deferred.fail(item.deferred, new RejectedError())
         }
         return
@@ -353,6 +374,7 @@ export const layer = Layer.effect(
           requestID: item.info.id,
           reply: "always",
         })
+        yield* publishReplied(item.info.sessionID, item.info.id, "always")
         yield* Deferred.succeed(item.deferred, undefined)
       }
     })
@@ -469,6 +491,6 @@ export function disabled(tools: string[], ruleset: Ruleset): Set<string> {
   return result
 }
 
-export const defaultLayer = layer.pipe(Layer.provide(Bus.layer))
+export const defaultLayer = layer.pipe(Layer.provide(Bus.layer), Layer.provide(SyncEvent.defaultLayer))
 
 export * as Permission from "."
