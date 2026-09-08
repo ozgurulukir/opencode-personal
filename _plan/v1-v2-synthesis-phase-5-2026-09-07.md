@@ -1,7 +1,7 @@
 # V1/V2 Synthesis — Phase 5: message model adoption, engine re-homing, V1 deletion
 
 Date: 2026-09-07
-Status: IN PROGRESS — 5a/5b/5d done, 5c batches 1-3 done, 5c batch 4 pending (session/index.tsx — last TUI V1 consumer), app pipeline batch pending, 5e/5f pending
+Status: IN PROGRESS — 5a/5b/5d done, 5c batches 1-4 done (batch 4 = session/index.tsx, last TUI V1 consumer), app pipeline batch pending, 5e/5f pending
 Depends on: Phase 4 (complete — commit `9d9fe54bc`, build verified)
 
 ## Goal
@@ -161,17 +161,16 @@ live behind `V2Session` emitting `SessionEvent.*` natively.
   newest-first slice; model reshape `{id}`→`{modelID}` for `local.model.set`).
 
 **Remaining for 5c (next batches):**
-- `routes/session/index.tsx` — the big one: UserMessage/AssistantMessage rebuild
-  on V2 shapes, tool-renderer adapter (V2 `AssistantTool` → V1 `ToolPart`:
-  `structured`→`metadata`, `content[].text` join→`output`, `time.pruned`→
-  `time.compacted`), transcript formatter (`formatTranscript` takes V1
-  `{info, parts}` pairs), scroll navigation, Task subagent view, revert prompt
-  restore (→ `fromUserMessage`).
+- ~~`routes/session/index.tsx`~~ — DONE in batch 4 (see below).
 - `plugin/api.tsx` — DONE in batch 3 (V2 shapes; `part()` removed — breaking).
 - `context/sync.tsx` `status()` — DONE in batch 2.
-- Run reducers (`session.shared.ts`, `stream.transport.ts`) + app
+- Run reducers (`stream.transport.ts`) + app
   (`context/sync.tsx:301`, `pages/layout.tsx:745` prefetch).
 - Delete V1 `message.*` handlers + `message`/`part` slices + V1 load (last).
+  NOTE: after batch 4, NOTHING in the TUI reads the V1 `message`/`part`
+  slices anymore — the only remaining V1 client call is the
+  `sync.tsx:796` load itself. 5c final can delete the load + handlers + slices
+  in one sweep.
 
 **Verification (batch 1):** typecheck clean in `opencode` + `app` (tsbuildinfo
 cleared after SDK regen); tui+run+v2+bridge suites 381/381.
@@ -231,6 +230,62 @@ broken on this branch independent of this work.
 **Verification (batch 2):** typecheck clean in `opencode` + `app`;
 session.shared+variant.shared 11/11; `test/cli/cmd/run/` 287/287; tui 49/49;
 v2 33/33.
+
+**Shipped in batch 4 (2026-09-08) — `routes/session/index.tsx`, the last TUI V1
+slice consumer:**
+
+- **`util/transcript.ts` rewritten to V2** (small, self-contained — migrated
+  directly instead of adapting): `formatTranscript(session, messages:
+  SessionMessage[], options)`; `formatMessage(msg, options, providers?)`;
+  `formatUserContent` (text + file/agent attachment lines);
+  `formatAssistantHeader` (now exported for tests; `model.providerID`/`model.id`);
+  `formatAssistantContent` (content items; tool output = text content items
+  joined; tool error = `state.error.message`). `MessageWithParts` type deleted.
+- **`messages` memo** — `(sync.data.messages[route.sessionID] ??
+  []).toReversed()` (oldest-first) so all `findLast`/scan/id-comparison logic
+  keeps V1 semantics; rendering order unchanged. The V2 slice also holds
+  shell/synthetic/compaction/agent-switched records the V1 slice never had —
+  the rendering loop skips them; compaction renders as a " Compaction " divider
+  `<Match>` in the loop (replaces the old UserMessage compaction-part check).
+- **`contentPartFromV2` adapter** — V2 content items → V1-shaped
+  `ToolPart`/`TextPart`/`ReasoningPart` so the ~15 tool renderers stay
+  untouched: `structured`→`metadata`, text content join→`output`,
+  `time.{created,completed,pruned}`→`state.time.{start,end,compacted}`,
+  pending string input→`{input: {}, raw}`, error→`state.error.message`,
+  `callID` = item id, text box id synthesized `${message.id}-text-${index}`
+  (V2 `AssistantText` has no id). Also removed the old `part={part as any}`
+  Dynamic cast (replaced by one documented cast on the component union —
+  SolidJS `Dynamic` cannot join component/prop unions).
+- **Component prop migration** — `UserMessage{message: SessionMessageUser}`
+  (text/files inline; file badge `file.name`); `AssistantMessage{message:
+  SessionMessageAssistant, sessionID, last}` (V2 messages carry no sessionID —
+  passed down; duration via newest-first slice position instead of `parentID`;
+  model via `model.{providerID,id}`); `ReasoningPart`/`TextPart`/`ToolPart`
+  take `message: SessionMessageAssistant` + `sessionID` (permission getter
+  reads `props.sessionID`).
+- **Abort detection heuristic** — V1 checked the stable
+  `error.name === "MessageAbortedError"`; V2 `UnknownError` is
+  `{type: "unknown", message}` with a DOMException-derived message. Now:
+  case-insensitive `"abort"` substring on `error.message` (documented; false
+  positive only restyles the footer as "interrupted").
+- **Command migrations** — revert prompt restore → `fromUserMessage()` (shared
+  helper); jump-to-last-user + scroll navigation read the V2 slice (newest-first
+  iteration); copy-last-assistant joins text content items; Task subagent view
+  reads `sync.data.messages` + inline content tools.
+- **Test port** — `test/cli/tui/transcript.test.ts` V1→V2 (18 tests, assertions
+  preserved; synthetic-text-skip test dropped — V2 content has no synthetic
+  flag; file-attachment test added for `formatUserContent`).
+- **Deviations (documented):** footer shows `agent` instead of `mode` (V2 has
+  no mode); Task view running-tool label degrades from `tool + title` to just
+  the tool name (V2 tool states carry no `title`); V2 completed-state
+  `attachments` (PromptFileAttachment) not mapped to V1 `FilePart` — no
+  renderer reads it.
+- **Verification (batch 4):** typecheck clean in `opencode` + `app`;
+  transcript 18/18; `test/cli/cmd/run/` 287/287; v2+httpapi-session 45/45;
+  `test/cli/tui/` 91 pass + the 1 pre-existing flake (stash-verified
+  identical baseline); TUI smoke: mounts, prompt submit + retry/status footer
+  live (LLM quota exhausted mid-smoke — assistant render covered by transcript
+  tests + typecheck).
 
 ### 5d — acp prompt/command (last 2 V1 prompt sites) — DONE (2026-09-07)
 
