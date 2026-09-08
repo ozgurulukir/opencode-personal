@@ -174,6 +174,16 @@ function createGlobalSync() {
 
   const paused = () => untrack(() => globalStore.reload) !== undefined
 
+  // Wired by the Sync context (which owns the optimistic message ledger) so
+  // the event reducer can evict optimistic entries when the real projected
+  // user message arrives. Registered once at SyncProvider init. The resolver
+  // matches by prompt text (V2 message ids are event ids, not client ids).
+  type OptimisticResolver = (directory: string, sessionID: string, text: string) => void
+  let optimisticResolver: OptimisticResolver | undefined
+  const setOptimisticResolver = (fn: OptimisticResolver) => {
+    optimisticResolver = fn
+  }
+
   const queue = createRefreshQueue({
     paused,
     key: directoryKey,
@@ -371,6 +381,7 @@ function createGlobalSync() {
       loadLsp: () => {
         void queryClient.fetchQuery(loadLspQuery(key, sdkFor(directory)))
       },
+      resolveOptimistic: (sessionID, text) => optimisticResolver?.(directory, sessionID, text),
     })
   })
 
@@ -433,6 +444,7 @@ function createGlobalSync() {
     todo: {
       set: setSessionTodo,
     },
+    setOptimisticResolver,
   }
 }
 

@@ -37,9 +37,17 @@ import { AppRuntime } from "@/effect/app-runtime"
 import { MessageV2 } from "@/session/message-v2"
 import { ConfigMCP } from "@/config/mcp"
 import { LoadAPIKeyError } from "ai"
-import type { Event, OpencodeClient, SessionMessageAssistant, SessionMessageResponse, ToolPart } from "@opencode-ai/sdk/v2"
+import type { Event, OpencodeClient, SessionMessage, SessionMessageAssistant, SessionMessageUser } from "@opencode-ai/sdk/v2"
 import { InstallationVersion } from "@opencode-ai/core/installation/version"
-import { handleToolPartUpdate, toToolKind, toLocations } from "./tool-dispatch"
+import {
+  handleToolCalled,
+  handleToolFailed,
+  handleToolProgress,
+  handleToolSuccess,
+  toToolKind,
+  toLocations,
+  type ToolCallInfo,
+} from "./tool-dispatch"
 import { getContextLimit, sendUsageUpdate, defaultModel, lastUsedModel } from "./model-resolution"
 import { processMessage, parseUri, getNewContent } from "./message-replay"
 import {
@@ -76,8 +84,9 @@ export function rethrowAuthAware(e: unknown, defaultProviderID: string | undefin
 function unwrapSyncEvent(event: any): any {
   if (event?.type !== "sync" || !event.syncEvent) return event
   const syncEvent = event.syncEvent
-  // Strip version suffix: "message.part.updated.1" → "message.part.updated"
-  const type = syncEvent.type.replace(/\.\d+$/, "")
+  // Strip version suffix: "message.part.updated.1" (dot form) or
+  // "session.next.text.delta/1" (slash form, what SyncEvent.versionedType emits)
+  const type = syncEvent.type.replace(/[./]\d+$/, "")
   const data = syncEvent.data ?? {}
   return {
     id: syncEvent.id ?? event.id,
@@ -103,6 +112,7 @@ export class Agent implements ACPAgent {
   private eventStarted = false
   private shellSnapshots = new Map<string, string>()
   private toolStarts = new Set<string>()
+  private toolCalls = new Map<string, ToolCallInfo>()
   private permissionQueues = new Map<string, Promise<void>>()
   private permissionOptions: PermissionOption[] = [
     { optionId: "once", kind: "allow_once", name: "Allow once" },
@@ -147,178 +157,179 @@ export class Agent implements ACPAgent {
   private async handleEvent(rawEvent: Event) {
     const event = unwrapSyncEvent(rawEvent) as Event
     switch (event.type) {
-      case "permission.asked": {
-        const permission = event.properties
-        const session = await this.sessionManager.tryGetOrLoad(permission.sessionID)
-        if (!session) return
-
-        const prev = this.permissionQueues.get(permission.sessionID) ?? Promise.resolve()
-        const next = prev
-          .then(async () => {
-            const directory = session.cwd
-
-            const res = await this.connection
-              .requestPermission({
-                sessionId: permission.sessionID,
-                toolCall: {
-                  toolCallId: permission.tool?.callID ?? permission.id,
-                  status: "pending",
-                  title: permission.permission,
-                  rawInput: permission.metadata,
-                  kind: toToolKind(permission.permission),
-                  locations: toLocations(permission.permission, permission.metadata),
-                },
-                options: this.permissionOptions,
-              })
-              .catch(async (error) => {
-                log.error("failed to request permission from ACP", {
-                  error,
-                  permissionID: permission.id,
-                  sessionID: permission.sessionID,
-                })
-                await this.sdk.permission.reply({
-                  requestID: permission.id,
-                  reply: "reject",
-                  directory,
-                })
-                return undefined
-              })
-
-            if (!res) return
-            if (res.outcome.outcome !== "selected") {
-              await this.sdk.permission.reply({
-                requestID: permission.id,
-                reply: "reject",
-                directory,
-              })
-              return
-            }
-
-            if (res.outcome.optionId !== "reject" && permission.permission == "edit") {
-              const metadata = permission.metadata || {}
-              const filepath = typeof metadata["filepath"] === "string" ? metadata["filepath"] : ""
-              const diff = typeof metadata["diff"] === "string" ? metadata["diff"] : ""
-              const content = (await Filesystem.exists(filepath)) ? await Filesystem.readText(filepath) : ""
-              const newContent = getNewContent(content, diff)
-
-              if (newContent) {
-                void this.connection.writeTextFile({
-                  sessionId: session.id,
-                  path: filepath,
-                  content: newContent,
-                })
-              }
-            }
-
-            await this.sdk.permission.reply({
-              requestID: permission.id,
-              reply: res.outcome.optionId as "once" | "always" | "reject",
-              directory,
-            })
-          })
-          .catch((error) => {
-            log.error("failed to handle permission", { error, permissionID: permission.id })
-          })
-          .finally(() => {
-            if (this.permissionQueues.get(permission.sessionID) === next) {
-              this.permissionQueues.delete(permission.sessionID)
-            }
-          })
-        this.permissionQueues.set(permission.sessionID, next)
+      case "session.next.permission.asked": {
+        // The V2 event wraps the whole V1 permission request as `request`.
+        const permission = (event.properties as { request: any }).request
+        await this.handlePermissionAsked(permission)
         return
       }
 
-      case "message.part.updated": {
-        log.info("message part updated", { event: event.properties })
-        const props = event.properties
-        const part = props.part
-        const session = await this.sessionManager.tryGetOrLoad(part.sessionID)
-        if (!session) return
-        const sessionId = session.id
-
-        if (part.type === "tool") {
-          await handleToolPartUpdate(this.connection, this.shellSnapshots, this.toolStarts, sessionId, part)
-          return
-        }
-
-        // ACP clients already know the prompt they just submitted, so replaying
-        // live user parts duplicates the message. We still replay user history in
-        // loadSession() and forkSession() via processMessage().
-        if (part.type !== "text" && part.type !== "file") return
-
-        return
-      }
-
-      case "message.part.delta": {
-        const props = event.properties
+      case "session.next.text.delta": {
+        const props = event.properties as { sessionID: string; delta: string }
         const session = await this.sessionManager.tryGetOrLoad(props.sessionID)
         if (!session) return
-        const sessionId = session.id
-
-        const message = await this.sdk.session
-          .message(
-            {
-              sessionID: props.sessionID,
-              messageID: props.messageID,
-              directory: session.cwd,
+        // V2 delta events carry no messageID; the field is optional in the ACP
+        // schema and chunks arrive in order anyway.
+        await this.connection
+          .sessionUpdate({
+            sessionId: session.id,
+            update: {
+              sessionUpdate: "agent_message_chunk",
+              content: {
+                type: "text",
+                text: props.delta,
+              },
             },
-            { throwOnError: true },
-          )
-          .then((x) => x.data)
-          .catch((error) => {
-            log.error("unexpected error when fetching message", { error })
-            return undefined
           })
-
-        if (!message || message.info.role !== "assistant") return
-
-        const part = message.parts.find((p) => p.id === props.partID)
-        if (!part) return
-
-        if (part.type === "text" && props.field === "text" && part.ignored !== true) {
-          await this.connection
-            .sessionUpdate({
-              sessionId,
-              update: {
-                sessionUpdate: "agent_message_chunk",
-                messageId: props.messageID,
-                content: {
-                  type: "text",
-                  text: props.delta,
-                },
-              },
-            })
-            .catch((error) => {
-              log.error("failed to send text delta to ACP", { error })
-            })
-          return
-        }
-
-        if (part.type === "reasoning" && props.field === "text") {
-          await this.connection
-            .sessionUpdate({
-              sessionId,
-              update: {
-                sessionUpdate: "agent_thought_chunk",
-                messageId: props.messageID,
-                content: {
-                  type: "text",
-                  text: props.delta,
-                },
-              },
-            })
-            .catch((error) => {
-              log.error("failed to send reasoning delta to ACP", { error })
-            })
-        }
+          .catch((error) => {
+            log.error("failed to send text delta to ACP", { error })
+          })
         return
       }
 
-      case "message.part.removed": {
-        // No-op: part removal doesn't need to be forwarded to ACP clients
+      case "session.next.reasoning.delta": {
+        const props = event.properties as { sessionID: string; delta: string }
+        const session = await this.sessionManager.tryGetOrLoad(props.sessionID)
+        if (!session) return
+        await this.connection
+          .sessionUpdate({
+            sessionId: session.id,
+            update: {
+              sessionUpdate: "agent_thought_chunk",
+              content: {
+                type: "text",
+                text: props.delta,
+              },
+            },
+          })
+          .catch((error) => {
+            log.error("failed to send reasoning delta to ACP", { error })
+          })
+        return
+      }
+
+      case "session.next.tool.called": {
+        const props = event.properties as { sessionID: string; callID: string; tool: string; input: Record<string, unknown> }
+        const session = await this.sessionManager.tryGetOrLoad(props.sessionID)
+        if (!session) return
+        await handleToolCalled(this.connection, this.shellSnapshots, this.toolStarts, this.toolCalls, session.id, props)
+        return
+      }
+
+      case "session.next.tool.progress": {
+        const props = event.properties as { sessionID: string; callID: string; structured: Record<string, unknown> }
+        const session = await this.sessionManager.tryGetOrLoad(props.sessionID)
+        if (!session) return
+        await handleToolProgress(this.connection, this.shellSnapshots, this.toolCalls, session.id, props)
+        return
+      }
+
+      case "session.next.tool.success": {
+        const props = event.properties as {
+          sessionID: string
+          callID: string
+          structured: Record<string, unknown>
+          content: any[]
+        }
+        const session = await this.sessionManager.tryGetOrLoad(props.sessionID)
+        if (!session) return
+        await handleToolSuccess(this.connection, this.shellSnapshots, this.toolStarts, this.toolCalls, session.id, props)
+        return
+      }
+
+      case "session.next.tool.failed": {
+        const props = event.properties as { sessionID: string; callID: string; error: { message: string } }
+        const session = await this.sessionManager.tryGetOrLoad(props.sessionID)
+        if (!session) return
+        await handleToolFailed(this.connection, this.shellSnapshots, this.toolStarts, this.toolCalls, session.id, props)
         return
       }
     }
+  }
+
+  private async handlePermissionAsked(permission: {
+    id: string
+    sessionID: string
+    permission: string
+    metadata?: Record<string, unknown>
+    tool?: { callID?: string }
+  }) {
+    const session = await this.sessionManager.tryGetOrLoad(permission.sessionID)
+    if (!session) return
+
+    const prev = this.permissionQueues.get(permission.sessionID) ?? Promise.resolve()
+    const next = prev
+      .then(async () => {
+        const directory = session.cwd
+
+        const res = await this.connection
+          .requestPermission({
+            sessionId: permission.sessionID,
+            toolCall: {
+              toolCallId: permission.tool?.callID ?? permission.id,
+              status: "pending",
+              title: permission.permission,
+              rawInput: permission.metadata,
+              kind: toToolKind(permission.permission),
+              locations: toLocations(permission.permission, permission.metadata ?? {}),
+            },
+            options: this.permissionOptions,
+          })
+          .catch(async (error) => {
+            log.error("failed to request permission from ACP", {
+              error,
+              permissionID: permission.id,
+              sessionID: permission.sessionID,
+            })
+            await this.sdk.permission.reply({
+              requestID: permission.id,
+              reply: "reject",
+              directory,
+            })
+            return undefined
+          })
+
+        if (!res) return
+        if (res.outcome.outcome !== "selected") {
+          await this.sdk.permission.reply({
+            requestID: permission.id,
+            reply: "reject",
+            directory,
+          })
+          return
+        }
+
+        if (res.outcome.optionId !== "reject" && permission.permission == "edit") {
+          const metadata = permission.metadata || {}
+          const filepath = typeof metadata["filepath"] === "string" ? metadata["filepath"] : ""
+          const diff = typeof metadata["diff"] === "string" ? metadata["diff"] : ""
+          const content = (await Filesystem.exists(filepath)) ? await Filesystem.readText(filepath) : ""
+          const newContent = getNewContent(content, diff)
+
+          if (newContent) {
+            void this.connection.writeTextFile({
+              sessionId: session.id,
+              path: filepath,
+              content: newContent,
+            })
+          }
+        }
+
+        await this.sdk.permission.reply({
+          requestID: permission.id,
+          reply: res.outcome.optionId as "once" | "always" | "reject",
+          directory,
+        })
+      })
+      .catch((error) => {
+        log.error("failed to handle permission", { error, permissionID: permission.id })
+      })
+      .finally(() => {
+        if (this.permissionQueues.get(permission.sessionID) === next) {
+          this.permissionQueues.delete(permission.sessionID)
+        }
+      })
+    this.permissionQueues.set(permission.sessionID, next)
   }
 
   async initialize(params: InitializeRequest): Promise<InitializeResponse> {
@@ -424,7 +435,7 @@ export class Agent implements ACPAgent {
 
       for (const msg of messages ?? []) {
         log.debug("replay message", msg)
-        await processMessage(this.connection, this.shellSnapshots, this.toolStarts, msg)
+        await processMessage(this.connection, this.shellSnapshots, this.toolStarts, sessionId, msg)
       }
 
       await sendUsageUpdate(this.connection, this.sdk, sessionId, directory)
@@ -440,15 +451,16 @@ export class Agent implements ACPAgent {
       const cursor = params.cursor ? Number(params.cursor) : undefined
       const limit = 100
 
-      const sessions = await this.sdk.session
+      const sessions = await this.sdk.v2.session
         .list(
           {
             directory: params.cwd ?? undefined,
             roots: true,
+            limit: 100,
           },
           { throwOnError: true },
         )
-        .then((x) => x.data ?? [])
+        .then((x) => x.data?.items ?? [])
 
       const sorted = sessions.toSorted((a, b) => b.time.updated - a.time.updated)
       const filtered = cursor ? sorted.filter((s) => s.time.updated < cursor) : sorted
@@ -481,7 +493,7 @@ export class Agent implements ACPAgent {
     try {
       const model = await defaultModel(this.config, directory)
 
-      const forked = await this.sdk.session
+      const forked = await this.sdk.v2.session
         .fork(
           {
             sessionID: params.sessionId,
@@ -511,7 +523,7 @@ export class Agent implements ACPAgent {
 
       for (const msg of messages ?? []) {
         log.debug("replay message", msg)
-        await processMessage(this.connection, this.shellSnapshots, this.toolStarts, msg)
+        await processMessage(this.connection, this.shellSnapshots, this.toolStarts, sessionId, msg)
       }
 
       await sendUsageUpdate(this.connection, this.sdk, sessionId, directory)
@@ -554,7 +566,7 @@ export class Agent implements ACPAgent {
     const session = this.sessionManager.remove(params.sessionId)
     if (!session) return {}
 
-    await this.sdk.session
+    await this.sdk.v2.session
       .abort(
         {
           sessionID: params.sessionId,
@@ -1001,29 +1013,30 @@ export class Agent implements ACPAgent {
   }
 
   private async loadSessionMessages(directory: string, sessionId: string, limit?: number) {
-    return this.sdk.session
+    return this.sdk.v2.session
       .messages(
         {
           sessionID: sessionId,
           directory,
           limit,
+          order: "asc",
         },
         { throwOnError: true },
       )
-      .then((x) => x.data)
+      .then((x) => x.data?.items)
       .catch((error) => {
         log.error("unexpected error when fetching message", { error })
         return undefined
       })
   }
 
-  private restoreSessionStateFromMessages(sessionId: string, messages: SessionMessageResponse[] | undefined) {
-    const lastUser = messages?.findLast((message) => message.info.role === "user")?.info
-    if (lastUser?.role !== "user") return
+  private restoreSessionStateFromMessages(sessionId: string, messages: SessionMessage[] | undefined) {
+    const lastUser = messages?.findLast((message) => message.type === "user")
+    if (lastUser?.type !== "user") return
 
     this.sessionManager.setModel(sessionId, {
       providerID: ProviderID.make(lastUser.model.providerID),
-      modelID: ModelID.make(lastUser.model.modelID),
+      modelID: ModelID.make(lastUser.model.id),
     })
     this.sessionManager.setVariant(sessionId, lastUser.model.variant)
     if (lastUser.agent) {

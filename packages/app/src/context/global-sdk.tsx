@@ -52,19 +52,21 @@ export const { use: useGlobalSDK, provider: GlobalSDKProvider } = createSimpleCo
     let queue: Queued[] = []
     let buffer: Queued[] = []
     const coalesced = new Map<string, number>()
-    const staleDeltas = new Set<string>()
     let timer: ReturnType<typeof setTimeout> | undefined
     let last = 0
 
-    const deltaKey = (directory: string, messageID: string, partID: string) => `${directory}:${messageID}:${partID}`
-
+    // Coalesce only full-state, idempotent events whose reordering cannot
+    // corrupt incremental deltas: V2 text/reasoning/compaction deltas are
+    // appends applied in order and are never dropped, and no coalescable
+    // event shares a target with them.
     const key = (directory: string, payload: Event) => {
-      if (payload.type === "session.status") return `session.status:${directory}:${payload.properties.sessionID}`
+      if (payload.type === "session.next.status") return `session.next.status:${directory}:${payload.properties.sessionID}`
       if (payload.type === "lsp.updated") return `lsp.updated:${directory}`
-      if (payload.type === "message.part.updated") {
-        const part = payload.properties.part
-        return `message.part.updated:${directory}:${part.messageID}:${part.id}`
-      }
+      if (payload.type === "session.next.updated") return `session.next.updated:${directory}:${payload.properties.sessionID}`
+      if (payload.type === "session.next.todo") return `session.next.todo:${directory}:${payload.properties.sessionID}`
+      if (payload.type === "session.next.diff") return `session.next.diff:${directory}:${payload.properties.sessionID}`
+      if (payload.type === "session.next.tool.progress")
+        return `session.next.tool.progress:${directory}:${payload.properties.callID}`
     }
 
     const flush = () => {
@@ -74,20 +76,14 @@ export const { use: useGlobalSDK, provider: GlobalSDKProvider } = createSimpleCo
       if (queue.length === 0) return
 
       const events = queue
-      const skip = staleDeltas.size > 0 ? new Set(staleDeltas) : undefined
       queue = buffer
       buffer = events
       queue.length = 0
       coalesced.clear()
-      staleDeltas.clear()
 
       last = Date.now()
       batch(() => {
         for (const event of events) {
-          if (skip && event.payload.type === "message.part.delta") {
-            const props = event.payload.properties
-            if (skip.has(deltaKey(event.directory, props.messageID, props.partID))) continue
-          }
           emitter.emit(event.directory, event.payload)
         }
       })
@@ -167,10 +163,6 @@ export const { use: useGlobalSDK, provider: GlobalSDKProvider } = createSimpleCo
                 const i = coalesced.get(k)
                 if (i !== undefined) {
                   queue[i] = { directory, payload }
-                  if (payload.type === "message.part.updated") {
-                    const part = payload.properties.part
-                    staleDeltas.add(deltaKey(directory, part.messageID, part.id))
-                  }
                   continue
                 }
                 coalesced.set(k, queue.length)

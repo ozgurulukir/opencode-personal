@@ -9,36 +9,47 @@ import { Hash } from "@opencode-ai/core/util/hash"
 import { ShellID } from "@/tool/shell/id"
 import { Todo } from "@/session/todo"
 import { Result, Schema } from "effect"
-import type { ToolPart } from "@opencode-ai/sdk/v2"
+import type { SessionMessageAssistantTool, ToolTextContent } from "@opencode-ai/sdk/v2"
 
 const log = Log.create({ service: "acp-tool-dispatch" })
 
 const decodeTodos = Schema.decodeUnknownResult(Schema.fromJsonString(Schema.Array(Todo.Info)))
 
-export function shellOutput(part: ToolPart): string | undefined {
-  if (part.tool !== ShellID.ToolID) return
-  if (!("metadata" in part.state) || !part.state.metadata || typeof part.state.metadata !== "object") return
-  const output = part.state.metadata["output"]
-  if (typeof output !== "string") return
-  return output
+// V2 progress/success/failed events carry only `callID`, so the tool name and
+// input recorded at `tool.called` are reused for later updates.
+export type ToolCallInfo = { tool: string; input: Record<string, unknown> }
+
+type V2ToolContent = ToolTextContent | { type: "file"; uri: string; mime: string; name?: string }
+
+function textOutput(content: V2ToolContent[]): string {
+  return content
+    .filter((item): item is ToolTextContent => item.type === "text")
+    .map((item) => item.text)
+    .join("\n")
+}
+
+function structuredShellOutput(structured: Record<string, unknown>): string | undefined {
+  const output = structured["output"]
+  return typeof output === "string" ? output : undefined
 }
 
 export async function toolStart(
   connection: AgentSideConnection,
   toolStarts: Set<string>,
   sessionId: string,
-  part: ToolPart,
+  callID: string,
+  tool: string,
 ) {
-  if (toolStarts.has(part.callID)) return
-  toolStarts.add(part.callID)
+  if (toolStarts.has(callID)) return
+  toolStarts.add(callID)
   await connection
     .sessionUpdate({
       sessionId,
       update: {
         sessionUpdate: "tool_call",
-        toolCallId: part.callID,
-        title: part.tool,
-        kind: toToolKind(part.tool),
+        toolCallId: callID,
+        title: tool,
+        kind: toToolKind(tool),
         status: "pending",
         locations: [],
         rawInput: {},
@@ -49,66 +60,47 @@ export async function toolStart(
     })
 }
 
-export async function handleToolPartUpdate(
+export async function handleToolCalled(
   connection: AgentSideConnection,
   shellSnapshots: Map<string, string>,
   toolStarts: Set<string>,
+  toolCalls: Map<string, ToolCallInfo>,
   sessionId: string,
-  part: ToolPart,
+  props: { callID: string; tool: string; input: Record<string, unknown> },
 ) {
-  await toolStart(connection, toolStarts, sessionId, part)
-  switch (part.state.status) {
-    case "pending":
-      shellSnapshots.delete(part.callID)
-      return
+  toolCalls.set(props.callID, { tool: props.tool, input: props.input })
+  // A re-called tool starts a fresh output stream (V1 cleared the snapshot on
+  // the pending state).
+  shellSnapshots.delete(props.callID)
+  await toolStart(connection, toolStarts, sessionId, props.callID, props.tool)
+}
 
-    case "running": {
-      const output = shellOutput(part)
-      const content: ToolCallContent[] = []
-      if (output) {
-        const hash = Hash.fast(output)
-        if (part.tool === ShellID.ToolID) {
-          if (shellSnapshots.get(part.callID) === hash) {
-            await connection
-              .sessionUpdate({
-                sessionId,
-                update: {
-                  sessionUpdate: "tool_call_update",
-                  toolCallId: part.callID,
-                  status: "in_progress",
-                  kind: toToolKind(part.tool),
-                  title: part.tool,
-                  locations: toLocations(part.tool, part.state.input),
-                  rawInput: part.state.input,
-                },
-              })
-              .catch((error) => {
-                log.error("failed to send tool in_progress to ACP", { error })
-              })
-            return
-          }
-          shellSnapshots.set(part.callID, hash)
-        }
-        content.push({
-          type: "content",
-          content: {
-            type: "text",
-            text: output,
-          },
-        })
-      }
+export async function handleToolProgress(
+  connection: AgentSideConnection,
+  shellSnapshots: Map<string, string>,
+  toolCalls: Map<string, ToolCallInfo>,
+  sessionId: string,
+  props: { callID: string; structured: Record<string, unknown> },
+) {
+  const info = toolCalls.get(props.callID)
+  if (!info) return
+  const output = info.tool === ShellID.ToolID ? structuredShellOutput(props.structured) : undefined
+  const content: ToolCallContent[] = []
+  if (output) {
+    const hash = Hash.fast(output)
+    if (shellSnapshots.get(props.callID) === hash) {
+      // Identical snapshot: re-assert progress without content (V1 wire parity).
       await connection
         .sessionUpdate({
           sessionId,
           update: {
             sessionUpdate: "tool_call_update",
-            toolCallId: part.callID,
+            toolCallId: props.callID,
             status: "in_progress",
-            kind: toToolKind(part.tool),
-            title: part.tool,
-            locations: toLocations(part.tool, part.state.input),
-            rawInput: part.state.input,
-            ...(content.length > 0 && { content }),
+            kind: toToolKind(info.tool),
+            title: info.tool,
+            locations: toLocations(info.tool, info.input),
+            rawInput: info.input,
           },
         })
         .catch((error) => {
@@ -116,93 +108,220 @@ export async function handleToolPartUpdate(
         })
       return
     }
+    shellSnapshots.set(props.callID, hash)
+    content.push({
+      type: "content",
+      content: {
+        type: "text",
+        text: output,
+      },
+    })
+  }
+  await connection
+    .sessionUpdate({
+      sessionId,
+      update: {
+        sessionUpdate: "tool_call_update",
+        toolCallId: props.callID,
+        status: "in_progress",
+        kind: toToolKind(info.tool),
+        title: info.tool,
+        locations: toLocations(info.tool, info.input),
+        rawInput: info.input,
+        ...(content.length > 0 && { content }),
+      },
+    })
+    .catch((error) => {
+      log.error("failed to send tool in_progress to ACP", { error })
+    })
+}
 
-    case "completed": {
-      toolStarts.delete(part.callID)
-      shellSnapshots.delete(part.callID)
-      const kind = toToolKind(part.tool)
-      const content = completedToolContent(part, kind)
+export async function handleToolSuccess(
+  connection: AgentSideConnection,
+  shellSnapshots: Map<string, string>,
+  toolStarts: Set<string>,
+  toolCalls: Map<string, ToolCallInfo>,
+  sessionId: string,
+  props: { callID: string; structured: Record<string, unknown>; content: V2ToolContent[] },
+) {
+  const info = toolCalls.get(props.callID)
+  if (!info) return
+  toolStarts.delete(props.callID)
+  shellSnapshots.delete(props.callID)
+  const kind = toToolKind(info.tool)
+  const content = completedToolContent(info.tool, info.input, props.content, kind)
 
-      if (part.tool === "todowrite") {
-        const parsedTodos = decodeTodos(part.state.output)
-        if (Result.isSuccess(parsedTodos)) {
-          await connection
-            .sessionUpdate({
-              sessionId,
-              update: {
-                sessionUpdate: "plan",
-                entries: parsedTodos.success.map((todo) => {
-                  const status: PlanEntry["status"] =
-                    todo.status === "cancelled" ? "completed" : (todo.status as PlanEntry["status"])
-                  return {
-                    priority: "medium",
-                    status,
-                    content: todo.content,
-                  }
-                }),
-              },
-            })
-            .catch((error) => {
-              log.error("failed to send session update for todo", { error })
-            })
-        } else {
-          log.error("failed to parse todo output", { error: parsedTodos.failure })
-        }
-      }
-
+  if (info.tool === "todowrite") {
+    const parsedTodos = decodeTodos(textOutput(props.content))
+    if (Result.isSuccess(parsedTodos)) {
       await connection
         .sessionUpdate({
           sessionId,
           update: {
-            sessionUpdate: "tool_call_update",
-            toolCallId: part.callID,
-            status: "completed",
-            kind,
-            content,
-            title: part.state.title,
-            rawInput: part.state.input,
-            rawOutput: completedToolRawOutput(part),
+            sessionUpdate: "plan",
+            entries: parsedTodos.success.map((todo) => {
+              const status: PlanEntry["status"] =
+                todo.status === "cancelled" ? "completed" : (todo.status as PlanEntry["status"])
+              return {
+                priority: "medium",
+                status,
+                content: todo.content,
+              }
+            }),
           },
         })
         .catch((error) => {
-          log.error("failed to send tool completed to ACP", { error })
+          log.error("failed to send session update for todo", { error })
         })
-      return
+    } else {
+      log.error("failed to parse todo output", { error: parsedTodos.failure })
     }
+  }
 
-    case "error":
-      toolStarts.delete(part.callID)
-      shellSnapshots.delete(part.callID)
-      await connection
-        .sessionUpdate({
-          sessionId,
-          update: {
-            sessionUpdate: "tool_call_update",
-            toolCallId: part.callID,
-            status: "failed",
-            kind: toToolKind(part.tool),
-            title: part.tool,
-            rawInput: part.state.input,
-            content: [
-              {
-                type: "content",
-                content: {
-                  type: "text",
-                  text: part.state.error,
-                },
-              },
-            ],
-            rawOutput: {
-              error: part.state.error,
-              metadata: part.state.metadata,
+  await connection
+    .sessionUpdate({
+      sessionId,
+      update: {
+        sessionUpdate: "tool_call_update",
+        toolCallId: props.callID,
+        status: "completed",
+        kind,
+        content,
+        title: info.tool,
+        rawInput: info.input,
+        rawOutput: {
+          output: textOutput(props.content),
+          metadata: props.structured,
+        },
+      },
+    })
+    .catch((error) => {
+      log.error("failed to send tool completed to ACP", { error })
+    })
+}
+
+export async function handleToolFailed(
+  connection: AgentSideConnection,
+  shellSnapshots: Map<string, string>,
+  toolStarts: Set<string>,
+  toolCalls: Map<string, ToolCallInfo>,
+  sessionId: string,
+  props: { callID: string; error: { message: string } },
+) {
+  const info = toolCalls.get(props.callID)
+  if (!info) return
+  toolStarts.delete(props.callID)
+  shellSnapshots.delete(props.callID)
+  await connection
+    .sessionUpdate({
+      sessionId,
+      update: {
+        sessionUpdate: "tool_call_update",
+        toolCallId: props.callID,
+        status: "failed",
+        kind: toToolKind(info.tool),
+        title: info.tool,
+        rawInput: info.input,
+        content: [
+          {
+            type: "content",
+            content: {
+              type: "text",
+              text: props.error.message,
             },
           },
-        })
-        .catch((error) => {
-          log.error("failed to send tool error to ACP", { error })
-        })
+        ],
+        rawOutput: {
+          error: props.error.message,
+          metadata: {},
+        },
+      },
+    })
+    .catch((error) => {
+      log.error("failed to send tool error to ACP", { error })
+    })
+}
+
+// Replay path: a projected V2 assistant tool item carries its own name and
+// state, so no event registry is needed.
+export async function handleToolPartUpdate(
+  connection: AgentSideConnection,
+  shellSnapshots: Map<string, string>,
+  toolStarts: Set<string>,
+  sessionId: string,
+  part: SessionMessageAssistantTool,
+) {
+  const info: ToolCallInfo = {
+    tool: part.name,
+    input: part.state.status === "pending" ? {} : part.state.input,
+  }
+  // Ensure the pending tool_call exists before any state update (the replay
+  // path has no prior `tool.called` event).
+  await toolStart(connection, toolStarts, sessionId, part.id, part.name)
+  switch (part.state.status) {
+    case "pending":
+      return
+
+    case "running":
+      await handleToolProgress(connection, shellSnapshots, new Map([[part.id, info]]), sessionId, {
+        callID: part.id,
+        structured: part.state.structured,
+      })
+      return
+
+    case "completed":
+      await handleToolSuccess(connection, shellSnapshots, toolStarts, new Map([[part.id, info]]), sessionId, {
+        callID: part.id,
+        structured: part.state.structured,
+        content: part.state.content,
+      })
+      return
+
+    case "error":
+      await handleToolFailed(connection, shellSnapshots, toolStarts, new Map([[part.id, info]]), sessionId, {
+        callID: part.id,
+        error: part.state.error,
+      })
       return
   }
+}
+
+// Replay path for V2 shell messages: the projected shell carries the command
+// and final output directly (the assistant has no bash tool item in V2).
+export async function handleShellMessage(
+  connection: AgentSideConnection,
+  sessionId: string,
+  shell: { callID: string; command: string; output: string },
+) {
+  await connection
+    .sessionUpdate({
+      sessionId,
+      update: {
+        sessionUpdate: "tool_call",
+        toolCallId: shell.callID,
+        title: ShellID.ToolID,
+        kind: toToolKind(ShellID.ToolID),
+        status: "completed",
+        locations: [],
+        rawInput: { command: shell.command },
+        content: [
+          {
+            type: "content",
+            content: {
+              type: "text",
+              text: shell.output,
+            },
+          },
+        ],
+        rawOutput: {
+          output: shell.output,
+          metadata: {},
+        },
+      },
+    })
+    .catch((error) => {
+      log.error("failed to send shell tool call to ACP", { error })
+    })
 }
 
 export function toToolKind(toolName: string): ToolKind {
@@ -258,21 +377,23 @@ export function toLocations(toolName: string, input: Record<string, any>): { pat
   }
 }
 
-export function completedToolContent(part: ToolPart, kind: ToolKind): ToolCallContent[] {
-  if (part.state.status !== "completed") return []
-
-  const content: ToolCallContent[] = [
+export function completedToolContent(
+  toolName: string,
+  input: Record<string, unknown>,
+  content: V2ToolContent[],
+  kind: ToolKind,
+): ToolCallContent[] {
+  const result: ToolCallContent[] = [
     {
       type: "content",
       content: {
         type: "text",
-        text: part.state.output,
+        text: textOutput(content),
       },
     },
   ]
 
   if (kind === "edit") {
-    const input = part.state.input
     const filePath = typeof input["filePath"] === "string" ? input["filePath"] : ""
     const oldText = typeof input["oldString"] === "string" ? input["oldString"] : ""
     const newText =
@@ -281,7 +402,7 @@ export function completedToolContent(part: ToolPart, kind: ToolKind): ToolCallCo
         : typeof input["content"] === "string"
           ? input["content"]
           : ""
-    content.push({
+    result.push({
       type: "diff",
       path: filePath,
       oldText,
@@ -289,23 +410,15 @@ export function completedToolContent(part: ToolPart, kind: ToolKind): ToolCallCo
     })
   }
 
-  content.push(...imageContents(part.state.attachments ?? []))
-  return content
+  result.push(...imageContents(content))
+  return result
 }
 
-export function completedToolRawOutput(part: ToolPart) {
-  if (part.state.status !== "completed") return {}
-  return {
-    output: part.state.output,
-    metadata: part.state.metadata,
-    ...(part.state.attachments?.length ? { attachments: part.state.attachments } : {}),
-  }
-}
-
-function imageContents(attachments: Array<{ mime: string; url: string }>): ToolCallContent[] {
-  return attachments.flatMap((attachment): ToolCallContent[] => {
-    const match = attachment.url.match(/^data:([^;,]+)(?:;[^,]*)*;base64,(.*)$/)
-    const mime = match?.[1] ?? attachment.mime
+function imageContents(content: V2ToolContent[]): ToolCallContent[] {
+  return content.flatMap((item): ToolCallContent[] => {
+    if (item.type !== "file") return []
+    const match = item.uri.match(/^data:([^;,]+)(?:;[^,]*)*;base64,(.*)$/)
+    const mime = match?.[1] ?? item.mime
     if (!mime.startsWith("image/")) return []
     const data = match?.[2]
     if (data === undefined) return []

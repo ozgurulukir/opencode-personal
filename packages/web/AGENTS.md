@@ -13,6 +13,10 @@ This package follows the root [AGENTS.md](../AGENTS.md) for general repo rules.
 
 **Fix**: Add a `d.content.type === "shell"` check before the metadata check and convert via `fromShell()`, which maps the shell message to an assistant message with a single `tool: "bash"` part.
 
+The current `share-next` producer intentionally sends V1-shaped message/part
+payloads at the external share API boundary, so `fromV1()` remains live. Keep
+the shell and V2 branches for payloads produced by newer share producers.
+
 ## `BashTool` expected state shape
 
 `part.tsx:629-637` (`BashTool`) reads:

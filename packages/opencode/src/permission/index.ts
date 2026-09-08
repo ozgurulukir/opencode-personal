@@ -208,7 +208,7 @@ export const layer = Layer.effect(
   Effect.gen(function* () {
     const bus = yield* Bus.Service
     const sync = yield* SyncEvent.Service
-    // Native V2 emission (replaces the v2/event-bridge translation)
+    // Native V2 lifecycle emission is published alongside the V1 event
     const publishReplied = (sessionID: SessionID, requestID: PermissionID, reply: Reply) =>
       sync.run(SessionEvent.Permission.Replied.Sync, {
         sessionID,

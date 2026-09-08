@@ -22,7 +22,11 @@ import { Bus } from "@/bus"
 import { Agent } from "@/agent/agent"
 import { Config } from "@/config/config"
 import { Permission } from "@/permission"
-import { subagentSessionPermission, subagentToolRestrictions, MAX_SUBAGENT_NESTING_LEVELS } from "@/agent/subagent-permissions"
+import {
+  subagentSessionPermission,
+  subagentToolRestrictions,
+  MAX_SUBAGENT_NESTING_LEVELS,
+} from "@/agent/subagent-permissions"
 import { NotFoundError as StorageNotFoundError } from "@/storage/storage"
 import { SessionRevert } from "@/session/revert"
 import { Command } from "@/command"
@@ -126,10 +130,7 @@ export interface Interface {
     agent?: string
     messageID?: MessageID
     tools?: Record<string, boolean>
-  }) => Effect.Effect<
-    { user: SessionMessage.User | undefined; assistant: SessionMessage.Assistant | undefined },
-    never
-  >
+  }) => Effect.Effect<{ user: SessionMessage.User | undefined; assistant: SessionMessage.Assistant | undefined }, never>
   readonly shell: (input: {
     id?: EventV2.ID
     sessionID: SessionID
@@ -174,11 +175,14 @@ export interface Interface {
     providerID: ProviderID
     modelID: ModelID
   }) => Effect.Effect<boolean, never>
-  readonly command: (input: SessionPrompt.CommandInput) => Effect.Effect<
-    { user: SessionMessage.User | undefined; assistant: SessionMessage.Assistant | undefined },
-    never
-  >
-  readonly revert: (input: { sessionID: SessionID; messageID: MessageID; partID?: PartID }) => Effect.Effect<Info, NotFoundError>
+  readonly command: (
+    input: SessionPrompt.CommandInput,
+  ) => Effect.Effect<{ user: SessionMessage.User | undefined; assistant: SessionMessage.Assistant | undefined }, never>
+  readonly revert: (input: {
+    sessionID: SessionID
+    messageID: MessageID
+    partID?: PartID
+  }) => Effect.Effect<Info, NotFoundError>
   readonly unrevert: (sessionID: SessionID) => Effect.Effect<Info, NotFoundError>
 }
 
@@ -252,6 +256,37 @@ function toPromptModel(model: Modelv2.Ref): { modelID: ModelID; providerID: Prov
   return { modelID: model.id, providerID: model.providerID }
 }
 
+type LegacyMessageDefaults = {
+  agent: string
+  model: Modelv2.Ref
+}
+
+const UnknownModel: Modelv2.Ref = {
+  id: Modelv2.ID.make("unknown"),
+  providerID: Modelv2.ProviderID.make("unknown"),
+  variant: Modelv2.VariantID.make("default"),
+}
+
+function legacyMessageDefaults(sessionID: SessionID): LegacyMessageDefaults {
+  const row = Database.use((db) =>
+    db
+      .select({ agent: SessionTable.agent, model: SessionTable.model })
+      .from(SessionTable)
+      .where(eq(SessionTable.id, sessionID))
+      .get(),
+  )
+  return {
+    agent: row?.agent ?? "build",
+    model: row?.model
+      ? {
+          id: Modelv2.ID.make(row.model.id),
+          providerID: Modelv2.ProviderID.make(row.model.providerID),
+          variant: Modelv2.VariantID.make(row.model.variant ?? "default"),
+        }
+      : UnknownModel,
+  }
+}
+
 export const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
@@ -259,11 +294,12 @@ export const layer = Layer.effect(
     // Layer scope: background fibers (the deferred-delivery worker) fork into
     // this so they outlive HTTP requests and die with the instance.
     const scope = yield* Scope.Scope
-    const decodeMessage = Schema.decodeUnknownSync(SessionMessage.Message)
-    // V1 services used by the delegation bridge. Captured lazily via serviceOption
+    const decodeMessage = (data: unknown) =>
+      Schema.decodeUnknownSync(SessionMessage.Message)(SessionMessage.normalizeForDecode(data))
+    // Compatibility and persistence services are captured lazily via serviceOption
     // so read-only consumers (get/list/messages/context) still work without them.
     const sessionsV1 = yield* Effect.serviceOption(Session.Service)
-    const promptV1 = yield* Effect.serviceOption(SessionPrompt.Service)
+    const promptEngine = yield* Effect.serviceOption(SessionPrompt.Engine)
     const compactionV1 = yield* Effect.serviceOption(SessionCompaction.Service)
     const statusV1 = yield* Effect.serviceOption(SessionStatus.Service)
     const bus = yield* Effect.serviceOption(Bus.Service)
@@ -272,10 +308,19 @@ export const layer = Layer.effect(
     const revertV1 = yield* Effect.serviceOption(SessionRevert.Service)
 
     const requireV1 = <A>(svc: Option.Option<A>, name: string) =>
-      Option.isNone(svc) ? Effect.die(`V2Session.${name} requires the V1 ${name} service to be provided`) : Effect.succeed(svc.value)
+      Option.isNone(svc)
+        ? Effect.die(`V2Session.${name} requires the V1 ${name} service to be provided`)
+        : Effect.succeed(svc.value)
 
-    const decode = (row: typeof SessionMessageTable.$inferSelect) =>
-      decodeMessage({ ...row.data, id: row.id, type: row.type })
+    const decode = (row: typeof SessionMessageTable.$inferSelect, defaults: LegacyMessageDefaults) => {
+      const data: Record<string, unknown> = { ...row.data, id: row.id, type: row.type }
+      if (row.type !== "user") return decodeMessage(data)
+      return decodeMessage({
+        ...data,
+        agent: data.agent ?? defaults.agent,
+        model: data.model ?? defaults.model,
+      })
+    }
 
     function fromRow(row: typeof SessionTable.$inferSelect): Info {
       return new Info({
@@ -421,7 +466,8 @@ export const layer = Layer.effect(
           const rows = input.limit === undefined ? query.all() : query.limit(input.limit).all()
           return direction === "previous" ? rows.toReversed() : rows
         })
-        return rows.map((row) => decode(row))
+        const defaults = legacyMessageDefaults(input.sessionID)
+        return rows.map((row) => decode(row, defaults))
       }),
       context: Effect.fn("V2Session.context")(function* (sessionID) {
         const rows = Database.use((db) => {
@@ -453,21 +499,22 @@ export const layer = Layer.effect(
             .orderBy(asc(SessionMessageTable.time_created), asc(SessionMessageTable.id))
             .all()
         })
-        return rows.map((row) => decode(row))
+        const defaults = legacyMessageDefaults(sessionID)
+        return rows.map((row) => decode(row, defaults))
       }),
       prompt: Effect.fn("V2Session.prompt")(function* (input) {
-        // Delegates to V1 SessionPrompt.prompt, which owns the agent loop and
+        // Delegates to the shared prompt engine, which owns the agent loop and
         // emits SessionEvent.*.Sync unconditionally. The Prompted projector then
         // populates SessionMessageTable, which the read methods (`messages`/`context`)
-        // query. V1 is the writer by design.
-        const promptSvc = yield* requireV1(promptV1, "SessionPrompt")
+        // query. SessionPrompt.Service remains the V1 compatibility facade.
+        const engine = yield* requireV1(promptEngine, "SessionPromptEngine")
         const delivery = input.delivery ?? DefaultDelivery
         const parts = promptToParts(input.prompt)
 
         // `noReply: true` tells V1 to create the user message but NOT run the
         // loop. Used for deferred delivery — the message is staged and the loop
         // runs later via runDeferred().
-        yield* promptSvc.prompt({
+        yield* engine.prompt({
           sessionID: input.sessionID,
           parts,
           noReply: delivery === "deferred",
@@ -501,11 +548,11 @@ export const layer = Layer.effect(
         return { user, assistant }
       }),
       shell: Effect.fn("V2Session.shell")(function* (input) {
-        // V1 SessionPrompt.shell already emits Shell.Started/Ended at
+        // The shared prompt engine emits Shell.Started/Ended at
         // prompt.ts:884/907.
-        const promptSvc = yield* requireV1(promptV1, "SessionPrompt")
+        const engine = yield* requireV1(promptEngine, "SessionPromptEngine")
         const session = yield* result.get(input.sessionID).pipe(Effect.orDie)
-        yield* promptSvc.shell({
+        yield* engine.shell({
           sessionID: input.sessionID,
           messageID: input.messageID,
           agent: input.agent ?? session.agent ?? "build",
@@ -516,11 +563,11 @@ export const layer = Layer.effect(
       skill: Effect.fn("V2Session.skill")(function* (input) {
         // Invokes a skill by prompting with the skill name as text. The skill
         // loader in the agent loop resolves `/skill-name` into the skill content.
-        // Delegates to V1 prompt — no dedicated Skill.Invoked event is needed
+        // Delegates to the shared prompt engine — no dedicated Skill.Invoked event is needed
         // because the prompt flow already emits Prompted.Sync + the tool events.
-        const promptSvc = yield* requireV1(promptV1, "SessionPrompt")
+        const engine = yield* requireV1(promptEngine, "SessionPromptEngine")
         const session = yield* result.get(input.sessionID).pipe(Effect.orDie)
-        yield* promptSvc.prompt({
+        yield* engine.prompt({
           sessionID: input.sessionID,
           agent: session.agent ?? "build",
           parts: [{ type: "text", text: `/${input.skill}` }],
@@ -556,15 +603,16 @@ export const layer = Layer.effect(
         }
         const parentAgent = parent.agent
           ? yield* agents.get(parent.agent).pipe(
-              Effect.map((a) =>
-                a ??
-                ({
-                  permission: [
-                    { permission: "edit", pattern: "*", action: "deny" },
-                    { permission: "write", pattern: "*", action: "deny" },
-                    { permission: "bash", pattern: "*", action: "deny" },
-                  ],
-                } as Agent.Info),
+              Effect.map(
+                (a) =>
+                  a ??
+                  ({
+                    permission: [
+                      { permission: "edit", pattern: "*", action: "deny" },
+                      { permission: "write", pattern: "*", action: "deny" },
+                      { permission: "bash", pattern: "*", action: "deny" },
+                    ],
+                  } as Agent.Info),
               ),
               Effect.catchCause((cause) =>
                 Effect.sync(() => {
@@ -591,7 +639,7 @@ export const layer = Layer.effect(
           primaryTools: cfgInfo.experimental?.primary_tools,
         })
 
-        for (let depth = 0, currentParentID: SessionID | undefined = input.parentID; currentParentID; ) {
+        for (let depth = 0, currentParentID: SessionID | undefined = input.parentID; currentParentID;) {
           depth++
           if (depth >= MAX_SUBAGENT_NESTING_LEVELS) {
             return yield* Effect.fail(
@@ -620,8 +668,8 @@ export const layer = Layer.effect(
         // signal fires. The prompt call blocks until the child loop finishes,
         // so we don't need a separate wait() — the result is available
         // immediately after prompt returns.
-        const promptSvc = yield* requireV1(promptV1, "SessionPrompt")
-        const cancelChild = promptSvc.cancel(session.id)
+        const engine = yield* requireV1(promptEngine, "SessionPromptEngine")
+        const cancelChild = engine.cancel(session.id)
         const bridge = yield* EffectBridge.make()
         let cancelled = false
         const onAbort = () => {
@@ -734,13 +782,11 @@ export const layer = Layer.effect(
         if (!status || !busSvc) return // no status service available — nothing to wait on
         const current = yield* status.get(sessionID)
         if (current.type === "idle") return
-        yield* busSvc
-          .subscribe(SessionStatus.Event.Idle)
-          .pipe(
-            Stream.filter((e) => e.properties.sessionID === sessionID),
-            Stream.take(1),
-            Stream.runDrain,
-          )
+        yield* busSvc.subscribe(SessionStatus.Event.Idle).pipe(
+          Stream.filter((e) => e.properties.sessionID === sessionID),
+          Stream.take(1),
+          Stream.runDrain,
+        )
       }),
       children: Effect.fn("V2Session.children")(function* (sessionID) {
         const sessions = yield* requireV1(sessionsV1, "Session")
@@ -749,9 +795,9 @@ export const layer = Layer.effect(
       }),
       remove: Effect.fn("V2Session.remove")(function* (sessionID) {
         const sessions = yield* requireV1(sessionsV1, "Session")
-        yield* sessions.remove(sessionID).pipe(
-          Effect.catchIf(StorageNotFoundError.isInstance, () => Effect.fail(new NotFoundError({ sessionID }))),
-        )
+        yield* sessions
+          .remove(sessionID)
+          .pipe(Effect.catchIf(StorageNotFoundError.isInstance, () => Effect.fail(new NotFoundError({ sessionID }))))
       }),
       update: Effect.fn("V2Session.update")(function* (input) {
         const sessions = yield* requireV1(sessionsV1, "Session")
@@ -771,14 +817,18 @@ export const layer = Layer.effect(
         return yield* result.get(input.sessionID)
       }),
       abort: Effect.fn("V2Session.abort")(function* (sessionID) {
-        const promptSvc = yield* requireV1(promptV1, "SessionPrompt")
-        yield* promptSvc.cancel(sessionID)
+        const engine = yield* requireV1(promptEngine, "SessionPromptEngine")
+        yield* engine.cancel(sessionID)
       }),
       fork: Effect.fn("V2Session.fork")(function* (input) {
         const sessions = yield* requireV1(sessionsV1, "Session")
-        const info = yield* sessions.fork(input).pipe(
-          Effect.catchIf(StorageNotFoundError.isInstance, () => Effect.fail(new NotFoundError({ sessionID: input.sessionID }))),
-        )
+        const info = yield* sessions
+          .fork(input)
+          .pipe(
+            Effect.catchIf(StorageNotFoundError.isInstance, () =>
+              Effect.fail(new NotFoundError({ sessionID: input.sessionID })),
+            ),
+          )
         return toV2Info(info)
       }),
       summarize: Effect.fn("V2Session.summarize")(function* (input) {
@@ -788,11 +838,15 @@ export const layer = Layer.effect(
         const sessions = yield* requireV1(sessionsV1, "Session")
         const revert = yield* requireV1(revertV1, "SessionRevert")
         const compactionSvc = yield* requireV1(compactionV1, "SessionCompaction")
-        const promptSvc = yield* requireV1(promptV1, "SessionPrompt")
+        const engine = yield* requireV1(promptEngine, "SessionPromptEngine")
         const agents = yield* requireV1(agentsV1, "Agent")
-        const info = yield* sessions.get(input.sessionID).pipe(
-          Effect.catchIf(StorageNotFoundError.isInstance, () => Effect.fail(new NotFoundError({ sessionID: input.sessionID }))),
-        )
+        const info = yield* sessions
+          .get(input.sessionID)
+          .pipe(
+            Effect.catchIf(StorageNotFoundError.isInstance, () =>
+              Effect.fail(new NotFoundError({ sessionID: input.sessionID })),
+            ),
+          )
         yield* revert.cleanup(info)
         const messages = yield* sessions.messages({ sessionID: input.sessionID })
         const defaultAgent = yield* agents.defaultAgent()
@@ -803,12 +857,12 @@ export const layer = Layer.effect(
           model: { providerID: input.providerID, modelID: input.modelID },
           auto: input.auto ?? false,
         })
-        yield* promptSvc.loop({ sessionID: input.sessionID })
+        yield* engine.loop({ sessionID: input.sessionID })
         return true
       }),
       init: Effect.fn("V2Session.init")(function* (input) {
-        const promptSvc = yield* requireV1(promptV1, "SessionPrompt")
-        yield* promptSvc.command({
+        const engine = yield* requireV1(promptEngine, "SessionPromptEngine")
+        yield* engine.command({
           sessionID: input.sessionID,
           messageID: input.messageID,
           model: `${input.providerID}/${input.modelID}`,
@@ -818,11 +872,11 @@ export const layer = Layer.effect(
         return true
       }),
       command: Effect.fn("V2Session.command")(function* (input) {
-        // Mirrors the V2 prompt style: stage the command message through V1
+        // Mirrors the V2 prompt style: stage the command message through the shared engine
         // (which runs the loop synchronously) and read back the projected
         // user + final assistant messages for per-turn usage reporting.
-        const promptSvc = yield* requireV1(promptV1, "SessionPrompt")
-        yield* promptSvc.command(input)
+        const engine = yield* requireV1(promptEngine, "SessionPromptEngine")
+        yield* engine.command(input)
         const messages = yield* result.messages({ sessionID: input.sessionID, order: "asc" })
         const user = messages.findLast((m): m is SessionMessage.User => m.type === "user")
         const assistant = messages.findLast((m): m is SessionMessage.Assistant => m.type === "assistant")
@@ -843,16 +897,17 @@ export const layer = Layer.effect(
     }
 
     /**
-     * Drain deferred-delivery prompts for a session by running the V1 loop.
+     * Drain deferred-delivery prompts for a session by running the shared loop.
      * Exposed via an extended service so tests/callers can trigger deferred
-     * processing. A real background worker can be wired later. Delegates to V1
-     * `SessionPrompt.loop` by design — V1 owns the loop execution.
+     * processing. The layer-scoped worker invokes this after deferred staging.
+     * Delegates to `SessionPromptEngine.loop`; the V1 service is only a
+     * compatibility facade.
      */
     const runDeferred = (sessionID: SessionID): Effect.Effect<void> =>
       Effect.gen(function* () {
         if (!deferredQueue.delete(sessionID)) return
-        const promptSvc = yield* requireV1(promptV1, "SessionPrompt")
-        yield* promptSvc.loop({ sessionID })
+        const engine = yield* requireV1(promptEngine, "SessionPromptEngine")
+        yield* engine.loop({ sessionID })
       })
 
     return Service.of(Object.assign(result, { runDeferred }))

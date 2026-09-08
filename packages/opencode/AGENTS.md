@@ -317,28 +317,56 @@ const cb = Instance.bind((err, evts) => {
 nativeAddon.subscribe(dir, cb)
 ```
 
-## V2 session service — delegation bridge
+## V2 session service — projection and shared-engine architecture
 
-The V2 session service (`src/v2/session.ts`) is a **hybrid delegation bridge** to V1. The V1 agent loop (`session/prompt.ts`, `session/processor.ts`, `session/compaction.ts`) emits every V2 `SessionEvent.*` unconditionally (the former `OPENCODE_EXPERIMENTAL_EVENT_SYSTEM` flag was removed 2026-09). The V2 projectors (`session/projectors-next.ts`) are wired globally and populate `SessionMessageTable`. So the V2 read methods (`get`, `list`, `messages`, `context`) already work, and the V2 write methods delegate to V1 (which runs the real loop AND emits the events).
+The V2 session service (`src/v2/session.ts`) is a stable two-layer design. Read
+methods (`get`, `list`, `messages`, `context`) query the session tables directly;
+they do not require V1 services. Write methods use the shared
+`SessionPrompt.Engine` for prompt/loop operations, while session and compaction
+persistence services remain at the storage boundary. The engine emits V2 sync
+events unconditionally, and `session/projectors-next.ts` populates
+`SessionMessageTable` from those events.
+
+The existing `SessionPrompt.Service` is a compatibility facade over the same
+engine for legacy callers (`github.ts`, `control-plane/workspace.ts`, and the V1
+prediction route). This is compatibility support, not a second V2 engine.
+
+The in-workspace GitHub command uses that facade to start the prompt but listens
+to `SessionEvent.*.Sync` for tool and text output. `share/share-next.ts` also
+listens to V2 lifecycle events; its compatibility read is intentional because
+the external share API still receives V1-shaped message/part payloads. The
+standalone `github/` action is outside this workspace and remains on the
+legacy-compatible `client.session.*` HTTP group until the deferred deletion
+pass.
 
 **Implementation** (`src/v2/session.ts`):
-- `create` → V1 `Session.create` + `toV2Info()` mapper (V1 `Info` → V2 `Info`, handling `DateTime` timestamps and `Modelv2.Ref` brand conversion)
-- `prompt` → V1 `SessionPrompt.prompt`; `delivery: "immediate"` runs the loop synchronously, `delivery: "deferred"` stages the message (`noReply: true`) and enqueues for `runDeferred()`
-- `compact` → V1 `SessionCompaction.create` (stages compaction; summarization runs on next loop iteration)
-- `wait` → subscribes to `SessionStatus.Event.Idle` bus event (`bus.subscribe` + `Stream.filter` + `Stream.take(1)` + `Stream.runDrain`); returns immediately if already idle
-- `shell` → V1 `SessionPrompt.shell` (already emits `Shell.Started/Ended`)
-- `skill` → prompts with `/{skill}` text prefix
-- `subagent` → creates child session with derived permissions (`subagentSessionPermission`), restricted tools (`subagentToolRestrictions`), abort handling, and error propagation via `catchCause` → synthetic error message. Posts result back to parent as `SessionEvent.Synthetic`. Requires `Agent.Service` and `Config.Service` in addition to the other V1 services.
+- `create` → V1 `Session.create` + `toV2Info()` projection
+- `prompt`, `shell`, `skill`, `subagent`, `abort`, `command`, and deferred-loop
+  execution → `SessionPrompt.Engine`
+- `compact`/`summarize`/`init` retain the V1 persistence and orchestration services
+  required at the storage boundary
+- `wait` → session status events, returning immediately when already idle
+- `subagent` → derived permissions, restricted tools, abort handling, and a
+  synthetic result message on the parent session
 
-**V1 service capture**: V1 services (`Session`, `SessionPrompt`, `SessionCompaction`, `SessionStatus`, `Bus`) are captured via `Effect.serviceOption` at layer build time. Read-only methods work without them; write methods die with a clear message if missing (`requireV1()` helper). In production, all V1 services are available via `instanceContextLayer` (`server/routes/instance/httpapi/server.ts:208-225`).
+**Service capture**: read-only methods remain usable without write-side services.
+Write operations fail clearly when a required compatibility or persistence service
+is absent. The V2 layer captures optional services at layer construction and
+captures the instance `Scope` for deferred workers, which outlive HTTP requests
+and terminate with the instance.
 
-**Brand conversion**: V1 uses `ModelID`/`ProviderID` brands (`provider/schema.ts`); V2 uses `Modelv2.ID`/`Modelv2.ProviderID` brands (`v2/model.ts`). They're incompatible — convert via `as unknown as` casts at the boundary (see `toV2Info` and `create`).
+**Model IDs**: V1 and V2 share the `ModelID`/`ProviderID` brands from
+`provider/schema.ts`, re-exported by `v2/model.ts`. `VariantID` remains V2-local;
+the only remaining model conversion is the field-name reshape handled by
+`toPromptModel`.
 
-**Deferred delivery queue**: An in-memory `Set<SessionID>` tracks sessions with staged deferred prompts. `runDeferred(sessionID)` drains a session by calling `SessionPrompt.loop`. Exposed via `Object.assign(result, { runDeferred })` on the service object. A background worker is NOT wired yet — callers/tests trigger `runDeferred` explicitly.
+**Deferred delivery**: deferred prompts are staged in an in-memory session set
+and drained by a worker forked into the V2 layer scope. The queue guard makes
+concurrent drains idempotent; the worker terminates with the instance scope.
 
-**`TODO(v2-native)` markers**: All delegated methods are marked for a future native-loop swap (port `runLoop`/`processor` into V2-native code that emits `SessionEvent` directly without V1).
-
-**Testing** (`test/v2/session.test.ts`, 17 tests): Uses stubbed V1 services (`stubPromptLayer` emits `SessionEvent.Prompted.Sync` + assistant message events to exercise the projector; `stubCompactionLayer` records calls) with real `Session`/`SyncEvent`/`Bus`/`Agent`/`Config`. Follows the `task.test.ts` `stubOps` pattern, not the 20-layer `prompt.test.ts` tower.
+**Testing** (`test/v2/session.test.ts`): tests stub `SessionPrompt.Engine` when
+isolating V2 behavior and retain real persistence/event layers where projection
+behavior is under test.
 
 ## Known Issues
 

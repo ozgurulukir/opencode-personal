@@ -85,7 +85,7 @@ export const layer = Layer.effect(
     const set = Effect.fn("SessionStatus.set")(function* (sessionID: SessionID, status: Info) {
       const data = yield* InstanceState.get(state)
       yield* bus.publish(Event.Status, { sessionID, status })
-      // Native V2 emission (replaces the v2/event-bridge translation)
+      // Native V2 lifecycle emission is published alongside the V1 event
       yield* sync.run(SessionEvent.StatusUpdated.Sync, {
         sessionID,
         timestamp: DateTime.makeUnsafe(Date.now()),

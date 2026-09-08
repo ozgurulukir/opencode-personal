@@ -172,8 +172,8 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
         }
 
         case "session.next.permission.asked": {
-          // The bridge wraps the whole V1 permission payload as `request`, but
-          // the SDK types it `unknown` (it is the V1 PermissionRequest shape).
+          // Native V2 permission events intentionally keep the established
+          // PermissionRequest payload under `request`; the SDK types it unknown.
           const request = event.properties.request as PermissionRequest
           const requests = store.permission[request.sessionID]
           if (!requests) {
@@ -234,8 +234,8 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
         }
 
         case "session.next.todo":
-          // Bridge payloads are typed `unknown` in the SDK; they carry the V1
-          // event shapes (todos: Todo[], info: Session, status, diff).
+          // Lifecycle payloads are intentionally loose in the SDK because the
+          // established todo/session/diff shapes are reused at this boundary.
           setStore("todo", event.properties.sessionID, event.properties.todos as Todo[])
           break
 

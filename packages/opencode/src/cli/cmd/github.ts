@@ -28,6 +28,7 @@ import { MessageID, PartID } from "../../session/schema"
 import { Provider } from "@/provider/provider"
 import { Bus } from "../../bus"
 import { MessageV2 } from "../../session/message-v2"
+import { SessionEvent } from "../../v2/session-event"
 import { SessionPrompt } from "@/session/prompt"
 import { Git } from "@/git"
 import { setTimeout as sleep } from "node:timers/promises"
@@ -889,33 +890,32 @@ export const GithubRunCommand = effectCmd({
           )
         }
 
-        let text = ""
-        Bus.subscribe(MessageV2.Event.PartUpdated, (evt) => {
-          if (evt.properties.part.sessionID !== session.id) return
-          //if (evt.properties.part.messageID === messageID) return
-          const part = evt.properties.part
-
-          if (part.type === "tool" && part.state.status === "completed") {
-            const [tool, color] = TOOL[part.tool] ?? [part.tool, UI.Style.TEXT_INFO_BOLD]
-            const title =
-              part.state.title || Object.keys(part.state.input).length > 0
-                ? JSON.stringify(part.state.input)
-                : "Unknown"
-            console.log()
-            printEvent(color, tool, title)
-          }
-
-          if (part.type === "text") {
-            text = part.text
-
-            if (part.time?.end) {
-              UI.empty()
-              UI.println(UI.markdown(text))
-              UI.empty()
-              text = ""
-              return
-            }
-          }
+        const calls = new Map<string, { tool: string; input: Record<string, unknown> }>()
+        Bus.subscribe(SessionEvent.Tool.Called.Sync, (evt) => {
+          if (evt.properties.sessionID !== session.id) return
+          calls.set(evt.properties.callID, { tool: evt.properties.tool, input: evt.properties.input })
+        })
+        Bus.subscribe(SessionEvent.Tool.Success.Sync, (evt) => {
+          if (evt.properties.sessionID !== session.id) return
+          const call = calls.get(evt.properties.callID)
+          if (!call) return
+          const [tool, color] = TOOL[call.tool] ?? [call.tool, UI.Style.TEXT_INFO_BOLD]
+          const title = Object.keys(call.input).length > 0 ? JSON.stringify(call.input) : "Unknown"
+          console.log()
+          printEvent(color, tool, title)
+          calls.delete(evt.properties.callID)
+        })
+        Bus.subscribe(SessionEvent.Tool.Failed.Sync, (evt) => {
+          if (evt.properties.sessionID !== session.id) return
+          calls.delete(evt.properties.callID)
+        })
+        Bus.subscribe(SessionEvent.Text.Ended.Sync, (evt) => {
+          if (evt.properties.sessionID !== session.id) return
+          const text = evt.properties.text
+          if (!text) return
+          UI.empty()
+          UI.println(UI.markdown(text))
+          UI.empty()
         })
       }
 

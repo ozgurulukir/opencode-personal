@@ -1,6 +1,6 @@
-# V2 session service — delegation architecture
+# V2 session service — projection and shared-engine architecture
 
-## Architecture: V2 is a read model + V1-delegating write facade (by design)
+## Architecture: V2 is a read model backed by a shared prompt engine
 
 The V2 session service (`v2/session.ts`) is **not** an in-progress migration target.
 It is a stable two-layer design:
@@ -8,23 +8,22 @@ It is a stable two-layer design:
 - **Reads** (`get`, `list`, `messages`, `context`) query the `SessionTable` /
   `SessionMessageTable` directly via Drizzle — they do **not** call V1 services and
   work without any V1 service provided.
-- **Writes** (`create`, `prompt`, `shell`, `skill`, `subagent`, `compact`) delegate
-  to the V1 services (`Session`, `SessionPrompt`, `SessionCompaction`). V1 owns the
-  agent loop and all persistence. The V1 write path emits `SessionEvent.*.Sync`
-  unconditionally; the V2 projectors
+- **Writes** (`create`, `prompt`, `shell`, `skill`, `subagent`, `compact`) use the
+  existing session services. Prompt/loop operations use `SessionPrompt.Engine`,
+  while session and compaction persistence still use the corresponding V1
+  services. The shared engine emits `SessionEvent.*.Sync` unconditionally; the V2 projectors
   (`session/projectors-next.ts`) consume those events to populate
   `SessionMessageTable`, which is what the V2 read methods query.
 
-In short: **V1 is the writer and source of truth; V2 is a read projection plus a
-thin API facade that delegates writes back through V1.** This is the intended
-architecture, not a transitional state. The earlier `TODO(v2-native)` markers have
-been removed; each delegation site now carries a comment explaining *why* it
-delegates (the V1 service already handles the concern correctly).
+In short: **V2 is the read projection and API facade; the shared prompt engine is
+the writer for prompt/loop activity, with V1 persistence services retained at the
+storage boundary.** `SessionPrompt.Service` remains a compatibility facade over
+that engine for legacy callers (including the GitHub/workspace integrations and
+the V1 prediction route).
 
 If a future feature genuinely requires events to be the source of truth (e.g.
 multi-session replay, real-time collaboration), that is a separate architectural
-inversion — see the `_plan/` blueprint Step 4. Do not assume the current code is
-"halfway there"; it is a complete delegation bridge.
+inversion — see the `_plan/` blueprint Step 4.
 
 ## Shared model-ID brands (unified 2026-09)
 
@@ -38,9 +37,9 @@ in `v2/session.ts`. The V2 service `prompt()` input takes the V1 model shape dir
 (`{ providerID, modelID }` + separate `variant`), so no conversion happens on the
 prompt path.
 
-## V2 prompt() must pass agent to V1
+## V2 prompt() must pass agent to the shared engine
 
-V2 `prompt()` delegates to V1 `SessionPrompt.prompt`. If `agent` is not passed, V1
+V2 `prompt()` delegates to `SessionPrompt.Engine.prompt`. If `agent` is not passed,
 `createUserMessage` falls back to `agents.defaultAgent()`, detects
 `current.agent !== info.agent`, and emits `AgentSwitched.Sync` — silently
 overwriting the session's agent to the default. Always pass `agent` explicitly
@@ -54,7 +53,19 @@ assembled by V1 separately). `revert` IS projected — it is a SessionTable JSON
 its field schema is reused from `Session.Info.fields.revert` so both projections stay in
 sync. When adding support for a new field, add it to the schema AND wire it in both
 `fromRow()` (DB row → V2 Info) and `toV2Info()` (V1 Info → V2 Info). Missing `toV2Info`
-causes the field to be lost when V1 `Session.create` returns data through the delegation bridge.
+causes the field to be lost when V1 `Session.create` returns data through the V2 write facade.
+
+## V2 message reads normalize legacy persisted rows
+
+`V2Session.messages()` and `session/projectors-next.ts` decode through
+`SessionMessage.normalizeForDecode()` before applying the V2 schema. This keeps
+old rows readable when a user message lacks `agent`/`model` (defaults come from
+the session row, with a safe fallback) and when a provider persisted tool input
+with one or more extra JSON-encoding layers. Running/completed/error tool input
+must reach the V2 schema as a record; malformed input degrades to `{}` so one
+bad historical tool call does not break the session history endpoint. Keep this
+bounded compatibility pass until the deferred storage/backfill cleanup is
+complete, and add regression coverage for any new legacy shape.
 
 ## V2 subagent() service dependencies
 
@@ -69,7 +80,7 @@ compaction (V1 HTTP handler parity). `fork()`/`summarize()` fail with the V2
 `NotFoundError` when the session is missing; `init()` has no typed error channel
 (`SessionPrompt.command` is infallible — V1's `mapError(BadRequest)` was dead code).
 
-## V1 PromptInput.model field names differ from V2 Modelv2.Ref
+## PromptInput.model field names differ from V2 Modelv2.Ref
 
 V1 `PromptInput.model` uses `{ modelID, providerID }` (no `id` or `variant`). V2
 `Modelv2.Ref` uses `{ id, providerID, variant }`. When passing a `Modelv2.Ref` to a V1
@@ -77,10 +88,11 @@ caller (compaction, subagent's inner prompt), map `model.id` → `modelID` and d
 `variant` via the `toPromptModel` helper. The V2 service `prompt()` input already uses
 the V1 shape, so its delegation passes `model`/`variant`/`messageID` straight through.
 
-## V1 SessionPrompt.prompt blocks until loop finishes
+## SessionPrompt prompt blocks until loop finishes
 
-V1 `SessionPrompt.prompt` runs the agent loop synchronously (unless `noReply: true`).
-It returns `MessageV2.WithParts` after the loop completes. Calling `forkChild()` +
+`SessionPrompt.Engine.prompt` runs the agent loop synchronously (unless `noReply: true`);
+the V1 `SessionPrompt.Service` facade has the same behavior. It returns
+`MessageV2.WithParts` after the loop completes. Calling `forkChild()` +
 `wait()` after `prompt()` is redundant — the result is already available when
 `prompt()` returns.
 
@@ -89,8 +101,8 @@ It returns `MessageV2.WithParts` after the loop completes. Calling `forkChild()`
 `subagent()` posts the child's final assistant text back to the parent session as a
 `SessionEvent.Synthetic.Sync` message (so callers observing the parent can see the
 result). The `subagent()` interface returns `void`. This is the delegation design —
-the child loop is driven via V1, and the result is surfaced through the event
-projection. If a caller needs the structured return value, it should read the
+the child loop is driven via the shared engine, and the result is surfaced through
+the event projection. If a caller needs the structured return value, it should read the
 synthetic message from the parent's `messages()`.
 
 ## V2 subagent() fallback deny rules when parent agent is not found

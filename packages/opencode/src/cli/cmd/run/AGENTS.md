@@ -23,6 +23,7 @@ cli/cmd/run/
 ├── session-data.ts        # Reducer orchestrator (imports handlers)
 ├── stream.ts              # Stream transport (imports reducers)
 ├── stream.transport.ts    # Low-level transport (imports stream.ts)
+├── v2-legacy.ts           # V2 history/event → legacy reducer compatibility boundary
 ├── *.shared.ts            # Pure state machines (no imports from above)
 ├── session-data/
 │   ├── handlers/*.ts      # Event-specific handlers (pure, no side effects)
@@ -52,6 +53,23 @@ cli/cmd/run/
    - Orchestrators
    - Types
    - NEVER import handlers directly
+
+## V2 event compatibility boundary
+
+`stream.transport.ts` bootstraps from `sdk.v2.session.messages()` and passes the
+projected messages through `v2-legacy.ts` because the existing scrollback
+reducers still consume V1-shaped `{ info, parts }` data. The same adapter maps
+native `session.next.*` events to the reducer event vocabulary.
+
+Create one adapter per event stream. It keeps per-session message, text,
+reasoning, and tool state while converting native events; never share one
+adapter between unrelated stream lifetimes.
+
+The interactive transport drops dual-published V1 message/session/permission
+events. The production non-interactive `event-loop.ts` runs in explicit native
+mode and drops those V1 copies even when a V1 publish arrives first; its default
+mode remains available for V1-only fixtures. Do not remove this boundary until
+the reducer and the remaining V1 event definitions are removed together.
 
 ## Handler Signature Pattern
 
@@ -185,11 +203,3 @@ This symptom means the DB path has full content but the TUI streaming path lost 
 ## `runSync` → `runPromise` for TUI transport callbacks
 
 `stream.transport.ts` transport callbacks (`selectSubagent`, `runPromptTurn`, `close`) must use `runtime.runPromise`, not `runtime.runSync`. Even when the Effect is `Effect.sync()` (truly synchronous), `runSync` risks blocking the TUI event loop if the Effect ever becomes async. Use `void runtime.runPromise(...).catch(() => {})` to preserve the `void` return type.
-
-## `reduceSubagentData` — `message.part.updated` branch is reachable
-
-`subagent-data.ts:782-784` handles `message.part.updated` by extracting
-`event.properties.part.sessionID`. This branch is reachable when the event carries a
-`part` whose `sessionID` differs from the input `sessionID` (e.g., cross-session part
-updates during subagent bootstrap). Do not remove this branch as dead code without
-verifying the `part.sessionID` invariant.

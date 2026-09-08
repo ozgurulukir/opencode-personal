@@ -62,11 +62,20 @@ const handler = Effect.fn("SessionHttpApi.foo")(function* (ctx) {
 })
 ```
 
-Stable services (like `SessionPrompt.Service`) are yielded once at handler-group construction and closed over. Don't `Effect.provide` layers inside handlers — provide them at the app boundary instead.
+Stable compatibility services (for example `SessionPrompt.Service` used by the
+legacy/prediction paths) are yielded once at handler-group construction and
+closed over. Don't `Effect.provide` layers inside handlers — provide them at the
+app boundary instead.
 
-## `session.get()` only needs `sessionID`, not `directory`
+## Legacy `session.get()` only needs `sessionID`, not `directory`
 
-The `session.get()` handler (`handlers/session.ts:74-76`) calls `session.get(ctx.params.sessionID)` — the `directory` parameter in SDK calls is for HTTP instance routing, not session lookup. The ACP agent's `sdk.session.get({ sessionID })` works without `directory` because the agent connects to a specific server instance directly.
+The legacy `session.get()` handler (`handlers/session.ts`) calls
+`session.get(ctx.params.sessionID)` — the `directory` parameter in SDK calls is
+for HTTP instance routing, not session lookup. Current ACP session operations
+use `sdk.v2.session.*`; do not reintroduce the removed V1 client call sites.
+The V1 session HTTP group is still mounted for compatibility; the 5f consumer
+migration does not remove it. New workspace consumers should use the V2 group,
+while deletion of the V1 group remains a separate, deferred pass.
 
 ## OpenAPI self-referencing component workaround
 

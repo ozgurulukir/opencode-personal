@@ -20,6 +20,9 @@ import { SessionEvent } from "../../src/v2/session-event"
 import { FileAttachment, AgentAttachment } from "../../src/v2/session-prompt"
 import * as DateTime from "effect/DateTime"
 import { Modelv2 } from "../../src/v2/model"
+import { SessionMessage } from "../../src/v2/session-message"
+import { SessionMessageTable, SessionTable } from "../../src/session/session.sql"
+import * as Database from "../../src/storage/db"
 
 afterEach(async () => {
   await disposeAllInstances()
@@ -30,47 +33,42 @@ const ref = {
   modelID: ModelID.make("test-model"),
 }
 
-/** A stub V1 SessionPrompt that records calls and returns canned messages. */
-function stubPromptLayer(opts?: {
-  loopResult?: MessageV2.WithParts
-  failPrompt?: boolean
-}) {
+/** A stub shared prompt engine that records calls and returns canned messages. */
+function stubPromptLayer(opts?: { loopResult?: MessageV2.WithParts; failPrompt?: boolean }) {
   const calls: { prompt: unknown[]; loop: string[]; shell: unknown[] } = { prompt: [], loop: [], shell: [] }
-  const loopResult =
-    opts?.loopResult ??
-    ({
-      info: {
-        id: MessageID.ascending(),
-        role: "assistant",
-        parentID: MessageID.ascending(),
+  const loopResult = opts?.loopResult ?? {
+    info: {
+      id: MessageID.ascending(),
+      role: "assistant",
+      parentID: MessageID.ascending(),
+      sessionID: SessionID.make("ses_stub"),
+      mode: "build",
+      agent: "build",
+      cost: 0,
+      path: { cwd: "/tmp", root: "/tmp" },
+      tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+      modelID: ref.modelID,
+      providerID: ref.providerID,
+      time: { created: Date.now() },
+      finish: "stop",
+    } satisfies MessageV2.Assistant,
+    parts: [
+      {
+        id: PartID.ascending(),
+        messageID: MessageID.ascending(),
         sessionID: SessionID.make("ses_stub"),
-        mode: "build",
-        agent: "build",
-        cost: 0,
-        path: { cwd: "/tmp", root: "/tmp" },
-        tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
-        modelID: ref.modelID,
-        providerID: ref.providerID,
-        time: { created: Date.now() },
-        finish: "stop",
-      } satisfies MessageV2.Assistant,
-      parts: [
-        {
-          id: PartID.ascending(),
-          messageID: MessageID.ascending(),
-          sessionID: SessionID.make("ses_stub"),
-          type: "text",
-          text: "stub result",
-        },
-      ],
-    })
+        type: "text",
+        text: "stub result",
+      },
+    ],
+  }
 
   // The layer depends on SyncEvent.Service so the stub can emit Prompted events.
   const layer = Layer.effect(
-    SessionPrompt.Service,
+    SessionPrompt.Engine,
     Effect.gen(function* () {
       const sync = yield* SyncEvent.Service
-      return SessionPrompt.Service.of({
+      return SessionPrompt.Engine.of({
         prompt: (input: any) =>
           Effect.gen(function* () {
             calls.prompt.push(input)
@@ -175,7 +173,7 @@ function stubCompactionLayer() {
   return { layer, calls }
 }
 
-// Full layer: real Session + SyncEvent + Bus + Config, stubbed prompt/compaction.
+// Full layer: real Session + SyncEvent + Bus + Config, stubbed engine/compaction.
 // Stubs MUST be provided to the V2 layer (not merged alongside) because the V2
 // layer captures them at build time via Effect.serviceOption.
 function makeTestLayer() {
@@ -295,6 +293,93 @@ describe("v2.session", () => {
       // Immediate delivery runs the loop synchronously — the stub emits an
       // assistant message, so the response carries it for usage reporting.
       expect(user.assistant?.type).toBe("assistant")
+    }),
+  )
+
+  it.instance("messages reads legacy user rows without agent or model fields", () =>
+    Effect.gen(function* () {
+      const session = yield* SessionV2.Service
+      const info = yield* session.create({ agent: "build" })
+      const created = Date.now()
+
+      Database.use((db) => {
+        db.update(SessionTable)
+          .set({ model: { id: "legacy-model", providerID: "legacy-provider", variant: "default" } })
+          .where(Database.eq(SessionTable.id, info.id))
+          .run()
+        db.insert(SessionMessageTable)
+          .values([
+            {
+              id: SessionMessage.ID.create(),
+              session_id: info.id,
+              type: "user",
+              time_created: created,
+              data: {
+                text: "legacy prompt",
+                files: [],
+                agents: [],
+                time: { created },
+              } as (typeof SessionMessageTable.$inferInsert)["data"],
+            },
+          ])
+          .run()
+      })
+
+      const messages = yield* session.messages({ sessionID: info.id })
+      const user = messages.find((message): message is SessionMessage.User => message.type === "user")
+      expect(user).toMatchObject({
+        text: "legacy prompt",
+        agent: "build",
+        model: { id: "legacy-model", providerID: "legacy-provider" },
+      })
+    }),
+  )
+
+  it.instance("messages tolerates a JSON-encoded running tool input", () =>
+    Effect.gen(function* () {
+      const session = yield* SessionV2.Service
+      const info = yield* session.create({ agent: "build" })
+      const created = Date.now()
+
+      Database.use((db) => {
+        db.insert(SessionMessageTable)
+          .values([
+            {
+              id: SessionMessage.ID.create(),
+              session_id: info.id,
+              type: "assistant",
+              time_created: created,
+              data: {
+                time: { created },
+                agent: "build",
+                model: { id: "test-model", providerID: "test", variant: "default" },
+                content: [
+                  {
+                    type: "tool",
+                    id: "call_legacy",
+                    name: "write",
+                    state: {
+                      status: "running",
+                      input: JSON.stringify({ content: "legacy source" }),
+                      structured: {},
+                      content: [],
+                    },
+                    time: { created },
+                  },
+                ],
+              } as (typeof SessionMessageTable.$inferInsert)["data"],
+            },
+          ])
+          .run()
+      })
+
+      const messages = yield* session.messages({ sessionID: info.id })
+      const assistant = messages.find((message): message is SessionMessage.Assistant => message.type === "assistant")
+      const tool = assistant?.content.find((item): item is SessionMessage.AssistantTool => item.type === "tool")
+      expect(tool?.state).toMatchObject({
+        status: "running",
+        input: { content: "legacy source" },
+      })
     }),
   )
 
@@ -601,9 +686,7 @@ describe("v2.session", () => {
       // allow todowrite or task, so deriveSubagentSessionPermission adds
       // default denies for both.
       expect(child.permission).toBeDefined()
-      const todowriteDeny = child.permission?.find(
-        (r) => r.permission === "todowrite" && r.action === "deny",
-      )
+      const todowriteDeny = child.permission?.find((r) => r.permission === "todowrite" && r.action === "deny")
       expect(todowriteDeny).toBeDefined()
       const taskDeny = child.permission?.find((r) => r.permission === "task" && r.action === "deny")
       expect(taskDeny).toBeDefined()
@@ -687,27 +770,29 @@ describe("v2.session", () => {
     }),
   )
 
-  it.instance("subagent with primary_tools configured allows them in permission but disables in tools", () =>
-    Effect.gen(function* () {
-      const session = yield* SessionV2.Service
-      const parent = yield* session.create({ agent: "build" })
+  it.instance(
+    "subagent with primary_tools configured allows them in permission but disables in tools",
+    () =>
+      Effect.gen(function* () {
+        const session = yield* SessionV2.Service
+        const parent = yield* session.create({ agent: "build" })
 
-      yield* session.subagent({
-        parentID: parent.id,
-        agent: "general",
-        prompt: { text: "do something" },
-      })
+        yield* session.subagent({
+          parentID: parent.id,
+          agent: "general",
+          prompt: { text: "do something" },
+        })
 
-      const lastCall = promptStub.calls.prompt.at(-1) as any
-      // primary_tools are false'd in tools map; general agent also gets
-      // todowrite: false and task: false from subagentToolRestrictions.
-      expect(lastCall.tools).toEqual({
-        todowrite: false,
-        task: false,
-        bash: false,
-        read: false,
-      })
-    }),
+        const lastCall = promptStub.calls.prompt.at(-1) as any
+        // primary_tools are false'd in tools map; general agent also gets
+        // todowrite: false and task: false from subagentToolRestrictions.
+        expect(lastCall.tools).toEqual({
+          todowrite: false,
+          task: false,
+          bash: false,
+          read: false,
+        })
+      }),
     {
       config: {
         experimental: {
@@ -726,7 +811,11 @@ describe("v2.session", () => {
         parentID: parent.id,
         agent: "general",
         prompt: { text: "do something" },
-        model: { id: Modelv2.ID.make("test-model"), providerID: Modelv2.ProviderID.make("test"), variant: Modelv2.VariantID.make("fast") },
+        model: {
+          id: Modelv2.ID.make("test-model"),
+          providerID: Modelv2.ProviderID.make("test"),
+          variant: Modelv2.VariantID.make("fast"),
+        },
       })
 
       // Verify the child session was created with the variant

@@ -13,12 +13,12 @@ const userMessage = (id: string, sessionID: string): Message => ({
   model: { providerID: "openai", modelID: "gpt" },
 })
 
-const textPart = (id: string, sessionID: string, messageID: string): Text => ({
+const textPart = (id: string, sessionID: string, messageID: string, text = id): Text => ({
   id,
   sessionID,
   messageID,
   type: "text",
-  text: id,
+  text,
 })
 
 describe("sync optimistic reducers", () => {
@@ -60,64 +60,90 @@ describe("sync optimistic reducers", () => {
     const sessionID = "ses_1"
     const page = mergeOptimisticPage(
       {
-        session: [userMessage("msg_1", sessionID)],
-        part: [{ id: "msg_1", part: [textPart("prt_1", sessionID, "msg_1")] }],
+        session: [userMessage("evt_1", sessionID)],
+        part: [{ id: "evt_1", part: [textPart("evt_1:0000:text", sessionID, "evt_1", "server text")] }],
         complete: true,
       },
-      [{ message: userMessage("msg_2", sessionID), parts: [textPart("prt_2", sessionID, "msg_2")] }],
+      [
+        {
+          message: userMessage("msg_2", sessionID),
+          parts: [textPart("prt_2", sessionID, "msg_2", "optimistic text")],
+        },
+      ],
     )
 
-    expect(page.session.map((x) => x.id)).toEqual(["msg_1", "msg_2"])
+    expect(page.session.map((x) => x.id)).toEqual(["evt_1", "msg_2"])
     expect(page.part.find((x) => x.id === "msg_2")?.part.map((x) => x.id)).toEqual(["prt_2"])
     expect(page.confirmed).toEqual([])
     expect(page.complete).toBe(true)
   })
 
-  test("mergeOptimisticPage keeps missing optimistic parts until the server has them", () => {
+  test("mergeOptimisticPage confirms by prompt text and keeps the real message", () => {
     const sessionID = "ses_1"
     const page = mergeOptimisticPage(
       {
-        session: [userMessage("msg_2", sessionID)],
-        part: [{ id: "msg_2", part: [textPart("prt_2", sessionID, "msg_2")] }],
+        session: [userMessage("evt_1", sessionID)],
+        part: [{ id: "evt_1", part: [textPart("evt_1:0000:text", sessionID, "evt_1", "hello")] }],
         complete: true,
       },
       [
         {
           message: userMessage("msg_2", sessionID),
-          parts: [textPart("prt_1", sessionID, "msg_2"), textPart("prt_2", sessionID, "msg_2")],
-        },
-      ],
-    )
-
-    expect(page.part.find((x) => x.id === "msg_2")?.part.map((x) => x.id)).toEqual(["prt_1", "prt_2"])
-    expect(page.confirmed).toEqual([])
-  })
-
-  test("mergeOptimisticPage confirms echoed messages once all parts arrive", () => {
-    const sessionID = "ses_1"
-    const page = mergeOptimisticPage(
-      {
-        session: [userMessage("msg_2", sessionID)],
-        part: [
-          {
-            id: "msg_2",
-            part: [{ ...textPart("prt_1", sessionID, "msg_2"), text: "server" }, textPart("prt_2", sessionID, "msg_2")],
-          },
-        ],
-        complete: true,
-      },
-      [
-        {
-          message: userMessage("msg_2", sessionID),
-          parts: [textPart("prt_1", sessionID, "msg_2"), textPart("prt_2", sessionID, "msg_2")],
+          parts: [textPart("prt_2", sessionID, "msg_2", "hello")],
         },
       ],
     )
 
     expect(page.confirmed).toEqual(["msg_2"])
-    expect(page.part.find((x) => x.id === "msg_2")?.part).toMatchObject([
-      { id: "prt_1", type: "text", text: "server" },
-      { id: "prt_2", type: "text", text: "prt_2" },
-    ])
+    expect(page.session.map((x) => x.id)).toEqual(["evt_1"])
+    expect(page.part.find((x) => x.id === "msg_2")).toBeUndefined()
+  })
+
+  test("mergeOptimisticPage ignores synthetic parts when matching text", () => {
+    const sessionID = "ses_1"
+    const note = "The user made the following comment regarding line 3 of src/a.ts: fix this"
+    const page = mergeOptimisticPage(
+      {
+        session: [userMessage("evt_1", sessionID)],
+        part: [{ id: "evt_1", part: [textPart("evt_1:0000:text", sessionID, "evt_1", "hello")] }],
+        complete: true,
+      },
+      [
+        {
+          message: userMessage("msg_2", sessionID),
+          parts: [
+            textPart("prt_2", sessionID, "msg_2", "hello"),
+            { ...textPart("prt_3", sessionID, "msg_2", note), synthetic: true },
+          ],
+        },
+      ],
+    )
+
+    expect(page.confirmed).toEqual(["msg_2"])
+    expect(page.session.map((x) => x.id)).toEqual(["evt_1"])
+  })
+
+  test("mergeOptimisticPage confirms one entry per matching real message", () => {
+    const sessionID = "ses_1"
+    const page = mergeOptimisticPage(
+      {
+        session: [userMessage("evt_1", sessionID)],
+        part: [{ id: "evt_1", part: [textPart("evt_1:0000:text", sessionID, "evt_1", "hello")] }],
+        complete: true,
+      },
+      [
+        {
+          message: userMessage("msg_2", sessionID),
+          parts: [textPart("prt_2", sessionID, "msg_2", "hello")],
+        },
+        {
+          message: userMessage("msg_3", sessionID),
+          parts: [textPart("prt_3", sessionID, "msg_3", "hello")],
+        },
+      ],
+    )
+
+    expect(page.confirmed).toEqual(["msg_2"])
+    expect(page.session.map((x) => x.id)).toEqual(["evt_1", "msg_3"])
   })
 })

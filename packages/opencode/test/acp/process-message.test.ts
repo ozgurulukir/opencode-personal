@@ -24,107 +24,124 @@ function createTestAgent() {
   return { agent, connection, sessionUpdates, shellSnapshots, toolStarts }
 }
 
-function textMessage(overrides: Record<string, unknown> = {}, parts: Record<string, unknown>[] = []): any {
+const SESSION_ID = "ses_1"
+
+function assistantMessage(content: Record<string, unknown>[], overrides: Record<string, unknown> = {}): any {
   return {
-    info: {
-      id: "msg_1",
-      sessionID: "ses_1",
-      role: "assistant",
-      ...overrides,
-    },
-    parts,
+    id: "msg_1",
+    type: "assistant",
+    agent: "build",
+    model: { id: "test-model", providerID: "test", variant: "default" },
+    time: { created: Date.now() },
+    content,
+    ...overrides,
   }
 }
 
-function textPart(overrides: Record<string, unknown> = {}): any {
+function userMessage(overrides: Record<string, unknown> = {}): any {
   return {
-    id: "part_1",
-    sessionID: "ses_1",
-    messageID: "msg_1",
+    id: "msg_1",
+    type: "user",
+    text: "hello world",
+    files: [],
+    agents: [],
+    agent: "build",
+    model: { id: "test-model", providerID: "test", variant: "default" },
+    time: { created: Date.now() },
+    ...overrides,
+  }
+}
+
+function textContent(overrides: Record<string, unknown> = {}): any {
+  return {
     type: "text",
     text: "hello world",
-    time: { created: Date.now() },
     ...overrides,
   }
 }
 
-function filePart(overrides: Record<string, unknown> = {}): any {
+function fileAttachment(overrides: Record<string, unknown> = {}): any {
   return {
-    id: "part_1",
-    sessionID: "ses_1",
-    messageID: "msg_1",
-    type: "file",
-    url: "file:///tmp/test.txt",
-    filename: "test.txt",
+    uri: "file:///tmp/test.txt",
+    name: "test.txt",
     mime: "text/plain",
-    time: { created: Date.now() },
     ...overrides,
   }
 }
 
-function reasoningPart(overrides: Record<string, unknown> = {}): any {
+function reasoningContent(overrides: Record<string, unknown> = {}): any {
   return {
-    id: "part_1",
-    sessionID: "ses_1",
-    messageID: "msg_1",
     type: "reasoning",
+    id: "reasoning_1",
     text: "thinking...",
-    time: { created: Date.now() },
     ...overrides,
   }
 }
 
-function toolPart(state: string, overrides: Record<string, unknown> = {}): any {
+function toolContent(state: string, overrides: Record<string, unknown> = {}): any {
+  const { state: stateOverride, ...rest } = overrides
   return {
-    id: "part_1",
-    sessionID: "ses_1",
-    messageID: "msg_1",
     type: "tool",
-    callID: "call_1",
-    tool: "read",
+    id: "call_1",
+    name: "read",
+    time: { created: Date.now() },
     state: {
       status: state,
       input: { filePath: "/tmp/test.txt" },
-      ...(state === "completed" ? { output: "file content", title: "read", metadata: {} } : {}),
-      ...(state === "error" ? { error: "boom", metadata: {} } : {}),
-      ...(typeof overrides.state === "object" && overrides.state !== null ? overrides.state : {}),
+      ...(state === "running" ? { structured: {}, content: [] } : {}),
+      ...(state === "completed" ? { structured: {}, content: [{ type: "text", text: "file content" }] } : {}),
+      ...(state === "error" ? { structured: {}, content: [], error: { type: "unknown", message: "boom" } } : {}),
+      ...(typeof stateOverride === "object" && stateOverride !== null ? stateOverride : {}),
     },
+    ...rest,
   }
 }
 
 describe("Agent.processMessage", () => {
-  test("ignores messages with non-assistant/user roles", async () => {
-    const { agent, connection, sessionUpdates, shellSnapshots, toolStarts } = createTestAgent()
-    await processMessage(connection, shellSnapshots, toolStarts,textMessage({ role: "system" }, [textPart()]))
+  test("ignores non-replayable message types", async () => {
+    const { connection, sessionUpdates, shellSnapshots, toolStarts } = createTestAgent()
+    await processMessage(
+      connection,
+      shellSnapshots,
+      toolStarts,
+      SESSION_ID,
+      { id: "msg_1", type: "synthetic", sessionID: SESSION_ID, text: "note", time: { created: Date.now() } },
+    )
     expect(sessionUpdates).toHaveLength(0)
   })
 
-  test("sends agent_message_chunk for assistant text parts", async () => {
-    const { agent, connection, sessionUpdates, shellSnapshots, toolStarts } = createTestAgent()
-    await processMessage(connection, shellSnapshots, toolStarts,textMessage({ role: "assistant" }, [textPart({ text: "hi" })]))
+  test("sends agent_message_chunk for assistant text content", async () => {
+    const { connection, sessionUpdates, shellSnapshots, toolStarts } = createTestAgent()
+    await processMessage(connection, shellSnapshots, toolStarts, SESSION_ID, assistantMessage([textContent({ text: "hi" })]))
     expect(sessionUpdates).toHaveLength(1)
     expect(sessionUpdates[0].update.sessionUpdate).toBe("agent_message_chunk")
     expect(sessionUpdates[0].update.content).toEqual({ type: "text", text: "hi" })
   })
 
-  test("sends user_message_chunk for user text parts", async () => {
-    const { agent, connection, sessionUpdates, shellSnapshots, toolStarts } = createTestAgent()
-    await processMessage(connection, shellSnapshots, toolStarts,textMessage({ role: "user" }, [textPart({ text: "hello" })]))
+  test("sends user_message_chunk for user text", async () => {
+    const { connection, sessionUpdates, shellSnapshots, toolStarts } = createTestAgent()
+    await processMessage(connection, shellSnapshots, toolStarts, SESSION_ID, userMessage({ text: "hello" }))
     expect(sessionUpdates).toHaveLength(1)
     expect(sessionUpdates[0].update.sessionUpdate).toBe("user_message_chunk")
   })
 
-  test("skips empty text parts", async () => {
-    const { agent, connection, sessionUpdates, shellSnapshots, toolStarts } = createTestAgent()
-    await processMessage(connection, shellSnapshots, toolStarts,textMessage({ role: "assistant" }, [textPart({ text: "" })]))
+  test("skips empty text content", async () => {
+    const { connection, sessionUpdates, shellSnapshots, toolStarts } = createTestAgent()
+    await processMessage(connection, shellSnapshots, toolStarts, SESSION_ID, assistantMessage([textContent({ text: "" })]))
     expect(sessionUpdates).toHaveLength(0)
   })
 
-  test("sends resource_link for file:// URLs", async () => {
-    const { agent, connection, sessionUpdates, shellSnapshots, toolStarts } = createTestAgent()
-    await processMessage(connection, shellSnapshots, toolStarts,textMessage({ role: "assistant" }, [filePart()]))
+  test("sends resource_link for file:// attachments", async () => {
+    const { connection, sessionUpdates, shellSnapshots, toolStarts } = createTestAgent()
+    await processMessage(
+      connection,
+      shellSnapshots,
+      toolStarts,
+      SESSION_ID,
+      userMessage({ text: "", files: [fileAttachment()] }),
+    )
     expect(sessionUpdates).toHaveLength(1)
-    expect(sessionUpdates[0].update.sessionUpdate).toBe("agent_message_chunk")
+    expect(sessionUpdates[0].update.sessionUpdate).toBe("user_message_chunk")
     expect(sessionUpdates[0].update.content).toEqual({
       type: "resource_link",
       uri: "file:///tmp/test.txt",
@@ -133,13 +150,18 @@ describe("Agent.processMessage", () => {
     })
   })
 
-  test("sends image block for data:image/* URLs", async () => {
-    const { agent, connection, sessionUpdates, shellSnapshots, toolStarts } = createTestAgent()
-    const part = filePart({
-      url: "data:image/png;base64,abc123",
-      mime: "image/png",
-    })
-    await processMessage(connection, shellSnapshots, toolStarts,textMessage({ role: "assistant" }, [part]))
+  test("sends image block for data:image/* attachments", async () => {
+    const { connection, sessionUpdates, shellSnapshots, toolStarts } = createTestAgent()
+    await processMessage(
+      connection,
+      shellSnapshots,
+      toolStarts,
+      SESSION_ID,
+      userMessage({
+        text: "",
+        files: [fileAttachment({ uri: "data:image/png;base64,abc123", mime: "image/png" })],
+      }),
+    )
     expect(sessionUpdates).toHaveLength(1)
     expect(sessionUpdates[0].update.content).toEqual({
       type: "image",
@@ -149,13 +171,18 @@ describe("Agent.processMessage", () => {
     })
   })
 
-  test("sends resource with text for data:text/* URLs", async () => {
-    const { agent, connection, sessionUpdates, shellSnapshots, toolStarts } = createTestAgent()
-    const part = filePart({
-      url: "data:text/plain;base64,SGVsbG8=",
-      mime: "text/plain",
-    })
-    await processMessage(connection, shellSnapshots, toolStarts,textMessage({ role: "assistant" }, [part]))
+  test("sends resource with text for data:text/* attachments", async () => {
+    const { connection, sessionUpdates, shellSnapshots, toolStarts } = createTestAgent()
+    await processMessage(
+      connection,
+      shellSnapshots,
+      toolStarts,
+      SESSION_ID,
+      userMessage({
+        text: "",
+        files: [fileAttachment({ uri: "data:text/plain;base64,SGVsbG8=", mime: "text/plain" })],
+      }),
+    )
     expect(sessionUpdates).toHaveLength(1)
     const content = sessionUpdates[0].update.content
     expect(content.type).toBe("resource")
@@ -163,13 +190,18 @@ describe("Agent.processMessage", () => {
     expect((content as any).resource.mimeType).toBe("text/plain")
   })
 
-  test("sends resource with blob for binary data URLs", async () => {
-    const { agent, connection, sessionUpdates, shellSnapshots, toolStarts } = createTestAgent()
-    const part = filePart({
-      url: "data:application/pdf;base64,abc123",
-      mime: "application/pdf",
-    })
-    await processMessage(connection, shellSnapshots, toolStarts,textMessage({ role: "assistant" }, [part]))
+  test("sends resource with blob for binary data attachments", async () => {
+    const { connection, sessionUpdates, shellSnapshots, toolStarts } = createTestAgent()
+    await processMessage(
+      connection,
+      shellSnapshots,
+      toolStarts,
+      SESSION_ID,
+      userMessage({
+        text: "",
+        files: [fileAttachment({ uri: "data:application/pdf;base64,abc123", mime: "application/pdf" })],
+      }),
+    )
     expect(sessionUpdates).toHaveLength(1)
     const content = sessionUpdates[0].update.content
     expect(content.type).toBe("resource")
@@ -177,25 +209,25 @@ describe("Agent.processMessage", () => {
     expect((content as any).resource.mimeType).toBe("application/pdf")
   })
 
-  test("sends agent_thought_chunk for reasoning parts", async () => {
-    const { agent, connection, sessionUpdates, shellSnapshots, toolStarts } = createTestAgent()
-    await processMessage(connection, shellSnapshots, toolStarts,textMessage({ role: "assistant" }, [reasoningPart()]))
+  test("sends agent_thought_chunk for reasoning content", async () => {
+    const { connection, sessionUpdates, shellSnapshots, toolStarts } = createTestAgent()
+    await processMessage(connection, shellSnapshots, toolStarts, SESSION_ID, assistantMessage([reasoningContent()]))
     expect(sessionUpdates).toHaveLength(1)
     expect(sessionUpdates[0].update.sessionUpdate).toBe("agent_thought_chunk")
     expect(sessionUpdates[0].update.content).toEqual({ type: "text", text: "thinking..." })
   })
 
-  test("sends tool_call for pending tool parts", async () => {
-    const { agent, connection, sessionUpdates, shellSnapshots, toolStarts } = createTestAgent()
-    await processMessage(connection, shellSnapshots, toolStarts,textMessage({ role: "assistant" }, [toolPart("pending")]))
+  test("sends tool_call for pending tool content", async () => {
+    const { connection, sessionUpdates, shellSnapshots, toolStarts } = createTestAgent()
+    await processMessage(connection, shellSnapshots, toolStarts, SESSION_ID, assistantMessage([toolContent("pending")]))
     expect(sessionUpdates).toHaveLength(1)
     expect(sessionUpdates[0].update.sessionUpdate).toBe("tool_call")
     expect(sessionUpdates[0].update.status).toBe("pending")
   })
 
-  test("sends tool_call then tool_call_update for running tool parts", async () => {
-    const { agent, connection, sessionUpdates, shellSnapshots, toolStarts } = createTestAgent()
-    await processMessage(connection, shellSnapshots, toolStarts,textMessage({ role: "assistant" }, [toolPart("running")]))
+  test("sends tool_call then tool_call_update for running tool content", async () => {
+    const { connection, sessionUpdates, shellSnapshots, toolStarts } = createTestAgent()
+    await processMessage(connection, shellSnapshots, toolStarts, SESSION_ID, assistantMessage([toolContent("running")]))
     expect(sessionUpdates).toHaveLength(2)
     expect(sessionUpdates[0].update.sessionUpdate).toBe("tool_call")
     expect(sessionUpdates[0].update.status).toBe("pending")
@@ -203,9 +235,9 @@ describe("Agent.processMessage", () => {
     expect(sessionUpdates[1].update.status).toBe("in_progress")
   })
 
-  test("sends tool_call then tool_call_update for completed tool parts", async () => {
-    const { agent, connection, sessionUpdates, shellSnapshots, toolStarts } = createTestAgent()
-    await processMessage(connection, shellSnapshots, toolStarts,textMessage({ role: "assistant" }, [toolPart("completed")]))
+  test("sends tool_call then tool_call_update for completed tool content", async () => {
+    const { connection, sessionUpdates, shellSnapshots, toolStarts } = createTestAgent()
+    await processMessage(connection, shellSnapshots, toolStarts, SESSION_ID, assistantMessage([toolContent("completed")]))
     expect(sessionUpdates).toHaveLength(2)
     expect(sessionUpdates[0].update.sessionUpdate).toBe("tool_call")
     expect(sessionUpdates[0].update.status).toBe("pending")
@@ -214,9 +246,9 @@ describe("Agent.processMessage", () => {
     expect(sessionUpdates[1].update.toolCallId).toBe("call_1")
   })
 
-  test("sends tool_call then tool_call_update for error tool parts", async () => {
-    const { agent, connection, sessionUpdates, shellSnapshots, toolStarts } = createTestAgent()
-    await processMessage(connection, shellSnapshots, toolStarts,textMessage({ role: "assistant" }, [toolPart("error")]))
+  test("sends tool_call then tool_call_update for error tool content", async () => {
+    const { connection, sessionUpdates, shellSnapshots, toolStarts } = createTestAgent()
+    await processMessage(connection, shellSnapshots, toolStarts, SESSION_ID, assistantMessage([toolContent("error")]))
     expect(sessionUpdates).toHaveLength(2)
     expect(sessionUpdates[0].update.sessionUpdate).toBe("tool_call")
     expect(sessionUpdates[0].update.status).toBe("pending")
@@ -226,20 +258,23 @@ describe("Agent.processMessage", () => {
   })
 
   test("sends plan update when todowrite tool completes with valid output", async () => {
-    const { agent, connection, sessionUpdates, shellSnapshots, toolStarts } = createTestAgent()
-    await processMessage(connection, shellSnapshots, toolStarts,
-      textMessage({ role: "assistant" }, [
-        {
-          ...toolPart("completed"),
-          tool: "todowrite",
+    const { connection, sessionUpdates, shellSnapshots, toolStarts } = createTestAgent()
+    await processMessage(
+      connection,
+      shellSnapshots,
+      toolStarts,
+      SESSION_ID,
+      assistantMessage([
+        toolContent("completed", {
+          id: "call_1",
+          name: "todowrite",
           state: {
             status: "completed",
             input: {},
-            output: JSON.stringify([{ content: "task 1", status: "pending", priority: "medium" }]),
-            title: "todowrite",
-            metadata: {},
+            structured: {},
+            content: [{ type: "text", text: JSON.stringify([{ content: "task 1", status: "pending", priority: "medium" }]) }],
           },
-        },
+        }),
       ]),
     )
     expect(sessionUpdates).toHaveLength(3)
@@ -250,14 +285,18 @@ describe("Agent.processMessage", () => {
     expect((planUpdate as any).update.entries[0].status).toBe("pending")
   })
 
-  test("processes mixed part types in one message", async () => {
-    const { agent, connection, sessionUpdates, shellSnapshots, toolStarts } = createTestAgent()
-    await processMessage(connection, shellSnapshots, toolStarts,
-      textMessage({ role: "assistant" }, [
-        textPart({ id: "p1", text: "text" }),
-        reasoningPart({ id: "p2", text: "thought" }),
-        toolPart("completed", {
-          state: { status: "completed", input: {}, output: "done", title: "read", metadata: {} },
+  test("processes mixed content types in one message", async () => {
+    const { connection, sessionUpdates, shellSnapshots, toolStarts } = createTestAgent()
+    await processMessage(
+      connection,
+      shellSnapshots,
+      toolStarts,
+      SESSION_ID,
+      assistantMessage([
+        textContent({ text: "text" }),
+        reasoningContent({ text: "thought" }),
+        toolContent("completed", {
+          state: { status: "completed", input: {}, structured: {}, content: [{ type: "text", text: "done" }] },
         }),
       ]),
     )
@@ -267,5 +306,29 @@ describe("Agent.processMessage", () => {
     expect(sessionUpdates[2].update.sessionUpdate).toBe("tool_call")
     expect(sessionUpdates[3].update.sessionUpdate).toBe("tool_call_update")
     expect(sessionUpdates[3].update.status).toBe("completed")
+  })
+
+  test("sends completed tool_call for shell messages", async () => {
+    const { connection, sessionUpdates, shellSnapshots, toolStarts } = createTestAgent()
+    await processMessage(
+      connection,
+      shellSnapshots,
+      toolStarts,
+      SESSION_ID,
+      {
+        id: "msg_1",
+        type: "shell",
+        callID: "call_shell",
+        command: "echo hi",
+        output: "hi\n",
+        time: { created: Date.now(), completed: Date.now() },
+      } as any,
+    )
+    expect(sessionUpdates).toHaveLength(1)
+    expect(sessionUpdates[0].update.sessionUpdate).toBe("tool_call")
+    expect(sessionUpdates[0].update.status).toBe("completed")
+    expect(sessionUpdates[0].update.toolCallId).toBe("call_shell")
+    expect(sessionUpdates[0].update.rawInput).toEqual({ command: "echo hi" })
+    expect(sessionUpdates[0].update.content).toEqual([{ type: "content", content: { type: "text", text: "hi\n" } }])
   })
 })

@@ -1,6 +1,7 @@
 import { NodeFileSystem } from "@effect/platform-node"
 import { beforeEach, describe, expect } from "bun:test"
 import { Effect, Exit, Layer, Option } from "effect"
+import * as DateTime from "effect/DateTime"
 import { HttpClient, HttpClientRequest, HttpClientResponse } from "effect/unstable/http"
 
 import { AccessToken, AccountID, OrgID, RefreshToken } from "../../src/account/schema"
@@ -12,6 +13,7 @@ import { Config } from "@/config/config"
 import { Provider } from "@/provider/provider"
 import { Session } from "@/session/session"
 import type { SessionID } from "../../src/session/schema"
+import { SessionEvent } from "../../src/v2/session-event"
 import { ShareNext } from "@/share/share-next"
 import { SessionShareTable } from "../../src/share/share.sql"
 import { Database } from "@/storage/db"
@@ -268,8 +270,9 @@ describe("ShareNext", () => {
             ),
           )
 
-          yield* bus.publish(Session.Event.Diff, {
+          yield* bus.publish(SessionEvent.DiffUpdated.Sync, {
             sessionID: info.id,
+            timestamp: DateTime.makeUnsafe(Date.now()),
             diff: [
               {
                 file: "a.ts",
@@ -281,8 +284,9 @@ describe("ShareNext", () => {
               },
             ],
           })
-          yield* bus.publish(Session.Event.Diff, {
+          yield* bus.publish(SessionEvent.DiffUpdated.Sync, {
             sessionID: info.id,
+            timestamp: DateTime.makeUnsafe(Date.now()),
             diff: [
               {
                 file: "b.ts",

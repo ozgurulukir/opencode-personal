@@ -622,7 +622,7 @@ export const RunCommand = effectCmd({
             toolError,
             client,
           }
-          loop(ctx, events).catch((e) => {
+          loop(ctx, events, { native: true }).catch((e) => {
             console.error(e)
             process.exit(1)
           })

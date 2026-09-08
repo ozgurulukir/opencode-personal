@@ -1,11 +1,15 @@
 # V1/V2 Synthesis — Phase 1+2 (Brands + Event System) — 2026-09-06
 
+Status: COMPLETE — implementation landed in `cb7fbd990` and its descendants; post-implementation audit recorded 2026-09-08.
+
+> This document preserves the 2026-09-06 planning baseline. Current-state claims and line anchors below are historical unless explicitly marked as an audit.
+
 ## Goal
 
 Remove the two cheapest coupling layers between the V1 session engine and the V2 facade:
 
 1. **Phase 1 — Brand unification**: eliminate the `ModelID`/`Modelv2.ID` brand mismatch and the cast helpers at the delegation boundary.
-2. **Phase 2 — Event system unification**: make the V2 `SessionEvent.*.Sync` stream unconditional (remove the `OPENCODE_EXPERIMENTAL_EVENT_SYSTEM` flag and its 20 gate sites).
+2. **Phase 2 — Event system unification**: make the V2 `SessionEvent.*.Sync` stream unconditional (remove the `OPENCODE_EXPERIMENTAL_EVENT_SYSTEM` flag and its initially estimated 20 gate sites; the exact implementation census was 19).
 
 Both phases are small-diff, independently shippable, and reversible. Neither rewrites the engine, touches the HTTP API surface, or changes the wire format.
 
@@ -35,7 +39,7 @@ Both phases are small-diff, independently shippable, and reversible. Neither rew
 
 ## Phase 1 — Brand unification
 
-> **Status: DONE (2026-09-06).** `v2/model.ts` re-exports V1 brands; cast helpers replaced by `toPromptModel`; `toV2Info` casts removed; unused `Modelv2` import dropped from `session/prompt.ts`; docs updated (v2/AGENTS.md + root AGENTS.md). Verified: typecheck opencode + app clean, test/v2/ 31 pass, run-loop characterization 4 pass, oxlint no new warnings. Not committed.
+> **Status: DONE (2026-09-06).** `v2/model.ts` re-exports V1 brands; cast helpers replaced by `toPromptModel`; `toV2Info` casts removed; unused `Modelv2` import dropped from `session/prompt.ts`; docs updated (v2/AGENTS.md + root AGENTS.md). Verified: typecheck opencode + app clean, test/v2/ 31 pass, run-loop characterization 4 pass, oxlint no new warnings. The implementation was later committed as part of `cb7fbd990` and its descendants.
 
 **Direction:** unify on the **V1 brands** (`ModelID`, `ProviderID` from `provider/schema.ts`). Rationale: 84 vs ~31 usage asymmetry, the provider layer is the single source of truth for model identity, and the provider layer is otherwise cast-clean (1 known cast). `VariantID` has no V1 counterpart and stays in `v2/model.ts`.
 
@@ -95,7 +99,7 @@ SDK regen NOT required (brand symbols don't affect openapi.json), but run `bun t
 
 ## Phase 2 — Event system unification (flag removal)
 
-> **Status: DONE (2026-09-06).** All 19 gate sites stripped (processor ×13 incl. the `Retried` ternary, compaction ×2, create-user-message ×2, shell ×2); `SessionV2Debug` registered unconditionally; flag deleted from `flag.ts`; `test/preload.ts` env line removed; docs updated (root AGENTS.md, packages/opencode/AGENTS.md, v2/AGENTS.md, v2/session.ts comment). Zero `Flag`/`OPENCODE_EXPERIMENTAL_EVENT_SYSTEM` references remain in code. Verified: typecheck core+opencode+app clean; full suite 97-100 fails — baseline comparison on the critical files (processor-effect 11/1, prompt.test 2-3 flaky fails, plugin-loader 1 fail) shows IDENTICAL failure sets with and without the change → all pre-existing order-dependent flakes. Runtime smoke: flag key absent from `Flag`. NOT performed: interactive TUI smoke (`bun dev` + session-v2 route) — needs live LLM session. Not committed.
+> **Status: DONE (2026-09-06).** All 19 gate sites stripped (processor ×13 incl. the `Retried` ternary, compaction ×2, create-user-message ×2, shell ×2); `SessionV2Debug` registered unconditionally; flag deleted from `flag.ts`; `test/preload.ts` env line removed; docs updated (root AGENTS.md, packages/opencode/AGENTS.md, v2/AGENTS.md, v2/session.ts comment). Zero `OPENCODE_EXPERIMENTAL_EVENT_SYSTEM` references remain in code; other, unrelated `Flag` uses remain. Verified: typecheck core+opencode+app clean; full suite 97-100 fails — baseline comparison on the critical files (processor-effect 11/1, prompt.test 2-3 flaky fails, plugin-loader 1 fail) shows IDENTICAL failure sets with and without the change → all pre-existing order-dependent flakes. Runtime smoke: flag key absent from `Flag`. NOT performed: interactive TUI smoke (`bun dev` + session-v2 route) — needs live LLM session. The implementation was later committed as part of `cb7fbd990` and its descendants.
 
 **Semantics:** every gate wraps only `yield* sync.run(SessionEvent.*.Sync, {...})`. Removal = the V2 projection becomes unconditional. V1 emissions are untouched.
 
@@ -159,3 +163,10 @@ Both phases are small, mechanical diffs. `git revert` per phase is sufficient. N
 - Phase 3: port the 22 V1 HTTP endpoints (`/session/*`) to V2 schemas/handlers.
 - Phase 4: re-home `session/loop/*` + `processor.ts` + `compaction.ts` as the engine behind `V2Session`.
 - Phase 5: delete V1 bus events, TUI `sync.tsx` (21 `useSync()` consumers), legacy JSON `Storage.Service`, backfill tooling.
+
+## Post-implementation audit (2026-09-08)
+
+- Both phases are implemented and carried forward in the Phase 3+ commit lineage; the old “Not committed” notes above were historical at the time of writing and are corrected in the batch statuses.
+- The Phase 2 gate count is corrected: 20 was the initial estimate, while the exact stripped-site census was 19.
+- The event-system flag has no remaining code references. Unrelated `Flag` definitions/usages are expected and were not removed.
+- The interactive TUI smoke test documented in the original verification remains unperformed. Later Phase 4/5 TUI smoke coverage exists, but it is not a substitute for the exact no-env-var smoke described here.

@@ -42,6 +42,7 @@ import {
   SUBAGENT_CALL_BOOTSTRAP_LIMIT,
   type SubagentData,
 } from "./subagent-data"
+import { createV2EventAdapter, isMigratedLegacyEvent, sessionMessagesToLegacy } from "./v2-legacy"
 import { traceFooterOutput, writeSessionOutput } from "./stream"
 import type {
   FooterApi,
@@ -439,6 +440,7 @@ function createLayer(input: StreamInput) {
           blockerTick: 0,
           blockers: new Map(),
         }
+        const eventAdapter = createV2EventAdapter()
         const recovering = new Set<string>()
         const currentSubagentState = () => {
           if (state.selectedSubagent && !state.subagent.tabs.has(state.selectedSubagent)) {
@@ -559,12 +561,13 @@ function createLayer(input: StreamInput) {
 
         const messages = (sessionID: string, limit: number) =>
           Effect.promise(() =>
-            input.sdk.session.messages({
+            input.sdk.v2.session.messages({
               sessionID,
               limit,
+              order: "desc",
             }),
           ).pipe(
-            Effect.map((item) => item.data ?? []),
+            Effect.map((item) => sessionMessagesToLegacy((item.data?.items ?? []).slice().reverse(), sessionID)),
             Effect.orElseSucceed(() => []),
           )
 
@@ -799,59 +802,61 @@ function createLayer(input: StreamInput) {
             return
           }
 
-          const event = globalPayloadEvent(item)
-          if (!event) {
+          const rawEvent = globalPayloadEvent(item)
+          if (!rawEvent || isMigratedLegacyEvent(rawEvent.type)) {
             return
           }
 
-          const sessionID = sid(event)
-          if (sessionID !== input.sessionID && (!sessionID || !state.subagent.tabs.has(sessionID))) {
-            return
+          for (const event of eventAdapter.adapt(rawEvent)) {
+            const sessionID = sid(event)
+            if (sessionID !== input.sessionID && (!sessionID || !state.subagent.tabs.has(sessionID))) {
+              continue
+            }
+
+            input.trace?.write("recv.event", event)
+            trackBlocker(event)
+
+            const prev = event.type === "message.part.updated" ? listSubagentTabs(state.subagent) : undefined
+            const next = reduceSessionData({
+              data: state.data,
+              event,
+              sessionID: input.sessionID,
+              thinking: input.thinking,
+              limits: input.limits(),
+            })
+            state.data = next.data
+
+            if (
+              event.type === "message.part.updated" &&
+              event.properties.part.sessionID === input.sessionID &&
+              event.properties.part.type === "tool" &&
+              event.properties.part.tool === "question" &&
+              event.properties.part.state.status === "running" &&
+              state.data.questions.length === 0
+            ) {
+              yield* recoverQuestion(event.properties.part.id).pipe(
+                Effect.forkIn(scope, { startImmediately: true }),
+                Effect.asVoid,
+              )
+            }
+
+            const changed = reduceSubagentData({
+              data: state.subagent,
+              event,
+              sessionID: input.sessionID,
+              thinking: input.thinking,
+              limits: input.limits(),
+            })
+            if (changed && prev) {
+              traceTabs(input.trace, prev, listSubagentTabs(state.subagent))
+            }
+            releaseBlocker(event)
+
+            syncFooter(next.commits, next.footer?.patch, changed ? currentSubagentState() : undefined)
+
+            touch(event)
+            yield* mark(event)
           }
-
-          input.trace?.write("recv.event", event)
-          trackBlocker(event)
-
-          const prev = event.type === "message.part.updated" ? listSubagentTabs(state.subagent) : undefined
-          const next = reduceSessionData({
-            data: state.data,
-            event,
-            sessionID: input.sessionID,
-            thinking: input.thinking,
-            limits: input.limits(),
-          })
-          state.data = next.data
-
-          if (
-            event.type === "message.part.updated" &&
-            event.properties.part.sessionID === input.sessionID &&
-            event.properties.part.type === "tool" &&
-            event.properties.part.tool === "question" &&
-            event.properties.part.state.status === "running" &&
-            state.data.questions.length === 0
-          ) {
-            yield* recoverQuestion(event.properties.part.id).pipe(
-              Effect.forkIn(scope, { startImmediately: true }),
-              Effect.asVoid,
-            )
-          }
-
-          const changed = reduceSubagentData({
-            data: state.subagent,
-            event,
-            sessionID: input.sessionID,
-            thinking: input.thinking,
-            limits: input.limits(),
-          })
-          if (changed && prev) {
-            traceTabs(input.trace, prev, listSubagentTabs(state.subagent))
-          }
-          releaseBlocker(event)
-
-          syncFooter(next.commits, next.footer?.patch, changed ? currentSubagentState() : undefined)
-
-          touch(event)
-          yield* mark(event)
         })
 
         const loop = Effect.fn("RunStreamTransport.watchLoop")(function* (stream: AsyncIterable<unknown>) {

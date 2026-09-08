@@ -1,12 +1,14 @@
 # V1/V2 Synthesis — Phase 4: TUI sync unification + remaining read migrations
 
 Date: 2026-09-07
-Status: IN PROGRESS — 4a done, 4b done, 4c done, 4d done, Phase 4 complete
+Status: COMPLETE — 4a done, 4b done, 4c done, 4d done; post-implementation audit recorded 2026-09-08.
+
+> This document preserves the Phase 4 historical plan and batch snapshots. Phase 5 supersedes the temporary event-bridge and ACP decisions noted below.
 Depends on: Phase 3 (complete — commits `cb7fbd990`..`d6330086f`, build verified)
 
 ## Batch status (updated 2026-09-07)
 
-- **4a — DONE.** Event bridge (`src/v2/event-bridge.ts`) translates all 7 lifecycle
+- **4a — DONE (historical bridge implementation; superseded by Phase 5e-2).** Event bridge (`src/v2/event-bridge.ts`) translated all 7 lifecycle
   events; wired into `project/bootstrap.ts`. Two bridge bugs found and fixed by the new
   test: (1) the 7 bridged events had no projectors, so `SyncEvent.run` threw
   "Projector not found" — no-op projectors added in `session/projectors-next.ts`;
@@ -50,7 +52,9 @@ Depends on: Phase 3 (complete — commits `cb7fbd990`..`d6330086f`, build verifi
     so V2 event `timestamp` arrives as an ISO string over SSE while the schema declares
     millis (`V2Schema.DateTimeUtcFromMillis`). Normalized consumer-side via `eventTime()`;
     root fix is encoding at publish in `SyncEvent.process()`.
-- **4d — DONE (2026-09-07).** Executed per the census + decisions above:
+  - Post-Phase-5 note: the `session.next.*` vocabulary remains, but lifecycle producers
+    now emit it natively; it no longer depends on the bridge described by this snapshot.
+- **4d — DONE (2026-09-07; ACP decision superseded by Phase 5d).** Executed per the census + decisions above:
   - V2 sync `prompt` payload extended with `agent?`/`model?`/`variant?`/`messageID?`
     (D1); V2 service prompt input takes the V1 model shape + `variant`/`messageID`
     straight through. `toPromptModel` kept (still used by `summarize` + subagent's
@@ -73,11 +77,11 @@ Depends on: Phase 3 (complete — commits `cb7fbd990`..`d6330086f`, build verifi
     only the documented pre-existing pair (`provider HttpApi > serves OAuth authorize
     response shapes`, `v2 SDK error shape > 404 with responseStyle data…`) plus
     provider parallel-load 5s-timeout flakes (AGENTS.md Known Issues class).
-  - acp `prompt` + `command` remain on V1 (D4) — Phase 5 must extend the V2 sync
-    prompt response (final assistant message with tokens) or restructure ACP usage
-    reporting before those can move.
+  - At the time of Phase 4, acp `prompt` + `command` remained on V1 (D4). Phase 5d
+    subsequently migrated both to V2 and pairs the response with the final assistant
+    message for usage reporting.
 
-#### 4d census (verified, replaces the "~55 sites" estimate from Phase 3)
+#### 4d census (historical snapshot, verified 2026-09-07; later superseded by Phase 5)
 
 Remaining V1 session-domain HTTP client calls (grep `client.session.|sdk.session.` minus
 `v2.`, excluding server-internal + Effect-service callers):
@@ -136,6 +140,13 @@ app `sendFollowupDraft.ts`.
 4. Typecheck both packages; tests: `test/v2/ test/server/ test/cli/cmd/run/
    test/cli/cmd/tui/` + app `test:unit`.
 5. Update this file's batch status.
+
+## Post-implementation audit (2026-09-08)
+
+- Phase 4 is complete. Its bridge-based 4a implementation was intentionally replaced by native lifecycle emission in 5e-2; `v2/event-bridge.ts` and its bootstrap wiring are deleted.
+- The 4d ACP “stay V1” decision was intentionally reversed in 5d. The historical census is retained for traceability, not as the current consumer census.
+- The 4c V1-shaped app/TUI compatibility slices were later completed through the Phase 5 app adapter batch; the V2 event vocabulary remains the source stream.
+- The wire-format compatibility normalizer remains necessary for legacy/replay paths even after publish-time timestamp encoding; removing `eventTime()` is therefore not an unverified cleanup.
 
 ## Goal
 

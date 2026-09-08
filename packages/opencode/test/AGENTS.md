@@ -170,4 +170,8 @@ This is much shorter than stubbing every method with `Effect.void` / `Effect.suc
 
 ## V2 subagent error-path test coverage
 
-`test/v2/session.test.ts` stubs `SessionPrompt.prompt` to return successfully by default, so the subagent error path (synthetic error message to parent) is not exercised. Use `stubPromptLayer({ failPrompt: true })` or a custom stub that throws to verify `SessionEvent.Synthetic.Sync` is posted with the error text when the child loop fails.
+`test/v2/session.test.ts` stubs `SessionPrompt.Engine` to return successfully
+by default, so the subagent error path (synthetic error message to parent) is
+not exercised. Use `stubPromptLayer({ failPrompt: true })` or a custom engine
+stub that fails to verify `SessionEvent.Synthetic.Sync` is posted with the
+error text when the child loop fails.

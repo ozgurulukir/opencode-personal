@@ -80,6 +80,7 @@ import {
 } from "./layout/deep-links"
 import { createInlineEditorController } from "./layout/inline-editor"
 import { createPrefetchQueues } from "./layout/prefetch-queue"
+import { sessionMessagesToV1 } from "@/context/global-sync/v2-adapter"
 import {
   LocalWorkspace,
   SortableWorkspace,
@@ -742,20 +743,25 @@ export default function Layout(props: ParentProps) {
       directory,
       sessionID,
       task: (rev) =>
-        retry(() => globalSDK.client.session.messages({ directory, sessionID, limit: prefetchChunk }))
+        retry(() =>
+          globalSDK.client.v2.session.messages({ directory, sessionID, limit: prefetchChunk, order: "desc" }),
+        )
           .then((messages) => {
             if (prefetchToken.value !== token) return
             if (!isSessionPrefetchCurrent(directory, sessionID, rev)) return
 
-            const items = (messages.data ?? []).filter((x) => !!x?.info?.id)
-            const next = items.map((x) => x.info).filter((m): m is Message => !!m?.id)
-            const sorted = mergeByID([], next)
+            const items = (messages.data?.items ?? []).filter((x) => !!x?.id)
+            // Pages are newest-first; the store slices are ascending (oldest
+            // first). Convert through the V2→V1 adapter so prefetched data
+            // matches what the event stream writes.
+            const converted = sessionMessagesToV1(items.toReversed(), sessionID)
+            const sorted = mergeByID([], converted.session)
             const stale = markPrefetched(directory, sessionID)
-            const cursor = messages.response!.headers.get("x-next-cursor") ?? undefined
+            const cursor = messages.data?.cursor.next
             const meta = {
               limit: sorted.length,
               cursor,
-              complete: !cursor,
+              complete: sorted.length < prefetchChunk,
               at: Date.now(),
             }
 
@@ -786,14 +792,14 @@ export default function Layout(props: ParentProps) {
               setStore("message", sessionID, reconcile(merged, { key: "id" }))
               setSessionPrefetch({ directory, sessionID, ...meta })
 
-              for (const message of items) {
-                const currentParts = store.part[message.info.id] ?? []
+              for (const [messageID, parts] of Object.entries(converted.part)) {
+                const currentParts = store.part[messageID] ?? []
                 const mergedParts = mergeByID(
                   currentParts.filter((item): item is (typeof currentParts)[number] & { id: string } => !!item?.id),
-                  message.parts.filter((item): item is (typeof message.parts)[number] & { id: string } => !!item?.id),
+                  parts.filter((item): item is (typeof parts)[number] & { id: string } => !!item?.id),
                 )
 
-                setStore("part", message.info.id, reconcile(mergedParts, { key: "id" }))
+                setStore("part", messageID, reconcile(mergedParts, { key: "id" }))
               }
             })
 

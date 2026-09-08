@@ -13,7 +13,8 @@ import { useGlobalSync } from "./global-sync"
 import { useSDK } from "./sdk"
 import type { Message, Part } from "@opencode-ai/sdk/v2/client"
 import { SESSION_CACHE_LIMIT, dropSessionCaches, pickSessionCacheEvictions } from "./global-sync/session-cache"
-import { diffs as list, message as clean } from "@/utils/diffs"
+import { diffs as list } from "@/utils/diffs"
+import { messageText, sessionMessagesToV1 } from "./global-sync/v2-adapter"
 
 const SKIP_PARTS = new Set(["patch", "step-start", "step-finish"])
 
@@ -69,44 +70,38 @@ type MessagePage = {
   complete: boolean
 }
 
-const hasParts = (parts: Part[] | undefined, want: Part[]) => {
-  if (!parts) return want.length === 0
-  return want.every((part) => Binary.search(parts, part.id, (item) => item.id).found)
-}
-
-const mergeParts = (parts: Part[] | undefined, want: Part[]) => {
-  if (!parts) return sortParts(want)
-  const next = [...parts]
-  let changed = false
-  for (const part of want) {
-    const result = Binary.search(next, part.id, (item) => item.id)
-    if (result.found) continue
-    next.splice(result.index, 0, part)
-    changed = true
-  }
-  if (!changed) return parts
-  return next
-}
-
 export function mergeOptimisticPage(page: MessagePage, items: OptimisticItem[]) {
   if (items.length === 0) return { ...page, confirmed: [] as string[] }
 
-  const session = [...page.session]
-  const part = new Map(page.part.map((item) => [item.id, sortParts(item.part)]))
+  // One persisted user message confirms at most one optimistic entry, so
+  // duplicate in-flight texts stay pending until their own message lands.
+  // V2 message ids are event ids, not the client's messageID, so matching is
+  // by prompt text (both sides build it identically via messageText).
+  const unmatched = page.session
+    .filter((message) => message.role === "user")
+    .map((message) => ({
+      id: message.id,
+      text: messageText(page.part.find((entry) => entry.id === message.id)?.part ?? []),
+    }))
   const confirmed: string[] = []
+  const pending: OptimisticItem[] = []
 
   for (const item of items) {
-    const result = Binary.search(session, item.message.id, (message) => message.id)
-    const found = result.found
-    if (!found) session.splice(result.index, 0, item.message)
-
-    const current = part.get(item.message.id)
-    if (found && hasParts(current, item.parts)) {
+    const index = unmatched.findIndex((entry) => entry.text === messageText(item.parts))
+    if (index >= 0) {
+      unmatched.splice(index, 1)
       confirmed.push(item.message.id)
       continue
     }
+    pending.push(item)
+  }
 
-    part.set(item.message.id, mergeParts(current, item.parts))
+  const session = [...page.session]
+  const part = new Map(page.part.map((entry) => [entry.id, sortParts(entry.part)]))
+  for (const item of pending) {
+    const result = Binary.search(session, item.message.id, (message) => message.id)
+    session.splice(result.index, 0, item.message)
+    part.set(item.message.id, sortParts(item.parts))
   }
 
   return {
@@ -230,6 +225,24 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
       ...(optimistic.get(keyFor(directory, sessionID))?.values() ?? []),
     ]
 
+    // Called by the event reducer when a real projected user message arrives:
+    // evicts the optimistic entry (and its store copy) whose prompt text
+    // matches, so the timeline never shows both. One real message consumes
+    // one entry.
+    const resolveOptimistic = (directory: string, sessionID: string, text: string) => {
+      const list = optimistic.get(keyFor(directory, sessionID))
+      if (!list) return
+      for (const [messageID, item] of list) {
+        if (messageText(item.parts) !== text) continue
+        clearOptimistic(directory, sessionID, messageID)
+        const [, setStore] = target(directory)
+        setOptimisticRemove(setStore as (...args: unknown[]) => void, { sessionID, messageID })
+        return
+      }
+    }
+
+    globalSync.setOptimisticResolver(resolveOptimistic)
+
     const seenFor = (directory: string) => {
       const existing = seen.get(directory)
       if (existing) {
@@ -295,20 +308,28 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
       client: typeof sdk.client
       sessionID: string
       limit: number
-      before?: string
+      cursor?: string
     }) => {
       const messages = await retry(() =>
-        input.client.session.messages({ sessionID: input.sessionID, limit: input.limit, before: input.before }),
+        input.client.v2.session.messages({
+          sessionID: input.sessionID,
+          limit: input.limit,
+          order: "desc",
+          cursor: input.cursor,
+        }),
       )
-      const items = (messages.data ?? []).filter((x) => !!x?.info?.id)
-      const session = items.map((x) => clean(x.info)).sort((a, b) => cmp(a.id, b.id))
-      const part = items.map((message) => ({ id: message.info.id, part: sortParts(message.parts) }))
-      const cursor = messages.response!.headers.get("x-next-cursor") ?? undefined
+      const items = (messages.data?.items ?? []).filter((x) => !!x?.id)
+      // The v2 endpoint always encodes cursor.next for a non-empty page, so
+      // completeness is derived from the page size instead (a short page means
+      // the older boundary was exhausted).
+      const cursor = messages.data?.cursor.next
+      // Pages are newest-first; the store slices are ascending (oldest first).
+      const converted = sessionMessagesToV1(items.toReversed(), input.sessionID)
       return {
-        session,
-        part,
+        session: converted.session,
+        part: Object.entries(converted.part).map(([id, part]) => ({ id, part })),
         cursor,
-        complete: !cursor,
+        complete: items.length < input.limit,
       }
     }
 
@@ -320,7 +341,7 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
       setStore: Setter
       sessionID: string
       limit: number
-      before?: string
+      cursor?: string
       mode?: "replace" | "prepend"
     }) => {
       const key = keyFor(input.directory, input.sessionID)
@@ -402,30 +423,6 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
             clearOptimistic(directory, input.sessionID, input.messageID)
             setOptimisticRemove(setStore as (...args: unknown[]) => void, input)
           },
-        },
-        addOptimisticMessage(input: {
-          sessionID: string
-          messageID: string
-          parts: Part[]
-          agent: string
-          model: { providerID: string; modelID: string }
-          variant?: string
-        }) {
-          const message: Message = {
-            id: input.messageID,
-            sessionID: input.sessionID,
-            role: "user",
-            time: { created: Date.now() },
-            agent: input.agent,
-            model: { ...input.model, variant: input.variant },
-          }
-          const [, setStore] = target()
-          setOptimistic(sdk.directory, input.sessionID, { message, parts: input.parts })
-          setOptimisticAdd(setStore as (...args: unknown[]) => void, {
-            sessionID: input.sessionID,
-            message,
-            parts: input.parts,
-          })
         },
         async sync(sessionID: string, opts?: { force?: boolean }) {
           const directory = sdk.directory
@@ -564,8 +561,8 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
             const step = count ?? historyMessagePageSize
             if (meta.loading[key]) return
             if (meta.complete[key]) return
-            const before = meta.cursor[key]
-            if (!before) return
+            const cursor = meta.cursor[key]
+            if (!cursor) return
 
             await loadMessages({
               directory,
@@ -573,7 +570,7 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
               setStore,
               sessionID,
               limit: step,
-              before,
+              cursor,
               mode: "prepend",
             })
           },

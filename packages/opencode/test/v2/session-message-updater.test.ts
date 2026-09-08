@@ -5,7 +5,16 @@ import { EventV2 } from "../../src/v2/event"
 import { Modelv2 } from "../../src/v2/model"
 import { SessionEvent } from "../../src/v2/session-event"
 import { SessionMessageUpdater } from "../../src/v2/session-message-updater"
+import { SessionMessage } from "../../src/v2/session-message"
 import { SubtaskAttachment } from "../../src/v2/session-prompt"
+
+test("normalizes JSON-encoded tool inputs for the V2 message contract", () => {
+  expect(SessionMessage.normalizeToolInput(JSON.stringify({ content: "source" }))).toEqual({ content: "source" })
+  expect(SessionMessage.normalizeToolInput(JSON.stringify(JSON.stringify({ content: "source" })))).toEqual({
+    content: "source",
+  })
+  expect(SessionMessage.normalizeToolInput("not-json")).toEqual({})
+})
 
 test("step snapshots carry over to assistant messages", () => {
   const state: SessionMessageUpdater.MemoryState = { messages: [] }
