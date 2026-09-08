@@ -4,7 +4,7 @@ import { ModelID, ProviderID } from "@/provider/schema"
 import { WorkspaceID } from "@/control-plane/schema"
 import { and, asc, desc, eq, gt, gte, isNull, like, lt, or, type SQL } from "@/storage/db"
 import * as Database from "@/storage/db"
-import { Cause, Context, DateTime, Effect, Exit, Layer, Option, Schema, Stream } from "effect"
+import { Cause, Context, DateTime, Effect, Exit, Layer, Option, Schema, Scope, Stream } from "effect"
 import { SessionMessage } from "./session-message"
 import type { Prompt } from "./session-prompt"
 import { EventV2 } from "./event"
@@ -256,6 +256,9 @@ export const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
     const sync = yield* SyncEvent.Service
+    // Layer scope: background fibers (the deferred-delivery worker) fork into
+    // this so they outlive HTTP requests and die with the instance.
+    const scope = yield* Scope.Scope
     const decodeMessage = Schema.decodeUnknownSync(SessionMessage.Message)
     // V1 services used by the delegation bridge. Captured lazily via serviceOption
     // so read-only consumers (get/list/messages/context) still work without them.
@@ -475,10 +478,6 @@ export const layer = Layer.effect(
           tools: input.tools,
         })
 
-        if (delivery === "deferred") {
-          deferredQueue.add(input.sessionID)
-        }
-
         // Read back the projected messages: the user message the Prompted
         // event wrote, plus the final assistant message (the loop ran
         // synchronously for immediate delivery) so callers like ACP can
@@ -486,6 +485,19 @@ export const layer = Layer.effect(
         const messages = yield* result.messages({ sessionID: input.sessionID, order: "asc" })
         const user = messages.findLast((m): m is SessionMessage.User => m.type === "user")
         const assistant = messages.findLast((m): m is SessionMessage.Assistant => m.type === "assistant")
+
+        if (delivery === "deferred") {
+          deferredQueue.add(input.sessionID)
+          // Background worker: drain the staged prompt on a layer-scoped fiber
+          // so the run survives request completion (the promptAsync HTTP
+          // handler relies on this). Forked AFTER the read-back so the
+          // response is deterministic — the drain cannot interleave before
+          // the caller's result is built. The queue guard makes concurrent
+          // drains idempotent; a message staged while the loop is busy is
+          // consumed by the running loop's continuation check.
+          yield* runDeferred(input.sessionID).pipe(Effect.forkIn(scope))
+        }
+
         return { user, assistant }
       }),
       shell: Effect.fn("V2Session.shell")(function* (input) {

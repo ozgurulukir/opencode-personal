@@ -14,7 +14,7 @@ import { SessionShare } from "@/share/session"
 import { NotFoundError as StorageNotFoundError } from "@/storage/storage"
 import { SessionV2 } from "@/v2/session"
 import { NamedError } from "@opencode-ai/core/util/error"
-import { Cause, Effect, Schema, Scope } from "effect"
+import { Cause, Effect, Schema } from "effect"
 import { HttpApiBuilder, HttpApiError, HttpApiSchema } from "effect/unstable/httpapi"
 import { InstanceHttpApi } from "../../api"
 import { notFound } from "../../errors"
@@ -100,7 +100,6 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "v2.session
     const runState = yield* SessionRunState.Service
     const permissionSvc = yield* Permission.Service
     const bus = yield* Bus.Service
-    const scope = yield* Scope.Scope
 
     return handlers
       .handle(
@@ -392,19 +391,49 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "v2.session
       .handle(
         "promptAsync",
         Effect.fn(function* (ctx) {
-          yield* promptSvc
-            .prompt({ ...ctx.payload, sessionID: ctx.params.sessionID })
+          // Stage the prompt through the V2 service with deferred delivery —
+          // the V2Session layer-scoped worker drains it, so the run survives
+          // request completion (the old handler forked into the request
+          // scope). Payload is the V1 PromptInput shape (parts); convert to
+          // the V2 Prompt (same mapping as acp/agent.ts).
+          const parts = ctx.payload.parts ?? []
+          const textParts = parts.filter((p) => p.type === "text")
+          const model = ctx.payload.model
+            ? { providerID: ctx.payload.model.providerID, modelID: ctx.payload.model.modelID }
+            : undefined
+          yield* session
+            .prompt({
+              sessionID: ctx.params.sessionID,
+              prompt: {
+                text: textParts
+                  .filter((p) => !p.synthetic && !p.ignored)
+                  .map((p) => p.text)
+                  .join("\n"),
+                files: parts.flatMap((p) =>
+                  p.type === "file" ? [{ uri: p.url, mime: p.mime, name: p.filename }] : [],
+                ),
+                synthetic: textParts.flatMap((p) => (p.synthetic ? [p.text] : [])),
+                ignored: textParts.flatMap((p) => (p.ignored ? [p.text] : [])),
+              },
+              agent: ctx.payload.agent,
+              model,
+              variant: ctx.payload.variant,
+              messageID: ctx.payload.messageID,
+              delivery: "deferred",
+            })
             .pipe(
               Effect.catchCause((cause) =>
                 Effect.gen(function* () {
-                  yield* Effect.logError("prompt_async failed", { sessionID: ctx.params.sessionID, cause })
+                  yield* Effect.logError("prompt_async staging failed", {
+                    sessionID: ctx.params.sessionID,
+                    cause,
+                  })
                   yield* bus.publish(SessionV1.Event.Error, {
                     sessionID: ctx.params.sessionID,
                     error: new NamedError.Unknown({ message: Cause.pretty(cause) }).toObject(),
                   })
                 }),
               ),
-              Effect.forkIn(scope, { startImmediately: true }),
             )
           return HttpApiSchema.NoContent.make()
         }),
