@@ -1,9 +1,7 @@
 import type {
-  Message,
   Agent,
   Provider,
   Session,
-  Part,
   Config,
   Todo,
   Command,
@@ -112,8 +110,6 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
       session_status: {},
       session_diff: {},
       todo: {},
-      message: {},
-      part: {},
       lsp: [],
       mcp: {},
       mcp_resource: {},
@@ -495,135 +491,6 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
           })
           break
 
-        case "message.updated": {
-          const messages = store.message[event.properties.info.sessionID]
-          if (!messages) {
-            setStore("message", event.properties.info.sessionID, [event.properties.info])
-            break
-          }
-          const result = Binary.search(messages, event.properties.info.id, (m) => m.id)
-          if (result.found) {
-            setStore("message", event.properties.info.sessionID, result.index, reconcile(event.properties.info))
-            break
-          }
-          setStore(
-            "message",
-            event.properties.info.sessionID,
-            produce((draft) => {
-              draft.splice(result.index, 0, event.properties.info)
-            }),
-          )
-          const updated = store.message[event.properties.info.sessionID]
-          if (updated.length > 100) {
-            const oldest = updated[0]
-            batch(() => {
-              setStore(
-                "message",
-                event.properties.info.sessionID,
-                produce((draft) => {
-                  draft.shift()
-                }),
-              )
-              setStore(
-                "part",
-                produce((draft) => {
-                  delete draft[oldest.id]
-                }),
-              )
-            })
-          }
-          break
-        }
-        case "message.removed": {
-          const messages = store.message[event.properties.sessionID]
-          const result = Binary.search(messages, event.properties.messageID, (m) => m.id)
-          if (result.found) {
-            setStore(
-              "message",
-              event.properties.sessionID,
-              produce((draft) => {
-                draft.splice(result.index, 1)
-              }),
-            )
-          }
-          break
-        }
-        case "message.part.updated": {
-          const parts = store.part[event.properties.part.messageID]
-          if (!parts) {
-            setStore("part", event.properties.part.messageID, [event.properties.part])
-            break
-          }
-          const result = Binary.search(parts, event.properties.part.id, (p) => p.id)
-          if (result.found) {
-            setStore("part", event.properties.part.messageID, result.index, reconcile(event.properties.part))
-            break
-          }
-          setStore(
-            "part",
-            event.properties.part.messageID,
-            produce((draft) => {
-              draft.splice(result.index, 0, event.properties.part)
-            }),
-          )
-          break
-        }
-
-        case "message.part.updated.batch": {
-          for (const part of event.properties.parts) {
-            const existing = store.part[part.messageID]
-            if (!existing) {
-              setStore("part", part.messageID, [part])
-              continue
-            }
-            const r = Binary.search(existing, part.id, (p: Part) => p.id)
-            if (r.found) {
-              setStore("part", part.messageID, r.index, reconcile(part))
-            } else {
-              setStore(
-                "part",
-                part.messageID,
-                produce((draft: Part[]) => {
-                  draft.splice(r.index, 0, part)
-                }),
-              )
-            }
-          }
-          break
-        }
-
-        case "message.part.delta": {
-          const parts = store.part[event.properties.messageID]
-          if (!parts) break
-          const result = Binary.search(parts, event.properties.partID, (p) => p.id)
-          if (!result.found) break
-          setStore(
-            "part",
-            event.properties.messageID,
-            produce((draft) => {
-              const part = draft[result.index]
-              const field = event.properties.field as keyof typeof part
-              const existing = part[field] as string | undefined
-              ;(part[field] as string) = (existing ?? "") + event.properties.delta
-            }),
-          )
-          break
-        }
-
-        case "message.part.removed": {
-          const parts = store.part[event.properties.messageID]
-          const result = Binary.search(parts, event.properties.partID, (p) => p.id)
-          if (result.found)
-            setStore(
-              "part",
-              event.properties.messageID,
-              produce((draft) => {
-                draft.splice(result.index, 1)
-              }),
-            )
-          break
-        }
-
         case "lsp.updated": {
           const workspace = project.workspace.current()
           void sdk.client.lsp.status({ workspace }).then((x) => setStore("lsp", x.data ?? []))
@@ -791,9 +658,8 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
         },
         async sync(sessionID: string) {
           if (fullSyncedSessions.has(sessionID)) return
-          const [session, messages, todo, diff, v2messages] = await Promise.all([
+          const [session, todo, diff, v2messages] = await Promise.all([
             sdk.client.v2.session.get({ sessionID }, { throwOnError: true }),
-            sdk.client.session.messages({ sessionID, limit: 100 }),
             sdk.client.v2.session.todo({ sessionID }),
             sdk.client.v2.session.diff({ sessionID }),
             sdk.client.v2.session.messages({ sessionID }),
@@ -804,17 +670,9 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
               if (match.found) draft.session[match.index] = session.data!
               if (!match.found) draft.session.splice(match.index, 0, session.data!)
               draft.todo[sessionID] = todo.data ?? []
-              const infos: (typeof draft.message)[string] = []
-              for (const message of messages.data ?? []) {
-                infos.push(message.info)
-                draft.part[message.info.id] = message.parts
-              }
-              draft.message[sessionID] = infos
               draft.session_diff[sessionID] = diff.data ?? []
               // V2 read model: newest-first, same order the session.next.*
-              // handlers maintain via unshift. Feeds the consumer migration
-              // (phase 5c) — the V1 message/part slices go away once all
-              // readers are off them.
+              // handlers maintain via unshift.
               draft.messages[sessionID] = v2messages.data?.items ?? []
             }),
           )
