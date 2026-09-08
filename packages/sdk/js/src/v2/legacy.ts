@@ -191,7 +191,12 @@ export function legacyToolState(
     return { status: "running", input: state.input, metadata: state.structured, time: { start } }
   const end = time.completed ?? start
   if (state.status === "completed") {
-    const attachments = state.attachments?.map((file, index) =>
+    const files = state.attachments?.length
+      ? state.attachments
+      : state.content
+          .filter((item): item is Extract<(typeof state.content)[number], { type: "file" }> => item.type === "file")
+          .map(({ uri, mime, name }) => ({ uri, mime, ...(name === undefined ? {} : { name }) }))
+    const attachments = files?.map((file, index) =>
       legacyFilePart({
         id: `${input?.id ?? "tool"}:attachment:${index}`,
         sessionID: input?.sessionID ?? "",
