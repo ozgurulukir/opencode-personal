@@ -4,6 +4,9 @@ import type { ComponentProps } from "solid-js"
 import { useI18n } from "../context/i18n"
 import { IconButton } from "./icon-button"
 import { Tooltip } from "./tooltip"
+import { forwardKeyDown, shouldClearOnEscape } from "./text-field.shared"
+
+export { forwardKeyDown, shouldClearOnEscape }
 
 export interface TextFieldProps
   extends
@@ -89,6 +92,18 @@ export function TextField(props: TextFieldProps) {
     inputRef?.focus()
   }
 
+  function handleKeyDown(e: KeyboardEvent) {
+    if (shouldClearOnEscape(e.key, !!local.onClear, !!(local.value || inputRef?.value))) {
+      e.preventDefault()
+      e.stopPropagation()
+      handleClear()
+      // Consumed: the user's onKeyDown intentionally does not see the clear-Escape,
+      // so a parent dialog cannot close underneath the cleared field.
+      return
+    }
+    forwardKeyDown(local.onKeyDown, e)
+  }
+
   return (
     <Kobalte
       data-component="input"
@@ -97,7 +112,7 @@ export function TextField(props: TextFieldProps) {
       defaultValue={local.defaultValue}
       value={local.value}
       onChange={local.onChange}
-      onKeyDown={local.onKeyDown}
+      onKeyDown={handleKeyDown}
       onClick={handleClick}
       required={local.required}
       disabled={local.disabled}
