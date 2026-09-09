@@ -76,7 +76,6 @@ export function isPrivateIP(ip: string): boolean {
   return isPrivateIPv4(ip)
 }
 
-
 /**
  * Normalizes a hostname by stripping IPv6 brackets.
  * URL.hostname retains brackets for IPv6 (e.g. "[::1]"), but dns.promises.lookup
