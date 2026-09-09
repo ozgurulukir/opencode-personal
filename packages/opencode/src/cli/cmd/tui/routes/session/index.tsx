@@ -34,6 +34,7 @@ import type {
   TextPart,
   ReasoningPart,
 } from "@opencode-ai/sdk/v2"
+import { isLegacyAbortError } from "@opencode-ai/sdk/v2/legacy"
 import { useLocal } from "@tui/context/local"
 import { Locale } from "@/util/locale"
 import type { Tool } from "@/tool/tool"
@@ -1382,9 +1383,7 @@ function AssistantMessage(props: { message: SessionMessageAssistant; sessionID: 
   // before the tagged error was introduced rendering as interrupted.
   const aborted = createMemo(() => {
     const error = props.message.error
-    if (!error) return false
-    if (error.type === "aborted") return true
-    return error.type === "unknown" && error.message.toLowerCase().includes("abort")
+    return isLegacyAbortError(error)
   })
 
   const duration = createMemo(() => {

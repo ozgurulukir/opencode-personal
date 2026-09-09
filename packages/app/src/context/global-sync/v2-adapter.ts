@@ -24,9 +24,10 @@ import {
   legacyToolPart,
   legacyToolState,
   sessionMessagesToLegacy,
+  toLegacyError,
   toLegacyModel,
 } from "@opencode-ai/sdk/v2/legacy"
-import type { LegacyModelRef } from "@opencode-ai/sdk/v2/legacy"
+import type { LegacyError, LegacyModelRef } from "@opencode-ai/sdk/v2/legacy"
 import { decodeFilePath, stripFileProtocol, stripQueryAndHash } from "@/context/file/path"
 import { parseCommentNote } from "@/utils/comment-note"
 
@@ -59,6 +60,10 @@ export const partID = {
 const toV1Model = (model: V2Model) => ({
   ...toLegacyModel(model),
 })
+
+export function assistantError(input: LegacyError | undefined): AssistantMessage["error"] {
+  return toLegacyError(input)
+}
 
 const zeroTokens = { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } }
 
@@ -130,6 +135,21 @@ export function textPart(input: {
 }
 
 const filePath = (uri: string) => decodeFilePath(stripQueryAndHash(stripFileProtocol(uri)))
+
+export function toolAttachmentPart(input: {
+  id: string
+  sessionID: string
+  messageID: string
+  file: PromptFileAttachment
+}): FilePart {
+  return legacyFilePart({
+    id: input.id,
+    sessionID: input.sessionID,
+    messageID: input.messageID,
+    file: input.file,
+    resolveFilePath: filePath,
+  })
+}
 
 export function filePart(input: {
   messageID: string

@@ -1,6 +1,16 @@
 import { describe, expect, test } from "bun:test"
-import { clean, heading, list, partState, record, same, summaryDiff, unwrap } from "./session-turn-utils"
-import type { Part, SnapshotFileDiff } from "@opencode-ai/sdk/v2"
+import {
+  assistantErrorState,
+  clean,
+  heading,
+  list,
+  partState,
+  record,
+  same,
+  summaryDiff,
+  unwrap,
+} from "./session-turn-utils"
+import type { AssistantMessage, Part, SnapshotFileDiff } from "@opencode-ai/sdk/v2"
 
 describe("session-turn-utils", () => {
   describe("record", () => {
@@ -170,6 +180,27 @@ describe("session-turn-utils", () => {
     test("returns undefined for unknown part types", () => {
       const part = { type: "unknown" } as unknown as Part
       expect(partState(part, true)).toBeUndefined()
+    })
+  })
+
+  describe("assistantErrorState", () => {
+    test("classifies an aborted assistant message as an interruption", () => {
+      const result = assistantErrorState([
+        { error: { name: "MessageAbortedError", data: { message: "Aborted" } } } as unknown as AssistantMessage,
+      ])
+
+      expect(result).toEqual({ interrupted: true, error: undefined })
+    })
+
+    test("keeps a generic assistant error visible", () => {
+      const result = assistantErrorState([
+        { error: { name: "UnknownError", data: { message: "Something failed" } } } as unknown as AssistantMessage,
+      ])
+
+      expect(result).toEqual({
+        interrupted: false,
+        error: { name: "UnknownError", data: { message: "Something failed" } },
+      })
     })
   })
 

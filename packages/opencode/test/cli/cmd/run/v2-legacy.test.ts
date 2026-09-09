@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import type { Event, SessionMessage } from "@opencode-ai/sdk/v2/client"
+import type { Event, Part, SessionMessage } from "@opencode-ai/sdk/v2/client"
 import { createV2EventAdapter, sessionMessagesToLegacy } from "../../../../src/cli/cmd/run/v2-legacy"
 
 const sessionID = "ses_1"
@@ -7,6 +7,19 @@ const model = { id: "model_1", providerID: "provider_1", variant: "default" }
 
 function event(type: string, properties: Record<string, unknown>, id = `evt_${type}`) {
   return { id, type, properties } as unknown as Event
+}
+
+function semanticPart(part: Part | undefined) {
+  if (!part) return
+  const { id: _id, sessionID: _sessionID, messageID: _messageID, ...semantic } = part
+  return semantic
+}
+
+function eventPart(events: Event[], type: Part["type"]) {
+  for (const item of events) {
+    const part = (item.properties as { part?: Part } | undefined)?.part
+    if (part?.type === type) return part
+  }
 }
 
 describe("createV2EventAdapter", () => {
@@ -225,7 +238,18 @@ describe("sessionMessagesToLegacy", () => {
     })
   })
 
-  test("emits the same subtask part for live prompted events as history", () => {
+  test("emits the same semantic file and subtask parts for live events as history", () => {
+    const message: SessionMessage = {
+      id: "user_1",
+      type: "user",
+      text: "delegate",
+      agent: "build",
+      model,
+      time: { created: 100 },
+      files: [{ uri: "file:///tmp/a.ts", mime: "text/plain", name: "a.ts" }],
+      subtask: { agent: "explore", description: "inspect", prompt: "read" },
+    }
+    const history = sessionMessagesToLegacy([message], sessionID)
     const adapter = createV2EventAdapter()
     const prompted = adapter.adapt(
       event(
@@ -235,6 +259,7 @@ describe("sessionMessagesToLegacy", () => {
           timestamp: 100,
           prompt: {
             text: "delegate",
+            files: message.files,
             subtask: { agent: "explore", description: "inspect", prompt: "read" },
           },
           agent: "build",
@@ -244,7 +269,11 @@ describe("sessionMessagesToLegacy", () => {
       ),
     )
 
-    expect(prompted[2]?.properties).toMatchObject({ part: { type: "subtask" } })
+    for (const type of ["file", "subtask"] as const) {
+      expect(semanticPart(eventPart(prompted, type))).toEqual(
+        semanticPart(history[0]?.parts.find((part) => part.type === type)),
+      )
+    }
   })
 
   test("maps an explicit V2 abort error to the legacy MessageAbortedError", () => {
@@ -260,5 +289,24 @@ describe("sessionMessagesToLegacy", () => {
     expect(failed[0]?.properties).toMatchObject({
       error: { name: "MessageAbortedError", data: { message: "Aborted" } },
     })
+  })
+
+  test("preserves the reasoning start timestamp when the block ends", () => {
+    const adapter = createV2EventAdapter()
+    adapter.adapt(
+      event("session.next.step.started", { sessionID, timestamp: 100, agent: "build", model }, "assistant_1"),
+    )
+    adapter.adapt(
+      event("session.next.reasoning.started", { sessionID, timestamp: 120, reasoningID: "rsn_1" }, "reasoning_start"),
+    )
+    const ended = adapter.adapt(
+      event(
+        "session.next.reasoning.ended",
+        { sessionID, timestamp: 130, reasoningID: "rsn_1", text: "thinking" },
+        "reasoning_end",
+      ),
+    )
+
+    expect(ended[0]?.properties).toMatchObject({ part: { type: "reasoning", time: { start: 120, end: 130 } } })
   })
 })

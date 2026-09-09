@@ -17,21 +17,21 @@ import type {
   UserMessage,
 } from "@opencode-ai/sdk/v2/client"
 import type { State, VcsCache } from "./types"
-import { legacyFilePart, toLegacyError } from "@opencode-ai/sdk/v2/legacy"
 import { trimSessions } from "./session-trim"
 import { dropSessionCaches } from "./session-cache"
 import { diffs as list } from "@/utils/diffs"
-import { decodeFilePath, stripFileProtocol, stripQueryAndHash } from "@/context/file/path"
 import {
   SHELL_SYNTHETIC_TEXT,
   agentPart,
   assistantMessage,
+  assistantError,
   commentPart,
   compactionPart,
   filePart,
   reasoningPart,
   subtaskPart,
   textPart,
+  toolAttachmentPart,
   toolPart,
   userMessage,
 } from "./v2-adapter"
@@ -490,7 +490,7 @@ function handleStepFailed(input: MessageHandlerInput, event: MessageEvent) {
   updateAssistant(input, props.sessionID, active.assistant.id, (assistant) => {
     assistant.time.completed = completed
     assistant.finish = "error"
-    assistant.error = toLegacyError(props.error)
+    assistant.error = assistantError(props.error)
   })
 }
 
@@ -618,12 +618,11 @@ function handleToolSuccess(input: MessageHandlerInput, event: MessageEvent) {
     const attachments = props.content
       .filter((item): item is Extract<(typeof props.content)[number], { type: "file" }> => item.type === "file")
       .map((file, index) =>
-        legacyFilePart({
+        toolAttachmentPart({
           id: `${match.id}:attachment:${index}`,
           sessionID: props.sessionID,
           messageID: active.assistant.id,
           file,
-          resolveFilePath: (uri) => decodeFilePath(stripQueryAndHash(stripFileProtocol(uri))),
         }),
       )
     match.state = {

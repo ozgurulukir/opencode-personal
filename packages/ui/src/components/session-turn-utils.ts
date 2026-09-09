@@ -1,4 +1,4 @@
-import type { Part, SnapshotFileDiff } from "@opencode-ai/sdk/v2"
+import type { AssistantMessage, Part, SnapshotFileDiff } from "@opencode-ai/sdk/v2"
 
 export const MAX_FILES = 10
 
@@ -102,6 +102,13 @@ export function partState(part: Part, showReasoningSummaries: boolean) {
   }
   if (knownPartTypes.has(part.type)) return "visible" as const
   return
+}
+
+export function assistantErrorState(messages: AssistantMessage[]) {
+  return {
+    interrupted: messages.some((message) => message.error?.name === "MessageAbortedError"),
+    error: messages.find((message) => message.error && message.error.name !== "MessageAbortedError")?.error,
+  }
 }
 
 export function clean(value: string) {
