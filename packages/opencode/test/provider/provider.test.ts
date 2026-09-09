@@ -1,4 +1,6 @@
 import { test, expect, mock } from "bun:test"
+import { generateText } from "ai"
+import { createOpenAI } from "@ai-sdk/openai"
 import { mkdir, unlink } from "fs/promises"
 import path from "path"
 
@@ -2689,5 +2691,58 @@ test("rewriteMaxOutputTokens > passthroughs non-JSON bodies silently", async () 
     expect(callArgs[1].body).toBe(init.body)
   } finally {
     globalThis.fetch = originalFetch
+  }
+})
+
+test("rewriteMaxOutputTokens > end-to-end through @ai-sdk/openai responses model", async () => {
+  // Drives the real service layers (AI SDK responses mapping + the fetch
+  // wrapper) against a stub Responses API endpoint and asserts the renamed
+  // key arrives on the wire while the SDK round-trips the response.
+  // NOTE: this proves the client-side contract only — whether OpenAI's
+  // servers accept max_completion_tokens needs one live call (no key here).
+  let captured: Record<string, unknown> | undefined
+  const server = Bun.serve({
+    port: 0,
+    async fetch(req) {
+      if (req.method === "POST" && new URL(req.url).pathname === "/responses") {
+        captured = (await req.json()) as Record<string, unknown>
+        return Response.json({
+          id: "resp_test",
+          object: "response",
+          created_at: 123,
+          model: "gpt-4o",
+          output: [
+            {
+              type: "message",
+              id: "msg_1",
+              role: "assistant",
+              status: "completed",
+              content: [{ type: "output_text", text: "hello from stub", annotations: [] }],
+            },
+          ],
+          status: "completed",
+          usage: { input_tokens: 5, output_tokens: 3, total_tokens: 8 },
+        })
+      }
+      return new Response("not found", { status: 404 })
+    },
+  })
+  try {
+    const openai = createOpenAI({
+      baseURL: `http://127.0.0.1:${server.port}/`,
+      apiKey: "test-key",
+      fetch: rewriteMaxOutputTokens as typeof fetch,
+    })
+    const { text } = await generateText({
+      model: openai.responses("gpt-4o"),
+      prompt: "Say hello",
+      maxOutputTokens: 32000,
+    })
+    expect(text).toBe("hello from stub")
+    expect(captured).toBeDefined()
+    expect(captured!.max_output_tokens).toBeUndefined()
+    expect(captured!.max_completion_tokens).toBe(32000)
+  } finally {
+    server.stop()
   }
 })
