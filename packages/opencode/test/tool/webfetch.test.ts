@@ -279,4 +279,15 @@ describe("tool.webfetch", () => {
       },
     })
   })
+
+  test("rejects requests to IPv6 addresses with brackets containing private IPs", async () => {
+    await WithInstance.provide({
+      directory: projectRoot,
+      fn: async () => {
+        await expect(exec({ url: "http://[fc00::1]/", format: "text" })).rejects.toThrow(
+          "SSRF guard: requests to private/internal IPs are not allowed",
+        )
+      },
+    })
+  })
 })
