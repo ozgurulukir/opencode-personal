@@ -1,4 +1,4 @@
-import { test, expect } from "bun:test"
+import { test, expect, mock } from "bun:test"
 import { mkdir, unlink } from "fs/promises"
 import path from "path"
 
@@ -9,6 +9,7 @@ import { WithInstance } from "../../src/project/with-instance"
 import { Plugin } from "../../src/plugin/index"
 import { ModelsDev } from "@/provider/models"
 import { Provider } from "@/provider/provider"
+import { rewriteMaxOutputTokens } from "@/provider/provider"
 import { ProviderID, ModelID } from "../../src/provider/schema"
 import { Filesystem } from "@/util/filesystem"
 import { Env } from "../../src/env"
@@ -2617,9 +2618,6 @@ test("opencode loader keeps paid models when auth exists", async () => {
     }
   }
 })
-
-import { rewriteMaxOutputTokens } from "../../src/provider/provider"
-import { mock } from "bun:test"
 
 test("rewriteMaxOutputTokens > rewrites max_output_tokens to max_completion_tokens in JSON body", async () => {
   const originalFetch = globalThis.fetch
