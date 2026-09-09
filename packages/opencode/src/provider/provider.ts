@@ -176,6 +176,23 @@ function selectAzureLanguageModel(sdk: any, modelID: string, useChat: boolean) {
   return sdk.languageModel(modelID)
 }
 
+
+export const rewriteMaxOutputTokens = (url: RequestInfo | URL, init?: RequestInit) => {
+  if (init?.body && typeof init.body === "string") {
+    try {
+      const body = JSON.parse(init.body)
+      if ("max_output_tokens" in body) {
+        body.max_completion_tokens = body.max_output_tokens
+        delete body.max_output_tokens
+        init.body = JSON.stringify(body)
+      }
+    } catch {
+      // Silently swallow JSON.parse failures as this is intended for non-JSON passthrough
+    }
+  }
+  return fetch(url, init)
+}
+
 function custom(dep: CustomDep): Record<string, CustomLoader> {
   return {
     anthropic: () =>
@@ -216,7 +233,7 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
         async getModel(sdk: any, modelID: string, _options?: Record<string, any>) {
           return sdk.responses(modelID)
         },
-        options: {},
+        options: { fetch: rewriteMaxOutputTokens },
       }),
     xai: () =>
       Effect.succeed({
@@ -224,7 +241,7 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
         async getModel(sdk: any, modelID: string, _options?: Record<string, any>) {
           return sdk.responses(modelID)
         },
-        options: {},
+        options: { fetch: rewriteMaxOutputTokens },
       }),
     "github-copilot": () =>
       Effect.succeed({
