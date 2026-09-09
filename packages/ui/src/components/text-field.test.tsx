@@ -1,13 +1,9 @@
 import { describe, expect, test } from "bun:test"
-import { forwardKeyDown, shouldClearOnEscape, TextField } from "./text-field"
+// Import from the shared module: "./text-field" pulls in Kobalte/Solid
+// client-only APIs that throw under bun test (server-side).
+import { forwardKeyDown, shouldClearOnEscape } from "./text-field.shared"
 
 const escape = { key: "Escape" } as KeyboardEvent
-
-describe("TextField", () => {
-  test("module resolves cleanly", () => {
-    expect(TextField).toBeDefined()
-  })
-})
 
 describe("shouldClearOnEscape", () => {
   test("clears on Escape when clearable and has value", () => {

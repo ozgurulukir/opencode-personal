@@ -4,6 +4,9 @@ import type { ComponentProps } from "solid-js"
 import { useI18n } from "../context/i18n"
 import { IconButton } from "./icon-button"
 import { Tooltip } from "./tooltip"
+import { forwardKeyDown, shouldClearOnEscape } from "./text-field.shared"
+
+export { forwardKeyDown, shouldClearOnEscape }
 
 export interface TextFieldProps
   extends
@@ -32,27 +35,6 @@ export interface TextFieldProps
   multiline?: boolean
   autofocus?: boolean
   onClear?: () => void
-}
-
-/**
- * Escape clears a clearable field instead of bubbling to the parent dialog.
- * Returns true when the field has a value and an onClear handler, meaning the
- * caller must stop propagation so the dialog does not close underneath.
- */
-export function shouldClearOnEscape(key: string, hasOnClear: boolean, hasValue: boolean): boolean {
-  return key === "Escape" && hasOnClear && hasValue
-}
-
-/**
- * Invokes a user-supplied onKeyDown, supporting SolidJS bound handler tuples
- * ([handler, argument]) in addition to plain functions.
- */
-export function forwardKeyDown(onKeyDown: TextFieldProps["onKeyDown"], e: KeyboardEvent) {
-  if (typeof onKeyDown === "function") {
-    onKeyDown(e)
-  } else if (Array.isArray(onKeyDown)) {
-    onKeyDown[0](onKeyDown[1], e)
-  }
 }
 
 export function TextField(props: TextFieldProps) {
@@ -115,6 +97,8 @@ export function TextField(props: TextFieldProps) {
       e.preventDefault()
       e.stopPropagation()
       handleClear()
+      // Consumed: the user's onKeyDown intentionally does not see the clear-Escape,
+      // so a parent dialog cannot close underneath the cleared field.
       return
     }
     forwardKeyDown(local.onKeyDown, e)
