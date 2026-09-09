@@ -76,6 +76,3 @@ WebUI is UX-ready
 
 **Lessons Learned:**
 - Simple interactions like "Clear" often break keyboard focus state if not explicitly managed. Whenever implementing action buttons inside input components, always verify focus is returned to the primary interactive element.
-## 2026-09-07 - [SolidJS Bound Event Handlers]
-**Learning:** In SolidJS, when an event handler (e.g. `onKeyDown`) is an array, it does not mean an array of functions to call, but rather a **bound event handler tuple** of the form `[handlerFunction, argument]`. Iterating over it and calling each element will result in a runtime error or unexpected behavior, because it will try to call the argument as a function (or miss it entirely).
-**Action:** When manually invoking event handlers passed as props in SolidJS components, check `Array.isArray(handler)` and invoke it via `handler[0](handler[1], event)` instead of a `for...of` loop.

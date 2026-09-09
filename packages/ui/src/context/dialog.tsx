@@ -1,6 +1,5 @@
 import {
   createContext,
-  createEffect,
   createRoot,
   createSignal,
   getOwner,

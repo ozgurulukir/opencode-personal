@@ -31,14 +31,12 @@
     "generate:tailwind": "bun run script/tailwind.ts"
   },
   "devDependencies": {
-    "@solidjs/testing-library": "0.8.10",
     "@tailwindcss/vite": "catalog:",
     "@tsconfig/node22": "catalog:",
     "@types/bun": "catalog:",
     "@types/katex": "0.16.8",
     "@types/luxon": "catalog:",
     "@typescript/native-preview": "catalog:",
-    "jsdom": "30.0.1",
     "tailwindcss": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
