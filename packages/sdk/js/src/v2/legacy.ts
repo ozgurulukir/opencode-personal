@@ -49,9 +49,13 @@ export function toLegacyModel(input: LegacyModelRef | undefined): UserMessage["m
   }
 }
 
+export function isLegacyAbortError(input: LegacyError | undefined) {
+  return input?.type === "aborted" || (input?.type === "unknown" && input.message.toLowerCase().includes("abort"))
+}
+
 export function toLegacyError(input: LegacyError | undefined): AssistantMessage["error"] {
   if (!input) return undefined
-  if (input.type === "aborted" || (input.type === "unknown" && input.message.toLowerCase().includes("abort"))) {
+  if (isLegacyAbortError(input)) {
     return { name: "MessageAbortedError", data: { message: input.message } }
   }
   return { name: "UnknownError", data: { message: input.message } }
@@ -295,7 +299,9 @@ function historyUserParts(
 ): Part[] {
   const partID = options.partID ?? defaultPartID
   const time = options.includeTextTime ? { start: message.time.created, end: message.time.created } : undefined
-  const parts: Part[] = [
+  const files = message.files ?? []
+  const agents = message.agents ?? []
+  return [
     legacyTextPart({
       id: partID(message.id, 0, "text"),
       sessionID,
@@ -303,33 +309,34 @@ function historyUserParts(
       text: message.text,
       ...time,
     }),
-  ]
-  let index = 1
-  for (const file of message.files ?? []) {
-    parts.push(
+    ...files.map((file, index) =>
       legacyFilePart({
-        id: partID(message.id, index++, "file"),
+        id: partID(message.id, index + 1, "file"),
         sessionID,
         messageID: message.id,
         file,
         resolveFilePath: options.resolveFilePath,
       }),
-    )
-  }
-  for (const agent of message.agents ?? []) {
-    parts.push(legacyAgentPart({ id: partID(message.id, index++, "agent"), sessionID, messageID: message.id, agent }))
-  }
-  if (message.subtask) {
-    parts.push(
-      legacySubtaskPart({
-        id: partID(message.id, index, "subtask"),
+    ),
+    ...agents.map((agent, index) =>
+      legacyAgentPart({
+        id: partID(message.id, files.length + index + 1, "agent"),
         sessionID,
         messageID: message.id,
-        subtask: message.subtask,
+        agent,
       }),
-    )
-  }
-  return parts
+    ),
+    ...(message.subtask
+      ? [
+          legacySubtaskPart({
+            id: partID(message.id, files.length + agents.length + 1, "subtask"),
+            sessionID,
+            messageID: message.id,
+            subtask: message.subtask,
+          }),
+        ]
+      : []),
+  ]
 }
 
 function historyAssistantParts(
@@ -375,6 +382,11 @@ function historyAssistantParts(
   })
 }
 
+/**
+ * Reconstructs V1 message and part entries from ascending projected V2 messages.
+ * Preserves legacy turn wrappers for shell and compaction messages, while
+ * filtering synthetic messages through the consumer-provided predicate.
+ */
 export function sessionMessagesToLegacy(
   messages: SessionMessage[],
   sessionID: string,

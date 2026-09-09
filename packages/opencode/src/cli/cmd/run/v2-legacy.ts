@@ -1,16 +1,13 @@
 import type {
   AssistantMessage,
   Event,
-  FilePart,
   Message,
   Part,
   PromptAgentAttachment,
   PromptFileAttachment,
   PromptSubtaskAttachment,
   SessionMessage,
-  SessionMessageAssistantTool,
   StepFinishPart,
-  ToolPart,
   ToolState,
   UserMessage,
 } from "@opencode-ai/sdk/v2/client"
@@ -21,7 +18,6 @@ import {
   legacySubtaskPart,
   legacyTextPart,
   legacyToolPart,
-  legacyToolState,
   sessionMessagesToLegacy as sharedSessionMessagesToLegacy,
   toLegacyError,
   toLegacyModel,
@@ -41,7 +37,7 @@ type SessionState = {
   model: ModelRef
   agent: string
   textID?: string
-  reasoning: Map<string, string>
+  reasoning: Map<string, { id: string; start: number }>
   tools: Map<string, { id: string; tool: string; start: number; input: Record<string, unknown> }>
 }
 
@@ -66,10 +62,6 @@ const migratedLegacyEvents = new Set([
   "permission.replied",
 ])
 
-function model(input: ModelRef | undefined): UserMessage["model"] {
-  return toLegacyModel(input)
-}
-
 function userInfo(input: {
   id: string
   sessionID: string
@@ -83,7 +75,7 @@ function userInfo(input: {
     role: "user",
     time: { created: input.created },
     agent: input.agent,
-    model: model(input.model),
+    model: toLegacyModel(input.model),
   }
 }
 
@@ -109,46 +101,6 @@ function assistantInfo(input: {
     cost: 0,
     tokens: zeroTokens,
   }
-}
-
-function textPart(input: {
-  id: string
-  sessionID: string
-  messageID: string
-  text: string
-  start: number
-  end?: number
-  synthetic?: boolean
-}) {
-  return legacyTextPart(input)
-}
-
-function filePart(input: {
-  id: string
-  sessionID: string
-  messageID: string
-  file: NonNullable<Extract<SessionMessage, { type: "user" }>["files"]>[number]
-}): FilePart {
-  return legacyFilePart(input)
-}
-
-function toolState(
-  state: SessionMessageAssistantTool["state"],
-  time: { created: number; ran?: number; completed?: number },
-  input?: { id?: string; sessionID?: string; messageID?: string },
-): ToolState {
-  return legacyToolState(state, time, input)
-}
-
-function toolPart(input: {
-  id: string
-  sessionID: string
-  messageID: string
-  callID: string
-  tool: string
-  state: ToolState
-}): ToolPart {
-  return legacyToolPart(input)
 }
 
 export function sessionMessagesToLegacy(messages: SessionMessage[], sessionID: string): SessionMessageWithParts[] {
@@ -254,7 +206,7 @@ function toolEvent(
       file,
     }),
   )
-  const part = toolPart({
+  const part = legacyToolPart({
     id: partID,
     sessionID,
     messageID: state.assistantID ?? `${event.id}:assistant`,
@@ -349,7 +301,7 @@ export function createV2EventAdapter() {
           state.model = props.model
           state.textID = undefined
           const parts: Part[] = [
-            textPart({
+            legacyTextPart({
               id: `${event.id}:text`,
               sessionID,
               messageID: event.id,
@@ -360,7 +312,7 @@ export function createV2EventAdapter() {
           ]
           let index = 1
           for (const file of props.prompt.files ?? []) {
-            parts.push(filePart({ id: `${event.id}:${index++}:file`, sessionID, messageID: event.id, file }))
+            parts.push(legacyFilePart({ id: `${event.id}:${index++}:file`, sessionID, messageID: event.id, file }))
           }
           for (const agent of props.prompt.agents ?? []) {
             parts.push(legacyAgentPart({ id: `${event.id}:${index++}:agent`, sessionID, messageID: event.id, agent }))
@@ -425,7 +377,7 @@ export function createV2EventAdapter() {
           return [
             legacy(`${event.id}:part`, "message.part.updated", {
               sessionID,
-              part: textPart({ id: state.textID, sessionID, messageID: state.assistantID, text: "", start: timestamp }),
+              part: legacyTextPart({ id: state.textID, sessionID, messageID: state.assistantID, text: "", start: timestamp }),
               time: timestamp,
             }),
           ]
@@ -449,7 +401,7 @@ export function createV2EventAdapter() {
           return [
             legacy(`${event.id}:part`, "message.part.updated", {
               sessionID,
-              part: textPart({
+              part: legacyTextPart({
                 id,
                 sessionID,
                 messageID: state.assistantID,
@@ -464,7 +416,7 @@ export function createV2EventAdapter() {
         case "session.next.reasoning.started": {
           if (!state.assistantID) return []
           const id = `${state.assistantID}:reasoning:${props.reasoningID}`
-          state.reasoning.set(props.reasoningID, id)
+          state.reasoning.set(props.reasoningID, { id, start: timestamp })
           return [
             legacy(`${event.id}:part`, "message.part.updated", {
               sessionID,
@@ -474,7 +426,7 @@ export function createV2EventAdapter() {
           ]
         }
         case "session.next.reasoning.delta": {
-          const id = state.reasoning.get(props.reasoningID)
+          const id = state.reasoning.get(props.reasoningID)?.id
           if (!state.assistantID || !id) return []
           return [
             legacy(`${event.id}:delta`, "message.part.delta", {
@@ -488,7 +440,8 @@ export function createV2EventAdapter() {
         }
         case "session.next.reasoning.ended": {
           if (!state.assistantID) return []
-          const id = state.reasoning.get(props.reasoningID) ?? `${state.assistantID}:reasoning:${props.reasoningID}`
+          const current = state.reasoning.get(props.reasoningID)
+          const id = current?.id ?? `${state.assistantID}:reasoning:${props.reasoningID}`
           state.reasoning.delete(props.reasoningID)
           return [
             legacy(`${event.id}:part`, "message.part.updated", {
@@ -498,7 +451,7 @@ export function createV2EventAdapter() {
                 sessionID,
                 messageID: state.assistantID,
                 text: props.text,
-                start: timestamp,
+                start: current?.start ?? timestamp,
                 end: timestamp,
               }),
               time: timestamp,
@@ -592,7 +545,7 @@ export function createV2EventAdapter() {
           return [
             legacy(`${event.id}:part`, "message.part.updated", {
               sessionID,
-              part: textPart({
+              part: legacyTextPart({
                 id: `${event.id}:synthetic`,
                 sessionID,
                 messageID: state.userID,

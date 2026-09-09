@@ -17,7 +17,7 @@ import { SessionTurnThinking } from "./session-turn-thinking"
 import { SessionTurnHeader } from "./session-turn-header"
 import { createAutoScroll } from "../hooks"
 import { useI18n } from "../context/i18n"
-import { list, partState, same, summaryDiff, type SummaryDiff, unwrap, heading } from "./session-turn-utils"
+import { assistantErrorState, list, partState, same, summaryDiff, type SummaryDiff, unwrap, heading } from "./session-turn-utils"
 
 export function SessionTurn(
   props: ParentProps<{
@@ -147,15 +147,14 @@ export function SessionTurn(
     { equals: same },
   )
 
-  const interrupted = createMemo(() => assistantMessages().some((m) => m.error?.name === "MessageAbortedError"))
+  const assistantErrors = createMemo(() => assistantErrorState(assistantMessages()))
+  const interrupted = createMemo(() => assistantErrors().interrupted)
   const divider = createMemo(() => {
     if (compaction()) return i18n.t("ui.messagePart.compaction")
     if (interrupted()) return i18n.t("ui.message.interrupted")
     return ""
   })
-  const error = createMemo(
-    () => assistantMessages().find((m) => m.error && m.error.name !== "MessageAbortedError")?.error,
-  )
+  const error = createMemo(() => assistantErrors().error)
   const showAssistantCopyPartID = createMemo(() => {
     const messages = assistantMessages()
 
