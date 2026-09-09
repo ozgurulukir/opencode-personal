@@ -103,7 +103,7 @@ export const WebFetchTool = Tool.define(
 
           const { hostname } = new URL(params.url)
           const resolvedAddress = yield* Effect.tryPromise({
-            try: () => dns.promises.lookup(hostname, { all: false }),
+            try: () => dns.promises.lookup(hostname.replace(/^\[(.*?)\]$/, "$1"), { all: false }),
             catch: (error) => new Error(`DNS lookup failed: ${error instanceof Error ? error.message : String(error)}`),
           })
 

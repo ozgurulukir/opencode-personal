@@ -1,4 +1,4 @@
-// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+// Bun Snapshot v1, https://goo.gl/fbAQLP
 
 exports[`tool parameters JSON Schema (wire shape) apply_patch 1`] = `
 {
@@ -309,13 +309,17 @@ exports[`tool parameters JSON Schema (wire shape) skill 1`] = `
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "properties": {
     "name": {
-      "description": "The name of the skill from available_skills",
+      "description": "The name of a single skill from available_skills. Prefer 'names' for loading multiple skills.",
       "type": "string",
     },
+    "names": {
+      "description": "Array of skill names from available_skills. Use this to load multiple skills at once.",
+      "items": {
+        "type": "string",
+      },
+      "type": "array",
+    },
   },
-  "required": [
-    "name",
-  ],
   "type": "object",
 }
 `;

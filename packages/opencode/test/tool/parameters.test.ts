@@ -193,8 +193,8 @@ describe("tool parameters", () => {
     test("accepts name", () => {
       expect(parse(Skill, { name: "foo" }).name).toBe("foo")
     })
-    test("rejects missing name", () => {
-      expect(accepts(Skill, {})).toBe(false)
+    test("accepts missing name", () => {
+      expect(accepts(Skill, {})).toBe(true)
     })
   })
 
