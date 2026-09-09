@@ -76,6 +76,16 @@ export function isPrivateIP(ip: string): boolean {
   return isPrivateIPv4(ip)
 }
 
+
+/**
+ * Normalizes a hostname by stripping IPv6 brackets.
+ * URL.hostname retains brackets for IPv6 (e.g. "[::1]"), but dns.promises.lookup
+ * requires the bare address ("::1").
+ */
+function normalizeHostname(hostname: string): string {
+  return hostname.replace(/^\[(.*?)\]$/, "$1")
+}
+
 export const Parameters = Schema.Struct({
   url: Schema.String.annotate({ description: "The URL to fetch content from" }),
   format: Schema.Literals(["text", "markdown", "html"])
@@ -103,7 +113,7 @@ export const WebFetchTool = Tool.define(
 
           const { hostname } = new URL(params.url)
           const resolvedAddress = yield* Effect.tryPromise({
-            try: () => dns.promises.lookup(hostname.replace(/^\[(.*?)\]$/, "$1"), { all: false }),
+            try: () => dns.promises.lookup(normalizeHostname(hostname), { all: false }),
             catch: (error) => new Error(`DNS lookup failed: ${error instanceof Error ? error.message : String(error)}`),
           })
 
