@@ -1,7 +1,7 @@
-import type { SessionMessageAssistant } from "@opencode-ai/sdk/v2"
 import type { TuiPlugin, TuiPluginApi } from "@opencode-ai/plugin/tui"
 import type { InternalTuiPlugin } from "../../plugin/internal-types"
 import { createMemo } from "solid-js"
+import { latestAssistantUsage, totalAssistantCost } from "../../context-usage.shared"
 
 const id = "internal:sidebar-context"
 
@@ -13,41 +13,16 @@ const money = new Intl.NumberFormat("en-US", {
 function View(props: { api: TuiPluginApi; session_id: string }) {
   const theme = () => props.api.theme.current
   const msg = createMemo(() => props.api.state.session.messages(props.session_id))
-  const cost = createMemo(() =>
-    msg().reduce((sum, item) => sum + (item.type === "assistant" ? (item.cost ?? 0) : 0), 0),
-  )
-
-  const state = createMemo(() => {
-    const last = msg().findLast(
-      (item): item is SessionMessageAssistant => item.type === "assistant" && (item.tokens?.output ?? 0) > 0,
-    )
-    if (!last) {
-      return {
-        tokens: 0,
-        percent: null,
-      }
-    }
-
-    const tokens =
-      (last.tokens?.input ?? 0) +
-      (last.tokens?.output ?? 0) +
-      (last.tokens?.reasoning ?? 0) +
-      (last.tokens?.cache.read ?? 0) +
-      (last.tokens?.cache.write ?? 0)
-    const model = props.api.state.provider.find((item) => item.id === last.model.providerID)?.models[last.model.id]
-    return {
-      tokens,
-      percent: model?.limit.context ? Math.round((tokens / model.limit.context) * 100) : null,
-    }
-  })
+  const cost = createMemo(() => totalAssistantCost(msg()))
+  const state = createMemo(() => latestAssistantUsage(msg(), props.api.state.provider))
 
   return (
     <box>
       <text fg={theme().text}>
         <b>Context</b>
       </text>
-      <text fg={theme().textMuted}>{state().tokens.toLocaleString()} tokens</text>
-      <text fg={theme().textMuted}>{state().percent ?? 0}% used</text>
+      <text fg={theme().textMuted}>{(state()?.tokens ?? 0).toLocaleString()} tokens</text>
+      <text fg={theme().textMuted}>{state()?.percent ?? 0}% used</text>
       <text fg={theme().textMuted}>{money.format(cost())} spent</text>
     </box>
   )

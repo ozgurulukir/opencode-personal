@@ -3,8 +3,8 @@ import { useRouteData } from "@tui/context/route"
 import { useSync } from "@tui/context/sync"
 import { useTheme } from "@tui/context/theme"
 import { SplitBorder } from "@tui/component/border"
-import type { SessionMessageAssistant } from "@opencode-ai/sdk/v2"
 import { Locale } from "@/util/locale"
+import { latestAssistantUsage, totalAssistantCost } from "../../context-usage.shared"
 import { useTerminalDimensions } from "@opentui/solid"
 import { useCommandPalette } from "../../context/command-palette"
 import { useCommandShortcut } from "../../keymap"
@@ -33,22 +33,11 @@ export function SubagentFooter() {
 
   const usage = createMemo(() => {
     const msg = messages()
-    const last = msg.findLast(
-      (item): item is SessionMessageAssistant => item.type === "assistant" && (item.tokens?.output ?? 0) > 0,
-    )
-    if (!last) return
+    const usage = latestAssistantUsage(msg, sync.data.provider)
+    if (!usage) return
 
-    const tokens =
-      (last.tokens?.input ?? 0) +
-      (last.tokens?.output ?? 0) +
-      (last.tokens?.reasoning ?? 0) +
-      (last.tokens?.cache.read ?? 0) +
-      (last.tokens?.cache.write ?? 0)
-    if (tokens <= 0) return
-
-    const model = sync.data.provider.find((item) => item.id === last.model.providerID)?.models[last.model.id]
-    const pct = model?.limit.context ? `${Math.round((tokens / model.limit.context) * 100)}%` : undefined
-    const cost = msg.reduce((sum, item) => sum + (item.type === "assistant" ? (item.cost ?? 0) : 0), 0)
+    const pct = usage.percent != null ? `${usage.percent}%` : undefined
+    const cost = totalAssistantCost(msg)
 
     const money = new Intl.NumberFormat("en-US", {
       style: "currency",
@@ -56,7 +45,7 @@ export function SubagentFooter() {
     })
 
     return {
-      context: pct ? `${Locale.number(tokens)} (${pct})` : Locale.number(tokens),
+      context: pct ? `${Locale.number(usage.tokens)} (${pct})` : Locale.number(usage.tokens),
       cost: cost > 0 ? money.format(cost) : undefined,
     }
   })
