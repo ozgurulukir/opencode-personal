@@ -71,7 +71,7 @@ import parsers from "../../../../../../parsers-config.ts"
 import * as Clipboard from "../../util/clipboard"
 import { collectSessionDescendants } from "../../util/session-tree"
 import { isDeniedErrorMessage } from "../../util/denied-error.shared"
-import { errorMessage } from "@/util/error"
+import { errorMessage, safeCatch } from "@/util/error"
 import { Toast, useToast } from "../../ui/toast"
 import { useKV } from "../../context/kv.tsx"
 import * as Editor from "../../util/editor"
@@ -295,6 +295,19 @@ export function Session() {
   const command = useCommandPalette()
   const dialog = useDialog()
   const renderer = useRenderer()
+  const runSessionHistoryAction = (action: "undo" | "redo", request: () => Promise<unknown>) =>
+    request()
+      .then(() => true)
+      .catch((error) => {
+        safeCatch(`session.${action}`, error, () =>
+          toast.show({
+            message: `Failed to ${action} session: ${errorMessage(error)}`,
+            variant: "error",
+            duration: 5000,
+          }),
+        )
+        return false
+      })
 
   event.on("session.status", (evt) => {
     if (evt.properties.sessionID !== route.sessionID) return
@@ -617,15 +630,19 @@ export function Session() {
           (x): x is SessionMessageUser => (!revert || x.id < revert) && x.type === "user",
         )
         if (!message) return
-        void sdk.client.v2.session.revert({
-          sessionID: route.sessionID,
-          messageID: message.id,
-        })
-          .then(() => {
-            toBottom()
-          })
-        prompt?.set(fromUserMessage(message))
         dialog.clear()
+        const success = await runSessionHistoryAction("undo", () =>
+          sdk.client.v2.session.revert(
+            {
+              sessionID: route.sessionID,
+              messageID: message.id,
+            },
+            { throwOnError: true },
+          ),
+        )
+        if (!success) return
+        prompt?.set(fromUserMessage(message))
+        toBottom()
       },
     },
     {
@@ -636,22 +653,28 @@ export function Session() {
       slash: {
         name: "redo",
       },
-      run: () => {
+      run: async () => {
         dialog.clear()
         const messageID = session()?.revert?.messageID
         if (!messageID) return
         const message = messages().find((x) => x.type === "user" && x.id > messageID)
         if (!message) {
-          void sdk.client.v2.session.unrevert({
-            sessionID: route.sessionID,
-          })
+          const success = await runSessionHistoryAction("redo", () =>
+            sdk.client.v2.session.unrevert({ sessionID: route.sessionID }, { throwOnError: true }),
+          )
+          if (!success) return
           prompt?.set({ input: "", parts: [] })
           return
         }
-        void sdk.client.v2.session.revert({
-          sessionID: route.sessionID,
-          messageID: message.id,
-        })
+        await runSessionHistoryAction("redo", () =>
+          sdk.client.v2.session.revert(
+            {
+              sessionID: route.sessionID,
+              messageID: message.id,
+            },
+            { throwOnError: true },
+          ),
+        )
       },
     },
     {

@@ -257,16 +257,38 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
           break
         }
         case "session.next.updated": {
-          const info = event.properties.info as Session
-          const result = Binary.search(store.session, info.id, (s) => s.id)
-          if (result.found) {
-            setStore("session", result.index, reconcile(info))
+          // The session.next.updated `info` is a partial patch (e.g. `{title}`,
+          // `{summary, time, revert}`), NOT a full session — it has no `id`.
+          // Reconcile by the event's sessionID and merge the patch into the
+          // existing entry so unrelated session fields survive. Searching by
+          // `info.id` (undefined for partial patches) would fail to find the
+          // session and mis-insert a broken entry, leaving sessions stale — e.g.
+          // the TUI never learns about a `session.revert`, so undo can't clear
+          // the screen back to the previous state.
+          const info = event.properties.info as Partial<Session>
+          const sessionID = (event.properties.sessionID as string | undefined) ?? info.id
+          if (!sessionID) break
+          if (info.time?.archived) {
+            setStore(
+              "session",
+              produce((draft) => {
+                const index = draft.findIndex((s) => s.id === sessionID)
+                if (index >= 0) draft.splice(index, 1)
+              }),
+            )
             break
           }
           setStore(
             "session",
             produce((draft) => {
-              draft.splice(result.index, 0, info)
+              const match = draft.find((s) => s.id === sessionID)
+              if (match) {
+                Object.assign(match, info, {
+                  id: sessionID,
+                  ...(info.time ? { time: { ...match.time, ...info.time } } : {}),
+                })
+                return
+              }
             }),
           )
           break

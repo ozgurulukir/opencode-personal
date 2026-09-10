@@ -31,3 +31,16 @@ Update `v2-adapter.test.ts`, `event-reducer.test.ts`, and the optimistic-sync
 tests together when changing this boundary. A change is complete when load and
 live event paths produce the same V1 shapes, all relevant app tests pass, and
 `bun typecheck` passes from `packages/app`.
+
+## `session.next.updated` is a partial patch keyed by `sessionID`
+
+`session.next.updated` carries `info` as a **partial patch**, not a full
+session — e.g. `{title}`, or `{summary, time, revert}`, with **no `id`**
+(emitted by `Session.setRevert`/`patch`). `handleSessionUpdated` reconciles by
+the event's `sessionID` (falling back to `info.id`) and merges the patch onto
+the existing entry, including nested `time` fields, while preserving unrelated
+metadata. Unknown IDs are ignored until a full session load supplies the
+required fields. Searching by `info.id` (often `undefined` for partial patches)
+fails to find the session and leaves it stale — the same bug class fixed in the
+TUI `sync.tsx` handler. Keep the fallback `props.sessionID ?? props.info.id`
+so both partial patches and rare full-session payloads work.

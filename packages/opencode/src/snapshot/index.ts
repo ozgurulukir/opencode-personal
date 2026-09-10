@@ -53,8 +53,8 @@ export interface Interface {
   readonly track: () => Effect.Effect<string | undefined>
   readonly patch: (hash: string) => Effect.Effect<Patch>
   readonly diffNames: (from: string, to: string) => Effect.Effect<Patch>
-  readonly restore: (snapshot: string) => Effect.Effect<void>
-  readonly revert: (patches: Patch[]) => Effect.Effect<void>
+  readonly restore: (snapshot: string) => Effect.Effect<void, Error>
+  readonly revert: (patches: Patch[]) => Effect.Effect<void, Error>
   readonly diff: (hash: string) => Effect.Effect<string>
   readonly diffFull: (from: string, to: string) => Effect.Effect<FileDiff[]>
 }
@@ -181,7 +181,16 @@ export const layer: Layer.Layer<
 
         const exists = (file: string) => fs.exists(file).pipe(Effect.orDie)
         const read = (file: string) => fs.readFileString(file).pipe(Effect.catch(() => Effect.succeed("")))
-        const remove = (file: string) => fs.remove(file).pipe(Effect.catch(() => Effect.void))
+        const remove = Effect.fnUntraced(function* (file: string) {
+          if (!(yield* exists(file))) return
+          yield* fs
+            .remove(file)
+            .pipe(Effect.mapError((error) => new Error(`failed to remove snapshot file: ${file}`, { cause: error })))
+        })
+        const gitFailure = (operation: string, result: GitResult) => {
+          const detail = result.stderr.trim() || result.text.trim() || "unknown git error"
+          return new Error(`${operation} failed with exit code ${result.code}: ${detail}`)
+        }
         const locked = <A, E, R>(fx: Effect.Effect<A, E, R>) => lock(state.gitdir).withPermits(1)(fx)
 
         const enabled = Effect.fnUntraced(function* () {
@@ -396,32 +405,29 @@ export const layer: Layer.Layer<
           )
         })
 
+        const restoreTree = Effect.fnUntraced(function* (snapshot: string) {
+          const result = yield* git([...core, ...args(["read-tree", snapshot])], { cwd: state.worktree })
+          if (result.code !== 0) yield* Effect.fail(gitFailure("read snapshot tree", result))
+          const checkout = yield* git([...core, ...args(["checkout-index", "-a", "-f"])], {
+            cwd: state.worktree,
+          })
+          if (checkout.code !== 0) yield* Effect.fail(gitFailure("checkout restored snapshot", checkout))
+        })
+
         const restore = Effect.fnUntraced(function* (snapshot: string) {
           return yield* locked(
             Effect.gen(function* () {
               log.info("restore", { commit: snapshot })
-              const result = yield* git([...core, ...args(["read-tree", snapshot])], { cwd: state.worktree })
-              if (result.code === 0) {
-                const checkout = yield* git([...core, ...args(["checkout-index", "-a", "-f"])], {
-                  cwd: state.worktree,
-                })
-                if (checkout.code === 0) {
-                  // Invalidate lastHash — worktree changed, next track() must re-scan.
-                  state.lastHash = undefined
-                  return
-                }
-                log.error("failed to restore snapshot", {
-                  snapshot,
-                  exitCode: checkout.code,
-                  stderr: checkout.stderr,
-                })
-                return
-              }
-              log.error("failed to restore snapshot", {
-                snapshot,
-                exitCode: result.code,
-                stderr: result.stderr,
-              })
+              // read-tree or checkout-index may partially update the snapshot index/worktree
+              // before failing, so never reuse the previous hash after a restore attempt.
+              state.lastHash = undefined
+              yield* restoreTree(snapshot).pipe(
+                Effect.tapError((error) =>
+                  Effect.sync(() => {
+                    log.error("failed to restore snapshot", { snapshot, error })
+                  }),
+                ),
+              )
             }),
           )
         })
@@ -443,83 +449,85 @@ export const layer: Layer.Layer<
                 }
               }
 
-              const single = Effect.fnUntraced(function* (op: (typeof ops)[number]) {
-                log.info("reverting", { file: op.file, hash: op.hash })
-                const result = yield* git([...core, ...args(["checkout", op.hash, "--", op.file])], {
-                  cwd: state.worktree,
-                })
-                if (result.code === 0) return
-                const tree = yield* git([...core, ...args(["ls-tree", op.hash, "--", op.rel])], {
-                  cwd: state.worktree,
-                })
-                if (tree.code === 0 && tree.text.trim()) {
-                  log.info("file existed in snapshot but checkout failed, keeping", { file: op.file, hash: op.hash })
-                  return
+              if (!ops.length) return
+
+              // Keep a tree of the exact pre-revert worktree so a later failed
+              // operation cannot leave an earlier file partially reverted.
+              state.lastHash = undefined
+              const rollback = yield* Effect.gen(function* () {
+                if (!(yield* exists(state.gitdir))) return
+                yield* add()
+                const rollbackResult = yield* git(args(["write-tree"]), { cwd: state.worktree })
+                if (rollbackResult.code !== 0 || !rollbackResult.text.trim()) {
+                  yield* Effect.fail(gitFailure("write snapshot revert rollback tree", rollbackResult))
                 }
-                log.info("file did not exist in snapshot, deleting", { file: op.file, hash: op.hash })
-                yield* remove(op.file)
+                return rollbackResult.text.trim()
               })
 
-              const clash = (a: string, b: string) => a === b || a.startsWith(`${b}/`) || b.startsWith(`${a}/`)
-
-              for (let i = 0; i < ops.length; ) {
-                const first = ops[i]!
-                const run = [first]
-                let j = i + 1
-                // Only batch adjacent files when their paths cannot affect each other.
-                while (j < ops.length && run.length < 100) {
-                  const next = ops[j]!
-                  if (next.hash !== first.hash) break
-                  if (run.some((item) => clash(item.rel, next.rel))) break
-                  run.push(next)
-                  j += 1
-                }
-
-                if (run.length === 1) {
-                  yield* single(first)
-                  i = j
-                  continue
-                }
-
-                const tree = yield* git(
-                  [...core, ...args(["ls-tree", "--name-only", first.hash, "--", ...run.map((item) => item.rel)])],
-                  {
+              const apply = Effect.gen(function* () {
+                const single = Effect.fnUntraced(function* (op: (typeof ops)[number]) {
+                  log.info("reverting", { file: op.file, hash: op.hash })
+                  const result = yield* git([...core, ...args(["checkout", op.hash, "--", op.file])], {
                     cwd: state.worktree,
-                  },
-                )
-
-                if (tree.code !== 0) {
-                  log.info("batched ls-tree failed, falling back to single-file revert", {
-                    hash: first.hash,
-                    files: run.length,
                   })
-                  for (const op of run) {
-                    yield* single(op)
+                  if (result.code === 0) return
+                  const tree = yield* git([...core, ...args(["ls-tree", op.hash, "--", op.rel])], {
+                    cwd: state.worktree,
+                  })
+                  if (tree.code !== 0) {
+                    log.error("failed to inspect snapshot file after checkout failure", {
+                      file: op.file,
+                      hash: op.hash,
+                      exitCode: tree.code,
+                      stderr: tree.stderr,
+                    })
+                    yield* Effect.fail(gitFailure(`inspect snapshot file ${op.rel}`, tree))
                   }
-                  i = j
-                  continue
-                }
+                  if (tree.text.trim()) {
+                    log.error("failed to revert snapshot file", {
+                      file: op.file,
+                      hash: op.hash,
+                      exitCode: result.code,
+                      stderr: result.stderr,
+                    })
+                    yield* Effect.fail(gitFailure(`revert snapshot file ${op.rel}`, result))
+                  }
+                  log.info("file did not exist in snapshot, deleting", { file: op.file, hash: op.hash })
+                  yield* remove(op.file)
+                })
 
-                const have = new Set(
-                  tree.text
-                    .trim()
-                    .split("\n")
-                    .map((item) => item.trim())
-                    .filter(Boolean),
-                )
-                const list = run.filter((item) => have.has(item.rel))
-                if (list.length) {
-                  log.info("reverting", { hash: first.hash, files: list.length })
-                  const result = yield* git(
-                    [...core, ...args(["checkout", first.hash, "--", ...list.map((item) => item.file)])],
+                const clash = (a: string, b: string) => a === b || a.startsWith(`${b}/`) || b.startsWith(`${a}/`)
+
+                for (let i = 0; i < ops.length; ) {
+                  const first = ops[i]!
+                  const run = [first]
+                  let j = i + 1
+                  // Only batch adjacent files when their paths cannot affect each other.
+                  while (j < ops.length && run.length < 100) {
+                    const next = ops[j]!
+                    if (next.hash !== first.hash) break
+                    if (run.some((item) => clash(item.rel, next.rel))) break
+                    run.push(next)
+                    j += 1
+                  }
+
+                  if (run.length === 1) {
+                    yield* single(first)
+                    i = j
+                    continue
+                  }
+
+                  const tree = yield* git(
+                    [...core, ...args(["ls-tree", "--name-only", first.hash, "--", ...run.map((item) => item.rel)])],
                     {
                       cwd: state.worktree,
                     },
                   )
-                  if (result.code !== 0) {
-                    log.info("batched checkout failed, falling back to single-file revert", {
+
+                  if (tree.code !== 0) {
+                    log.info("batched ls-tree failed, falling back to single-file revert", {
                       hash: first.hash,
-                      files: list.length,
+                      files: run.length,
                     })
                     for (const op of run) {
                       yield* single(op)
@@ -527,18 +535,64 @@ export const layer: Layer.Layer<
                     i = j
                     continue
                   }
-                }
 
-                for (const op of run) {
-                  if (have.has(op.rel)) continue
-                  log.info("file did not exist in snapshot, deleting", { file: op.file, hash: op.hash })
-                  yield* remove(op.file)
-                }
+                  const have = new Set(
+                    tree.text
+                      .trim()
+                      .split("\n")
+                      .map((item) => item.trim())
+                      .filter(Boolean),
+                  )
+                  const list = run.filter((item) => have.has(item.rel))
+                  if (list.length) {
+                    log.info("reverting", { hash: first.hash, files: list.length })
+                    const result = yield* git(
+                      [...core, ...args(["checkout", first.hash, "--", ...list.map((item) => item.file)])],
+                      {
+                        cwd: state.worktree,
+                      },
+                    )
+                    if (result.code !== 0) {
+                      log.info("batched checkout failed, falling back to single-file revert", {
+                        hash: first.hash,
+                        files: list.length,
+                      })
+                      for (const op of run) {
+                        yield* single(op)
+                      }
+                      i = j
+                      continue
+                    }
+                  }
 
-                i = j
-              }
-              // Invalidate lastHash — worktree changed, next track() must re-scan.
-              state.lastHash = undefined
+                  for (const op of run) {
+                    if (have.has(op.rel)) continue
+                    log.info("file did not exist in snapshot, deleting", { file: op.file, hash: op.hash })
+                    yield* remove(op.file)
+                  }
+
+                  i = j
+                }
+              })
+
+              yield* apply.pipe(
+                Effect.catch((error) =>
+                  Effect.gen(function* () {
+                    if (!rollback) return yield* Effect.fail(error)
+                    state.lastHash = undefined
+                    yield* restoreTree(rollback).pipe(
+                      Effect.mapError(
+                        (rollbackError) =>
+                          new Error("failed to restore worktree after snapshot revert failure", {
+                            cause: rollbackError,
+                          }),
+                      ),
+                    )
+                    state.lastHash = rollback
+                    yield* Effect.fail(error)
+                  }),
+                ),
+              )
             }),
           )
         })

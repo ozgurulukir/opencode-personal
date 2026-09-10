@@ -144,11 +144,16 @@ function handleSessionCreated(input: {
 function handleSessionUpdated(input: {
   store: Store<State>
   setStore: SetStoreFunction<State>
-  info: Session
+  info: Partial<Session>
+  sessionID: string
   setSessionTodo?: (sessionID: string, todos: Todo[] | undefined) => void
 }) {
-  const result = Binary.search(input.store.session, input.info.id, (s) => s.id)
-  if (input.info.time.archived) {
+  // `info` is a partial patch (no `id`) for session updates such as title, summary,
+  // and revert — reconcile by the event's sessionID and merge into the existing entry
+  // so unrelated fields survive. Searching by `info.id` fails for partial patches and
+  // leaves sessions stale (e.g. undo can't reflect a `session.revert`).
+  const result = Binary.search(input.store.session, input.sessionID, (s) => s.id)
+  if (input.info.time?.archived) {
     if (result.found) {
       input.setStore(
         "session",
@@ -157,20 +162,25 @@ function handleSessionUpdated(input: {
         }),
       )
     }
-    cleanupSessionCaches(input.setStore, input.info.id, input.setSessionTodo)
+    cleanupSessionCaches(input.setStore, input.sessionID, input.setSessionTodo)
     if (input.info.parentID) return
     input.setStore("sessionTotal", (value) => Math.max(0, value - 1))
     return
   }
+  const merged = { ...input.info, id: input.sessionID }
   if (result.found) {
-    input.setStore("session", result.index, reconcile(input.info))
+    input.setStore(
+      "session",
+      produce((draft) => {
+        Object.assign(draft[result.index], merged, {
+          ...(input.info.time ? { time: { ...draft[result.index].time, ...input.info.time } } : {}),
+        })
+      }),
+    )
     return
   }
-  const next = input.store.session.slice()
-  next.splice(result.index, 0, input.info)
-  const trimmed = trimSessions(next, { limit: input.store.limit, permission: input.store.permission })
-  input.setStore("session", reconcile(trimmed, { key: "id" }))
-  cleanupDroppedSessionCaches(input.store, input.setStore, trimmed, input.setSessionTodo)
+  // Unknown updates can be partial and do not contain enough data to create a
+  // valid session. The next full session load will add it to the store.
 }
 
 function handleSessionDeleted(input: {
@@ -850,10 +860,14 @@ export function applyDirectoryEvent(input: {
       break
     }
     case "session.next.updated": {
+      const props = event.properties as { info: Partial<Session>; sessionID?: string }
+      const sessionID = props.sessionID ?? props.info.id
+      if (!sessionID) break
       handleSessionUpdated({
         store: input.store,
         setStore: input.setStore,
-        info: (event.properties as { info: Session }).info,
+        info: props.info,
+        sessionID,
         setSessionTodo: input.setSessionTodo,
       })
       break

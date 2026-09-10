@@ -37,7 +37,7 @@ async function bootstrap() {
   })
 }
 
-function run<A>(dir: string, body: (snapshot: Snapshot.Interface) => Effect.Effect<A>) {
+function run<A>(dir: string, body: (snapshot: Snapshot.Interface) => Effect.Effect<A, Error>) {
   return Effect.runPromise(
     Effect.gen(function* () {
       const snapshot = yield* Snapshot.Service
@@ -304,6 +304,80 @@ test("patch with invalid hash", async () => {
       const patch = await run(tmp.path, (snapshot) => snapshot.patch("invalid-hash-12345"))
       expect(patch.files).toEqual([])
       expect(patch.hash).toBe("invalid-hash-12345")
+    },
+  })
+})
+
+test("restore rejects an invalid snapshot instead of reporting success", async () => {
+  await using tmp = await bootstrap()
+  await WithInstance.provide({
+    directory: tmp.path,
+    fn: async () => {
+      const failure = await run(tmp.path, (snapshot) => snapshot.restore("invalid-snapshot-hash")).then(
+        () => undefined,
+        (error) => error,
+      )
+      expect(failure).toBeDefined()
+      expect(failure instanceof Error ? failure.message : String(failure)).toContain("read snapshot tree failed")
+    },
+  })
+})
+
+test("revert rejects an invalid patch hash without deleting an existing file", async () => {
+  await using tmp = await bootstrap()
+  await WithInstance.provide({
+    directory: tmp.path,
+    fn: async () => {
+      const file = `${tmp.path}/a.txt`
+      const original = await fs.readFile(file, "utf-8")
+
+      const failure = await run(tmp.path, (snapshot) =>
+        snapshot.revert([
+          {
+            hash: "invalid-patch-hash",
+            files: [file],
+          },
+        ]),
+      ).then(
+        () => undefined,
+        (error) => error,
+      )
+      expect(failure).toBeDefined()
+      expect(failure instanceof Error ? failure.message : String(failure)).toContain(
+        "inspect snapshot file a.txt failed",
+      )
+
+      expect(await fs.readFile(file, "utf-8")).toBe(original)
+    },
+  })
+})
+
+test("revert restores earlier files when a later patch operation fails", async () => {
+  await using tmp = await bootstrap()
+  await WithInstance.provide({
+    directory: tmp.path,
+    fn: async () => {
+      const before = await run(tmp.path, (snapshot) => snapshot.track())
+      expect(before).toBeTruthy()
+
+      const first = `${tmp.path}/a.txt`
+      const second = `${tmp.path}/b.txt`
+      await Filesystem.write(first, "changed-a")
+      await Filesystem.write(second, "changed-b")
+
+      const failure = await run(tmp.path, (snapshot) =>
+        snapshot.revert([
+          { hash: before!, files: [first] },
+          { hash: "invalid-patch-hash", files: [second] },
+        ]),
+      ).then(
+        () => undefined,
+        (error) => error,
+      )
+
+      expect(failure).toBeDefined()
+      expect(await fs.readFile(first, "utf-8")).toBe("changed-a")
+      expect(await fs.readFile(second, "utf-8")).toBe("changed-b")
     },
   })
 })
