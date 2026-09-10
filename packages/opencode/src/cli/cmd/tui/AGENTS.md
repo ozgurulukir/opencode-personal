@@ -36,6 +36,12 @@ This file covers TUI-specific patterns for `packages/opencode/src/cli/cmd/tui/`.
 
 - `store.prompt.input` and the textarea's `plainText` can drift briefly during IME composition. Read `input.plainText` and call `setStore("prompt", "input", value)` to reconcile, or trust the textarea and sync the store at submission time. See `submit()` in `component/prompt/index.tsx` for the canonical double-defer pattern.
 
+## Message store ordering — newest-first (`find`, not `findLast`)
+
+- `sync.data.messages[sessionID]` is ordered **newest-first**: initial load comes from `V2Session.messages()` (`desc(time_created), desc(id)`, default `order: "desc"` at `v2/session.ts:432`) and live `session.next.*` handlers `unshift` (`context/sync.tsx:304-353`). The plugin API's `state.session.messages()` delegates to the same store (`plugin/api.tsx:158`), so plugin views share this contract. To get the LATEST message, use `find` (first match); `findLast` walks from the end and returns the OLDEST — this froze the context meters (prompt footer, sidebar context panel, subagent footer) at the first response.
+- Some call sites intentionally `.toReversed()` first and then `findLast` (`routes/session/index.tsx:179`, `feature-plugins/system/session-v2.tsx:52`) — both frames are correct; don't "fix" one to match the other.
+- Token usage/cost display has a single authority: `tui/context-usage.shared.ts` (`latestAssistantUsage`, `totalAssistantCost`; characterization tests in `test/cli/cmd/tui/`). Reuse it for any new tokens/percent/cost display instead of re-deriving the input+output+reasoning+cache sum.
+
 ## TUI plugin runtime
 
 - TUI plugins have a scoped lifecycle backed by `AbortController`. Each plugin's dispose functions are tracked and cleaned up in reverse order with a 5-second timeout per plugin (`DISPOSE_TIMEOUT_MS = 5000` in `plugin/runtime.ts:118`).
