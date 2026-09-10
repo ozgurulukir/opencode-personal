@@ -790,6 +790,7 @@ export function Prompt(props: PromptProps) {
       setStore("prompt", prompt)
       restoreExtmarksFromParts(prompt.parts)
       input.gotoBufferEnd()
+      renderer.requestRender()
     },
     reset() {
       input.clear()

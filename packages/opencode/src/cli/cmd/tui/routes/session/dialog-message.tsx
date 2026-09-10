@@ -6,6 +6,8 @@ import { useRoute } from "@tui/context/route"
 import * as Clipboard from "@tui/util/clipboard"
 import type { PromptInfo } from "@tui/component/prompt/history"
 import { fromUserMessage } from "@tui/component/prompt/part"
+import { useToast } from "@tui/ui/toast"
+import { errorMessage, safeCatch } from "@/util/error"
 
 export function DialogMessage(props: {
   messageID: string
@@ -16,6 +18,7 @@ export function DialogMessage(props: {
   const sdk = useSDK()
   const message = createMemo(() => sync.data.messages[props.sessionID]?.find((x) => x.id === props.messageID))
   const route = useRoute()
+  const toast = useToast()
 
   return (
     <DialogSelect
@@ -25,14 +28,30 @@ export function DialogMessage(props: {
           title: "Revert",
           value: "session.revert",
           description: "undo messages and file changes",
-          onSelect: (dialog) => {
+          onSelect: async (dialog) => {
             const msg = message()
             if (!msg) return
 
-            void sdk.client.v2.session.revert({
-              sessionID: props.sessionID,
-              messageID: msg.id,
-            })
+            const success = await sdk.client.v2.session
+              .revert(
+                {
+                  sessionID: props.sessionID,
+                  messageID: msg.id,
+                },
+                { throwOnError: true },
+              )
+              .then(() => true)
+              .catch((error) => {
+                safeCatch("tui.message-revert", error, () =>
+                  toast.show({
+                    message: `Failed to undo message: ${errorMessage(error)}`,
+                    variant: "error",
+                    duration: 5000,
+                  }),
+                )
+                return false
+              })
+            if (!success) return
 
             if (props.setPrompt && msg.type === "user") {
               props.setPrompt(fromUserMessage(msg))

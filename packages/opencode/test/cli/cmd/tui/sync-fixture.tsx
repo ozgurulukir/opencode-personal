@@ -6,6 +6,7 @@ import { ExitProvider } from "../../../../src/cli/cmd/tui/context/exit"
 import { KVProvider, useKV } from "../../../../src/cli/cmd/tui/context/kv"
 import { ProjectProvider } from "../../../../src/cli/cmd/tui/context/project"
 import { SDKProvider, type EventSource } from "../../../../src/cli/cmd/tui/context/sdk"
+import type { GlobalEvent } from "@opencode-ai/sdk/v2"
 import { SyncProvider, useSync } from "../../../../src/cli/cmd/tui/context/sync"
 
 export const worktree = "/tmp/opencode"
@@ -28,6 +29,30 @@ export function json(data: unknown, init?: ResponseInit) {
 
 export function eventSource(): EventSource {
   return { subscribe: async () => () => {} }
+}
+
+// Controllable event source: captures the subscribed handler so tests can push
+// GlobalEvents through the sync store (handles batching + directory filtering).
+export function controllableEventSource() {
+  let handler: ((event: GlobalEvent) => void) | undefined
+  const source: EventSource = {
+    subscribe: async (h) => {
+      handler = h
+      return () => {
+        handler = undefined
+      }
+    },
+  }
+  return {
+    source,
+    dispatch(event: Partial<GlobalEvent> & { payload: GlobalEvent["payload"] }) {
+      if (!handler) throw new Error("eventSource not subscribed yet")
+      handler({
+        directory: directory,
+        ...event,
+      } as GlobalEvent)
+    },
+  }
 }
 
 type FetchHandler = (url: URL) => Response | Promise<Response> | undefined
@@ -89,7 +114,7 @@ export function createFetch(override?: FetchHandler) {
 
 type Ctx = { kv: ReturnType<typeof useKV>; sync: ReturnType<typeof useSync> }
 
-export async function mount(override?: FetchHandler) {
+export async function mount(override?: FetchHandler, events?: EventSource) {
   const calls = createFetch(override)
   let sync!: ReturnType<typeof useSync>
   let kv!: ReturnType<typeof useKV>
@@ -112,7 +137,7 @@ export async function mount(override?: FetchHandler) {
     <ArgsProvider>
       <ExitProvider>
         <KVProvider>
-          <SDKProvider url="http://test" directory={directory} fetch={calls.fetch} events={eventSource()}>
+          <SDKProvider url="http://test" directory={directory} fetch={calls.fetch} events={events ?? eventSource()}>
             <ProjectProvider>
               <SyncProvider>
                 <Probe />

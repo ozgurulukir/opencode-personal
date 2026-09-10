@@ -1254,6 +1254,91 @@ describe("applyDirectoryEvent", () => {
     expect(store.session[0].time.updated).toBe(2)
   })
 
+  test("merges partial session.next.updated patch (no id, e.g. revert) into existing entry", () => {
+    const existing = { ...rootSession({ id: "ses_1" }), title: "original" } as Session
+    const [store, setStore] = createStore(
+      baseState({
+        session: [existing],
+      }),
+    )
+
+    // Real server payload: partial patch keyed by sessionID with no `id`.
+    applyDirectoryEvent({
+      event: {
+        type: "session.next.updated",
+        properties: {
+          sessionID: "ses_1",
+          info: {
+            revert: { messageID: "msg_9", diff: "d" },
+            summary: { additions: 3, deletions: 1, files: 2 },
+          },
+        },
+      },
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+
+    expect(store.session).toHaveLength(1)
+    expect(store.session[0].id).toBe("ses_1")
+    expect(store.session[0].title).toBe("original") // unrelated fields preserved
+    expect(store.session[0].revert?.messageID).toBe("msg_9")
+  })
+
+  test("merges nested time fields in a partial session update", () => {
+    const existing = rootSession({ id: "ses_1" })
+    const [store, setStore] = createStore(
+      baseState({
+        session: [existing],
+      }),
+    )
+
+    applyDirectoryEvent({
+      event: {
+        type: "session.next.updated",
+        properties: {
+          sessionID: "ses_1",
+          info: { time: { updated: 3 } },
+        },
+      },
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+
+    expect(store.session[0].time).toEqual({ created: 1, updated: 3 })
+  })
+
+  test("does not insert an incomplete session for an unknown partial update", () => {
+    const [store, setStore] = createStore(
+      baseState({
+        session: [rootSession({ id: "ses_existing" })],
+      }),
+    )
+
+    applyDirectoryEvent({
+      event: {
+        type: "session.next.updated",
+        properties: {
+          sessionID: "ses_unknown",
+          info: { title: "partial only" },
+        },
+      },
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+
+    expect(store.session).toHaveLength(1)
+    expect(store.session[0].id).toBe("ses_existing")
+  })
+
   test("skips permission.replied when permission list is missing", () => {
     const [store, setStore] = createStore(baseState())
 
