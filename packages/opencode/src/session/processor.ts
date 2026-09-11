@@ -578,6 +578,17 @@ export const layer: Layer.Layer<
               field: "text",
               delta: value.text,
             })
+            if (ctx.assistantMessage.summary) {
+              // Compaction summaries suppress Text.* events (see the text-start /
+              // text-end guards), so stream progress through the compaction channel.
+              // Without this the TUI compaction view sticks at "compacting..." with
+              // zero updates until Ended.
+              yield* sync.run(SessionEvent.Compaction.Delta.Sync, {
+                sessionID: ctx.sessionID,
+                timestamp: DateTime.makeUnsafe(Date.now()),
+                text: value.text,
+              })
+            }
             return
 
           case "text-end":

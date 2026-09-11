@@ -519,6 +519,13 @@ export const layer: Layer.Layer<
         }).toObject()
         processor.message.finish = "error"
         yield* session.updateMessage(processor.message)
+        // Resolve the compaction view even on failure — Started without Ended
+        // leaves the TUI stuck at "compacting..." forever.
+        yield* sync.run(SessionEvent.Compaction.Ended.Sync, {
+          sessionID: input.sessionID,
+          timestamp: DateTime.makeUnsafe(Date.now()),
+          text: "",
+        })
         return "stop"
       }
 
@@ -638,7 +645,16 @@ export const layer: Layer.Layer<
         }
       }
 
-      if (processor.message.error) return "stop"
+      if (processor.message.error) {
+        // Same stuck-view guard as the overflow path above: resolve the
+        // compaction view even when the summary turn errored.
+        yield* sync.run(SessionEvent.Compaction.Ended.Sync, {
+          sessionID: input.sessionID,
+          timestamp: DateTime.makeUnsafe(Date.now()),
+          text: "",
+        })
+        return "stop"
+      }
       if (result === "continue") {
         const summary = summaryText(
           (yield* session.messages({ sessionID: input.sessionID })).find((item) => item.info.id === msg.id) ?? {

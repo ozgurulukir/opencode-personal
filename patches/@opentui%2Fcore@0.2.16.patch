@@ -1,0 +1,13 @@
+diff --git a/parser.worker.js b/parser.worker.js
+index 3afcab0e6619a377a3a82e3d513be31dcbf61128..b38d5cefe362438e62475cb59f909c4d6fb26c46 100644
+--- a/parser.worker.js
++++ b/parser.worker.js
+@@ -304,7 +304,7 @@ class ParserWorker {
+       this.tsDataPath = path2.join(dataPath, "tree-sitter");
+       await mkdir3(path2.join(this.tsDataPath, "languages"), { recursive: true });
+       await mkdir3(path2.join(this.tsDataPath, "queries"), { recursive: true });
+-      let treeWasm = await resolveBundledFilePath(() => import("web-tree-sitter/tree-sitter.wasm", { with: { type: "wasm" } }), () => import.meta.resolve("web-tree-sitter/tree-sitter.wasm"), import.meta.url);
++      let treeWasm = await resolveBundledFilePath(() => import("web-tree-sitter/web-tree-sitter.wasm", { with: { type: "wasm" } }), () => import.meta.resolve("web-tree-sitter/web-tree-sitter.wasm"), import.meta.url);
+       if (isBunfsPath(treeWasm)) {
+         treeWasm = normalizeBunfsPath(path2.parse(treeWasm).base);
+       }
