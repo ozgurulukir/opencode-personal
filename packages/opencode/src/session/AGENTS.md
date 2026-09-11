@@ -65,6 +65,10 @@ Normal tools merge `agent.permission + session.permission`. But subagent task's 
 
 ## Compaction system
 
+### Compaction UI runs on `Compaction.*` sync events, not text parts
+
+The TUI compaction view listens ONLY to `session.next.compaction.started/delta/ended`. Summary assistants deliberately emit no `Text.*` events (processor `text-start`/`text-delta`/`text-end` all guard on `!assistantMessage.summary`), so streaming progress must go through `Compaction.Delta`. Every exit from `processCompaction` must emit `Compaction.Ended` — `Started` without `Ended` (both failure exits) sticks the view at "compacting..." forever.
+
 ### `isOverflow` headroom bug when `limit.input` is set
 
 `context-budget.ts:usableWith()` — when `model.limit.input` is set, the function previously used `limit.input - min(compactionBuffer, maxOutputTokens)`, which reserved only 20K headroom for output. For models with 32K+ output limits, compaction triggered too late. The fix: always subtract `maxOutputTokens` from `limit.input` (or `reserved` if user-configured). Regression tests at `compaction.test.ts:480-546` document the expected behavior. Related issues: #10634, #8089, #11086, #12621.
