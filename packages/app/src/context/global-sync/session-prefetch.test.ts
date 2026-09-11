@@ -3,6 +3,7 @@ import {
   clearSessionPrefetch,
   clearSessionPrefetchDirectory,
   getSessionPrefetch,
+  isSessionPrefetchCurrent,
   runSessionPrefetch,
   setSessionPrefetch,
   shouldSkipSessionPrefetch,
@@ -92,5 +93,28 @@ describe("session prefetch", () => {
         now: 1 + 15_001,
       }),
     ).toBe(true)
+  })
+
+  test("keeps invalidation versions for pending work while pruning old revisions", async () => {
+    const directory = "/tmp/rev-prune"
+    const sessionID = "ses-pending"
+    let resolve: (() => void) | undefined
+    const pending = runSessionPrefetch({
+      directory,
+      sessionID,
+      task: async () =>
+        new Promise((done) => {
+          resolve = () => done(undefined)
+        }),
+    })
+
+    clearSessionPrefetch(directory, [sessionID])
+    for (let i = 0; i < 4_100; i++) {
+      clearSessionPrefetch(directory, [`ses-${i}`])
+    }
+
+    expect(isSessionPrefetchCurrent(directory, sessionID, 0)).toBe(false)
+    resolve?.()
+    await pending
   })
 })

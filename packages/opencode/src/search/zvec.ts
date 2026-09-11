@@ -61,6 +61,16 @@ function toZvecError(op: string, e: unknown): ZvecError {
   if (e instanceof ZvecError) return e
   const msg = e instanceof Error ? e.message : String(e)
   const code = isZVecError(e) ? e.code : op
+  if (
+    op === "OPEN_FAILED" &&
+    (code === "ZVEC_FAILED_PRECONDITION" || code === "ZVEC_UNAVAILABLE" || /lock|busy|exclusive/i.test(msg))
+  ) {
+    return new ZvecError(
+      code,
+      "The workspace search index is busy because another opencode process is writing it. Close the other process or retry shortly.",
+      { cause: e },
+    )
+  }
   return new ZvecError(code, `Zvec ${op.toLowerCase().replace(/_/g, " ")} failed: ${msg}`, { cause: e })
 }
 

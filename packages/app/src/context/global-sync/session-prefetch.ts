@@ -24,8 +24,19 @@ export function shouldSkipSessionPrefetch(input: { message: boolean; info?: Meta
 const cache = new Map<string, Meta>()
 const inflight = new Map<string, Promise<Meta | undefined>>()
 const rev = new Map<string, number>()
+const protectedRev = new Set<string>()
+const MAX_REV_ENTRIES = 4096
 
 const version = (id: string) => rev.get(id) ?? 0
+
+function bumpVersion(id: string) {
+  rev.set(id, version(id) + 1)
+  while (rev.size > MAX_REV_ENTRIES) {
+    const candidate = [...rev.keys()].find((key) => !inflight.has(key) && !protectedRev.has(key))
+    if (!candidate) return
+    rev.delete(candidate)
+  }
+}
 
 export function getSessionPrefetch(directory: string, sessionID: string) {
   return cache.get(key(directory, sessionID))
@@ -55,7 +66,9 @@ export function runSessionPrefetch(input: {
   const value = version(id)
 
   const promise = input.task(value).finally(() => {
-    if (inflight.get(id) === promise) inflight.delete(id)
+    if (inflight.get(id) !== promise) return
+    inflight.delete(id)
+    protectedRev.delete(id)
   })
 
   inflight.set(id, promise)
@@ -82,7 +95,8 @@ export function clearSessionPrefetch(directory: string, sessionIDs: Iterable<str
   for (const sessionID of sessionIDs) {
     if (!sessionID) continue
     const id = key(directory, sessionID)
-    rev.set(id, version(id) + 1)
+    if (inflight.has(id)) protectedRev.add(id)
+    bumpVersion(id)
     cache.delete(id)
     inflight.delete(id)
   }
@@ -93,7 +107,8 @@ export function clearSessionPrefetchDirectory(directory: string) {
   const keys = new Set([...cache.keys(), ...inflight.keys()])
   for (const id of keys) {
     if (!id.startsWith(prefix)) continue
-    rev.set(id, version(id) + 1)
+    if (inflight.has(id)) protectedRev.add(id)
+    bumpVersion(id)
     cache.delete(id)
     inflight.delete(id)
   }
