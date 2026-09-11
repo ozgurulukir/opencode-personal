@@ -10,6 +10,8 @@ import { Todo } from "../../src/session/todo"
 import { SessionID, MessageID, PartID } from "../../src/session/schema"
 import { ProjectID } from "../../src/project/schema"
 import { WorkspaceID } from "../../src/control-plane/schema"
+import { EventV2 } from "../../src/v2/event"
+import { RevertPayload } from "../../src/server/routes/instance/httpapi/groups/session"
 
 // Covers the session-domain Effect Schema migration. For each migrated
 // schema we assert:
@@ -229,6 +231,17 @@ describe("SessionRevert.RevertInput", () => {
 
     expect(() => decode({ sessionID })).toThrow()
     expect(() => SessionRevert.RevertInput.zod.parse({ sessionID })).toThrow()
+  })
+
+  test("accepts V2 projected event message IDs", () => {
+    const input = { sessionID, messageID: EventV2.ID.create() }
+    expect(decode(input)).toEqual(input)
+    expect(SessionRevert.RevertInput.zod.parse(input)).toEqual(input)
+    expect(decodeUnknown(RevertPayload)({ messageID: input.messageID })).toEqual({ messageID: input.messageID })
+  })
+
+  test("rejects unrelated message ID prefixes", () => {
+    expect(() => decode({ sessionID, messageID: "part_01J5Y5H0AH4Q4NXJ6P4C3P5V2N" })).toThrow()
   })
 })
 

@@ -9,7 +9,7 @@ import { zod } from "@opencode-ai/core/effect-zod"
 import { withStatics } from "@opencode-ai/core/schema"
 import * as Session from "./session"
 import { MessageV2 } from "./message-v2"
-import { SessionID, MessageID, PartID } from "./schema"
+import { SessionID, PartID, RevertMessageID } from "./schema"
 import { SessionRunState } from "./run-state"
 import { SessionSummary } from "./summary"
 
@@ -17,7 +17,7 @@ const log = Log.create({ service: "session.revert" })
 
 export const RevertInput = Schema.Struct({
   sessionID: SessionID,
-  messageID: MessageID,
+  messageID: RevertMessageID,
   partID: Schema.optional(PartID),
 }).pipe(withStatics((s) => ({ zod: zod(s) })))
 export type RevertInput = Schema.Schema.Type<typeof RevertInput>

@@ -752,7 +752,7 @@ export type Session = {
   }
   permission?: PermissionRuleset
   revert?: {
-    messageID: string
+    messageID: string | string
     partID?: string
     snapshot?: string
     diff?: string
@@ -1459,7 +1459,7 @@ export type GlobalSession = {
   }
   permission?: PermissionRuleset
   revert?: {
-    messageID: string
+    messageID: string | string
     partID?: string
     snapshot?: string
     diff?: string
@@ -2425,7 +2425,7 @@ export type SyncEventSessionUpdated = {
       }
       permission?: PermissionRuleset | null
       revert?: {
-        messageID: string
+        messageID: string | string
         partID?: string
         snapshot?: string
         diff?: string
@@ -3412,7 +3412,7 @@ export type SessionInfo = {
     url: string
   }
   revert?: {
-    messageID: string
+    messageID: string | string
     partID?: string
     snapshot?: string
     diff?: string
@@ -6381,7 +6381,7 @@ export type SessionShellResponse = SessionShellResponses[keyof SessionShellRespo
 
 export type SessionRevertData = {
   body?: {
-    messageID: string
+    messageID: string | string
     partID?: string
   }
   path: {
@@ -7302,7 +7302,7 @@ export type V2SessionShellResponse = V2SessionShellResponses[keyof V2SessionShel
 
 export type V2SessionRevertData = {
   body?: {
-    messageID: string
+    messageID: string | string
     partID?: string
   }
   path: {

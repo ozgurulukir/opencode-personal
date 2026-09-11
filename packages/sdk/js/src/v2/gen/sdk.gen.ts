@@ -4039,7 +4039,7 @@ export class Session2 extends HeyApiClient {
       sessionID: string
       directory?: string
       workspace?: string
-      messageID: string
+      messageID: string | string
       partID?: string
     },
     options?: Options<never, ThrowOnError>,
@@ -5170,7 +5170,7 @@ export class Session3 extends HeyApiClient {
       sessionID: string
       directory?: string
       workspace?: string
-      messageID: string
+      messageID: string | string
       partID?: string
     },
     options?: Options<never, ThrowOnError>,
