@@ -5,7 +5,7 @@ import type { SessionMessage } from "../v2/session-message"
 import type { Snapshot } from "../snapshot"
 import type { Permission } from "../permission"
 import type { ProjectID } from "../project/schema"
-import type { SessionID, MessageID, PartID } from "./schema"
+import type { SessionID, MessageID, PartID, RevertMessageID } from "./schema"
 import type { WorkspaceID } from "../control-plane/schema"
 import { Timestamps } from "../storage/schema.sql"
 
@@ -33,7 +33,12 @@ export const SessionTable = sqliteTable(
     summary_deletions: integer(),
     summary_files: integer(),
     summary_diffs: text({ mode: "json" }).$type<Snapshot.FileDiff[]>(),
-    revert: text({ mode: "json" }).$type<{ messageID: MessageID; partID?: PartID; snapshot?: string; diff?: string }>(),
+    revert: text({ mode: "json" }).$type<{
+      messageID: RevertMessageID
+      partID?: PartID
+      snapshot?: string
+      diff?: string
+    }>(),
     permission: text({ mode: "json" }).$type<Permission.Ruleset>(),
     agent: text(),
     model: text({ mode: "json" }).$type<{

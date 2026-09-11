@@ -128,25 +128,29 @@ export const layer: Layer.Layer<
 
         const ignore = Effect.fnUntraced(function* (files: string[]) {
           if (!files.length) return new Set<string>()
-          const check = yield* git(
-            [
-              ...quote,
-              "--git-dir",
-              path.join(state.worktree, ".git"),
-              "--work-tree",
-              state.worktree,
-              "check-ignore",
-              "--no-index",
-              "--stdin",
-              "-z",
-            ],
-            {
-              cwd: state.worktree,
-              stdin: feed(files),
-            },
+          const multiline = files.filter((file) => file.includes("\n"))
+          const singleline = files.filter((file) => !file.includes("\n"))
+          const ignored = new Set<string>()
+          for (let i = 0; i < singleline.length; i += 1000) {
+            const check = yield* git(
+              [...quote, "check-ignore", "--no-index", "--", ...singleline.slice(i, i + 1000)],
+              { cwd: state.worktree },
+            )
+            if (check.code !== 0 && check.code !== 1) return new Set<string>()
+            for (const file of check.text.split("\n").filter((file) => file.length > 0)) {
+              ignored.add(file)
+            }
+          }
+          const multilineResults = yield* Effect.all(
+            multiline.map((file) =>
+              git([...quote, "check-ignore", "--no-index", "--", file], { cwd: state.worktree }).pipe(
+                Effect.map((result) => (result.code === 0 ? file : undefined)),
+              ),
+            ),
+            { concurrency: 4 },
           )
-          if (check.code !== 0 && check.code !== 1) return new Set<string>()
-          return new Set(check.text.split("\0").filter(Boolean))
+          for (const file of multilineResults) if (file) ignored.add(file)
+          return ignored
         })
 
         const drop = Effect.fnUntraced(function* (files: string[]) {

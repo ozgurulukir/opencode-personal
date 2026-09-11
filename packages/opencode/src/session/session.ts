@@ -30,7 +30,7 @@ import { InstanceState } from "@/effect/instance-state"
 import { Snapshot } from "@/snapshot"
 import { ProjectID } from "../project/schema"
 import { WorkspaceID } from "../control-plane/schema"
-import { SessionID, MessageID, PartID } from "./schema"
+import { SessionID, MessageID, PartID, RevertMessageID } from "./schema"
 import { ModelID, ProviderID } from "@/provider/schema"
 
 import type { Provider } from "@/provider/provider"
@@ -163,7 +163,7 @@ const Time = Schema.Struct({
 })
 
 const Revert = Schema.Struct({
-  messageID: MessageID,
+  messageID: RevertMessageID,
   partID: optionalOmitUndefined(PartID),
   snapshot: optionalOmitUndefined(Schema.String),
   diff: optionalOmitUndefined(Schema.String),

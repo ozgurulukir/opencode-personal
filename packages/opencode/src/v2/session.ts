@@ -1,5 +1,5 @@
 import { SessionMessageTable, SessionTable } from "@/session/session.sql"
-import { MessageID, PartID, SessionID } from "@/session/schema"
+import { MessageID, PartID, RevertMessageID, SessionID } from "@/session/schema"
 import { ModelID, ProviderID } from "@/provider/schema"
 import { WorkspaceID } from "@/control-plane/schema"
 import { and, asc, desc, eq, gt, gte, isNull, like, lt, or, type SQL } from "@/storage/db"
@@ -180,7 +180,7 @@ export interface Interface {
   ) => Effect.Effect<{ user: SessionMessage.User | undefined; assistant: SessionMessage.Assistant | undefined }, never>
   readonly revert: (input: {
     sessionID: SessionID
-    messageID: MessageID
+    messageID: RevertMessageID
     partID?: PartID
   }) => Effect.Effect<Info, NotFoundError>
   readonly unrevert: (sessionID: SessionID) => Effect.Effect<Info, NotFoundError>
