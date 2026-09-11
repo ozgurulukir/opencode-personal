@@ -77,6 +77,8 @@ ln -sf "$PWD/dist/opencode-linux-x64/bin/opencode" ~/.local/bin/opencode-dev
 
 Renaming the binary does not affect the runtime — channel/DB/data-dir are build-time baked (`OPENCODE_CHANNEL` define), not derived from the binary name. A local build uses channel `local`, so it reads/writes `opencode-local.db` (separate from the npm release's `opencode.db`). Re-running `bun run build -- --single ...` refreshes `opencode-dev` automatically since the symlink points at the fixed `dist/...` path.
 
+- Build-time pre-bundle entrypoints must live under the project tree: Bun resolves bare imports relative to the entry file, not the cwd, so a `mkdtemp(os.tmpdir())` entry fails with "Could not resolve" on workspace deps. `script/build.ts` stages the tree-sitter worker source under `packages/opencode/` for this reason.
+
 ## CLI Event Loop Architecture
 
 ### LoopContext Interface Pattern
@@ -369,6 +371,9 @@ isolating V2 behavior and retain real persistence/event layers where projection
 behavior is under test.
 
 ## Known Issues
+
+- Live `<markdown>`/`<code>` views need `streaming={true}`. Copying the static viewer's `streaming={false}` pattern into a live view re-highlights the full content on every delta (flicker, markdown never settles). See the compaction summary block in `routes/session/index.tsx` vs `CompactionMessage` in `feature-plugins/system/session-v2.tsx`.
+- `setupOpenTUILib()` (`src/index.ts:204`) runs on EVERY CLI boot before arg parsing — even `--version`. Anything added there (e.g. worker extraction) runs for all commands. Ordering is safe for `TreeSitterClient` because it is a lazy singleton (`singleton("tree-sitter-client", ...)` in `@opentui/core`), so boot-time env setup always wins without import-order hazards.
 
 - `Plugin.defaultLayer` includes `Config.defaultLayer` (real filesystem config) and triggers `import("../server/server")` inside the layer init closure (`plugin/index.ts:123`). Tests using `Plugin.defaultLayer` directly (`trigger.test.ts`, `workspace-adapter.test.ts`) time out because the server import block is too heavy for test context. Fix: use `TestConfig.layer()` mock + `Plugin.layer` (not `defaultLayer`) in tests that need Plugin service — see `auth-override.test.ts` and `loader-shared.test.ts` for the working pattern.
 - Testing modules that read `Log.file()` (or any singleton with module-level state): do NOT mutate `Global.Path.log` + `Log.init({...})` per test. The module-level `logpath` and `createWriteStream` race across parallel tests and leave dangling stream handles pointing at cleaned-up tmp dirs. Use `mock.module("@opencode-ai/core/util/log", () => ({...Log, file: () => logFile}))` to override the specific function per test, paired with `mock.restore()` in `afterEach`. See `test/cli/cmd/tui/stderr-capture.test.ts` for the pattern.
