@@ -97,24 +97,38 @@ describe("session prefetch", () => {
 
   test("keeps invalidation versions for pending work while pruning old revisions", async () => {
     const directory = "/tmp/rev-prune"
-    const sessionID = "ses-pending"
-    let resolve: (() => void) | undefined
-    const pending = runSessionPrefetch({
+    let resolveFirst: (() => void) | undefined
+    const first = runSessionPrefetch({
       directory,
-      sessionID,
+      sessionID: "ses-pending",
       task: async () =>
         new Promise((done) => {
-          resolve = () => done(undefined)
+          resolveFirst = () => done(undefined)
         }),
     })
 
-    clearSessionPrefetch(directory, [sessionID])
+    clearSessionPrefetch(directory, ["ses-pending"])
+    let resolveSecond: (() => void) | undefined
+    const second = runSessionPrefetch({
+      directory,
+      sessionID: "ses-pending",
+      task: async () =>
+        new Promise((done) => {
+          resolveSecond = () => done(undefined)
+        }),
+    })
+    clearSessionPrefetch(directory, ["ses-pending"])
     for (let i = 0; i < 4_100; i++) {
       clearSessionPrefetch(directory, [`ses-${i}`])
     }
 
-    expect(isSessionPrefetchCurrent(directory, sessionID, 0)).toBe(false)
-    resolve?.()
-    await pending
+    resolveSecond?.()
+    await second
+    for (let i = 4_100; i < 8_200; i++) {
+      clearSessionPrefetch(directory, [`ses-${i}`])
+    }
+    expect(isSessionPrefetchCurrent(directory, "ses-pending", 0)).toBe(false)
+    resolveFirst?.()
+    await first
   })
 })
