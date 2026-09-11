@@ -11,6 +11,7 @@ import { Ripgrep } from "../../src/file/ripgrep"
 import { AppFileSystem } from "@opencode-ai/core/filesystem"
 import { testEffect } from "../lib/effect"
 import { Reference } from "@/reference/reference"
+import { mkdtemp, rm, symlink } from "node:fs/promises"
 
 const it = testEffect(
   Layer.mergeAll(
@@ -89,6 +90,29 @@ describe("tool.grep", () => {
       )
       expect(result.metadata.matches).toBeGreaterThan(0)
     }),
+  )
+
+  it.instance("prompts before following a symlink outside the project", () =>
+    Effect.gen(function* () {
+      const test = yield* TestInstance
+      const outside = yield* Effect.promise(() => mkdtemp(path.join(path.dirname(test.directory), "grep-outside-")))
+      const link = path.join(test.directory, "linked")
+      try {
+        yield* Effect.promise(() => Bun.write(path.join(outside, "secret.txt"), "secret\n"))
+        yield* Effect.promise(() => symlink(outside, link, "dir"))
+        const requests: string[] = []
+        const info = yield* GrepTool
+        const grep = yield* info.init()
+        yield* grep.execute(
+          { pattern: "secret", path: link },
+          { ...ctx, ask: (request) => Effect.sync(() => requests.push(request.permission)) },
+        )
+        expect(requests).toContain("external_directory")
+      } finally {
+        yield* Effect.promise(() => rm(outside, { recursive: true, force: true }))
+      }
+    }),
+    { git: true },
   )
 
   it.instance("supports exact file paths", () =>

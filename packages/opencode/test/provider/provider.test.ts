@@ -97,7 +97,6 @@ test("provider loaded from env variable", async () => {
     },
   })
 })
-
 test("provider loaded from config with apiKey option", async () => {
   await using tmp = await tmpdir({
     init: async (dir) => {
@@ -2745,4 +2744,27 @@ test("rewriteMaxOutputTokens > end-to-end through @ai-sdk/openai responses model
   } finally {
     server.stop()
   }
+})
+
+
+test("toPublicInfo returns a safe provider when options contain a circular reference", () => {
+  const options: Record<string, unknown> = {}
+  options.circular = options
+  const provider = {
+    id: ProviderID.make("circular"),
+    name: "Circular Provider",
+    source: "config",
+    env: [],
+    options,
+    models: {},
+  } satisfies Provider.Info
+  expect(() => Provider.toPublicInfo(provider)).not.toThrow()
+  expect(Provider.toPublicInfo(provider)).toEqual({
+    id: provider.id,
+    name: provider.name,
+    source: provider.source,
+    env: provider.env,
+    options: {},
+    models: {},
+  })
 })

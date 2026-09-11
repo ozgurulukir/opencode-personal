@@ -985,18 +985,19 @@ describe("skill semantic index resilience", () => {
     // A fresh layer value per runtime: Effect memoizes layer builds by reference,
     // so reusing one value would share the InstanceState cache across sessions and
     // never re-run the state init this test needs to observe.
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "opencode-skill-h34-"))
+    const cache = path.join(dir, "cache")
     const makeSkillLayer = () =>
       Skill.layer.pipe(
         Layer.provide(Discovery.defaultLayer),
         Layer.provide(Config.defaultLayer),
         Layer.provide(Bus.layer),
         Layer.provide(AppFileSystem.defaultLayer),
-        Layer.provide(Global.layer),
+        Layer.provide(Global.layerWith({ cache })),
         Layer.provide(embedderLayer),
       )
 
-    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "opencode-skill-h34-"))
-    const indexPath = path.join(Global.Path.cache, "zvec", "skills", Hash.fast(dir))
+    const indexPath = path.join(cache, "zvec", "skills", Hash.fast(dir))
     const manifestPath = manifestPathFor(indexPath)
 
     // Assertions must run inside the provided effect: InstanceState-backed methods

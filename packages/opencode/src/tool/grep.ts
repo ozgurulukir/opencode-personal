@@ -4,6 +4,7 @@ import { InstanceState } from "@/effect/instance-state"
 import { AppFileSystem } from "@opencode-ai/core/filesystem"
 import { Ripgrep } from "../file/ripgrep"
 import { assertExternalDirectoryEffect } from "./external-directory"
+import { resolvePath } from "./file-path"
 import DESCRIPTION from "./grep.txt"
 import * as Tool from "./tool"
 import { Reference } from "@/reference/reference"
@@ -49,10 +50,12 @@ export const GrepTool = Tool.define(
           })
 
           const ins = yield* InstanceState.context
-          const search = AppFileSystem.resolve(
-            path.isAbsolute(params.path ?? ins.directory)
-              ? (params.path ?? ins.directory)
-              : path.join(ins.directory, params.path ?? "."),
+          const search = resolvePath(
+            AppFileSystem.resolve(
+              path.isAbsolute(params.path ?? ins.directory)
+                ? (params.path ?? ins.directory)
+                : path.join(ins.directory, params.path ?? "."),
+            ),
           )
           yield* reference.ensure(search)
           const info = yield* fs.stat(search).pipe(

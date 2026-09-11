@@ -909,13 +909,25 @@ export const ConfigProvidersResult = Schema.Struct({
 export type ConfigProvidersResult = Types.DeepMutable<Schema.Schema.Type<typeof ConfigProvidersResult>>
 
 export function toPublicInfo(provider: Info): Info {
-  return JSON.parse(
-    JSON.stringify(provider, (_, value) => {
-      if (typeof value === "function" || typeof value === "symbol" || value === undefined) return undefined
-      if (typeof value === "bigint") return value.toString()
-      return value
-    }),
-  )
+  try {
+    return JSON.parse(
+      JSON.stringify(provider, (_, value) => {
+        if (typeof value === "function" || typeof value === "symbol" || value === undefined) return undefined
+        if (typeof value === "bigint") return value.toString()
+        return value
+      }),
+    )
+  } catch {
+    return {
+      id: provider.id,
+      name: provider.name,
+      source: provider.source,
+      env: provider.env,
+      ...(provider.key ? { key: provider.key } : {}),
+      options: {},
+      models: {},
+    }
+  }
 }
 
 export function defaultModelIDs<T extends { models: Record<string, { id: string }> }>(providers: Record<string, T>) {
