@@ -29,6 +29,7 @@ import type {
   Provider,
   SessionMessageAssistant,
   SessionMessageAssistantTool,
+  SessionMessageCompaction,
   SessionMessageUser,
   ToolPart,
   TextPart,
@@ -163,7 +164,7 @@ export function Session() {
   const project = useProject()
   const tuiConfig = useTuiConfig()
   const kv = useKV()
-  const { theme } = useTheme()
+  const { theme, syntax } = useTheme()
   const promptRef = usePromptRef()
   const session = createMemo(() => sync.session.get(route.sessionID))
   const children = createMemo(() => {
@@ -175,7 +176,8 @@ export function Session() {
   // V2 message slice, reversed to oldest-first so the findLast/scan logic and
   // the rendering order keep their V1 semantics. The slice also holds
   // shell/synthetic/compaction/switch records the V1 slice never had — the
-  // rendering loop skips them (compaction renders as a divider).
+  // rendering loop skips them (compaction renders as a divider with its
+  // streaming summary).
   const messages = createMemo(() => (sync.data.messages[route.sessionID] ?? []).toReversed())
   // Every session in the viewed session's subtree (itself + all descendants through
   // the parentID chain, any depth). Powers recursive aggregation of pending asks.
@@ -1196,13 +1198,48 @@ export function Session() {
                         <></>
                       </Match>
                       <Match when={message.type === "compaction"}>
-                        <box
-                          marginTop={1}
-                          border={["top"]}
-                          title=" Compaction "
-                          titleAlignment="center"
-                          borderColor={theme.borderActive}
-                        />
+                        {(() => {
+                          const compaction = message as SessionMessageCompaction
+                          return (
+                            <box
+                              marginTop={1}
+                              border={["top"]}
+                              title={compaction.reason === "auto" ? " Auto Compaction " : " Compaction "}
+                              titleAlignment="center"
+                              borderColor={theme.borderActive}
+                            >
+                              <Show when={compaction.summary}>
+                                {(summary) => (
+                                  <box paddingLeft={3} paddingTop={1}>
+                                    <Switch>
+                                      <Match when={Flag.OPENCODE_EXPERIMENTAL_MARKDOWN}>
+                                        <markdown
+                                          syntaxStyle={syntax()}
+                                          streaming={true}
+                                          content={summary().trim()}
+                                          conceal={conceal()}
+                                          fg={theme.markdownText}
+                                          bg={theme.background}
+                                        />
+                                      </Match>
+                                      <Match when={!Flag.OPENCODE_EXPERIMENTAL_MARKDOWN}>
+                                        <code
+                                          filetype="markdown"
+                                          drawUnstyledText={false}
+                                          streaming={true}
+                                          syntaxStyle={syntax()}
+                                          content={summary().trim()}
+                                          conceal={conceal()}
+                                          fg={theme.text}
+                                        />
+                                      </Match>
+                                    </Switch>
+                                  </box>
+                                )}
+                              </Show>
+                            </box>
+                          )
+                        })()}
                       </Match>
                       <Match when={message.type === "user"}>
                         <UserMessage

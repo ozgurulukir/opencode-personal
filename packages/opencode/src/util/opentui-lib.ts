@@ -1,5 +1,6 @@
 import fs from "fs"
 import path from "path"
+import { ensureTreeSitterWorker } from "./ts-worker"
 
 const libName = (() => {
   switch (process.platform) {
@@ -43,6 +44,11 @@ function isBunRuntime(): boolean {
 }
 
 export async function setupOpenTUILib(): Promise<void> {
+  // Extract the pre-bundled tree-sitter worker for compiled binaries before
+  // any TreeSitterClient is created (the client is a lazy singleton, so boot
+  // ordering is sufficient). No-op in dev and when already overridden.
+  await ensureTreeSitterWorker()
+
   const bundledPath = findBundledLib()
   const runningUnderBun = isBunRuntime()
 

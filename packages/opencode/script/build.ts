@@ -2,6 +2,7 @@
 
 import { $ } from "bun"
 import fs from "fs"
+import os from "os"
 import path from "path"
 import { fileURLToPath } from "url"
 import { createSolidTransformPlugin } from "@opentui/solid/bun-plugin"
@@ -221,69 +222,111 @@ const opentuiLocalPath = path.resolve(dir, "node_modules/@opentui/core/parser.wo
 const opentuiRootPath = path.resolve(dir, "../../node_modules/@opentui/core/parser.worker.js")
 const parserWorker = fs.realpathSync(fs.existsSync(opentuiLocalPath) ? opentuiLocalPath : opentuiRootPath)
 
-// @opentui/core's parser.worker.js uses a dynamic import("web-tree-sitter/tree-sitter.wasm",
-// { with: { type: "wasm" } }) which Bun.build --compile cannot resolve at build time.
-// Patch the source string: replace the dynamic wasm import with a static import ... with
-// { type: "file" }, which Bun embeds into bunfs and resolves to /$bunfs/root/<hash>.wasm.
-// The patched string is injected as a virtual file via Bun.build's `files` option (upstream
-// pattern), avoiding disk I/O and cleanup.
-const treeSitterWorkerSrc = await Bun.file(parserWorker).text()
-const dynamicWasmImport =
-  'let treeWasm = await resolveBundledFilePath(() => import("web-tree-sitter/tree-sitter.wasm", { with: { type: "wasm" } }), () => import.meta.resolve("web-tree-sitter/tree-sitter.wasm"), import.meta.url);'
-const assetWasmImport =
-  'let treeWasm = treeSitterWasmPath ?? resolveAssetPath("web-tree-sitter/tree-sitter.wasm", () => new URL(import.meta.resolve("web-tree-sitter/tree-sitter.wasm")));'
-if (!treeSitterWorkerSrc.includes(dynamicWasmImport) && !treeSitterWorkerSrc.includes(assetWasmImport)) {
-  throw new Error(
-    "Cannot patch parser.worker.js: expected WASM asset loading code not found. " +
-      "The @opentui/core package may have updated — check parser.worker.js initialize() method.",
+// Compiled binaries cannot load the tree-sitter worker from Bun's virtual
+// filesystem as a Worker entry (proven with a minimal repro on Bun 1.3.14:
+// ModuleNotFound on files-map entries, in every URL form), so embed a
+// pre-bundled self-contained worker as text and extract it to disk at runtime
+// (see src/util/ts-worker.ts). The engine wasm is inlined as bytes matching
+// the web-tree-sitter JS the bundler resolves, so no JS/wasm version pairing
+// is needed. Language grammars and queries still load at runtime (network +
+// data-dir cache), same as dev.
+async function buildTreeSitterWorkerBundle(): Promise<string> {
+  console.log("Bundling tree-sitter worker...")
+  let workerSrc = await Bun.file(parserWorker).text()
+  const wasmImportSpecs = [
+    "web-tree-sitter/web-tree-sitter.wasm", // current (see patches/@opentui%2Fcore@0.2.16.patch)
+    "web-tree-sitter/tree-sitter.wasm", // pre-0.26.11 filename, kept as fallback
+  ]
+  const dynLine = wasmImportSpecs
+    .map(
+      (spec) =>
+        `let treeWasm = await resolveBundledFilePath(() => import("${spec}", { with: { type: "wasm" } }), () => import.meta.resolve("${spec}"), import.meta.url);`,
+    )
+    .find((line) => workerSrc.includes(line))
+  if (!dynLine) {
+    throw new Error(
+      "Cannot patch parser.worker.js: expected WASM asset loading code not found. " +
+        "The @opentui/core package may have updated — check parser.worker.js initialize() method.",
+    )
+  }
+  // Resolve the wasm next to the web-tree-sitter JS the bundler will inline,
+  // so the pair always matches regardless of root/nested hoisting.
+  const wtsDir = path.dirname(Bun.resolveSync("web-tree-sitter", path.dirname(parserWorker)))
+  const wasmBase64 = Buffer.from(await Bun.file(path.join(wtsDir, "web-tree-sitter.wasm")).arrayBuffer()).toString(
+    "base64",
   )
-}
-const treeSitterWorker = treeSitterWorkerSrc
-  .replace(
-    'import { createRequire } from "node:module";',
-    'import { createRequire } from "node:module";\nimport treeWasmUrl from "web-tree-sitter/tree-sitter.wasm" with { type: "file" };',
-  )
-  .replace(dynamicWasmImport, "let treeWasm = treeSitterWasmPath ?? treeWasmUrl;")
-  .replace(assetWasmImport, "let treeWasm = treeSitterWasmPath ?? treeWasmUrl;")
-  .replace(
-    "class ParserWorker {",
-    `try{
-const _origInstantiate=WebAssembly.instantiate;
-WebAssembly.instantiate=function(binary,imports){
-  try{
-    if(imports){
-      const wasi = imports.wasi_snapshot_preview1 || (imports.wasi_snapshot_preview1 = {});
-      wasi.clock_time_get = wasi.clock_time_get || function(clock_id, precision, ptime) { return 0; };
-      wasi.fd_close = wasi.fd_close || function() { return 0; };
-      wasi.fd_seek = wasi.fd_seek || function() { return 0; };
-      wasi.fd_write = wasi.fd_write || function() { return 0; };
-      wasi.proc_exit = wasi.proc_exit || function() {};
-      wasi.environ_sizes_get = wasi.environ_sizes_get || function() { return 0; };
-      wasi.environ_get = wasi.environ_get || function() { return 0; };
+  const apply = (from: string, to: string) => {
+    if (!workerSrc.includes(from)) {
+      throw new Error(`Cannot patch parser.worker.js: expected block not found: ${from.slice(0, 80)}...`)
     }
-  }catch(e){}
-  return _origInstantiate.call(this,binary,imports);
-};
-}catch(e){}
-class ParserWorker {`,
+    workerSrc = workerSrc.replace(from, to)
+  }
+  apply(dynLine, `let treeWasmBytes = Uint8Array.from(atob("${wasmBase64}"), (c) => c.charCodeAt(0));`)
+  apply(
+    `await Parser.init({
+        locateFile() {
+          return treeWasm;
+        }
+      });`,
+    `await Parser.init({ wasmBinary: treeWasmBytes });`,
   )
-const treeSitterWorkerPath = "opentui-tree-sitter-worker.js"
-
-// Bun.build resolves `import { Parser } from "web-tree-sitter"` to the ROOT
-// node_modules/web-tree-sitter (0.26.11), NOT @opentui/core's nested 0.25.10.
-// The wasm MUST match the JS version: 0.26.11 JS needs 0.26.11 wasm.
-// 0.26.11 renamed tree-sitter.wasm → web-tree-sitter.wasm and dropped clock_time_get.
-const wtsRootDir = path.resolve(path.dirname(parserWorker), "../../web-tree-sitter")
-const wtsNestedDir = path.resolve(path.dirname(parserWorker), "node_modules/web-tree-sitter")
-const wtsRootWasm = path.join(wtsRootDir, "web-tree-sitter.wasm")
-const wtsNestedWasm = path.join(wtsNestedDir, "tree-sitter.wasm")
-const wasmFile = fs.existsSync(wtsRootWasm) ? wtsRootWasm : wtsNestedWasm
-const wasmResolver = {
-  name: "web-tree-sitter-wasm-resolver",
-  setup(build: any) {
-    build.onResolve({ filter: /^web-tree-sitter\/tree-sitter\.wasm$/ }, (args: any) => {
-      return { path: wasmFile }
+  apply(
+    `if (isBunfsPath(treeWasm)) {
+        treeWasm = normalizeBunfsPath(path2.parse(treeWasm).base);
+      }
+`,
+    "",
+  )
+  // Keep the temporary entrypoint under the project tree so Bun can walk up
+  // to the workspace node_modules while resolving the worker's imports.
+  const tmpDir = fs.mkdtempSync(path.join(dir, ".ts-worker-"))
+  try {
+    const entry = path.join(tmpDir, "parser.worker.src.js")
+    fs.writeFileSync(entry, workerSrc)
+    const result = await Bun.build({
+      entrypoints: [entry],
+      outdir: path.join(tmpDir, "out"),
+      format: "esm",
+      target: "bun",
+      minify: true,
+      naming: "parser.worker.bundle.js",
     })
+    if (!result.success) {
+      throw new Error(`tree-sitter worker bundle failed:\n${result.logs.map((l) => l.message).join("\n")}`)
+    }
+    const bundled = await Bun.file(path.join(tmpDir, "out", "parser.worker.bundle.js")).text()
+    // Build-time assertions: fail loud, never ship a broken worker. Upstream
+    // swallows init errors (highlightOnce returns { error }, startHighlight
+    // falls back to raw text), so a silent break here means raw markdown.
+    const checks: Array<[string, boolean]> = [
+      ["wasm bytes inlined", bundled.includes("wasmBinary")],
+      ["no undeclared treeSitterWasmPath", !bundled.includes("treeSitterWasmPath")],
+      ["no bare web-tree-sitter import", !bundled.includes('from "web-tree-sitter"')],
+      ["no dynamic wasm import left", !bundled.includes('type: "wasm"')],
+    ]
+    const failed = checks.filter(([, ok]) => !ok).map(([label]) => label)
+    if (failed.length > 0) {
+      throw new Error(`tree-sitter worker bundle failed checks: ${failed.join(", ")}`)
+    }
+    console.log(`Tree-sitter worker bundle: ${(bundled.length / 1024).toFixed(0)} KB embedded`)
+    return bundled
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true })
+  }
+}
+
+const tsWorkerBundle = await buildTreeSitterWorkerBundle()
+const embeddedTsWorkerPlugin = {
+  name: "embedded-ts-worker-bundle",
+  setup(build: any) {
+    build.onResolve({ filter: /^embedded:ts-worker-bundle$/ }, () => ({
+      path: "embedded:ts-worker-bundle",
+      namespace: "embedded-ts-worker",
+    }))
+    build.onLoad({ filter: /.*/, namespace: "embedded-ts-worker" }, () => ({
+      contents: tsWorkerBundle,
+      loader: "text",
+    }))
   },
 }
 
@@ -307,7 +350,7 @@ for (const item of targets) {
   await Bun.build({
     conditions: ["bun"],
     tsconfig: "./tsconfig.json",
-    plugins: [preserveOpenTuiSolidPlugin, solidPlugin, wasmResolver],
+    plugins: [preserveOpenTuiSolidPlugin, solidPlugin, embeddedTsWorkerPlugin],
     external: ["node-gyp"],
     format: "esm",
     minify: true,
@@ -324,16 +367,14 @@ for (const item of targets) {
       windows: {},
     },
     files: {
-      [treeSitterWorkerPath]: treeSitterWorker,
       "diff-wasm/opencode_diff_rs.js": diffWasmJs,
       "diff-wasm/opencode_diff_rs_bg.wasm": new Uint8Array(diffWasmWasm),
       ...(embeddedFileMap ? { "opencode-web-ui.gen.ts": embeddedFileMap } : {}),
     },
-    entrypoints: ["./src/index.ts", treeSitterWorkerPath, workerPath, ...(embeddedFileMap ? ["opencode-web-ui.gen.ts"] : [])],
+    entrypoints: ["./src/index.ts", workerPath, ...(embeddedFileMap ? ["opencode-web-ui.gen.ts"] : [])],
     define: {
       OPENCODE_VERSION: `'${Script.version}'`,
       OPENCODE_MIGRATIONS: JSON.stringify(migrations),
-      OTUI_TREE_SITTER_WORKER_PATH: bunfsRoot + treeSitterWorkerPath,
       OPENCODE_DIFF_WASM_JS_PATH: bunfsRoot + "diff-wasm/opencode_diff_rs.js",
       OPENCODE_WORKER_PATH: workerPath,
       OPENCODE_CHANNEL: `'${Script.channel}'`,
