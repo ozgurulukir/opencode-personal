@@ -20,7 +20,7 @@ System prompt uses a **shared core + provider delta** structure:
 
 **AGENTS.md injection** (`session/prompt.ts:1638-1644`):
 
-- `instruction.system()` reads AGENTS.md/CLAUDE.md/CONTEXT.md from disk on every `runLoop` iteration (no caching)
+- `instruction.system()` resolves project/global AGENTS.md/CLAUDE.md and configured local paths on every `runLoop` iteration; local file contents use an mtime-based cache and configured remote URLs use a 60-second cache
 - Content is wrapped in `<instructions source="path">` tags and prepended as a **user message** (not system prompt)
 - Follows Claude Code / Codex CLI Instruction Hierarchy pattern: system prompt (priority 0) > AGENTS.md (priority 10)
 - AGENTS.md cannot override core safety rules
