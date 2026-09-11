@@ -1,5 +1,5 @@
 import path from "path"
-import { Effect, Layer, Context, Option } from "effect"
+import { Effect, Layer, Context, Option, Stream } from "effect"
 import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/unstable/http"
 import { Config } from "@/config/config"
 import { InstanceState } from "@/effect/instance-state"
@@ -7,8 +7,12 @@ import { Flag } from "@opencode-ai/core/flag/flag"
 import { AppFileSystem } from "@opencode-ai/core/filesystem"
 import { withTransientReadRetry } from "@/util/effect-http-client"
 import { Global } from "@opencode-ai/core/global"
+import * as Log from "@opencode-ai/core/util/log"
 import type { MessageV2 } from "./message-v2"
 import type { MessageID } from "./schema"
+
+const log = Log.create({ service: "instruction" })
+const MAX_INSTRUCTION_BYTES = 64 * 1024
 
 const FILES = [
   "AGENTS.md",
@@ -67,19 +71,35 @@ export const layer: Layer.Layer<
         Effect.succeed({
           // Track which instruction files have already been attached for a given assistant message.
           claims: new Map<MessageID, Set<string>>(),
+          remote: new Map<string, { content: string; at: number }>(),
+          oversize: new Set<string>(),
         }),
       ),
     )
 
+    // Non-git projects report worktree === "/" (project.ts). That would make the
+    // upward walk climb to the filesystem root and pick up e.g. ~/AGENTS.md, so
+    // the walk is clamped to the project directory in that case. Shared by the
+    // automatic AGENTS.md discovery and config.instructions-relative globbing so
+    // both stay within the workspace.
+    const projectStop = Effect.fnUntraced(function* () {
+      const ctx = yield* InstanceState.context
+      return ctx.worktree === "/" ? ctx.directory : ctx.worktree
+    })
+
     const relative = Effect.fnUntraced(function* (instruction: string) {
       const ctx = yield* InstanceState.context
       if (!Flag.OPENCODE_DISABLE_PROJECT_CONFIG) {
+        const stop = path.resolve(yield* projectStop())
         return yield* fs
-          .globUp(instruction, ctx.directory, ctx.worktree)
+          .globUp(instruction, ctx.directory, stop)
+          .pipe(Effect.map((matches) => matches.filter((item) => AppFileSystem.contains(stop, path.resolve(item)))))
           .pipe(Effect.catch(() => Effect.succeed([] as string[])))
       }
+      const stop = path.resolve(global.config)
       return yield* fs
-        .globUp(instruction, global.config, global.config)
+        .globUp(instruction, stop, stop)
+        .pipe(Effect.map((matches) => matches.filter((item) => AppFileSystem.contains(stop, path.resolve(item)))))
         .pipe(Effect.catch(() => Effect.succeed([] as string[])))
     })
 
@@ -97,13 +117,31 @@ export const layer: Layer.Layer<
       if (oldest !== undefined) fileCache.delete(oldest)
     }
 
-    const statMtime = Effect.fnUntraced(function* (filepath: string) {
+    const statInfo = Effect.fnUntraced(function* (filepath: string) {
       const info = yield* fs.stat(filepath).pipe(Effect.catch(() => Effect.succeed(undefined)))
-      return info && "mtime" in info ? (info.mtime as Option.Option<Date>).pipe(Option.getOrUndefined)?.getTime() : undefined
+      if (!info) return undefined
+      const mtime = "mtime" in info ? info.mtime.pipe(Option.getOrUndefined)?.getTime() : undefined
+      const size = "size" in info ? Number(info.size) : undefined
+      return { mtime, size }
     })
 
     const readCached = Effect.fnUntraced(function* (filepath: string) {
-      const mtime = yield* statMtime(filepath)
+      const info = yield* statInfo(filepath)
+      if (info?.size !== undefined && info.size > MAX_INSTRUCTION_BYTES) {
+        const s = yield* InstanceState.get(state)
+        if (!s.oversize.has(filepath)) {
+          s.oversize.add(filepath)
+          log.warn("instruction file exceeds size limit", {
+            filepath,
+            size: info.size,
+            limit: MAX_INSTRUCTION_BYTES,
+          })
+        }
+        fileCache.delete(filepath)
+        return ""
+      }
+
+      const mtime = info?.mtime
       if (mtime === undefined) {
         fileCache.delete(filepath)
         return yield* read(filepath)
@@ -123,14 +161,83 @@ export const layer: Layer.Layer<
       return content
     })
 
+    // Remote instructions are cached briefly so a multi-step session does not
+    // hammer the configured URLs on every LLM step, while still picking up
+    // content updates after the TTL elapses. Failed fetches are not cached, so a
+    // transient outage does not drop instructions for the whole session (they
+    // retry on the next step). The map doubles as an LRU via re-insertion.
+    const REMOTE_TTL_MS = 60_000
+    const REMOTE_CACHE_MAX = 50
+
     const fetch = Effect.fnUntraced(function* (url: string) {
+      const s = yield* InstanceState.get(state)
+      const cached = s.remote.get(url)
+      const now = Date.now()
+      if (cached && now - cached.at < REMOTE_TTL_MS) {
+        // Move to end (most recently used) by re-inserting
+        s.remote.delete(url)
+        s.remote.set(url, cached)
+        return cached.content
+      }
+
       const res = yield* http.execute(HttpClientRequest.get(url)).pipe(
         Effect.timeout(5000),
         Effect.catch(() => Effect.succeed(null)),
       )
       if (!res) return ""
-      const body = yield* res.arrayBuffer.pipe(Effect.catch(() => Effect.succeed(new ArrayBuffer(0))))
-      return new TextDecoder().decode(body)
+
+      class OversizedRemoteInstruction extends Error {
+        constructor(readonly size: number) {
+          super("remote instruction exceeds size limit")
+        }
+      }
+
+      const body = yield* res.stream.pipe(
+        Stream.runFoldEffect(
+          () => ({ chunks: [] as Uint8Array[], size: 0 }),
+          (acc, chunk) => {
+            const size = acc.size + chunk.byteLength
+            if (size > MAX_INSTRUCTION_BYTES) return Effect.fail(new OversizedRemoteInstruction(size))
+            return Effect.succeed({ chunks: [...acc.chunks, chunk], size })
+          },
+        ),
+        Effect.catch((error) => {
+          if (error instanceof OversizedRemoteInstruction) {
+            if (!s.oversize.has(url)) {
+              s.oversize.add(url)
+              log.warn("remote instruction exceeds size limit", {
+                url,
+                size: error.size,
+                limit: MAX_INSTRUCTION_BYTES,
+              })
+            }
+          }
+          return Effect.succeed(null)
+        }),
+      )
+      if (!body) {
+        s.remote.delete(url)
+        return ""
+      }
+
+      const bytes = new Uint8Array(body.size)
+      let offset = 0
+      for (const chunk of body.chunks) {
+        bytes.set(chunk, offset)
+        offset += chunk.byteLength
+      }
+      const content = new TextDecoder().decode(bytes)
+      if (!content) {
+        s.remote.delete(url)
+        return ""
+      }
+      s.remote.delete(url)
+      s.remote.set(url, { content, at: now })
+      if (s.remote.size > REMOTE_CACHE_MAX) {
+        const oldest = s.remote.keys().next().value
+        if (oldest !== undefined) s.remote.delete(oldest)
+      }
+      return content
     })
 
     const clear = Effect.fn("Instruction.clear")(function* (messageID: MessageID) {
@@ -150,10 +257,11 @@ export const layer: Layer.Layer<
         }
       }
 
-      // The first project-level match wins so we don't stack AGENTS.md/CLAUDE.md from every ancestor.
+      // Project-level instructions must not leak in from outside the workspace.
+      // See projectStop() — non-git projects would otherwise climb to the root.
       if (!Flag.OPENCODE_DISABLE_PROJECT_CONFIG) {
         for (const file of FILES) {
-          const matches = yield* fs.findUp(file, ctx.directory, ctx.worktree)
+          const matches = yield* fs.findUp(file, ctx.directory, yield* projectStop())
           if (matches.length > 0) {
             matches.forEach((item) => paths.add(path.resolve(item)))
             break

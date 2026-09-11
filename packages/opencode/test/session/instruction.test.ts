@@ -1,12 +1,15 @@
-import { describe, expect, test } from "bun:test"
+import { describe, expect } from "bun:test"
 import path from "path"
-import { Effect, FileSystem, Layer } from "effect"
-import { FetchHttpClient } from "effect/unstable/http"
+import { Effect, FileSystem, Layer, Ref } from "effect"
+import { FetchHttpClient, HttpClient, HttpClientError, HttpClientResponse } from "effect/unstable/http"
 import { NodeFileSystem } from "@effect/platform-node"
 import { CrossSpawnSpawner } from "@opencode-ai/core/cross-spawn-spawner"
 import { AppFileSystem } from "@opencode-ai/core/filesystem"
 import { ModelID, ProviderID } from "../../src/provider/schema"
 import { Instruction } from "../../src/session/instruction"
+import { InstanceRef } from "../../src/effect/instance-ref"
+import { ProjectID } from "../../src/project/schema"
+import { Config } from "@/config/config"
 import type { MessageV2 } from "../../src/session/message-v2"
 import { MessageID, PartID, SessionID } from "../../src/session/schema"
 import { Global } from "@opencode-ai/core/global"
@@ -31,11 +34,58 @@ const provideInstruction =
   <A, E, R>(self: Effect.Effect<A, E, R>) =>
     self.pipe(Effect.provide(instructionLayer(global)))
 
+// Variant of instructionLayer that swaps the real HttpClient for a fake that
+// counts remote "fetch()" calls (system() fetches config.instructions URLs).
+const makeFakeHttpLayer = (countRef: Ref.Ref<number>, body: string) =>
+  Layer.effect(
+    HttpClient.HttpClient,
+    Effect.gen(function* () {
+      return HttpClient.make((request) =>
+        Effect.gen(function* () {
+          yield* Ref.update(countRef, (n) => n + 1)
+          return HttpClientResponse.fromWeb(request, new Response(body, { status: 200 }))
+        }),
+      )
+    }),
+  )
+
+const provideInstructionWithHttp =
+  (global: Partial<Global.Interface>, httpLayer: Layer.Layer<HttpClient.HttpClient>, config: Partial<Config.Interface>) =>
+  <A, E, R>(self: Effect.Effect<A, E, R>) =>
+    self.pipe(
+      Effect.provide(
+        Instruction.layer.pipe(
+          Layer.provide(TestConfig.layer(config)),
+          Layer.provide(AppFileSystem.defaultLayer),
+          Layer.provide(httpLayer),
+          Layer.provide(Global.layerWith(global)),
+        ),
+      ),
+    )
+
 const write = (filepath: string, content: string) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem
     yield* fs.makeDirectory(path.dirname(filepath), { recursive: true })
     yield* fs.writeFileString(filepath, content)
+  })
+
+// A scoped temp dir for tests that explicitly provide a non-git InstanceContext.
+const isolatedTmpdir = <A, E, R>(self: (dir: string) => Effect.Effect<A, E, R>) =>
+  Effect.gen(function* () {
+    return yield* self(yield* tmpdirScoped())
+  })
+
+const provideNonGitInstance = (directory: string) =>
+  Effect.provideService(InstanceRef, {
+    directory,
+    worktree: "/",
+    project: {
+      id: ProjectID.global,
+      worktree: "/",
+      time: { created: 0, updated: 0 },
+      sandboxes: [],
+    },
   })
 
 const writeFiles = (dir: string, files: Record<string, string>) =>
@@ -192,11 +242,150 @@ describe("Instruction.resolve", () => {
       }),
     ),
   )
-
-  test.todo("fetches remote instructions from config URLs via HttpClient", () => {})
 })
 
 describe("Instruction.system", () => {
+  it.live("caches remote instructions across system() calls", () =>
+    Effect.gen(function* () {
+      const count = yield* Ref.make(0)
+      const url = "https://example.com/AGENTS.md"
+      const body = "# Remote Instructions"
+      const layer = makeFakeHttpLayer(count, body)
+
+      yield* Effect.gen(function* () {
+        const svc = yield* Instruction.Service
+        const first = yield* svc.system()
+        const second = yield* svc.system()
+        expect(first).toEqual([`<instructions source="${url}">\n${body}\n</instructions>`])
+        expect(second).toEqual(first)
+        expect(yield* Ref.get(count)).toBe(1)
+      }).pipe(
+        provideInstance(yield* tmpdirScoped()),
+        provideInstructionWithHttp({}, layer, {
+          get: () => Effect.succeed({ instructions: [url] }),
+        }),
+      )
+    }),
+  )
+
+  it.live("refetches a remote instruction after the cache TTL expires", () =>
+    Effect.gen(function* () {
+      const count = yield* Ref.make(0)
+      const url = "https://example.com/AGENTS.md"
+      const body = "# Remote Instructions"
+      const layer = makeFakeHttpLayer(count, body)
+
+      yield* Effect.gen(function* () {
+        const svc = yield* Instruction.Service
+        const first = yield* svc.system()
+        expect(yield* Ref.get(count)).toBe(1)
+
+        // Backdate the cache entry beyond REMOTE_TTL_MS so the next system()
+        // call must go back to the network instead of serving the cached copy.
+        const fakeNow = Date.now() + 61_000
+        const original = Date.now
+        Date.now = () => fakeNow
+        const second = yield* svc.system().pipe(Effect.ensuring(Effect.sync(() => (Date.now = original))))
+        expect(second).toEqual(first)
+        expect(yield* Ref.get(count)).toBe(2)
+      }).pipe(
+        provideInstance(yield* tmpdirScoped()),
+        provideInstructionWithHttp({}, layer, {
+          get: () => Effect.succeed({ instructions: [url] }),
+        }),
+      )
+    }),
+  )
+
+  it.live("rejects oversized remote instructions without caching them", () =>
+    Effect.gen(function* () {
+      const count = yield* Ref.make(0)
+      const url = "https://example.com/AGENTS.md"
+      // Remote fake returns a body over the 64 KiB ceiling: the content must be
+      // dropped (empty rule, not cached) instead of inflating every LLM step.
+      const layer = makeFakeHttpLayer(count, "# Too big\n" + "x".repeat(64 * 1024 + 1))
+
+      yield* Effect.gen(function* () {
+        const svc = yield* Instruction.Service
+        const first = yield* svc.system()
+        expect(first).toEqual([])
+        const second = yield* svc.system()
+        // Failed/oversized fetches are not cached: the next call retries.
+        expect(yield* Ref.get(count)).toBe(2)
+        expect(second).toEqual([])
+      }).pipe(
+        provideInstance(yield* tmpdirScoped()),
+        provideInstructionWithHttp({}, layer, {
+          get: () => Effect.succeed({ instructions: [url] }),
+        }),
+      )
+    }),
+  )
+
+  it.live("enforces the remote instruction limit in UTF-8 bytes", () =>
+    Effect.gen(function* () {
+      const count = yield* Ref.make(0)
+      const url = "https://example.com/AGENTS.md"
+      // 64 KiB UTF-16 code units is 128 KiB on the wire for this character.
+      const layer = makeFakeHttpLayer(count, "é".repeat(64 * 1024))
+
+      yield* Effect.gen(function* () {
+        const svc = yield* Instruction.Service
+        expect(yield* svc.system()).toEqual([])
+        expect(yield* Ref.get(count)).toBe(1)
+      }).pipe(
+        provideInstance(yield* tmpdirScoped()),
+        provideInstructionWithHttp({}, layer, {
+          get: () => Effect.succeed({ instructions: [url] }),
+        }),
+      )
+    }),
+  )
+
+  it.live("retries a failed remote instruction and caches a later success", () =>
+    Effect.gen(function* () {
+      const count = yield* Ref.make(0)
+      const url = "https://example.com/AGENTS.md"
+      const body = "# Remote Instructions"
+      const layer = Layer.effect(
+        HttpClient.HttpClient,
+        Effect.sync(() =>
+          HttpClient.make((request) =>
+            Effect.gen(function* () {
+              const current = yield* Ref.get(count)
+              yield* Ref.update(count, (n) => n + 1)
+              if (current === 0) {
+                return yield* Effect.fail(
+                  new HttpClientError.HttpClientError({
+                    reason: new HttpClientError.TransportError({ request, description: "temporary failure" }),
+                  }),
+                )
+              }
+              return HttpClientResponse.fromWeb(request, new Response(body, { status: 200 }))
+            }),
+          ),
+        ),
+      )
+
+      yield* Effect.gen(function* () {
+        const svc = yield* Instruction.Service
+        const first = yield* svc.system()
+        const second = yield* svc.system()
+        expect(first).toEqual([`<instructions source="${url}">\n${body}\n</instructions>`])
+        expect(second).toEqual(first)
+        // The HTTP retry recovers the first call; subsequent system() calls use the cache.
+        expect(yield* Ref.get(count)).toBe(2)
+        expect(yield* svc.system()).toEqual(second)
+        expect(yield* Ref.get(count)).toBe(2)
+      }).pipe(
+        provideInstance(yield* tmpdirScoped()),
+        provideInstructionWithHttp({}, layer, {
+          get: () => Effect.succeed({ instructions: [url] }),
+        }),
+      )
+    }),
+  )
+
   it.live("loads both project and global AGENTS.md when both exist", () =>
     Effect.gen(function* () {
       const globalTmp = yield* tmpWithFiles({ "AGENTS.md": "# Global Instructions" })
@@ -219,6 +408,79 @@ describe("Instruction.system", () => {
       }).pipe(provideInstance(projectTmp), provideInstruction({ home: globalTmp, config: globalTmp }))
     }),
   )
+
+  it.live("skips oversized local instruction files", () =>
+    isolatedTmpdir((base) =>
+      Effect.gen(function* () {
+        const globalTmp = yield* tmpdirScoped()
+        const project = path.join(base, "project")
+        const oversized = "# Large Instructions\n" + "x".repeat(64 * 1024)
+        yield* write(path.join(project, "AGENTS.md"), oversized)
+
+        yield* Effect.gen(function* () {
+          const svc = yield* Instruction.Service
+          const paths = yield* svc.systemPaths()
+          const rules = yield* svc.system()
+          expect(paths.has(path.join(project, "AGENTS.md"))).toBe(true)
+          expect(rules).toEqual([])
+        }).pipe(provideNonGitInstance(project), provideInstruction({ home: globalTmp, config: globalTmp }))
+      }),
+    ),
+  )
+})
+
+describe("Instruction.systemPaths non-git leaks", () => {
+  it.live("does not inherit AGENTS.md from parent dirs of a non-git project", () =>
+    // Irrelevant parent files must not be picked up: in a genuine non-git project
+    // (worktree "/"), systemPaths must clamp its findUp walk to the project dir.
+    isolatedTmpdir((base) =>
+      Effect.gen(function* () {
+        const proj = path.join(base, "proj")
+        const globalTmp = yield* tmpdirScoped()
+
+        yield* write(path.join(base, "AGENTS.md"), "# LEAK FROM PARENT")
+        yield* write(path.join(proj, "AGENTS.md"), "# Project Instructions")
+        yield* write(path.join(proj, "file.ts"), "const x = 1")
+
+        yield* Effect.gen(function* () {
+          const svc = yield* Instruction.Service
+          const paths = yield* svc.systemPaths()
+
+          // A file outside the project (parent of cwd, reachable only because
+          // non-git worktree is "/") must NOT enter the project context.
+          expect(paths.has(path.join(base, "AGENTS.md"))).toBe(false)
+          expect(paths.has(path.join(proj, "AGENTS.md"))).toBe(true)
+        }).pipe(provideNonGitInstance(proj), provideInstruction({ home: globalTmp, config: globalTmp }))
+      }),
+    ),
+  )
+
+  it.live("git project only walks up to the worktree root (does not escape repo)", () =>
+    isolatedTmpdir((base) =>
+      Effect.gen(function* () {
+        const repo = path.join(base, "repo")
+        const globalTmp = yield* tmpdirScoped()
+
+        // init a real git repo at `repo` so fromDirectory sees worktree = repo
+        yield* Effect.promise(() =>
+          import("node:child_process").then(({ execFile }) =>
+            new Promise<void>((res, rej) =>
+              execFile("git", ["init", "-q", repo], (err) => (err ? rej(err) : res())),
+            ),
+          ),
+        )
+        yield* write(path.join(repo, "AGENTS.md"), "# Project Instructions")
+        yield* write(path.join(base, "AGENTS.md"), "# LEAK OUTSIDE REPO")
+
+        yield* Effect.gen(function* () {
+          const svc = yield* Instruction.Service
+          const paths = yield* svc.systemPaths()
+          expect(paths.has(path.join(repo, "AGENTS.md"))).toBe(true)
+          expect(paths.has(path.join(base, "AGENTS.md"))).toBe(false)
+        }).pipe(provideInstance(repo), provideInstruction({ home: globalTmp, config: globalTmp }))
+      }),
+    ),
+  )
 })
 
 describe("Instruction.systemPaths global config", () => {
@@ -233,5 +495,30 @@ describe("Instruction.systemPaths global config", () => {
         expect(paths.has(path.join(globalTmp, "AGENTS.md"))).toBe(true)
       }).pipe(provideInstance(projectTmp), provideInstruction({ home: globalTmp, config: globalTmp }))
     }),
+  )
+})
+
+describe("Instruction.systemPaths config-relative boundary", () => {
+  it.live("does not let config-relative instructions climb above the project in non-git dirs", () =>
+    isolatedTmpdir((base) =>
+      Effect.gen(function* () {
+        const project = path.join(base, "project")
+        yield* write(path.join(base, "AGENTS.md"), "# LEAK FROM CONFIG-RELATIVE")
+        yield* write(path.join(project, "file.ts"), "const x = 1")
+
+        yield* Effect.gen(function* () {
+          const svc = yield* Instruction.Service
+          const paths = yield* svc.systemPaths()
+          expect(paths.has(path.join(base, "AGENTS.md"))).toBe(false)
+        }).pipe(
+          provideNonGitInstance(project),
+          // Config layer must be provided INTO Instruction.layer (as
+          // provideInstructionWithHttp does) or the override never reaches it.
+          provideInstructionWithHttp({}, FetchHttpClient.layer, {
+            get: () => Effect.succeed({ instructions: ["../AGENTS.md"] }),
+          }),
+        )
+      }),
+    ),
   )
 })

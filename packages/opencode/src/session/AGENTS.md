@@ -59,9 +59,9 @@ Normal tools merge `agent.permission + session.permission`. But subagent task's 
 
 `??` only falls through for `null`/`undefined`. When the intention is to fall through for all falsy values (including `0`), use `||`. Discovered in `getUsage`: `inputTokenDetails.cacheWriteTokens: 0` stopped the chain instead of falling back to `metadata.anthropic.cacheCreationInputTokens`.
 
-## `instruction.ts` fileCache grows unbounded without LRU eviction
+## `instruction.ts` fileCache uses bounded LRU eviction
 
-`session/instruction.ts:91` — the `fileCache` Map caches AGENTS.md/CLAUDE.md file contents by path. Entries are only evicted when a file is deleted or empty. For long-running sessions touching many project directories, this grows without bound. Add LRU eviction (100 entries) and re-insert on cache hit to maintain recency ordering. The cache is per-instance, not per-session, so it survives across session switches within the same project.
+`session/instruction.ts:108-160` — the `fileCache` Map caches AGENTS.md/CLAUDE.md file contents by path. It evicts the least recently used entry after 100 entries and re-inserts cache hits to maintain recency ordering. The cache is per-instance, not per-session, so it survives across session switches within the same project.
 
 ## Compaction system
 

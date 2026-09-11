@@ -126,7 +126,7 @@ export namespace AppFileSystem {
         let current = start
         while (true) {
           const search = join(current, target)
-          if (yield* fs.exists(search)) result.push(search)
+          if (yield* existsSafe(search)) result.push(search)
           if (stop === current) break
           const parent = dirname(current)
           if (parent === current) break
