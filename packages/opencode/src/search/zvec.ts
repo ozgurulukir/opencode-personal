@@ -1,4 +1,4 @@
-import { Effect, Layer } from "effect"
+import { Effect, Layer, Schedule } from "effect"
 import { createHash } from "node:crypto"
 import path from "path"
 import { AppFileSystem } from "@opencode-ai/core/filesystem"
@@ -16,6 +16,7 @@ const log = Log.create({ service: "search.zvec" })
 
 const VECTOR_FIELD = "embedding"
 const BATCH_SIZE = 1000
+const LOCK_RETRY_TIMEOUT_MS = 5_000
 
 // zvec document IDs reject characters like '/', ':' and '.'. Hash opaque IDs to
 // hex at the zvec boundary — the human-readable path is kept in the `path` field.
@@ -57,13 +58,21 @@ function alreadyExists(e: unknown): boolean {
   return /already exist|alreadyexist|path validate failed|\] exists/i.test(msg)
 }
 
+function isWriteLockError(error: { code: string; message: string }) {
+  return (
+    error.code === "ZVEC_FAILED_PRECONDITION" ||
+    error.code === "ZVEC_UNAVAILABLE" ||
+    /lock|busy|exclusive/i.test(error.message)
+  )
+}
+
 function toZvecError(op: string, e: unknown): ZvecError {
   if (e instanceof ZvecError) return e
   const msg = e instanceof Error ? e.message : String(e)
   const code = isZVecError(e) ? e.code : op
   if (
     op === "OPEN_FAILED" &&
-    (code === "ZVEC_FAILED_PRECONDITION" || code === "ZVEC_UNAVAILABLE" || /lock|busy|exclusive/i.test(msg))
+    isWriteLockError({ code, message: msg })
   ) {
     return new ZvecError(
       code,
@@ -73,6 +82,12 @@ function toZvecError(op: string, e: unknown): ZvecError {
   }
   return new ZvecError(code, `Zvec ${op.toLowerCase().replace(/_/g, " ")} failed: ${msg}`, { cause: e })
 }
+
+const lockRetrySchedule = Schedule.exponential(100, 1.7).pipe(
+  Schedule.either(Schedule.spaced(2_000)),
+  Schedule.jittered,
+  Schedule.while((meta) => meta.elapsed < LOCK_RETRY_TIMEOUT_MS),
+)
 
 // upsertSync/deleteSync return per-doc ZVecStatus {ok, code, message}. A fully-failed
 // batch is systemic and fails the operation; partial failures are logged only. Codes in
@@ -244,7 +259,7 @@ export class ZvecIndex {
       const outcome = yield* Effect.try({
         try: () => openNative(mod, self.path, buildSchema(mod, dimension), dimension),
         catch: (e) => toZvecError("OPEN_FAILED", e),
-      })
+      }).pipe(Effect.retry({ while: isWriteLockError, schedule: lockRetrySchedule }))
       if (outcome.migrated) {
         // The manifest maps the destroyed vectors (chunk ids / mtimes / hashes) —
         // wipe it so consumers re-embed into the fresh collection. A failed wipe
