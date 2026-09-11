@@ -97,6 +97,7 @@ test("provider loaded from env variable", async () => {
     },
   })
 })
+
 test("provider loaded from config with apiKey option", async () => {
   await using tmp = await tmpdir({
     init: async (dir) => {
@@ -2745,7 +2746,6 @@ test("rewriteMaxOutputTokens > end-to-end through @ai-sdk/openai responses model
     server.stop()
   }
 })
-
 
 test("toPublicInfo returns a safe provider when options contain a circular reference", () => {
   const options: Record<string, unknown> = {}
