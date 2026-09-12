@@ -6,6 +6,16 @@
 versioned replay envelope; native `session.next.*` events arrive through the
 raw global event path and are handled directly by `sync.tsx`.
 
+Message-state events (`prompted`, `step.*`, `text.*`, `tool.*`, `reasoning.*`,
+`compaction.*`, `shell.*`, `synthetic`) route through one fall-through case
+group into `reduceMessageEvent` (`sync-messages.shared.ts`) — a pure reducer
+that mutates the caller-owned message draft in place, newest-first. Do not add
+new message-state logic inline in `sync.tsx`; extend the reducer and pin the
+behavior in `test/cli/cmd/tui/sync-messages.test.ts` (the tool
+pending/running guards and out-of-order no-ops are the fragile part).
+`eventTime` for timestamp normalization comes from
+`@opencode-ai/sdk/v2/event-time` — do not re-copy it.
+
 ## Native permission payloads
 
 `session.next.permission.asked` keeps the established `PermissionRequest`
