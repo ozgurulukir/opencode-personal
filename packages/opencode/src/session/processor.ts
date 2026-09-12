@@ -462,6 +462,7 @@ export const layer: Layer.Layer<
               // V2 read-model projection: emit the SessionEvent so V2 projectors populate SessionMessageTable.
               yield* sync.run(SessionEvent.Step.Started.Sync, {
                 sessionID: ctx.sessionID,
+                legacyMessageID: input.assistantMessage.id,
                 agent: input.assistantMessage.agent,
                 model: {
                   id: Modelv2.ID.make(ctx.model.id),

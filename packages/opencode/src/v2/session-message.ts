@@ -60,6 +60,8 @@ export function normalizeForDecode(value: unknown): unknown {
 export const ID = EventV2.ID
 export type ID = Schema.Schema.Type<typeof ID>
 
+export const LEGACY_MESSAGE_ID = "opencodeLegacyMessageID"
+
 const Base = {
   id: ID,
   metadata: Schema.Record(Schema.String, Schema.Unknown).pipe(Schema.optional),

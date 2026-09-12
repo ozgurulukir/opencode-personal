@@ -1,4 +1,4 @@
-import { SessionID } from "@/session/schema"
+import { MessageID, SessionID } from "@/session/schema"
 import { Snapshot } from "@/snapshot"
 import { NonNegativeInt } from "@opencode-ai/core/schema"
 import { EventV2 } from "./event"
@@ -73,6 +73,7 @@ export const Prompted = EventV2.define({
     prompt: Prompt,
     agent: Schema.String,
     model: Modelv2.Ref,
+    legacyMessageID: MessageID.pipe(Schema.optional),
   },
 })
 export type Prompted = Schema.Schema.Type<typeof Prompted>
@@ -120,6 +121,7 @@ export namespace Step {
       agent: Schema.String,
       model: Modelv2.Ref,
       snapshot: Schema.String.pipe(Schema.optional),
+      legacyMessageID: MessageID.pipe(Schema.optional),
     },
   })
   export type Started = Schema.Schema.Type<typeof Started>

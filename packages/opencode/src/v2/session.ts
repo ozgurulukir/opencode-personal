@@ -5,7 +5,7 @@ import { WorkspaceID } from "@/control-plane/schema"
 import { and, asc, desc, eq, gt, gte, isNull, like, lt, or, type SQL } from "@/storage/db"
 import * as Database from "@/storage/db"
 import { Cause, Context, DateTime, Effect, Exit, Layer, Option, Schema, Scope, Stream } from "effect"
-import { SessionMessage } from "./session-message"
+import { LEGACY_MESSAGE_ID, SessionMessage } from "./session-message"
 import type { Prompt } from "./session-prompt"
 import { EventV2 } from "./event"
 import { ProjectID } from "@/project/schema"
@@ -314,6 +314,11 @@ export const layer = Layer.effect(
 
     const decode = (row: typeof SessionMessageTable.$inferSelect, defaults: LegacyMessageDefaults) => {
       const data: Record<string, unknown> = { ...row.data, id: row.id, type: row.type }
+      const metadata = data.metadata
+      if (metadata && typeof metadata === "object" && !Array.isArray(metadata) && LEGACY_MESSAGE_ID in metadata) {
+        const { [LEGACY_MESSAGE_ID]: _, ...rest } = metadata as Record<string, unknown>
+        data.metadata = Object.keys(rest).length ? rest : undefined
+      }
       if (row.type !== "user") return decodeMessage(data)
       return decodeMessage({
         ...data,
@@ -885,7 +890,43 @@ export const layer = Layer.effect(
       revert: Effect.fn("V2Session.revert")(function* (input) {
         const revert = yield* requireV1(revertV1, "SessionRevert")
         yield* result.get(input.sessionID)
-        const info = yield* revert.revert(input)
+        const messageID = input.messageID.startsWith("evt_")
+          ? yield* Effect.gen(function* () {
+              const sessions = yield* requireV1(sessionsV1, "Session")
+              const row = Database.use((db) =>
+                db
+                  .select({
+                    type: SessionMessageTable.type,
+                    time_created: SessionMessageTable.time_created,
+                    data: SessionMessageTable.data,
+                  })
+                  .from(SessionMessageTable)
+                  .where(
+                    and(
+                      eq(SessionMessageTable.session_id, input.sessionID),
+                      eq(SessionMessageTable.id, SessionMessage.ID.make(input.messageID)),
+                    ),
+                  )
+                  .get(),
+              )
+              if (!row) return yield* Effect.fail(new NotFoundError({ sessionID: input.sessionID }))
+              const messages = yield* sessions.messages({ sessionID: input.sessionID })
+              const legacyID = row.data.metadata?.[LEGACY_MESSAGE_ID]
+              const target =
+                (typeof legacyID === "string" && legacyID.startsWith("msg_")
+                  ? messages.find(
+                      (message) => message.info.role === row.type && message.info.id === MessageID.make(legacyID),
+                    )
+                  : undefined) ??
+                // Older V2 rows do not carry the V1 ID association. Keep the timestamp fallback for those projections.
+                messages.find(
+                  (message) => message.info.role === row.type && message.info.time.created === row.time_created,
+                )
+              if (!target) return yield* Effect.fail(new NotFoundError({ sessionID: input.sessionID }))
+              return target.info.id
+            })
+          : input.messageID
+        const info = yield* revert.revert({ ...input, messageID })
         return toV2Info(info)
       }),
       unrevert: Effect.fn("V2Session.unrevert")(function* (sessionID) {

@@ -1846,6 +1846,7 @@ export type SyncEventSessionNextPrompted = {
       providerID: string
       variant: string
     }
+    legacyMessageID?: string
   }
 }
 
@@ -1906,6 +1907,7 @@ export type SyncEventSessionNextStepStarted = {
       variant: string
     }
     snapshot?: string
+    legacyMessageID?: string
   }
 }
 
@@ -2901,6 +2903,7 @@ export type EventSessionNextPrompted = {
       providerID: string
       variant: string
     }
+    legacyMessageID?: string
   }
 }
 
@@ -2949,6 +2952,7 @@ export type EventSessionNextStepStarted = {
       variant: string
     }
     snapshot?: string
+    legacyMessageID?: string
   }
 }
 
