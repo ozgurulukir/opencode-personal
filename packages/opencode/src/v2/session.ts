@@ -327,9 +327,24 @@ export const layer = Layer.effect(
       })
     }
 
+    function projectedRevert(sessionID: SessionID, revert: Info["revert"]): Info["revert"] {
+      if (!revert?.messageID.startsWith("msg_")) return revert
+      const row = Database.use((db) =>
+        db
+          .select({ id: SessionMessageTable.id, data: SessionMessageTable.data })
+          .from(SessionMessageTable)
+          .where(eq(SessionMessageTable.session_id, sessionID))
+          .all()
+          .find((message) => message.data.metadata?.[LEGACY_MESSAGE_ID] === revert.messageID),
+      )
+      if (!row) return revert
+      return { ...revert, messageID: row.id }
+    }
+
     function fromRow(row: typeof SessionTable.$inferSelect): Info {
+      const sessionID = SessionID.make(row.id)
       return new Info({
-        id: SessionID.make(row.id),
+        id: sessionID,
         projectID: ProjectID.make(row.project_id),
         workspaceID: row.workspace_id ? WorkspaceID.make(row.workspace_id) : undefined,
         slug: row.slug,
@@ -356,7 +371,7 @@ export const layer = Layer.effect(
               }
             : undefined,
         share: row.share_url ? { url: row.share_url } : undefined,
-        revert: row.revert ?? undefined,
+        revert: projectedRevert(sessionID, row.revert ?? undefined),
         time: {
           created: DateTime.makeUnsafe(row.time_created),
           updated: DateTime.makeUnsafe(row.time_updated),
@@ -927,7 +942,16 @@ export const layer = Layer.effect(
             })
           : input.messageID
         const info = yield* revert.revert({ ...input, messageID })
-        return toV2Info(info)
+        const infoV2 = new Info({
+          ...toV2Info(info),
+          revert: info.revert ? { ...info.revert, messageID: input.messageID } : undefined,
+        })
+        yield* sync.run(SessionEvent.Updated.Sync, {
+          sessionID: input.sessionID,
+          timestamp: DateTime.makeUnsafe(Date.now()),
+          info: { revert: infoV2.revert },
+        })
+        return infoV2
       }),
       unrevert: Effect.fn("V2Session.unrevert")(function* (sessionID) {
         const revert = yield* requireV1(revertV1, "SessionRevert")

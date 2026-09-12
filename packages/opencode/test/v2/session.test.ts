@@ -223,11 +223,26 @@ function stubRevertLayer() {
   const calls: unknown[] = []
   const layer = Layer.effect(
     SessionRevert.Service,
-    Effect.succeed({
-      revert: (input: SessionRevert.RevertInput) =>
-        Effect.sync(() => calls.push(input)).pipe(Effect.andThen(Effect.die("revert stub reached"))),
-      unrevert: () => Effect.die("unrevert stub reached"),
-      cleanup: () => Effect.void,
+    Effect.gen(function* () {
+      const sessions = yield* SessionV1.Service
+      return {
+        revert: (input: SessionRevert.RevertInput) =>
+          Effect.gen(function* () {
+            calls.push(input)
+            yield* sessions.setRevert({
+              sessionID: input.sessionID,
+              revert: { messageID: input.messageID },
+              summary: { additions: 0, deletions: 0, files: 0 },
+            })
+            return yield* sessions.get(input.sessionID).pipe(Effect.orDie)
+          }),
+        unrevert: (input: { sessionID: SessionID }) =>
+          Effect.gen(function* () {
+            yield* sessions.clearRevert(input.sessionID)
+            return yield* sessions.get(input.sessionID).pipe(Effect.orDie)
+          }),
+        cleanup: () => Effect.void,
+      }
     }),
   )
   return { layer, calls }
@@ -298,12 +313,12 @@ describe("v2.session", () => {
       expect(prompted.user?.id).toStartWith("evt_")
       const revertCount = revertStub.calls.length
       const messageID = promptStub.calls.legacyMessageIDs.at(-1)
-      yield* session
-        .revert({ sessionID: info.id, messageID: prompted.user!.id })
-        .pipe(Effect.catchDefect(() => Effect.void))
+      const reverted = yield* session.revert({ sessionID: info.id, messageID: prompted.user!.id })
 
       expect(revertStub.calls).toHaveLength(revertCount + 1)
       expect(revertStub.calls.at(-1)).toMatchObject({ sessionID: info.id, messageID })
+      expect(reverted.revert?.messageID).toBe(prompted.user!.id)
+      expect((yield* session.get(info.id)).revert?.messageID).toBe(prompted.user!.id)
     }),
   )
 
