@@ -223,8 +223,10 @@ export const layer = Layer.effect(
 
         yield* watch(SessionEvent.Updated.Sync, (evt) =>
           Effect.gen(function* () {
-            const info = evt.properties.info
-            yield* sync(info.id, [{ type: "session", data: info }])
+            const sessionID = evt.properties.sessionID ?? evt.properties.info?.id
+            if (!sessionID) return
+            const info = yield* session.get(sessionID)
+            yield* sync(sessionID, [{ type: "session", data: info }])
           }),
         )
         for (const def of [

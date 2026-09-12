@@ -322,6 +322,25 @@ describe("v2.session", () => {
     }),
   )
 
+  it.instance("list batch-projects revert IDs for multiple sessions", () =>
+    Effect.gen(function* () {
+      const session = yield* SessionV2.Service
+      const infos = yield* Effect.forEach(["first undo", "second undo"], (text) =>
+        Effect.gen(function* () {
+          const info = yield* session.create({ agent: "build" })
+          const prompted = yield* session.prompt({ sessionID: info.id, prompt: { text } })
+          yield* session.revert({ sessionID: info.id, messageID: prompted.user!.id })
+          return { info, messageID: prompted.user!.id }
+        }),
+      )
+
+      const listed = yield* session.list({})
+      for (const { info, messageID } of infos) {
+        expect(listed.find((item) => item.id === info.id)?.revert?.messageID).toBe(messageID)
+      }
+    }),
+  )
+
   it.instance("revert resolves assistant event IDs when legacy and projected timestamps differ", () =>
     Effect.gen(function* () {
       const session = yield* SessionV2.Service
