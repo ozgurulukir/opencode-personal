@@ -164,3 +164,22 @@ When posting synthetic error messages to the parent, use `Cause.squash(cause)` i
 of manual `cause instanceof Error` checks. `Cause.squash` flattens composite causes
 (`parallel`, `sequential`, `nested`) into a single error with full context, producing
 more actionable error messages for the parent LLM.
+
+## Three session.next.* message reducers are intentionally separate
+
+Message-state logic for `session.next.*` events exists in three places and is
+NOT unified into one module: (1) the server projector
+(`v2/session-message-updater.ts` + `Adapter` seam) persists via SQL and uses
+internal Effect Schema types; (2) the TUI client reducer
+(`cli/cmd/tui/context/sync-messages.shared.ts`) operates on the V2
+`SessionMessage` model, newest-first; (3) the app reducer
+(`packages/app/src/context/global-sync/event-reducer.ts`) maintains V1-shaped
+`message`/`part` maps with load-bearing app semantics (optimistic eviction,
+comment-note synthetics, shell two-message expansion, deterministic part-ID
+contract shared with the load path). An architecture review (2026-09-12)
+evaluated full unification and rejected it: the app reducer is a different
+module, not a copy — forcing one reducer would require an adapter whose
+complexity exceeds the duplication (deletion test fails). Shared pieces DO
+live in the SDK: `eventTime` at `@opencode-ai/sdk/v2/event-time` (single copy;
+previously duplicated in TUI and app). Revisit only if app migrates its render
+pipeline to the V2 message model.

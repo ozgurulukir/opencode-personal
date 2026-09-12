@@ -16,6 +16,7 @@ import type {
   Todo,
   UserMessage,
 } from "@opencode-ai/sdk/v2/client"
+import { eventTime } from "@opencode-ai/sdk/v2/event-time"
 import type { State, VcsCache } from "./types"
 import { trimSessions } from "./session-trim"
 import { dropSessionCaches } from "./session-cache"
@@ -38,17 +39,6 @@ import {
 
 type MessageEvent = { id?: string; type: string; properties?: unknown }
 
-// V2 event timestamps are declared as epoch millis on the wire and
-// SyncEvent.process encodes DateTime instances to millis at publish.
-// Kept as a cheap normalizer because legacy EventTable rows (experimental
-// workspace replay) still carry ISO strings from before that fix.
-function eventTime(value: unknown): number {
-  if (typeof value === "number") return value
-  if (typeof value === "string") return Date.parse(value)
-  if (value && typeof value === "object" && "epochMilliseconds" in value)
-    return (value as { epochMilliseconds: number }).epochMilliseconds
-  return Date.now()
-}
 
 export function applyGlobalEvent(input: {
   event: { type: string; properties?: unknown }
