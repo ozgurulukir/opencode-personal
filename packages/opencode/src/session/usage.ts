@@ -15,15 +15,16 @@ export function getUsage(input: { model: Provider.Model; usage: LanguageModelUsa
   const cacheReadInputTokens = safe(
     input.usage.inputTokenDetails?.cacheReadTokens || input.usage.cachedInputTokens || 0,
   )
+  const rawCacheWrite = input.usage.inputTokenDetails?.cacheWriteTokens;
   const cacheWriteInputTokens = safe(Number(
-    input.usage.inputTokenDetails?.cacheWriteTokens ||
+    (rawCacheWrite !== undefined && rawCacheWrite !== null && rawCacheWrite !== 0) ? rawCacheWrite : (
     input.metadata?.["anthropic"]?.["cacheCreationInputTokens"] ||
     input.metadata?.["vertex"]?.["cacheCreationInputTokens"] ||
     // @ts-expect-error
     input.metadata?.["bedrock"]?.["usage"]?.["cacheWriteInputTokens"] ||
     // @ts-expect-error
     input.metadata?.["venice"]?.["usage"]?.["cacheCreationInputTokens"] ||
-    0,
+    0)
   ))
 
   const adjustedInputTokens = safe(inputTokens - cacheReadInputTokens - cacheWriteInputTokens)

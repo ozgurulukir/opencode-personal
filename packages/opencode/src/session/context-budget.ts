@@ -60,7 +60,7 @@ function usableWith(
   const context = model.limit.context
   if (context === 0) return 0
 
-  const reserved = cc.reserved ?? ProviderTransform.maxOutputTokens(model)
+  const reserved = Math.max(cc.reserved ?? DEFAULTS.compactionBuffer, ProviderTransform.maxOutputTokens(model))
   // When limit.input is set, subtract maxOutputTokens to reserve headroom for the
   // next model response. Without this, compaction triggers too late — the model
   // has no room to generate output on the next turn.
