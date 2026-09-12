@@ -5,7 +5,8 @@ import { WorkspaceID } from "@/control-plane/schema"
 import { and, asc, desc, eq, gt, gte, isNull, like, lt, or, type SQL } from "@/storage/db"
 import * as Database from "@/storage/db"
 import { Cause, Context, DateTime, Effect, Exit, Layer, Option, Schema, Scope, Stream } from "effect"
-import { LEGACY_MESSAGE_ID, SessionMessage } from "./session-message"
+import { SessionMessage } from "./session-message"
+import { legacyMessageID, matchLegacyMessage, stripLegacyMessageID } from "./legacy-message-id.shared"
 import type { Prompt } from "./session-prompt"
 import { EventV2 } from "./event"
 import { ProjectID } from "@/project/schema"
@@ -313,12 +314,7 @@ export const layer = Layer.effect(
         : Effect.succeed(svc.value)
 
     const decode = (row: typeof SessionMessageTable.$inferSelect, defaults: LegacyMessageDefaults) => {
-      const data: Record<string, unknown> = { ...row.data, id: row.id, type: row.type }
-      const metadata = data.metadata
-      if (metadata && typeof metadata === "object" && !Array.isArray(metadata) && LEGACY_MESSAGE_ID in metadata) {
-        const { [LEGACY_MESSAGE_ID]: _, ...rest } = metadata as Record<string, unknown>
-        data.metadata = Object.keys(rest).length ? rest : undefined
-      }
+      const data = stripLegacyMessageID({ ...row.data, id: row.id, type: row.type })
       if (row.type !== "user") return decodeMessage(data)
       return decodeMessage({
         ...data,
@@ -335,7 +331,7 @@ export const layer = Layer.effect(
           .from(SessionMessageTable)
           .where(eq(SessionMessageTable.session_id, sessionID))
           .all()
-          .find((message) => message.data.metadata?.[LEGACY_MESSAGE_ID] === revert.messageID),
+          .find((message) => legacyMessageID(message.data.metadata) === revert.messageID),
       )
       if (!row) return revert
       return { ...revert, messageID: row.id }
@@ -926,17 +922,18 @@ export const layer = Layer.effect(
               )
               if (!row) return yield* Effect.fail(new NotFoundError({ sessionID: input.sessionID }))
               const messages = yield* sessions.messages({ sessionID: input.sessionID })
-              const legacyID = row.data.metadata?.[LEGACY_MESSAGE_ID]
-              const target =
-                (typeof legacyID === "string" && legacyID.startsWith("msg_")
-                  ? messages.find(
-                      (message) => message.info.role === row.type && message.info.id === MessageID.make(legacyID),
-                    )
-                  : undefined) ??
-                // Older V2 rows do not carry the V1 ID association. Keep the timestamp fallback for those projections.
-                messages.find(
-                  (message) => message.info.role === row.type && message.info.time.created === row.time_created,
-                )
+              const { target, matchedBy } = matchLegacyMessage(
+                messages,
+                row.type,
+                legacyMessageID(row.data.metadata),
+                row.time_created,
+              )
+              if (matchedBy === "timestamp") {
+                log.warn("revert target resolved via timestamp fallback — V2 row missing legacy association", {
+                  sessionID: input.sessionID,
+                  messageID: input.messageID,
+                })
+              }
               if (!target) return yield* Effect.fail(new NotFoundError({ sessionID: input.sessionID }))
               return target.info.id
             })

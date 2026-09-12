@@ -1062,4 +1062,71 @@ describe("v2.session.error-path", () => {
       }
     }),
   )
+
+  // Characterization tests for the revert ID seam (v2/session.ts revert facade
+  // + projectedRevert read path) and the V2 dead-row behavior of revert
+  // cleanup. These lock current behavior before the revert deepening refactor.
+  describe("v2.session.revert-seam", () => {
+    it.instance("revert resolves evt_ id via timestamp fallback when legacy association is missing", () =>
+      Effect.gen(function* () {
+        const session = yield* SessionV2.Service
+        const info = yield* session.create({ agent: "build" })
+        const prompted = yield* session.prompt({
+          sessionID: info.id,
+          prompt: { text: "undo target without metadata" },
+        })
+        const legacyID = promptStub.calls.legacyMessageIDs.at(-1)!
+
+        // Simulate a pre-metadata V2 row: strip the legacy association but keep
+        // the row's time_created equal to the V1 message's created time.
+        Database.use((db) => {
+          const row = db
+            .select()
+            .from(SessionMessageTable)
+            .where(eq(SessionMessageTable.id, SessionMessage.ID.make(prompted.user!.id)))
+            .get()
+          if (!row) throw new Error("row not found")
+          const { opencodeLegacyMessageID: _, ...restMetadata } = (row.data.metadata ?? {}) as Record<string, unknown>
+          const data = { ...row.data, metadata: Object.keys(restMetadata).length ? restMetadata : undefined } as typeof row.data
+          db.update(SessionMessageTable)
+            .set({ data: data as never })
+            .where(eq(SessionMessageTable.id, SessionMessage.ID.make(prompted.user!.id)))
+            .run()
+        })
+
+        const revertCount = revertStub.calls.length
+        const reverted = yield* session.revert({ sessionID: info.id, messageID: prompted.user!.id })
+        expect(revertStub.calls).toHaveLength(revertCount + 1)
+        expect(revertStub.calls.at(-1)).toMatchObject({ sessionID: info.id, messageID: legacyID })
+        expect(reverted.revert?.messageID).toBe(prompted.user!.id)
+      }),
+    )
+
+    it.instance("revert fails NotFoundError for an unknown evt_ id", () =>
+      Effect.gen(function* () {
+        const session = yield* SessionV2.Service
+        const info = yield* session.create({ agent: "build" })
+        const error = yield* Effect.flip(
+          session.revert({
+            sessionID: info.id,
+            messageID: SessionMessage.ID.make(`evt_${Date.now()}`),
+          }),
+        )
+        expect(error._tag).toBe("Session.NotFoundError")
+      }),
+    )
+
+    it.instance("message reads strip the legacy association metadata", () =>
+      Effect.gen(function* () {
+        const session = yield* SessionV2.Service
+        const info = yield* session.create({ agent: "build" })
+        yield* session.prompt({ sessionID: info.id, prompt: { text: "metadata check" } })
+        const messages = yield* session.messages({ sessionID: info.id, order: "asc" })
+        const user = messages.find((m) => m.type === "user")
+        expect(user).toBeDefined()
+        expect(user?.metadata?.opencodeLegacyMessageID).toBeUndefined()
+      }),
+    )
+
+  })
 })
