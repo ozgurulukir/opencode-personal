@@ -83,7 +83,12 @@ export function DialogStatus() {
                         Needs authentication (run: opencode mcp auth {key})
                       </Match>
                       <Match when={(item.status as string) === "needs_client_registration" && item}>
-                        {(val) => (val() as { error: string }).error}
+                        {(val) => {
+                          const state = val()
+                          return state && typeof state === "object" && "error" in state && typeof state.error === "string"
+                            ? state.error
+                            : ""
+                        }}
                       </Match>
                     </Switch>
                   </span>

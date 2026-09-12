@@ -484,9 +484,10 @@ export const layer = Layer.effect(
               ),
               Effect.catchCause((cause) =>
                 Effect.sync(() => {
+                  const squashed = Cause.squash(cause)
                   log.warn("parent agent not found, applying fallback deny rules", {
                     parentAgent: parent.agent,
-                    cause: Cause.squash(cause),
+                    cause: squashed instanceof Error ? squashed.message : String(squashed),
                   })
                   return {
                     permission: [
@@ -594,6 +595,7 @@ export const layer = Layer.effect(
             }).pipe(
               Effect.catchCause((cause) =>
                 Effect.gen(function* () {
+                  const squashed = Cause.squash(cause)
                   log.error("subagent failed", {
                     cause: cause,
                     parentID: input.parentID,
@@ -602,7 +604,7 @@ export const layer = Layer.effect(
                   yield* sync.run(SessionEvent.Synthetic.Sync, {
                     sessionID: input.parentID,
                     timestamp: DateTime.makeUnsafe(Date.now()),
-                    text: `Subagent error: ${Cause.squash(cause)}`,
+                    text: `Subagent error: ${squashed instanceof Error ? squashed.message : String(squashed)}`,
                   })
                 }),
               ),

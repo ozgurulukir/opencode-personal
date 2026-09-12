@@ -513,7 +513,7 @@ describe("v2.session", () => {
           Effect.catchDefect((defect) =>
             Effect.succeed({ error: defect instanceof Error ? defect.message : String(defect), ok: false }),
           ),
-        )) as { error: string | undefined; ok: boolean }
+        ))
 
       expect(result.error).toContain("Unknown agent type")
     }),
@@ -622,7 +622,7 @@ describe("v2.session", () => {
           Effect.catch((error) =>
             Effect.succeed({ error: error instanceof Error ? error.message : String(error), ok: false }),
           ),
-        )) as { error: string | undefined; ok: boolean }
+        ))
 
       expect(result.ok).toBe(false)
       expect(result.error).toContain("Maximum subagent nesting levels")
