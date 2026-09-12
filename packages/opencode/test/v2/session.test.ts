@@ -6,6 +6,7 @@ import { CrossSpawnSpawner } from "@opencode-ai/core/cross-spawn-spawner"
 import { Session as SessionV1 } from "../../src/session/session"
 import { SessionPrompt } from "../../src/session/prompt"
 import { SessionCompaction } from "../../src/session/compaction"
+import { SessionRevert } from "../../src/session/revert"
 import { Todo } from "../../src/session/todo"
 import { SessionStatus } from "../../src/session/status"
 import { Bus } from "@/bus"
@@ -23,6 +24,7 @@ import { Modelv2 } from "../../src/v2/model"
 import { SessionMessage } from "../../src/v2/session-message"
 import { SessionMessageTable, SessionTable } from "../../src/session/session.sql"
 import * as Database from "../../src/storage/db"
+import { eq } from "../../src/storage/db"
 
 afterEach(async () => {
   await disposeAllInstances()
@@ -35,7 +37,19 @@ const ref = {
 
 /** A stub shared prompt engine that records calls and returns canned messages. */
 function stubPromptLayer(opts?: { loopResult?: MessageV2.WithParts; failPrompt?: boolean }) {
-  const calls: { prompt: unknown[]; loop: string[]; shell: unknown[] } = { prompt: [], loop: [], shell: [] }
+  const calls: {
+    prompt: unknown[]
+    loop: string[]
+    shell: unknown[]
+    legacyMessageIDs: MessageID[]
+    legacyAssistantMessageIDs: MessageID[]
+  } = {
+    prompt: [],
+    loop: [],
+    shell: [],
+    legacyMessageIDs: [],
+    legacyAssistantMessageIDs: [],
+  }
   const loopResult = opts?.loopResult ?? {
     info: {
       id: MessageID.ascending(),
@@ -81,10 +95,41 @@ function stubPromptLayer(opts?: { loopResult?: MessageV2.WithParts; failPrompt?:
             const textPart = input.parts?.find((p: any) => p.type === "text")
             const fileParts = (input.parts ?? []).filter((p: any) => p.type === "file")
             const agentParts = (input.parts ?? []).filter((p: any) => p.type === "agent")
-            const ts = DateTime.makeUnsafe(Date.now())
+            const created = Date.now()
+            const ts = DateTime.makeUnsafe(created)
+            const legacyMessageID = input.messageID ?? MessageID.ascending()
+            calls.legacyMessageIDs.push(legacyMessageID)
+            const legacyAssistantInfo =
+              loopResult.info.role === "assistant"
+                ? {
+                    ...loopResult.info,
+                    id: MessageID.ascending(),
+                    sessionID: input.sessionID,
+                    time: { created: created - 1 },
+                  }
+                : undefined
+            yield* sync.run(MessageV2.Event.Updated, {
+              sessionID: input.sessionID,
+              info: {
+                id: legacyMessageID,
+                role: "user",
+                sessionID: input.sessionID,
+                agent: input.agent ?? "general",
+                model: { providerID: ref.providerID, modelID: ref.modelID },
+                time: { created },
+              },
+            })
+            if (legacyAssistantInfo) {
+              calls.legacyAssistantMessageIDs.push(legacyAssistantInfo.id)
+              yield* sync.run(MessageV2.Event.Updated, {
+                sessionID: input.sessionID,
+                info: legacyAssistantInfo,
+              })
+            }
             yield* sync.run(SessionEvent.Prompted.Sync, {
               sessionID: input.sessionID,
               timestamp: ts,
+              legacyMessageID,
               agent: input.agent ?? "general",
               model: {
                 id: Modelv2.ID.make("test-model"),
@@ -105,6 +150,7 @@ function stubPromptLayer(opts?: { loopResult?: MessageV2.WithParts; failPrompt?:
             yield* sync.run(SessionEvent.Step.Started.Sync, {
               sessionID: input.sessionID,
               timestamp: ts,
+              legacyMessageID: legacyAssistantInfo?.id,
               agent: input.agent ?? "general",
               model: {
                 id: Modelv2.ID.make("test-model"),
@@ -130,10 +176,10 @@ function stubPromptLayer(opts?: { loopResult?: MessageV2.WithParts; failPrompt?:
             })
             return {
               info: {
-                id: input.messageID ?? MessageID.ascending(),
+                id: legacyMessageID,
                 role: "user",
                 sessionID: input.sessionID,
-                time: { created: Date.now() },
+                time: { created },
               },
               parts: [],
             } as unknown as MessageV2.WithParts
@@ -173,12 +219,27 @@ function stubCompactionLayer() {
   return { layer, calls }
 }
 
+function stubRevertLayer() {
+  const calls: unknown[] = []
+  const layer = Layer.effect(
+    SessionRevert.Service,
+    Effect.succeed({
+      revert: (input: SessionRevert.RevertInput) =>
+        Effect.sync(() => calls.push(input)).pipe(Effect.andThen(Effect.die("revert stub reached"))),
+      unrevert: () => Effect.die("unrevert stub reached"),
+      cleanup: () => Effect.void,
+    }),
+  )
+  return { layer, calls }
+}
+
 // Full layer: real Session + SyncEvent + Bus + Config, stubbed engine/compaction.
 // Stubs MUST be provided to the V2 layer (not merged alongside) because the V2
 // layer captures them at build time via Effect.serviceOption.
 function makeTestLayer() {
   const promptStub = stubPromptLayer()
   const compactionStub = stubCompactionLayer()
+  const revertStub = stubRevertLayer()
   // Infrastructure layers (no stubs yet)
   const infra = Layer.mergeAll(
     SessionV1.defaultLayer,
@@ -191,15 +252,16 @@ function makeTestLayer() {
     Todo.defaultLayer,
   )
   // Stubs depend on SyncEvent, so provide infra to them.
-  const stubs = Layer.mergeAll(promptStub.layer, compactionStub.layer).pipe(Layer.provide(infra))
+  const stubs = Layer.mergeAll(promptStub.layer, compactionStub.layer, revertStub.layer).pipe(Layer.provide(infra))
   // V2 layer needs both infra and stubs so serviceOption finds them at build.
   const v2WithStubs = SessionV2.layer.pipe(Layer.provide(Layer.mergeAll(infra, stubs)))
-  return { layer: v2WithStubs, promptStub, compactionStub }
+  return { layer: v2WithStubs, promptStub, compactionStub, revertStub }
 }
 
 function makeFailingTestLayer() {
   const promptStub = stubPromptLayer({ failPrompt: true })
   const compactionStub = stubCompactionLayer()
+  const revertStub = stubRevertLayer()
   const infra = Layer.mergeAll(
     SessionV1.defaultLayer,
     Config.defaultLayer,
@@ -210,9 +272,9 @@ function makeFailingTestLayer() {
     SyncEvent.defaultLayer,
     Todo.defaultLayer,
   )
-  const stubs = Layer.mergeAll(promptStub.layer, compactionStub.layer).pipe(Layer.provide(infra))
+  const stubs = Layer.mergeAll(promptStub.layer, compactionStub.layer, revertStub.layer).pipe(Layer.provide(infra))
   const v2WithStubs = SessionV2.layer.pipe(Layer.provide(Layer.mergeAll(infra, stubs)))
-  return { layer: v2WithStubs, promptStub, compactionStub }
+  return { layer: v2WithStubs, promptStub, compactionStub, revertStub }
 }
 
 const testLayer = makeTestLayer()
@@ -222,8 +284,59 @@ const it = testEffect(testLayer.layer)
 // so these references stay valid across all tests in this file.
 const promptStub = testLayer.promptStub
 const compactionStub = testLayer.compactionStub
+const revertStub = testLayer.revertStub
 
 describe("v2.session", () => {
+  it.instance("revert resolves projected event IDs to their legacy message IDs", () =>
+    Effect.gen(function* () {
+      const session = yield* SessionV2.Service
+      const info = yield* session.create({ agent: "build" })
+      const prompted = yield* session.prompt({
+        sessionID: info.id,
+        prompt: { text: "undo target" },
+      })
+      expect(prompted.user?.id).toStartWith("evt_")
+      const revertCount = revertStub.calls.length
+      const messageID = promptStub.calls.legacyMessageIDs.at(-1)
+      yield* session
+        .revert({ sessionID: info.id, messageID: prompted.user!.id })
+        .pipe(Effect.catchDefect(() => Effect.void))
+
+      expect(revertStub.calls).toHaveLength(revertCount + 1)
+      expect(revertStub.calls.at(-1)).toMatchObject({ sessionID: info.id, messageID })
+    }),
+  )
+
+  it.instance("revert resolves assistant event IDs when legacy and projected timestamps differ", () =>
+    Effect.gen(function* () {
+      const session = yield* SessionV2.Service
+      const info = yield* session.create({ agent: "build" })
+      const prompted = yield* session.prompt({
+        sessionID: info.id,
+        prompt: { text: "undo assistant target" },
+      })
+      expect(prompted.assistant?.id).toStartWith("evt_")
+      expect(prompted.assistant?.metadata?.opencodeLegacyMessageID).toBeUndefined()
+
+      const revertCount = revertStub.calls.length
+      const messageID = promptStub.calls.legacyAssistantMessageIDs.at(-1)!
+      const row = Database.use((db) =>
+        db
+          .select({ data: SessionMessageTable.data })
+          .from(SessionMessageTable)
+          .where(eq(SessionMessageTable.id, SessionMessage.ID.make(prompted.assistant!.id)))
+          .get(),
+      )
+      expect(row?.data.metadata?.opencodeLegacyMessageID).toBe(messageID)
+      yield* session
+        .revert({ sessionID: info.id, messageID: prompted.assistant!.id })
+        .pipe(Effect.catchDefect(() => Effect.void))
+
+      expect(revertStub.calls).toHaveLength(revertCount + 1)
+      expect(revertStub.calls.at(-1)).toMatchObject({ sessionID: info.id, messageID })
+    }),
+  )
+
   it.instance("create inserts a session row and returns V2 Info", () =>
     Effect.gen(function* () {
       const session = yield* SessionV2.Service

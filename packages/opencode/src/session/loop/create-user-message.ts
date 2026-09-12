@@ -499,6 +499,7 @@ export const createUserMessage = Effect.fn("SessionPrompt.createUserMessage")(
     yield* deps.sync.run(SessionEvent.Prompted.Sync, {
       sessionID: input.sessionID,
       timestamp: DateTime.makeUnsafe(info.time.created),
+      legacyMessageID: info.id,
       agent: info.agent,
       model: {
         id: Modelv2.ID.make(info.model.modelID),

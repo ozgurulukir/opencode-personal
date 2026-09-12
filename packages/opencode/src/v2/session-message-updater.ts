@@ -1,6 +1,6 @@
 import { produce, type WritableDraft } from "immer"
 import { SessionEvent } from "./session-event"
-import { SessionMessage } from "./session-message"
+import { LEGACY_MESSAGE_ID, SessionMessage } from "./session-message"
 
 export type MemoryState = {
   messages: SessionMessage.Message[]
@@ -159,7 +159,9 @@ export function update<Result>(adapter: Adapter<Result>, event: SessionEvent.Eve
         new SessionMessage.User({
           id: event.id,
           type: "user",
-          metadata: event.metadata,
+          metadata: event.data.legacyMessageID
+            ? { ...event.metadata, [LEGACY_MESSAGE_ID]: event.data.legacyMessageID }
+            : event.metadata,
           text: event.data.prompt.text,
           files: event.data.prompt.files,
           agents: event.data.prompt.agents,
@@ -217,6 +219,7 @@ export function update<Result>(adapter: Adapter<Result>, event: SessionEvent.Eve
         new SessionMessage.Assistant({
           id: event.id,
           type: "assistant",
+          metadata: event.data.legacyMessageID ? { [LEGACY_MESSAGE_ID]: event.data.legacyMessageID } : undefined,
           agent: event.data.agent,
           model: event.data.model,
           time: { created: event.data.timestamp },
