@@ -1,4 +1,5 @@
 export * from "./client.js"
+export * from "./event-time.js"
 export * from "./legacy.js"
 export * from "./server.js"
 

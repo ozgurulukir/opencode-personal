@@ -6,6 +6,7 @@ import type {
   SessionMessageAssistantTool,
   Event,
 } from "@opencode-ai/sdk/v2"
+import { eventTime } from "@opencode-ai/sdk/v2/event-time"
 
 /**
  * The session.next.* events that mutate per-session message state. Extracted
@@ -19,18 +20,6 @@ import type {
  * behavior this module was extracted from.
  */
 export type MessageSyncEvent = Extract<Event, { type: `session.next.${string}` }>
-
-// V2 event timestamps are declared as epoch millis on the wire and
-// SyncEvent.process now encodes DateTime instances to millis at publish.
-// Kept as a cheap normalizer because legacy EventTable rows (experimental
-// workspaces replay) still carry ISO strings from before that fix.
-function eventTime(value: unknown): number {
-  if (typeof value === "number") return value
-  if (typeof value === "string") return Date.parse(value)
-  if (value && typeof value === "object" && "epochMilliseconds" in value)
-    return (value as { epochMilliseconds: number }).epochMilliseconds
-  return Date.now()
-}
 
 function activeAssistant(messages: SessionMessage[]) {
   const index = messages.findIndex((message) => message.type === "assistant" && !message.time.completed)
