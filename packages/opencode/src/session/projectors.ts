@@ -5,7 +5,8 @@ import { sql } from "drizzle-orm"
 import { SyncEvent } from "@/sync"
 import * as Session from "./session"
 import { MessageV2 } from "./message-v2"
-import { SessionTable, MessageTable, PartTable } from "./session.sql"
+import { SessionTable, MessageTable, PartTable, SessionMessageTable } from "./session.sql"
+import { LEGACY_MESSAGE_ID } from "@/v2/session-message"
 import { WorkspaceTable } from "@/control-plane/workspace.sql"
 import { Log } from "@opencode-ai/core/util/log"
 import nextProjectors from "./projectors-next"
@@ -115,6 +116,18 @@ export default [
   SyncEvent.project(MessageV2.Event.Removed, (db, data) => {
     db.delete(MessageTable)
       .where(and(eq(MessageTable.id, data.messageID), eq(MessageTable.session_id, data.sessionID)))
+      .run()
+    // The V2 read model rows are keyed by evt_ ids and carry the V1 msg_ id in
+    // metadata (written by session-message-updater.ts on prompted/step events),
+    // so resolve the association here. Without this, the V2 read model
+    // accumulates dead rows forever after a revert.
+    db.delete(SessionMessageTable)
+      .where(
+        and(
+          eq(SessionMessageTable.session_id, data.sessionID),
+          sql`json_extract(${SessionMessageTable.data}, ${sql.raw(`'$."metadata"."${LEGACY_MESSAGE_ID}"'`)}) = ${data.messageID}`,
+        ),
+      )
       .run()
   }),
 

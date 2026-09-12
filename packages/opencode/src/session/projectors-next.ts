@@ -110,98 +110,70 @@ function update(db: Database.TxOrDb, event: SessionEvent.Event) {
   SessionMessageUpdater.update(sqlite(db, event.data.sessionID), event)
 }
 
+/**
+ * Registers one projector that funnels the event into SessionMessageUpdater.
+ * The `type` argument is the updater's event discriminator; each call site
+ * pairs it with `def`, so the correlated-union cast below is safe by
+ * construction. Events that also touch SessionTable register explicitly.
+ */
+function projectNext<Def extends SyncEvent.Definition>(def: Def, type: SessionEvent.Event["type"]) {
+  return SyncEvent.project(def, (db, data, event) => {
+    update(db, { id: SessionMessage.ID.make(event.id), type, data } as SessionEvent.Event)
+  })
+}
+
+const noProjector = (def: SyncEvent.Definition) => SyncEvent.project(def, () => {})
+
 export default [
   SyncEvent.project(SessionEvent.AgentSwitched.Sync, (db, data, event) => {
     db.update(SessionTable)
-      .set({
-        agent: data.agent,
-        time_updated: DateTime.toEpochMillis(data.timestamp),
-      })
+      .set({ agent: data.agent, time_updated: DateTime.toEpochMillis(data.timestamp) })
       .where(eq(SessionTable.id, data.sessionID))
       .run()
     update(db, { id: SessionMessage.ID.make(event.id), type: "session.next.agent.switched", data })
   }),
   SyncEvent.project(SessionEvent.ModelSwitched.Sync, (db, data, event) => {
     db.update(SessionTable)
-      .set({
-        model: data.model,
-        time_updated: DateTime.toEpochMillis(data.timestamp),
-      })
+      .set({ model: data.model, time_updated: DateTime.toEpochMillis(data.timestamp) })
       .where(eq(SessionTable.id, data.sessionID))
       .run()
     update(db, { id: SessionMessage.ID.make(event.id), type: "session.next.model.switched", data })
   }),
-  SyncEvent.project(SessionEvent.Prompted.Sync, (db, data, event) => {
-    update(db, { id: SessionMessage.ID.make(event.id), type: "session.next.prompted", data })
-  }),
-  SyncEvent.project(SessionEvent.Synthetic.Sync, (db, data, event) => {
-    update(db, { id: SessionMessage.ID.make(event.id), type: "session.next.synthetic", data })
-  }),
-  SyncEvent.project(SessionEvent.Shell.Started.Sync, (db, data, event) => {
-    update(db, { id: SessionMessage.ID.make(event.id), type: "session.next.shell.started", data })
-  }),
-  SyncEvent.project(SessionEvent.Shell.Ended.Sync, (db, data, event) => {
-    update(db, { id: SessionMessage.ID.make(event.id), type: "session.next.shell.ended", data })
-  }),
-  SyncEvent.project(SessionEvent.Step.Started.Sync, (db, data, event) => {
-    update(db, { id: SessionMessage.ID.make(event.id), type: "session.next.step.started", data })
-  }),
-  SyncEvent.project(SessionEvent.Step.Ended.Sync, (db, data, event) => {
-    update(db, { id: SessionMessage.ID.make(event.id), type: "session.next.step.ended", data })
-  }),
-  SyncEvent.project(SessionEvent.Step.Failed.Sync, (db, data, event) => {
-    update(db, { id: SessionMessage.ID.make(event.id), type: "session.next.step.failed", data })
-  }),
-  SyncEvent.project(SessionEvent.Text.Started.Sync, (db, data, event) => {
-    update(db, { id: SessionMessage.ID.make(event.id), type: "session.next.text.started", data })
-  }),
-  SyncEvent.project(SessionEvent.Text.Delta.Sync, () => {}),
-  SyncEvent.project(SessionEvent.Text.Ended.Sync, (db, data, event) => {
-    update(db, { id: SessionMessage.ID.make(event.id), type: "session.next.text.ended", data })
-  }),
-  SyncEvent.project(SessionEvent.Tool.Input.Started.Sync, (db, data, event) => {
-    update(db, { id: SessionMessage.ID.make(event.id), type: "session.next.tool.input.started", data })
-  }),
-  SyncEvent.project(SessionEvent.Tool.Input.Delta.Sync, () => {}),
-  SyncEvent.project(SessionEvent.Tool.Input.Ended.Sync, (db, data, event) => {
-    update(db, { id: SessionMessage.ID.make(event.id), type: "session.next.tool.input.ended", data })
-  }),
-  SyncEvent.project(SessionEvent.Tool.Called.Sync, (db, data, event) => {
-    update(db, { id: SessionMessage.ID.make(event.id), type: "session.next.tool.called", data })
-  }),
-  SyncEvent.project(SessionEvent.Tool.Success.Sync, (db, data, event) => {
-    update(db, { id: SessionMessage.ID.make(event.id), type: "session.next.tool.success", data })
-  }),
-  SyncEvent.project(SessionEvent.Tool.Failed.Sync, (db, data, event) => {
-    update(db, { id: SessionMessage.ID.make(event.id), type: "session.next.tool.failed", data })
-  }),
-  SyncEvent.project(SessionEvent.Reasoning.Started.Sync, (db, data, event) => {
-    update(db, { id: SessionMessage.ID.make(event.id), type: "session.next.reasoning.started", data })
-  }),
-  SyncEvent.project(SessionEvent.Reasoning.Delta.Sync, () => {}),
-  SyncEvent.project(SessionEvent.Reasoning.Ended.Sync, (db, data, event) => {
-    update(db, { id: SessionMessage.ID.make(event.id), type: "session.next.reasoning.ended", data })
-  }),
-  SyncEvent.project(SessionEvent.Retried.Sync, (db, data, event) => {
-    update(db, { id: SessionMessage.ID.make(event.id), type: "session.next.retried", data })
-  }),
-  SyncEvent.project(SessionEvent.Compaction.Started.Sync, (db, data, event) => {
-    update(db, { id: SessionMessage.ID.make(event.id), type: "session.next.compaction.started", data })
-  }),
-  SyncEvent.project(SessionEvent.Compaction.Delta.Sync, () => {}),
-  SyncEvent.project(SessionEvent.Compaction.Ended.Sync, (db, data, event) => {
-    update(db, { id: SessionMessage.ID.make(event.id), type: "session.next.compaction.ended", data })
-  }),
+  projectNext(SessionEvent.Prompted.Sync, "session.next.prompted"),
+  projectNext(SessionEvent.Synthetic.Sync, "session.next.synthetic"),
+  projectNext(SessionEvent.Shell.Started.Sync, "session.next.shell.started"),
+  projectNext(SessionEvent.Shell.Ended.Sync, "session.next.shell.ended"),
+  projectNext(SessionEvent.Step.Started.Sync, "session.next.step.started"),
+  projectNext(SessionEvent.Step.Ended.Sync, "session.next.step.ended"),
+  projectNext(SessionEvent.Step.Failed.Sync, "session.next.step.failed"),
+  projectNext(SessionEvent.Text.Started.Sync, "session.next.text.started"),
+  projectNext(SessionEvent.Text.Ended.Sync, "session.next.text.ended"),
+  projectNext(SessionEvent.Tool.Input.Started.Sync, "session.next.tool.input.started"),
+  projectNext(SessionEvent.Tool.Input.Ended.Sync, "session.next.tool.input.ended"),
+  projectNext(SessionEvent.Tool.Called.Sync, "session.next.tool.called"),
+  projectNext(SessionEvent.Tool.Success.Sync, "session.next.tool.success"),
+  projectNext(SessionEvent.Tool.Failed.Sync, "session.next.tool.failed"),
+  projectNext(SessionEvent.Reasoning.Started.Sync, "session.next.reasoning.started"),
+  projectNext(SessionEvent.Reasoning.Ended.Sync, "session.next.reasoning.ended"),
+  projectNext(SessionEvent.Retried.Sync, "session.next.retried"),
+  projectNext(SessionEvent.Compaction.Started.Sync, "session.next.compaction.started"),
+  projectNext(SessionEvent.Compaction.Ended.Sync, "session.next.compaction.ended"),
 
-  // Lifecycle events are already persisted by their source services
-  // (SessionTable, todo/diff storage, and permission state), so no V2-side
-  // projection is needed. The registrations still let SyncEvent.run publish
-  // the event instead of throwing "Projector not found".
-  SyncEvent.project(SessionEvent.Updated.Sync, () => {}),
-  SyncEvent.project(SessionEvent.Deleted.Sync, () => {}),
-  SyncEvent.project(SessionEvent.StatusUpdated.Sync, () => {}),
-  SyncEvent.project(SessionEvent.TodoUpdated.Sync, () => {}),
-  SyncEvent.project(SessionEvent.DiffUpdated.Sync, () => {}),
-  SyncEvent.project(SessionEvent.Permission.Asked.Sync, () => {}),
-  SyncEvent.project(SessionEvent.Permission.Replied.Sync, () => {}),
+  // Delta events are too granular to project; clients accumulate them from the
+  // event stream. Lifecycle events are already persisted by their source
+  // services (SessionTable, todo/diff storage, permission state). The
+  // registrations still let SyncEvent.run publish the event instead of
+  // throwing "Projector not found".
+  noProjector(SessionEvent.Text.Delta.Sync),
+  noProjector(SessionEvent.Tool.Input.Delta.Sync),
+  noProjector(SessionEvent.Tool.Progress.Sync),
+  noProjector(SessionEvent.Reasoning.Delta.Sync),
+  noProjector(SessionEvent.Compaction.Delta.Sync),
+  noProjector(SessionEvent.Updated.Sync),
+  noProjector(SessionEvent.Deleted.Sync),
+  noProjector(SessionEvent.StatusUpdated.Sync),
+  noProjector(SessionEvent.TodoUpdated.Sync),
+  noProjector(SessionEvent.DiffUpdated.Sync),
+  noProjector(SessionEvent.Permission.Asked.Sync),
+  noProjector(SessionEvent.Permission.Replied.Sync),
 ]
