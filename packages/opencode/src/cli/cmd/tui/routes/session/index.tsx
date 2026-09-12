@@ -36,6 +36,8 @@ import type {
   ReasoningPart,
 } from "@opencode-ai/sdk/v2"
 import { isLegacyAbortError } from "@opencode-ai/sdk/v2/legacy"
+import { contentPartFromV2 } from "./content-part.shared"
+import { firstUserAfterBoundary, lastUserBeforeBoundary, usersFromBoundary } from "./revert-boundary.shared"
 import { useLocal } from "@tui/context/local"
 import { Locale } from "@/util/locale"
 import type { Tool } from "@/tool/tool"
@@ -628,9 +630,7 @@ export function Session() {
         const status = sync.data.session_status?.[route.sessionID]
         if (status?.type !== "idle") await sdk.client.v2.session.abort({ sessionID: route.sessionID }).catch(() => {})
         const revert = session()?.revert?.messageID
-        const message = messages().findLast(
-          (x): x is SessionMessageUser => (!revert || x.id < revert) && x.type === "user",
-        )
+        const message = lastUserBeforeBoundary(messages(), revert)
         if (!message) return
         dialog.clear()
         const success = await runSessionHistoryAction("undo", () =>
@@ -659,7 +659,7 @@ export function Session() {
         dialog.clear()
         const messageID = session()?.revert?.messageID
         if (!messageID) return
-        const message = messages().find((x) => x.type === "user" && x.id > messageID)
+        const message = firstUserAfterBoundary(messages(), messageID)
         if (!message) {
           const success = await runSessionHistoryAction("redo", () =>
             sdk.client.v2.session.unrevert({ sessionID: route.sessionID }, { throwOnError: true }),
@@ -1071,7 +1071,7 @@ export function Session() {
   const revertRevertedMessages = createMemo(() => {
     const messageID = revertMessageID()
     if (!messageID) return []
-    return messages().filter((x) => x.id >= messageID && x.type === "user")
+    return usersFromBoundary(messages(), messageID)
   })
 
   const revert = createMemo(() => {
@@ -1530,79 +1530,6 @@ function AssistantMessage(props: { message: SessionMessageAssistant; sessionID: 
       </Switch>
     </>
   )
-}
-
-// V2 content items → V1-shaped parts so the ~15 tool renderers stay untouched.
-// structured→metadata, text content join→output, item-level time→state time.
-function contentPartFromV2(
-  item: SessionMessageAssistant["content"][number],
-  message: SessionMessageAssistant,
-  index: number,
-): ToolPart | TextPart | ReasoningPart {
-  if (item.type === "text") {
-    return {
-      id: `${message.id}-text-${index}`,
-      sessionID: "",
-      messageID: message.id,
-      type: "text",
-      text: item.text,
-      time: { start: message.time.created },
-    }
-  }
-  if (item.type === "reasoning") {
-    return {
-      id: item.id,
-      sessionID: "",
-      messageID: message.id,
-      type: "reasoning",
-      text: item.text,
-      time: { start: message.time.created },
-    }
-  }
-  const input = typeof item.state.input === "string" ? {} : item.state.input
-  const base = {
-    id: item.id,
-    sessionID: "",
-    messageID: message.id,
-    type: "tool" as const,
-    callID: item.id,
-    tool: item.name,
-  }
-  switch (item.state.status) {
-    case "pending":
-      return { ...base, state: { status: "pending", input, raw: item.state.input } }
-    case "running":
-      return {
-        ...base,
-        state: { status: "running", input, metadata: item.state.structured, time: { start: item.time.created } },
-      }
-    case "completed":
-      return {
-        ...base,
-        state: {
-          status: "completed",
-          input,
-          output: item.state.content
-            .filter((x) => x.type === "text")
-            .map((x) => x.text)
-            .join("\n"),
-          title: "",
-          metadata: item.state.structured,
-          time: { start: item.time.created, end: item.time.completed ?? item.time.created, compacted: item.time.pruned },
-        },
-      }
-    case "error":
-      return {
-        ...base,
-        state: {
-          status: "error",
-          input,
-          error: item.state.error.message,
-          metadata: item.state.structured,
-          time: { start: item.time.created, end: item.time.completed ?? item.time.created },
-        },
-      }
-  }
 }
 
 const CONTENT_MAPPING = {
