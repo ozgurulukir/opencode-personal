@@ -12,7 +12,7 @@ import { Bus } from "../../src/bus"
 import { Config } from "@/config/config"
 import { Provider } from "@/provider/provider"
 import { Session } from "@/session/session"
-import type { SessionID } from "../../src/session/schema"
+import { MessageID, type SessionID } from "../../src/session/schema"
 import { SessionEvent } from "../../src/v2/session-event"
 import { ShareNext } from "@/share/share-next"
 import { SessionShareTable } from "../../src/share/share.sql"
@@ -329,6 +329,78 @@ describe("ShareNext", () => {
               status: "modified",
             },
           ])
+        }).pipe(Effect.provide(wired(client)))
+      },
+      { config: { enterprise: { url: "https://legacy-share.example.com" } } },
+    ),
+  )
+
+  it.live("syncs a partial session update as a complete session to an active share", () =>
+    provideTmpdirInstance(
+      () => {
+        const seen: Array<{ url: string; body: string }> = []
+        const syncReceived = Promise.withResolvers<void>()
+        const client = HttpClient.make((req) => {
+          if (req.url.endsWith("/sync") && req.body._tag === "Uint8Array") {
+            seen.push({ url: req.url, body: new TextDecoder().decode(req.body.body) })
+            syncReceived.resolve()
+          }
+          return Effect.succeed(json(req, { ok: true }))
+        })
+
+        return Effect.gen(function* () {
+          const share = yield* ShareNext.Service
+          const bus = yield* Bus.Service
+          const session = yield* Session.Service
+          const info = yield* session.create({ title: "undo target" })
+          yield* share.init()
+          yield* Effect.sync(() =>
+            Database.use((db) =>
+              db
+                .insert(SessionShareTable)
+                .values({
+                  session_id: info.id,
+                  id: "shr_undo",
+                  url: "https://legacy-share.example.com/share/undo",
+                  secret: "sec_undo",
+                })
+                .run(),
+            ),
+          )
+
+          yield* session.setRevert({
+            sessionID: info.id,
+            revert: { messageID: MessageID.make("msg_undo") },
+            summary: { additions: 0, deletions: 0, files: 0 },
+          })
+          yield* Effect.raceFirst(
+            Effect.promise(() => syncReceived.promise),
+            Effect.forever(
+              bus
+                .publish(SessionEvent.Updated.Sync, {
+                  sessionID: info.id,
+                  timestamp: DateTime.makeUnsafe(Date.now()),
+                  info: { revert: { messageID: "evt_undo" } },
+                })
+                .pipe(Effect.andThen(Effect.sleep(100))),
+            ),
+          ).pipe(Effect.timeout("5 seconds"))
+
+          expect(seen).toHaveLength(1)
+          const body = JSON.parse(seen[0].body) as {
+            secret: string
+            data: Array<{ type: string; data: { id?: string; title?: string; revert?: { messageID: string } } }>
+          }
+          expect(body.secret).toBe("sec_undo")
+          expect(body.data).toHaveLength(1)
+          expect(body.data[0]).toMatchObject({
+            type: "session",
+            data: {
+              id: info.id,
+              title: "undo target",
+              revert: { messageID: "msg_undo" },
+            },
+          })
         }).pipe(Effect.provide(wired(client)))
       },
       { config: { enterprise: { url: "https://legacy-share.example.com" } } },

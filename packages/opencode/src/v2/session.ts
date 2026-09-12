@@ -2,10 +2,10 @@ import { SessionMessageTable, SessionTable } from "@/session/session.sql"
 import { MessageID, PartID, RevertMessageID, SessionID } from "@/session/schema"
 import { ModelID, ProviderID } from "@/provider/schema"
 import { WorkspaceID } from "@/control-plane/schema"
-import { and, asc, desc, eq, gt, gte, isNull, like, lt, or, type SQL } from "@/storage/db"
+import { and, asc, desc, eq, gt, gte, inArray, isNull, like, lt, or, sql, type SQL } from "@/storage/db"
 import * as Database from "@/storage/db"
 import { Cause, Context, DateTime, Effect, Exit, Layer, Option, Schema, Scope, Stream } from "effect"
-import { SessionMessage } from "./session-message"
+import { LEGACY_MESSAGE_ID, SessionMessage } from "./session-message"
 import { legacyMessageID, matchLegacyMessage, stripLegacyMessageID } from "./legacy-message-id.shared"
 import type { Prompt } from "./session-prompt"
 import { EventV2 } from "./event"
@@ -323,21 +323,51 @@ export const layer = Layer.effect(
       })
     }
 
-    function projectedRevert(sessionID: SessionID, revert: Info["revert"]): Info["revert"] {
-      if (!revert?.messageID.startsWith("msg_")) return revert
-      const row = Database.use((db) =>
-        db
-          .select({ id: SessionMessageTable.id, data: SessionMessageTable.data })
-          .from(SessionMessageTable)
-          .where(eq(SessionMessageTable.session_id, sessionID))
-          .all()
-          .find((message) => legacyMessageID(message.data.metadata) === revert.messageID),
+    function fromRows(rows: (typeof SessionTable.$inferSelect)[]): Info[] {
+      const reverted = rows.flatMap((row) =>
+        row.revert?.messageID.startsWith("msg_") ? [{ row, messageID: row.revert.messageID }] : [],
       )
-      if (!row) return revert
-      return { ...revert, messageID: row.id }
+      const projected = new Map<string, string>()
+      for (let offset = 0; offset < reverted.length; offset += 400) {
+        const batch = reverted.slice(offset, offset + 400)
+        const rowBySession = new Map(batch.map(({ row, messageID }) => [row.id, messageID]))
+        const matches = Database.use((db) =>
+          db
+            .select({
+              id: SessionMessageTable.id,
+              sessionID: SessionMessageTable.session_id,
+              legacyID: sql<string>`json_extract(
+                ${SessionMessageTable.data},
+                ${sql.raw(`'$.metadata.${LEGACY_MESSAGE_ID}'`)}
+              )`,
+            })
+            .from(SessionMessageTable)
+            .where(
+              and(
+                inArray(
+                  SessionMessageTable.session_id,
+                  batch.map(({ row }) => row.id),
+                ),
+                inArray(
+                  sql`json_extract(
+                    ${SessionMessageTable.data},
+                    ${sql.raw(`'$.metadata.${LEGACY_MESSAGE_ID}'`)}
+                  )`,
+                  batch.map(({ messageID }) => messageID),
+                ),
+              ),
+            )
+            .all(),
+        )
+        for (const match of matches) {
+          if (rowBySession.get(match.sessionID) === match.legacyID) projected.set(match.sessionID, match.id)
+        }
+      }
+
+      return rows.map((row) => fromRow(row, projected.get(row.id)))
     }
 
-    function fromRow(row: typeof SessionTable.$inferSelect): Info {
+    function fromRow(row: typeof SessionTable.$inferSelect, projectedRevertID?: string): Info {
       const sessionID = SessionID.make(row.id)
       return new Info({
         id: sessionID,
@@ -367,7 +397,8 @@ export const layer = Layer.effect(
               }
             : undefined,
         share: row.share_url ? { url: row.share_url } : undefined,
-        revert: projectedRevert(sessionID, row.revert ?? undefined),
+        revert:
+          row.revert && projectedRevertID ? { ...row.revert, messageID: projectedRevertID } : (row.revert ?? undefined),
         time: {
           created: DateTime.makeUnsafe(row.time_created),
           updated: DateTime.makeUnsafe(row.time_updated),
@@ -399,7 +430,7 @@ export const layer = Layer.effect(
       get: Effect.fn("V2Session.get")(function* (sessionID) {
         const row = Database.use((db) => db.select().from(SessionTable).where(eq(SessionTable.id, sessionID)).get())
         if (!row) return yield* new NotFoundError({ sessionID })
-        return fromRow(row)
+        return fromRows([row])[0]
       }),
       list: Effect.fn("V2Session.list")(function* (input) {
         const direction = input.cursor?.direction ?? "next"
@@ -441,7 +472,7 @@ export const layer = Layer.effect(
           )
 
         const rows = input.limit === undefined ? query.all() : query.limit(input.limit).all()
-        return (direction === "previous" ? rows.toReversed() : rows).map((row) => fromRow(row))
+        return fromRows(direction === "previous" ? rows.toReversed() : rows)
       }),
       messages: Effect.fn("V2Session.messages")(function* (input) {
         const direction = input.cursor?.direction ?? "next"
