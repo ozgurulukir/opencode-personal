@@ -28,6 +28,50 @@ describe("tui sync", () => {
     }
   })
 
+  test("session.created respects the active directory filter", async () => {
+    const previous = Global.Path.state
+    await using tmp = await tmpdir()
+    Global.Path.state = tmp.path
+    await Bun.write(`${tmp.path}/kv.json`, "{}")
+    const events = controllableEventSource()
+    const { app, sync } = await mount(undefined, events.source)
+
+    try {
+      const base = {
+        directory,
+        title: "created",
+        summary: {},
+        version: "x",
+        time: { created: 1, updated: 1 },
+      }
+
+      events.dispatch({
+        payload: {
+          type: "session.created",
+          properties: {
+            info: { ...base, id: "ses_outside", path: "packages/other" },
+          },
+        } as never,
+      })
+      await new Promise((r) => setTimeout(r, 50))
+      expect(sync.session.get("ses_outside")).toBeUndefined()
+
+      events.dispatch({
+        payload: {
+          type: "session.created",
+          properties: {
+            info: { ...base, id: "ses_inside", path: "packages/opencode/subdir" },
+          },
+        } as never,
+      })
+      await new Promise((r) => setTimeout(r, 50))
+      expect(sync.session.get("ses_inside")?.id).toBe("ses_inside")
+    } finally {
+      app.renderer.destroy()
+      Global.Path.state = previous
+    }
+  })
+
   test("session.next.updated with partial info (no id) merges into the existing session entry", async () => {
     const previous = Global.Path.state
     await using tmp = await tmpdir()

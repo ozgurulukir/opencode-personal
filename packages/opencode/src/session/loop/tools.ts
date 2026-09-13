@@ -4,7 +4,7 @@
 // Deps are passed explicitly (deps-object pattern); the `runner`/`ops`/
 // `cachedToolSchema` functions are defined in prompt.ts (they close over the
 // sibling prompt/shell/cancel impls and the schema cache) and threaded in.
-import { Effect } from "effect"
+import { DateTime, Effect } from "effect"
 import { type Tool as AITool, tool, jsonSchema, type ToolExecutionOptions, asSchema } from "ai"
 import * as EffectZod from "@opencode-ai/core/effect-zod"
 import * as Log from "@opencode-ai/core/util/log"
@@ -24,6 +24,8 @@ import { PartID } from "../schema"
 import { type TaskPromptOps } from "@/tool/task"
 import { type EffectBridge } from "@/effect/bridge"
 import { deriveMcpPatterns } from "../prompt/mcp-patterns"
+import { SyncEvent } from "@/sync"
+import { SessionEvent } from "@/v2/session-event"
 
 const log = Log.create({ service: "session.prompt" })
 
@@ -48,6 +50,7 @@ export interface ResolveToolsDeps {
   runner: () => Effect.Effect<EffectBridge.Shape>
   ops: () => Effect.Effect<TaskPromptOps>
   cachedToolSchema: CachedToolSchema
+  sync: SyncEvent.Interface
 }
 
 export const resolveTools = Effect.fn("SessionPrompt.resolveTools")(function* (
@@ -81,18 +84,28 @@ export const resolveTools = Effect.fn("SessionPrompt.resolveTools")(function* (
     agent: input.agent.name,
     messages: input.messages,
     metadata: (val) =>
-      input.processor.updateToolCall(options.toolCallId, (match) => {
-        if (!["running", "pending"].includes(match.state.status)) return match
-        return {
-          ...match,
-          state: {
-            title: val.title,
-            metadata: val.metadata,
-            status: "running",
-            input: args,
-            time: { start: Date.now() },
-          },
-        }
+      Effect.gen(function* () {
+        const part = yield* input.processor.updateToolCall(options.toolCallId, (match) => {
+          if (!["running", "pending"].includes(match.state.status)) return match
+          return {
+            ...match,
+            state: {
+              title: val.title,
+              metadata: val.metadata,
+              status: "running",
+              input: args,
+              time: { start: Date.now() },
+            },
+          }
+        })
+        if (!part || part.state.status !== "running") return
+        yield* deps.sync.run(SessionEvent.Tool.Progress.Sync, {
+          sessionID: part.sessionID,
+          callID: part.callID,
+          structured: part.state.metadata ?? {},
+          content: [],
+          timestamp: DateTime.makeUnsafe(Date.now()),
+        })
       }),
     ask: (req) =>
       deps.permission

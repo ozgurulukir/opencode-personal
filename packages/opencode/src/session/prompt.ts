@@ -255,6 +255,7 @@ export const engineLayer = Layer.effect(
             runner,
             ops,
             cachedToolSchema,
+            sync,
           },
           input.sessionID,
         ),

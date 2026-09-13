@@ -174,6 +174,72 @@ test("tool completion stores completed timestamp", () => {
   })
 })
 
+test("tool progress before called is retained for task navigation metadata", () => {
+  const state: SessionMessageUpdater.MemoryState = { messages: [] }
+  const sessionID = SessionID.make("session")
+  const callID = "task-call"
+
+  SessionMessageUpdater.update(SessionMessageUpdater.memory(state), {
+    id: EventV2.ID.create(),
+    type: "session.next.step.started",
+    data: {
+      sessionID,
+      timestamp: DateTime.makeUnsafe(1),
+      agent: "build",
+      model: {
+        id: Modelv2.ID.make("model"),
+        providerID: Modelv2.ProviderID.make("provider"),
+        variant: Modelv2.VariantID.make("default"),
+      },
+    },
+  } satisfies SessionEvent.Event)
+
+  SessionMessageUpdater.update(SessionMessageUpdater.memory(state), {
+    id: EventV2.ID.create(),
+    type: "session.next.tool.input.started",
+    data: {
+      sessionID,
+      timestamp: DateTime.makeUnsafe(2),
+      callID,
+      name: "task",
+    },
+  } satisfies SessionEvent.Event)
+
+  SessionMessageUpdater.update(SessionMessageUpdater.memory(state), {
+    id: EventV2.ID.create(),
+    type: "session.next.tool.progress",
+    data: {
+      sessionID,
+      timestamp: DateTime.makeUnsafe(3),
+      callID,
+      structured: { sessionId: "child" },
+      content: [],
+    },
+  } satisfies SessionEvent.Event)
+
+  SessionMessageUpdater.update(SessionMessageUpdater.memory(state), {
+    id: EventV2.ID.create(),
+    type: "session.next.tool.called",
+    data: {
+      sessionID,
+      timestamp: DateTime.makeUnsafe(4),
+      callID,
+      tool: "task",
+      input: { description: "inspect" },
+      provider: { executed: false },
+    },
+  } satisfies SessionEvent.Event)
+
+  const assistant = state.messages[0]
+  expect(assistant?.type).toBe("assistant")
+  if (assistant?.type !== "assistant") return
+  const tool = assistant.content[0]
+  expect(tool?.type).toBe("tool")
+  if (tool?.type !== "tool" || tool.state.status !== "running") return
+  expect(tool.state.input).toEqual({ description: "inspect" })
+  expect(tool.state.structured).toEqual({ sessionId: "child" })
+})
+
 test("step failure retains the explicit V2 abort error", () => {
   const state: SessionMessageUpdater.MemoryState = { messages: [] }
   const sessionID = SessionID.make("session")

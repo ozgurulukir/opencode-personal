@@ -324,11 +324,12 @@ export function update<Result>(adapter: Adapter<Result>, event: SessionEvent.Eve
             if (match) {
               match.provider = event.data.provider
               match.time.ran = event.data.timestamp
+              const progress = match.state.status === "running" ? match.state : undefined
               match.state = {
                 status: "running",
                 input: event.data.input,
-                structured: {},
-                content: [],
+                structured: progress?.structured ?? {},
+                content: progress?.content ?? [],
               }
             }
           }),
@@ -340,10 +341,19 @@ export function update<Result>(adapter: Adapter<Result>, event: SessionEvent.Eve
         adapter.updateAssistant(
           produce(currentAssistant, (draft) => {
             const match = latestTool(draft, event.data.callID)
-            if (match && match.state.status === "running") {
-              match.state.structured = event.data.structured
-              match.state.content = [...event.data.content]
+            if (!match) return
+            if (match.state.status === "pending") {
+              match.state = {
+                status: "running",
+                input: {},
+                structured: event.data.structured,
+                content: [...event.data.content],
+              }
+              return
             }
+            if (match.state.status !== "running") return
+            match.state.structured = event.data.structured
+            match.state.content = [...event.data.content]
           }),
         )
       }

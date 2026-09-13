@@ -225,6 +225,41 @@ describe("reduceMessageEvent", () => {
     expect(tool.state.content).toEqual([{ type: "text", text: "half" }])
   })
 
+  it("keeps task metadata when progress arrives before tool.called", () => {
+    const messages: SessionMessage[] = []
+    reduceMessageEvent(messages, ev("evt_1", "session.next.step.started", {
+      sessionID: "ses_1",
+      timestamp: now,
+      agent: "build",
+      model: { id: "m", providerID: "p", variant: "default" },
+    }))
+    reduceMessageEvent(messages, ev("evt_2", "session.next.tool.input.started", {
+      sessionID: "ses_1",
+      timestamp: now + 1,
+      callID: "call_task",
+      name: "task",
+    }))
+    reduceMessageEvent(messages, ev("evt_3", "session.next.tool.progress", {
+      sessionID: "ses_1",
+      timestamp: now + 2,
+      callID: "call_task",
+      structured: { sessionId: "ses_child" },
+      content: [],
+    }))
+    reduceMessageEvent(messages, ev("evt_4", "session.next.tool.called", {
+      sessionID: "ses_1",
+      timestamp: now + 3,
+      callID: "call_task",
+      input: { description: "inspect" },
+      provider: "test",
+    }))
+
+    const tool = toolPart(messages, "call_task")
+    if (tool.state.status !== "running") throw new Error("expected running state")
+    expect(tool.state.input).toStrictEqual({ description: "inspect" })
+    expect(tool.state.structured).toStrictEqual({ sessionId: "ses_child" })
+  })
+
   it("guards: out-of-order and duplicate events are no-ops", () => {
     const messages: SessionMessage[] = []
 
