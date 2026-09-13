@@ -96,3 +96,8 @@ The `Spinner` component (`component/spinner.tsx`) wraps the native `<spinner>` e
 ## Permission/question prompts aggregate over the full descendant session subtree
 
 The session route renders pending prompts from **every** session in the viewed session's subtree (`collectSessionDescendants`, `tui/util/session-tree.ts`), not just the viewed session + its direct children. This is load-bearing: a depth-2+ subagent's `Permission.ask` is keyed under its own `sessionID`, and if aggregation were limited to direct children that ask would never surface → the subagent's shell command hangs (its `Deferred.await` never resolves). The `children` memo (direct children) is kept for subagent tab navigation only — don't reuse it for prompt aggregation.
+
+Live child sessions are synchronized into `sync.data.session` as soon as the
+`session.created` event arrives. Keep those entries filtered by the active
+directory query and sorted by session id; otherwise a subagent can exist on the
+server but remain absent from Ctrl+X/session-tree navigation until a refresh.

@@ -38,3 +38,23 @@ the store by `info.id` (often `undefined` for partial patches) — that fails to
 find the session, mis-inserts a broken entry, and leaves the session stale (e.g.
 the TUI never learns about a `session.revert`, so undo can't clear the screen
 back to the previous state).
+
+## Live session synchronization and tool-event ordering
+
+- `sync.tsx` handles `session.created`, `session.updated`, and `session.deleted`
+  on the live event stream. New sessions must be inserted into the id-sorted
+  `store.session` immediately; waiting for bootstrap/refresh makes subagent
+  sessions unreachable from TUI navigation, including Ctrl+X.
+- A live `session.created` event must use the same `sessionListQuery()` path
+  semantics as `session.list`: an empty/undefined path is project-wide, while a
+  non-empty path accepts only that path or a descendant, with Windows path
+  separators normalized to `/`. Events from another directory must not leak
+  into the active session list.
+- `session.next.tool.progress` can arrive before `session.next.tool.called`.
+  `reduceMessageEvent` must preserve pending tool metadata/content and promote
+  the pending tool to running when progress is the first event; otherwise task
+  navigation loses the child `sessionId` and structured metadata.
+- `session.next.permission.asked` keeps the child request's `sessionID`. The
+  session route aggregates pending permission/question requests across the full
+  descendant subtree, so nested subagent asks reach the parent TUI and replies
+  are sent back to the child session that is waiting.
