@@ -487,7 +487,7 @@ export const layer = Layer.effect(
                   const squashed = Cause.squash(cause)
                   log.warn("parent agent not found, applying fallback deny rules", {
                     parentAgent: parent.agent,
-                    cause: squashed instanceof Error ? squashed.message : String(squashed),
+                    cause: Cause.squash(cause),
                   })
                   return {
                     permission: [
@@ -597,7 +597,7 @@ export const layer = Layer.effect(
                 Effect.gen(function* () {
                   const squashed = Cause.squash(cause)
                   log.error("subagent failed", {
-                    cause: cause,
+                    cause: Cause.squash(cause),
                     parentID: input.parentID,
                     agent: input.agent,
                   })
