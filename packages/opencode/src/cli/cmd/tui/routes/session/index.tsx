@@ -2040,9 +2040,9 @@ function Task(props: ToolProps<typeof TaskTool>) {
   const { navigate } = useRoute()
   const sync = useSync()
 
-  onMount(() => {
-    if (props.metadata.sessionId && !sync.data.messages[props.metadata.sessionId]?.length)
-      void sync.session.sync(props.metadata.sessionId)
+  createEffect(() => {
+    const sessionID = props.metadata.sessionId
+    if (sessionID && !sync.data.messages[sessionID]?.length) void sync.session.sync(sessionID)
   })
 
   const messages = createMemo(() => sync.data.messages[props.metadata.sessionId ?? ""] ?? [])
