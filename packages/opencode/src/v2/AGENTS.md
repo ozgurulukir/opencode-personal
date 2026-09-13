@@ -183,3 +183,12 @@ complexity exceeds the duplication (deletion test fails). Shared pieces DO
 live in the SDK: `eventTime` at `@opencode-ai/sdk/v2/event-time` (single copy;
 previously duplicated in TUI and app). Revisit only if app migrates its render
 pipeline to the V2 message model.
+
+## Tool progress may precede tool-called
+
+The V2 projector and TUI reducer must tolerate providers delivering
+`session.next.tool.progress` before `session.next.tool.called`. A progress event
+for a pending call promotes that call to `running` while retaining its
+`structured`/`content` payload; a later called event must not overwrite that
+metadata. This ordering preserves TaskTool child-session metadata for live
+navigation and permission routing.

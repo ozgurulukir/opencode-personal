@@ -28,6 +28,15 @@ This distinction matters when debugging permission prompts inside subagents: the
 
 `subagentSessionPermission()` and `subagentToolRestrictions()` in `agent/subagent-permissions.ts` are shared between V1 `tool/task.ts` (TaskTool) and V2 `v2/session.ts` (subagent method). Both must use these helpers to maintain parity — any change to subagent permission derivation or tool restriction logic must go through these functions, not be inlined.
 
+## Permission requests from nested subagents
+
+Permission asks are keyed by the session that owns the blocked tool, not by the
+parent session. The TUI deliberately aggregates pending asks across the full
+descendant session subtree and sends the reply back with that child `sessionID`.
+Keep this routing intact when changing subagent creation, permission merging, or
+session-tree navigation; limiting aggregation to the parent or direct children
+leaves deeper subagents waiting indefinitely.
+
 ## Subagent session cleanup — known limitation
 
 Subagent sessions are **not** automatically cleaned up. They persist in the database indefinitely, accumulating over time. This is a known limitation (Option C from the subagent fixes plan). The database is SQLite with bounded size, and subagent sessions are small rows, so this is acceptable for typical usage. If cleanup becomes necessary, it can be addressed later with a simple TTL or parent-session-completion hook. Per the wabi-sabi philosophy, we avoid over-engineering a GC system until there is a demonstrated need.

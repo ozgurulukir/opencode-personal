@@ -147,3 +147,16 @@ When filtering parts with `p is CompactionPart | SubtaskPart`, both types must b
 
 - `session.system > skills output is sorted by name and stable across calls` — fails intermittently (Expected: >489, Received: 188)
 - Permission tests have pre-existing `ScopedCache` state leakage between `withDir` tests — `disposeAllInstances()` invalidates async, so "always" replies leak into subsequent tests. 2 flaky tests remain.
+
+## Subagent tool metadata and out-of-order sync events
+
+- The V1 task path and V2 subagent path update the persisted tool part from the
+  metadata callback and then emit `SessionEvent.Tool.Progress.Sync`. This event
+  carries the child `sessionId`, model, and structured task metadata to live TUI
+  consumers; do not rely on the later provider `tool.called` event.
+- Providers may emit `tool.progress` before `tool.called`. Both the TUI reducer
+  and V2 message updater must preserve pending `structured`/`content` data and
+  promote that pending tool to `running` when progress arrives first. Dropping
+  pending progress makes the subagent appear non-navigable and loses metadata.
+- Thread the shared `sync` service through `SessionPrompt` → `runLoop` → tool
+  resolution/subtask execution so V1 and V2 emit the same lifecycle events.
