@@ -5,7 +5,7 @@
 // explicitly (deps-object pattern); the `ops` function (closing over the
 // sibling prompt/shell/cancel impls) is defined in prompt.ts and threaded in.
 // InstanceState.context resolves from the layer context.
-import { Cause, Effect } from "effect"
+import { Cause, DateTime, Effect } from "effect"
 import { ulid } from "ulid"
 import { NamedError } from "@opencode-ai/core/util/error"
 import * as Log from "@opencode-ai/core/util/log"
@@ -21,6 +21,8 @@ import { Session } from "../session"
 import { MessageV2 } from "../message-v2"
 import { SessionID, MessageID, PartID } from "../schema"
 import { getModel } from "./model"
+import { SyncEvent } from "@/sync"
+import { SessionEvent } from "@/v2/session-event"
 
 const log = Log.create({ service: "session.prompt" })
 
@@ -33,6 +35,7 @@ export interface HandleSubtaskDeps {
   bus: Bus.Interface
   permission: Permission.Interface
   provider: Provider.Interface
+  sync: SyncEvent.Interface
 }
 
 export const handleSubtask = Effect.fn("SessionPrompt.handleSubtask")(function* (
@@ -126,6 +129,14 @@ export const handleSubtask = Effect.fn("SessionPrompt.handleSubtask")(function* 
             type: "tool",
             state: { ...part.state, ...val },
           } satisfies MessageV2.ToolPart)
+          if (part.state.status !== "running") return
+          yield* deps.sync.run(SessionEvent.Tool.Progress.Sync, {
+            sessionID: part.sessionID,
+            callID: part.callID,
+            structured: part.state.metadata ?? {},
+            content: [],
+            timestamp: DateTime.makeUnsafe(Date.now()),
+          })
         }),
       ask: (req: any) =>
         deps.permission

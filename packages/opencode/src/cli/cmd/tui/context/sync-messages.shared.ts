@@ -175,12 +175,32 @@ export function reduceMessageEvent(messages: SessionMessage[], event: MessageSyn
       if (!match) return
       match.time.ran = eventTime(event.properties.timestamp)
       match.provider = event.properties.provider
-      match.state = { status: "running", input: event.properties.input, structured: {}, content: [] }
+      const progress = match.state.status === "running" ? match.state : undefined
+      match.state = {
+        status: "running",
+        input: event.properties.input,
+        structured: progress?.structured ?? {},
+        content: progress?.content ?? [],
+      }
       break
     }
     case "session.next.tool.progress": {
       const match = latestTool(activeAssistant(messages), event.properties.callID)
-      if (match?.state.status !== "running") return
+      if (!match) return
+      if (match.state.status === "pending") {
+        // Tool metadata may arrive from the executor before the provider emits
+        // tool.called (the task tool creates its child session in this window).
+        // Promote the pending part so the progress payload survives the later
+        // called event and the task renderer can navigate to the child.
+        match.state = {
+          status: "running",
+          input: {},
+          structured: event.properties.structured,
+          content: [...event.properties.content],
+        }
+        return
+      }
+      if (match.state.status !== "running") return
       match.state.structured = event.properties.structured
       match.state.content = [...event.properties.content]
       break

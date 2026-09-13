@@ -99,11 +99,64 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
         .then((x) => (x.data?.items ?? []).toSorted((a, b) => a.id.localeCompare(b.id)))
     }
 
+    function sessionMatchesQuery(info: Session) {
+      const query = sessionListQuery()
+      if (!query.path) return true
+      const sessionPath = info.path?.replaceAll("\\\\", "/")
+      return sessionPath === query.path || sessionPath?.startsWith(`${query.path}/`) === true
+    }
+
+    function upsertSession(info: Session) {
+      setStore(
+        "session",
+        produce((draft) => {
+          const match = Binary.search(draft, info.id, (session) => session.id)
+          if (match.found) {
+            draft[match.index] = info
+            return
+          }
+          draft.splice(match.index, 0, info)
+        }),
+      )
+    }
+
+    function patchSession(sessionID: string, info: Partial<Session>) {
+      setStore(
+        "session",
+        produce((draft) => {
+          const match = Binary.search(draft, sessionID, (session) => session.id)
+          if (!match.found) return
+          const current = draft[match.index]
+          Object.assign(current, info, {
+            id: sessionID,
+            ...(info.time ? { time: { ...current.time, ...info.time } } : {}),
+          })
+        }),
+      )
+    }
+
     event.subscribe((event) => {
       switch (event.type) {
         case "server.instance.disposed":
           void bootstrap()
           break
+        case "session.created":
+          if (sessionMatchesQuery(event.properties.info)) upsertSession(event.properties.info)
+          break
+        case "session.updated":
+          patchSession(event.properties.sessionID, event.properties.info)
+          break
+        case "session.deleted": {
+          const sessionID = event.properties.sessionID ?? event.properties.info.id
+          setStore(
+            "session",
+            produce((draft) => {
+              const match = Binary.search(draft, sessionID, (session) => session.id)
+              if (match.found) draft.splice(match.index, 1)
+            }),
+          )
+          break
+        }
         case "session.next.permission.replied": {
           const requests = store.permission[event.properties.sessionID]
           if (!requests) break
@@ -226,19 +279,7 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
             )
             break
           }
-          setStore(
-            "session",
-            produce((draft) => {
-              const match = draft.find((s) => s.id === sessionID)
-              if (match) {
-                Object.assign(match, info, {
-                  id: sessionID,
-                  ...(info.time ? { time: { ...match.time, ...info.time } } : {}),
-                })
-                return
-              }
-            }),
-          )
+          patchSession(sessionID, info)
           break
         }
 

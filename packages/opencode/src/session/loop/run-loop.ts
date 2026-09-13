@@ -28,6 +28,7 @@ import { Truncate } from "@/tool/truncate"
 import { AppFileSystem } from "@opencode-ai/core/filesystem"
 import { EffectBridge } from "@/effect/bridge"
 import { type TaskPromptOps } from "@/tool/task"
+import { SyncEvent } from "@/sync"
 import { NamedError } from "@opencode-ai/core/util/error"
 import { wrapMessageContinuation } from "../message-continuation"
 import { createStructuredOutputTool, STRUCTURED_OUTPUT_SYSTEM_PROMPT } from "../prompt/structured-output"
@@ -68,6 +69,7 @@ export interface RunLoopDeps {
   runner: () => Effect.Effect<EffectBridge.Shape>
   ops: () => Effect.Effect<TaskPromptOps>
   cachedToolSchema: CachedToolSchema
+  sync: SyncEvent.Interface
 }
 
 // ⚡ Bolt Optimization: Replace chained .filter().map().join(" ") with a single loop to reduce GC pressure and O(N) traversals
@@ -163,6 +165,7 @@ export const runLoop: (deps: RunLoopDeps, sessionID: SessionID) => Effect.Effect
           bus: deps.bus,
           permission: deps.permission,
           provider: deps.provider,
+          sync: deps.sync,
         },
         { task, model, lastUser, sessionID, session, msgs },
       )
@@ -254,6 +257,7 @@ export const runLoop: (deps: RunLoopDeps, sessionID: SessionID) => Effect.Effect
           runner: deps.runner,
           ops: deps.ops,
           cachedToolSchema: deps.cachedToolSchema,
+          sync: deps.sync,
         },
         {
           agent,
