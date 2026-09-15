@@ -686,7 +686,7 @@ describe("MessageV2.filterCompacted", () => {
           messageID: u1,
           sessionID: session.id,
           type: "compaction",
-          reserved_tokens: 0,
+          auto: false,
         })
 
         const u2 = await addUser(session.id, "post-boundary message")
