@@ -190,6 +190,22 @@ describe("Agent.processMessage", () => {
     expect((content as any).resource.mimeType).toBe("text/plain")
   })
 
+  test("decodes URL-encoded data resources", async () => {
+    const { connection, sessionUpdates, shellSnapshots, toolStarts } = createTestAgent()
+    await processMessage(
+      connection,
+      shellSnapshots,
+      toolStarts,
+      SESSION_ID,
+      userMessage({
+        text: "",
+        files: [fileAttachment({ uri: "data:text/plain,Hello%20ACP", mime: "text/plain" })],
+      }),
+    )
+    expect(sessionUpdates).toHaveLength(1)
+    expect((sessionUpdates[0].update.content as any).resource.text).toBe("Hello ACP")
+  })
+
   test("sends resource with blob for binary data attachments", async () => {
     const { connection, sessionUpdates, shellSnapshots, toolStarts } = createTestAgent()
     await processMessage(

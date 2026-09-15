@@ -140,16 +140,22 @@ export class Agent implements ACPAgent {
   private async runEventSubscription() {
     while (true) {
       if (this.eventAbort.signal.aborted) return
-      const events = await this.sdk.global.event({
-        signal: this.eventAbort.signal,
-      })
-      for await (const event of events.stream) {
-        if (this.eventAbort.signal.aborted) return
-        const payload = event?.payload
-        if (!payload) continue
-        await this.handleEvent(payload as Event).catch((error) => {
-          log.error("failed to handle event", { error, type: payload.type })
+      try {
+        const events = await this.sdk.global.event({
+          signal: this.eventAbort.signal,
         })
+        for await (const event of events.stream) {
+          if (this.eventAbort.signal.aborted) return
+          const payload = event?.payload
+          if (!payload) continue
+          await this.handleEvent(payload as Event).catch((error) => {
+            log.error("failed to handle event", { error, type: payload.type })
+          })
+        }
+      } catch (error) {
+        if (this.eventAbort.signal.aborted) return
+        log.error("event subscription failed; retrying", { error })
+        await new Promise((resolve) => setTimeout(resolve, 250))
       }
     }
   }
@@ -307,10 +313,16 @@ export class Agent implements ACPAgent {
           const newContent = getNewContent(content, diff)
 
           if (newContent) {
-            void this.connection.writeTextFile({
+            await this.connection.writeTextFile({
               sessionId: session.id,
               path: filepath,
               content: newContent,
+            }).catch((error) => {
+              log.error("failed to apply permission diff through ACP", {
+                error,
+                sessionID: session.id,
+                filepath,
+              })
             })
           }
         }
@@ -563,8 +575,10 @@ export class Agent implements ACPAgent {
   }
 
   async closeSession(params: CloseSessionRequest): Promise<CloseSessionResponse> {
-    const session = this.sessionManager.remove(params.sessionId)
+    const session = await this.sessionManager.tryGetOrLoad(params.sessionId)
     if (!session) return {}
+
+    this.sessionManager.remove(params.sessionId)
 
     await this.sdk.v2.session
       .abort(
@@ -840,7 +854,7 @@ export class Agent implements ACPAgent {
               filename,
               mime: part.mimeType,
             })
-          } else if (part.uri && part.uri.startsWith("http:")) {
+          } else if (part.uri && /^https?:\/\//i.test(part.uri)) {
             parts.push({
               type: "file",
               url: part.uri,
@@ -886,8 +900,6 @@ export class Agent implements ACPAgent {
           break
       }
     }
-
-    log.info("parts", { parts })
 
     const cmd = (() => {
       const text = parts
