@@ -484,7 +484,6 @@ export const layer = Layer.effect(
               ),
               Effect.catchCause((cause) =>
                 Effect.sync(() => {
-                  const squashed = Cause.squash(cause)
                   log.warn("parent agent not found, applying fallback deny rules", {
                     parentAgent: parent.agent,
                     cause: Cause.squash(cause),
