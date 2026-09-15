@@ -108,9 +108,21 @@ async function replayUser(connection: AgentSideConnection, sessionId: string, me
           log.error("failed to send resource_link to ACP", { error: err })
         })
     } else if (url.startsWith("data:")) {
-      const base64Match = url.match(/^data:([^;]+);base64,(.*)$/)
-      const dataMime = base64Match?.[1]
-      const base64Data = base64Match?.[2] ?? ""
+      const dataMatch = url.match(/^data:([^,]*),(.*)$/s)
+      const metadata = dataMatch?.[1] ?? ""
+      const payload = dataMatch?.[2] ?? ""
+      const dataMime = metadata.split(";")[0] || undefined
+      const isBase64 = metadata.split(";").includes("base64")
+      const decoded = isBase64
+        ? payload
+        : (() => {
+            try {
+              return decodeURIComponent(payload)
+            } catch {
+              return payload
+            }
+          })()
+      const base64Data = isBase64 ? payload : Buffer.from(decoded, "utf-8").toString("base64")
       const effectiveMime = dataMime || mime
 
       if (effectiveMime.startsWith("image/")) {
