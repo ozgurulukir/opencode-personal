@@ -26,6 +26,10 @@
 
 The fix in `ask()` splits evaluation: (1) deny from `ruleset` wins immediately (security invariant), (2) "allow" from `approved` overrides "ask" from `ruleset`, (3) config "allow" is still respected, (4) default to "ask". Do NOT change `evaluate()` itself — it is correct for single-ruleset use. The split must happen at the call site.
 
+## Shell ask patterns and always globs are token-aligned
+
+The shell tool derives `patterns` (what `ask()` evaluates on future calls) from `tool/shell/helpers.ts source()` and the `always` globs (what `reply("always")` persists) from `BashArity.prefix(parts()` tokens`) + " *"`. These MUST start at the same first token — if `source()` keeps a prefix that `parts()` drops (PowerShell `&`/`.` invocation operators, bash `VAR=...` assignments, line continuations), the stored glob can never `Wildcard.match` a future ask pattern and "allow always" re-prompts forever. Changes to `PART_TYPES`, `parts()`, or `BashArity.prefix` must keep `source()` in lockstep; the `always patterns match an ask pattern` tests in `test/tool/shell.test.ts` lock this invariant.
+
 ## Test isolation — `ScopedCache` state leaks between permission tests
 
 `Permission.layer` uses `InstanceState.make` backed by `ScopedCache`. `disposeAllInstances()` invalidates entries asynchronously (`Effect.runPromise`), so a test that replies `"always"` can leak its `approved` ruleset into subsequent tests that use the same temp directory. This is pre-existing and masked by the old evaluation order (config `ruleset` would override leaked `approved` anyway). When fixing permission logic, verify with `bun test test/permission/ -t "always"` to confirm new tests don't break unrelated ones.
