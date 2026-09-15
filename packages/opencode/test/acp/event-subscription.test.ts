@@ -66,6 +66,7 @@ function progressEvent(
   cwd: string,
   callID: string,
   structured: Record<string, unknown> = {},
+  content: Array<{ type: "text"; text: string }> = [],
 ): GlobalEventEnvelope {
   const payload: Event = {
     id: `evt_${callID}`,
@@ -75,7 +76,7 @@ function progressEvent(
       sessionID: sessionId,
       callID,
       structured,
-      content: [],
+      content,
     },
   } as Event
   return { directory: cwd, payload }
@@ -633,6 +634,47 @@ describe("acp.agent event subscription", () => {
         expect(pendings.every((p) => p.update.sessionUpdate === "tool_call" && p.update.status === "pending")).toBe(
           true,
         )
+        stop()
+      },
+    })
+  })
+
+  test("forwards tool progress content and shell final output", async () => {
+    await using tmp = await tmpdir()
+    await WithInstance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        const { agent, controller, sessionUpdates, stop } = createFakeAgent()
+        const cwd = "/tmp/opencode-acp-test"
+        const sessionId = await agent.newSession({ cwd, mcpServers: [] } as any).then((x) => x.sessionId)
+
+        controller.push(calledEvent(sessionId, cwd, "call_bash_content", "bash", { command: "echo hi" }))
+        controller.push(
+          progressEvent(sessionId, cwd, "call_bash_content", {}, [{ type: "text", text: "hi\n" }]),
+        )
+        controller.push(
+          successEvent(sessionId, cwd, "call_bash_content", "", { output: "hi\n" }),
+        )
+        await new Promise((r) => setTimeout(r, 20))
+
+        const progress = sessionUpdates.find(
+          (u) =>
+            u.sessionId === sessionId &&
+            u.update.sessionUpdate === "tool_call_update" &&
+            u.update.status === "in_progress",
+        )
+        const progressContent = progress?.update.sessionUpdate === "tool_call_update" ? progress.update.content : undefined
+        expect(progressContent).toContainEqual({
+          type: "content",
+          content: { type: "text", text: "hi\n" },
+        })
+
+        const completed = completedToolUpdate(sessionUpdates, sessionId, "call_bash_content")
+        expect(completed?.content).toContainEqual({
+          type: "content",
+          content: { type: "text", text: "hi\n" },
+        })
+        expect(completed?.rawOutput).toEqual({ output: "hi\n", metadata: { output: "hi\n" } })
         stop()
       },
     })

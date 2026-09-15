@@ -138,10 +138,13 @@ export class Agent implements ACPAgent {
   }
 
   private async runEventSubscription() {
+    const subscribe = this.sdk.global?.event
+    if (typeof subscribe !== "function") return
+
     while (true) {
       if (this.eventAbort.signal.aborted) return
       try {
-        const events = await this.sdk.global.event({
+        const events = await subscribe({
           signal: this.eventAbort.signal,
         })
         for await (const event of events.stream) {
@@ -152,6 +155,7 @@ export class Agent implements ACPAgent {
             log.error("failed to handle event", { error, type: payload.type })
           })
         }
+        return
       } catch (error) {
         if (this.eventAbort.signal.aborted) return
         log.error("event subscription failed; retrying", { error })
@@ -223,7 +227,12 @@ export class Agent implements ACPAgent {
       }
 
       case "session.next.tool.progress": {
-        const props = event.properties as { sessionID: string; callID: string; structured: Record<string, unknown> }
+        const props = event.properties as {
+          sessionID: string
+          callID: string
+          structured: Record<string, unknown>
+          content: Array<{ type: "text"; text: string } | { type: "file"; uri: string; mime: string; name?: string }>
+        }
         const session = await this.sessionManager.tryGetOrLoad(props.sessionID)
         if (!session) return
         await handleToolProgress(this.connection, this.shellSnapshots, this.toolCalls, session.id, props)
