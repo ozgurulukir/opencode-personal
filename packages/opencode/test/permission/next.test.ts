@@ -843,6 +843,40 @@ it.live("reply - always persists approval and resolves", () =>
   ),
 )
 
+it.live("reply - always approval auto-matches invoked-command token patterns", () =>
+  withDir({ git: true }, () =>
+    Effect.gen(function* () {
+      // The shape tool/shell/execute.ts produces for `& "$bin" ...` commands:
+      // ask pattern and always rule both start at the quoted command token.
+      const token = `"${process.execPath.replaceAll("\\", "/")}"`
+      const fiber = yield* ask({
+        id: PermissionID.make("per_callop"),
+        sessionID: SessionID.make("session_callop"),
+        permission: "bash",
+        patterns: [`${token} -e "console.log(1)"`],
+        metadata: {},
+        always: [`${token} *`],
+        ruleset: [],
+      }).pipe(Effect.forkScoped)
+
+      yield* waitForPending(1)
+      yield* reply({ requestID: PermissionID.make("per_callop"), reply: "always" })
+      yield* Fiber.join(fiber)
+
+      const result = yield* ask({
+        sessionID: SessionID.make("session_callop2"),
+        permission: "bash",
+        patterns: [`${token} -e "console.log(2)"`],
+        metadata: {},
+        always: [],
+        ruleset: [],
+      })
+      expect(result).toBeUndefined()
+      expect((yield* list()).length).toBe(0)
+    }),
+  ),
+)
+
 it.live("reply - always approval overrides config ask rule on subsequent calls", () =>
   withDir({ git: true }, () =>
     Effect.gen(function* () {

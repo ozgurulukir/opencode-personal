@@ -16,6 +16,7 @@ import { SessionID, MessageID } from "../../src/session/schema"
 import { CrossSpawnSpawner } from "@opencode-ai/core/cross-spawn-spawner"
 import { AppFileSystem } from "@opencode-ai/core/filesystem"
 import { Plugin } from "../../src/plugin"
+import { Wildcard } from "@/util/wildcard"
 
 const runtime = ManagedRuntime.make(
   Layer.mergeAll(
@@ -71,6 +72,7 @@ const shells = (() => {
 })()
 const PS = new Set(["pwsh", "powershell"])
 const ps = shells.filter((item) => PS.has(item.label))
+const nonPs = shells.filter((item) => !PS.has(item.label))
 const cmdShell = shells.find((item) => item.label === "cmd")
 
 const sh = () => Shell.name(Shell.acceptable())
@@ -1062,6 +1064,224 @@ describe("tool.shell permissions", () => {
       },
     })
   })
+
+  for (const item of ps) {
+    test(
+      `strips the call operator from permission patterns [${item.label}]`,
+      withShell(item, async () => {
+        await using tmp = await tmpdir()
+        await WithInstance.provide({
+          directory: tmp.path,
+          fn: async () => {
+            const bash = await initShell()
+            const err = new Error("stop after permission")
+            const requests: Array<Omit<Permission.Request, "id" | "sessionID" | "tool">> = []
+            await expect(
+              Effect.runPromise(
+                bash.execute(
+                  { command: `& ${bin} -e "console.log(1)"`, description: "Run binary via call operator" },
+                  capture(requests, err),
+                ),
+              ),
+            ).rejects.toThrow(err.message)
+            const bashReq = requests.find((r) => r.permission === "bash")
+            expect(bashReq).toBeDefined()
+            expect(bashReq!.patterns).toContain(`${bin} -e "console.log(1)"`)
+            expect(bashReq!.always).toContain(`${bin} *`)
+          },
+        })
+      }),
+    )
+  }
+
+  for (const item of ps) {
+    test(
+      `strips the dot-source operator from permission patterns [${item.label}]`,
+      withShell(item, async () => {
+        await using tmp = await tmpdir()
+        await WithInstance.provide({
+          directory: tmp.path,
+          fn: async () => {
+            const bash = await initShell()
+            const err = new Error("stop after permission")
+            const requests: Array<Omit<Permission.Request, "id" | "sessionID" | "tool">> = []
+            await expect(
+              Effect.runPromise(
+                bash.execute(
+                  { command: `. ${bin} -e "console.log(1)"`, description: "Run binary via dot-source operator" },
+                  capture(requests, err),
+                ),
+              ),
+            ).rejects.toThrow(err.message)
+            const bashReq = requests.find((r) => r.permission === "bash")
+            expect(bashReq).toBeDefined()
+            expect(bashReq!.patterns).toContain(`${bin} -e "console.log(1)"`)
+            expect(bashReq!.always).toContain(`${bin} *`)
+          },
+        })
+      }),
+    )
+  }
+
+  for (const item of nonPs) {
+    test(
+      `strips variable assignments from permission patterns [${item.label}]`,
+      withShell(item, async () => {
+        await using tmp = await tmpdir()
+        await WithInstance.provide({
+          directory: tmp.path,
+          fn: async () => {
+            const bash = await initShell()
+            const err = new Error("stop after permission")
+            const requests: Array<Omit<Permission.Request, "id" | "sessionID" | "tool">> = []
+            await expect(
+              Effect.runPromise(
+                bash.execute(
+                  { command: "FOO=1 echo hi", description: "Echo with env prefix" },
+                  capture(requests, err),
+                ),
+              ),
+            ).rejects.toThrow(err.message)
+            const bashReq = requests.find((r) => r.permission === "bash")
+            expect(bashReq).toBeDefined()
+            expect(bashReq!.patterns).toContain("echo hi")
+            expect(bashReq!.patterns.some((pattern) => pattern.startsWith("FOO="))).toBe(false)
+            expect(bashReq!.always).toContain("echo *")
+          },
+        })
+      }),
+    )
+  }
+
+  for (const item of nonPs) {
+    test(
+      `strips variable assignments before redirect in permission patterns [${item.label}]`,
+      withShell(item, async () => {
+        await using tmp = await tmpdir()
+        await WithInstance.provide({
+          directory: tmp.path,
+          fn: async () => {
+            const bash = await initShell()
+            const err = new Error("stop after permission")
+            const requests: Array<Omit<Permission.Request, "id" | "sessionID" | "tool">> = []
+            await expect(
+              Effect.runPromise(
+                bash.execute(
+                  { command: "A=1 B=2 bun --version > out.txt", description: "Version with env prefix and redirect" },
+                  capture(requests, err),
+                ),
+              ),
+            ).rejects.toThrow(err.message)
+            const bashReq = requests.find((r) => r.permission === "bash")
+            expect(bashReq).toBeDefined()
+            expect(bashReq!.patterns).toContain("bun --version > out.txt")
+            expect(bashReq!.always).toContain("bun --version *")
+          },
+        })
+      }),
+    )
+  }
+
+  for (const item of nonPs) {
+    test(
+      `strips variable assignments split by line continuations [${item.label}]`,
+      withShell(item, async () => {
+        await using tmp = await tmpdir()
+        await WithInstance.provide({
+          directory: tmp.path,
+          fn: async () => {
+            const bash = await initShell()
+            const err = new Error("stop after permission")
+            const requests: Array<Omit<Permission.Request, "id" | "sessionID" | "tool">> = []
+            await expect(
+              Effect.runPromise(
+                bash.execute(
+                  { command: "A=1 \\\nB=2 echo hi", description: "Echo with continued env prefix" },
+                  capture(requests, err),
+                ),
+              ),
+            ).rejects.toThrow(err.message)
+            const bashReq = requests.find((r) => r.permission === "bash")
+            expect(bashReq).toBeDefined()
+            expect(bashReq!.patterns).toContain("echo hi")
+            expect(bashReq!.always).toContain("echo *")
+          },
+        })
+      }),
+    )
+  }
+
+  for (const item of nonPs) {
+    test(
+      `does not ask for bash permission when command is a bare assignment [${item.label}]`,
+      withShell(item, async () => {
+        await using tmp = await tmpdir()
+        await WithInstance.provide({
+          directory: tmp.path,
+          fn: async () => {
+            const bash = await initShell()
+            const requests: Array<Omit<Permission.Request, "id" | "sessionID" | "tool">> = []
+            await Effect.runPromise(bash.execute({ command: "FOO=1", description: "Bare assignment" }, capture(requests)))
+            const bashReq = requests.find((r) => r.permission === "bash")
+            expect(bashReq).toBeUndefined()
+          },
+        })
+      }),
+    )
+  }
+
+  each("always patterns match an ask pattern for plain commands", async () => {
+    await using tmp = await tmpdir()
+    await WithInstance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        const bash = await initShell()
+        const requests: Array<Omit<Permission.Request, "id" | "sessionID" | "tool">> = []
+        await Effect.runPromise(bash.execute({ command: "echo hello", description: "Echo hello" }, capture(requests)))
+        const bashReq = requests.find((r) => r.permission === "bash")
+        expect(bashReq).toBeDefined()
+        for (const always of bashReq!.always) {
+          expect(
+            bashReq!.patterns.some((pattern) => Wildcard.match(pattern, always)),
+            `always "${always}" matches no pattern in [${bashReq!.patterns.join(", ")}]`,
+          ).toBe(true)
+        }
+      },
+    })
+  })
+
+  for (const item of ps) {
+    test(
+      `always patterns match an ask pattern for call-operator commands [${item.label}]`,
+      withShell(item, async () => {
+        await using tmp = await tmpdir()
+        await WithInstance.provide({
+          directory: tmp.path,
+          fn: async () => {
+            const bash = await initShell()
+            const err = new Error("stop after permission")
+            const requests: Array<Omit<Permission.Request, "id" | "sessionID" | "tool">> = []
+            await expect(
+              Effect.runPromise(
+                bash.execute(
+                  { command: `& ${bin} -e "console.log(1)" 2>&1`, description: "Run binary via call operator" },
+                  capture(requests, err),
+                ),
+              ),
+            ).rejects.toThrow(err.message)
+            const bashReq = requests.find((r) => r.permission === "bash")
+            expect(bashReq).toBeDefined()
+            for (const always of bashReq!.always) {
+              expect(
+                bashReq!.patterns.some((pattern) => Wildcard.match(pattern, always)),
+                `always "${always}" matches no pattern in [${bashReq!.patterns.join(", ")}]`,
+              ).toBe(true)
+            }
+          },
+        })
+      }),
+    )
+  }
 })
 
 describe("tool.shell abort", () => {

@@ -60,6 +60,8 @@ export function resolveWasm(asset: string) {
   return fileURLToPath(url)
 }
 
+const PART_TYPES = new Set(["command_name", "command_name_expr", "word", "string", "raw_string", "concatenation"])
+
 export function parts(node: Node) {
   const out: Part[] = []
   for (let i = 0; i < node.childCount; i++) {
@@ -73,23 +75,34 @@ export function parts(node: Node) {
       }
       continue
     }
-    if (
-      child.type !== "command_name" &&
-      child.type !== "command_name_expr" &&
-      child.type !== "word" &&
-      child.type !== "string" &&
-      child.type !== "raw_string" &&
-      child.type !== "concatenation"
-    ) {
-      continue
-    }
+    if (!PART_TYPES.has(child.type)) continue
     out.push({ type: child.type, text: child.text })
   }
   return out
 }
 
+const GAP = /^(\s|\\\r?\n)+/
+
+/**
+ * Command text for permission patterns, starting at the first child parts() accepts.
+ * Leading children parts() drops (PowerShell `&`/`.` invocation operators, bash
+ * `VAR=...` assignments) are skipped so patterns align with the BashArity always-rules
+ * built from the same tokens — otherwise "allow always" never matches future asks.
+ * Strips by string prefix rather than child.startIndex slicing on purpose:
+ * tree-sitter indexes are byte offsets while node.text is a JS UTF-16 string,
+ * and the startsWith guard degrades to the raw text on exotic parses.
+ */
 export function source(node: Node) {
-  return (node.parent?.type === "redirected_statement" ? node.parent.text : node.text).trim()
+  let text = (node.parent?.type === "redirected_statement" ? node.parent.text : node.text).trim()
+  for (let i = 0; i < node.childCount; i++) {
+    const child = node.child(i)
+    if (!child) continue
+    text = text.replace(GAP, "")
+    if (child.type === "command_elements" || PART_TYPES.has(child.type)) return text
+    if (!text.startsWith(child.text)) return text
+    text = text.slice(child.text.length)
+  }
+  return text
 }
 
 export function commands(node: Node) {
