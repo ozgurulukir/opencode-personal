@@ -660,6 +660,49 @@ describe("MessageV2.get", () => {
 })
 
 describe("MessageV2.filterCompacted", () => {
+
+  test("retains history after summary if tail_start_id is undefined", async () => {
+    await WithInstance.provide({
+      directory: root,
+      fn: async () => {
+        const session = await svc.create({})
+
+        // A message BEFORE the compaction (should be dropped)
+        const u0 = await addUser(session.id, "pre-boundary message")
+
+        const u1 = await addUser(session.id, "boundary message")
+        const a1 = await addAssistant(session.id, u1, { summary: true, finish: "end_turn" })
+        await svc.updatePart({
+          id: PartID.ascending(),
+          sessionID: session.id,
+          messageID: a1,
+          type: "text",
+          text: "summary",
+        })
+
+        // Insert compaction part with NO tail_start_id
+        await svc.updatePart({
+          id: PartID.ascending(),
+          messageID: u1,
+          sessionID: session.id,
+          type: "compaction",
+          reserved_tokens: 0,
+        })
+
+        const u2 = await addUser(session.id, "post-boundary message")
+        const a2 = await addAssistant(session.id, u2)
+
+        const result = MessageV2.filterCompacted(MessageV2.stream(session.id))
+
+        // We expect [u1 (compaction-user), a1 (summary), u2, a2]
+        // u0 should be dropped.
+        expect(result.map((m) => m.info.id)).toEqual([u1, a1, u2, a2])
+
+        await svc.remove(session.id)
+      },
+    })
+  })
+
   test("returns all messages when no compaction", async () => {
     await WithInstance.provide({
       directory: root,
