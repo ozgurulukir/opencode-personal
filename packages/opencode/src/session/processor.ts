@@ -260,6 +260,12 @@ export const layer: Layer.Layer<
               field: "text",
               delta: value.text,
             })
+            yield* sync.run(SessionEvent.Reasoning.Delta.Sync, {
+              sessionID: ctx.sessionID,
+              reasoningID: value.id,
+              delta: value.text,
+              timestamp: DateTime.makeUnsafe(Date.now()),
+            })
             return
 
           case "reasoning-end":
@@ -588,6 +594,12 @@ export const layer: Layer.Layer<
                 sessionID: ctx.sessionID,
                 timestamp: DateTime.makeUnsafe(Date.now()),
                 text: value.text,
+              })
+            } else {
+              yield* sync.run(SessionEvent.Text.Delta.Sync, {
+                sessionID: ctx.sessionID,
+                delta: value.text,
+                timestamp: DateTime.makeUnsafe(Date.now()),
               })
             }
             return
