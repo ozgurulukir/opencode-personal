@@ -2651,6 +2651,37 @@ test("rewriteMaxOutputTokens > rewrites max_output_tokens to max_completion_toke
   }
 })
 
+test("rewriteMaxOutputTokens > rewrites max_output_tokens to max_completion_tokens in Uint8Array body", async () => {
+  const originalFetch = globalThis.fetch
+  try {
+    globalThis.fetch = mock((url: RequestInfo | URL, init?: RequestInit) => {
+      return Promise.resolve(new Response("ok"))
+    }) as any
+
+    const init = {
+      body: new TextEncoder().encode(JSON.stringify({
+        model: "o1-preview",
+        max_output_tokens: 32000,
+        temperature: 0.7
+      }))
+    }
+
+    await rewriteMaxOutputTokens("https://api.openai.com/v1/responses", init)
+
+    expect(globalThis.fetch).toHaveBeenCalled()
+    const callArgs = (globalThis.fetch as any).mock.calls[0]
+    expect(callArgs[1].body).toBeInstanceOf(Uint8Array)
+    const body = JSON.parse(new TextDecoder().decode(callArgs[1].body))
+
+    expect(body.max_output_tokens).toBeUndefined()
+    expect(body.max_completion_tokens).toBe(32000)
+    expect(body.model).toBe("o1-preview")
+    expect(body.temperature).toBe(0.7)
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
 test("rewriteMaxOutputTokens > is a no-op if max_output_tokens is not present", async () => {
   const originalFetch = globalThis.fetch
   try {
