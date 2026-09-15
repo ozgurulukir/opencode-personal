@@ -1520,7 +1520,8 @@ const layer: Layer.Layer<
           ) {
             let body: Record<string, unknown>
             try {
-              body = JSON.parse(opts.body as string)
+              const bodyStr = opts.body instanceof Uint8Array ? new TextDecoder().decode(opts.body) : (opts.body as string)
+              body = JSON.parse(bodyStr)
             } catch {
               // Malformed JSON — pass through unmodified
               return fetchFn(input, { ...opts, timeout: false })
@@ -1532,7 +1533,7 @@ const layer: Layer.Layer<
                   delete item.id
                 }
               }
-              opts.body = JSON.stringify(body)
+              opts.body = opts.body instanceof Uint8Array ? new TextEncoder().encode(JSON.stringify(body)) : JSON.stringify(body)
             }
           }
 
