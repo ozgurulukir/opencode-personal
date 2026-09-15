@@ -1522,6 +1522,7 @@ const layer: Layer.Layer<
             try {
               const bodyStr = opts.body instanceof Uint8Array ? new TextDecoder().decode(opts.body) : (opts.body as string)
               body = JSON.parse(bodyStr)
+              if (!body || typeof body !== "object") throw new Error("Body is not an object")
             } catch {
               // Malformed JSON — pass through unmodified
               return fetchFn(input, { ...opts, timeout: false })
