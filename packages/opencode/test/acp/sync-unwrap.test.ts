@@ -13,9 +13,18 @@ function createTestAgent() {
     },
   } as unknown as AgentSideConnection
   const agent = new ACP.Agent(connection, {
+    // V2 SDK surface: session auto-recovery goes through sdk.v2.session.get.
+    // Unknown session IDs must fail server-side so auto-recovery drops the event.
     sdk: {
-      session: {
-        message: async () => ({ data: undefined }),
+      v2: {
+        session: {
+          get: async (params: any) => {
+            if (params?.sessionID !== "ses_1") throw new Error("Session not found on server")
+            return {
+              data: { id: "ses_1", directory: "/tmp", title: "test", time: { created: Date.now(), updated: Date.now() } },
+            }
+          },
+        },
       },
     } as any,
   })
@@ -29,12 +38,13 @@ function createTestAgent() {
   return { agent, sessionUpdates }
 }
 
-// Helper: wrap an event in a sync envelope (mimics what GlobalBus does)
+// Helper: wrap an event in a sync envelope (mimics the GlobalBus sync path).
+// The syncEvent type carries a slash-form version suffix from versionedType().
 function syncEnvelope(eventType: string, data: Record<string, unknown>, version = 1) {
   return {
     type: "sync",
     syncEvent: {
-      type: `${eventType}.${version}`,
+      type: `${eventType}/${version}`,
       id: "evt_test",
       seq: 1,
       aggregateID: (data.sessionID as string) ?? "ses_1",
@@ -43,54 +53,87 @@ function syncEnvelope(eventType: string, data: Record<string, unknown>, version 
   }
 }
 
-// Helper: a tool part in various states
-function toolPart(state: string, overrides: Record<string, unknown> = {}): any {
+// Raw Bus path: SyncEvents are also published unwrapped via ProjectBus.publish
+function rawEvent(eventType: string, properties: Record<string, unknown>) {
+  return { type: eventType, properties }
+}
+
+// V2 tool props exactly as emitted by session/processor.ts via SessionEvent.*.Sync
+function v2CalledProps(overrides: Record<string, unknown> = {}) {
   return {
-    id: "part_1",
     sessionID: "ses_1",
-    messageID: "msg_1",
-    type: "tool",
     callID: "call_1",
     tool: "read",
-    state: {
-      status: state,
-      input: { filePath: "/tmp/test.txt" },
-      ...(state === "completed" ? { output: "file content", title: "read", metadata: {} } : {}),
-      ...(state === "error" ? { error: "boom", metadata: {} } : {}),
-      ...(typeof overrides.state === "object" && overrides.state !== null ? overrides.state : {}),
-    },
+    input: { filePath: "/tmp/test.txt" },
+    provider: { executed: false },
+    ...overrides,
+  }
+}
+
+function v2SuccessProps(overrides: Record<string, unknown> = {}) {
+  return {
+    sessionID: "ses_1",
+    callID: "call_1",
+    structured: {},
+    content: [{ type: "text", text: "file content" }],
+    provider: { executed: false },
     ...overrides,
   }
 }
 
 describe("ACP sync envelope unwrapping", () => {
-  test("unwraps sync envelope for message.part.updated with completed tool", async () => {
+  test("handles session.next.tool.called via sync envelope", async () => {
     const { agent, sessionUpdates } = createTestAgent()
-    const event = syncEnvelope("message.part.updated", {
-      sessionID: "ses_1",
-      time: Date.now(),
-      part: toolPart("completed"),
-    })
+    const event = syncEnvelope("session.next.tool.called", v2CalledProps())
     await (agent as any).handleEvent(event)
-    expect(sessionUpdates.length).toBeGreaterThanOrEqual(2)
+    expect(sessionUpdates.length).toBe(1)
     const toolCall = sessionUpdates.find((u: any) => u.update.sessionUpdate === "tool_call")
     expect(toolCall).toBeDefined()
     expect(toolCall.update.status).toBe("pending")
+    expect(toolCall.update.toolCallId).toBe("call_1")
+  })
+
+  test("handles session.next.tool.success via sync envelope", async () => {
+    const { agent, sessionUpdates } = createTestAgent()
+    // success for an untracked callID is dropped (registry is populated by tool.called)
+    await (agent as any).handleEvent(syncEnvelope("session.next.tool.called", v2CalledProps()))
+    await (agent as any).handleEvent(syncEnvelope("session.next.tool.success", v2SuccessProps()))
+    const toolCall = sessionUpdates.find((u: any) => u.update.sessionUpdate === "tool_call")
+    expect(toolCall).toBeDefined()
     const toolUpdate = sessionUpdates.find((u: any) => u.update.sessionUpdate === "tool_call_update")
     expect(toolUpdate).toBeDefined()
     expect(toolUpdate.update.status).toBe("completed")
     expect(toolUpdate.update.toolCallId).toBe("call_1")
   })
 
-  test("unwraps sync envelope for message.part.updated with running tool", async () => {
+  test("handles session.next.tool.failed via sync envelope", async () => {
     const { agent, sessionUpdates } = createTestAgent()
-    const event = syncEnvelope("message.part.updated", {
-      sessionID: "ses_1",
-      time: Date.now(),
-      part: toolPart("running"),
-    })
-    await (agent as any).handleEvent(event)
-    expect(sessionUpdates.length).toBeGreaterThanOrEqual(2)
+    await (agent as any).handleEvent(syncEnvelope("session.next.tool.called", v2CalledProps()))
+    await (agent as any).handleEvent(
+      syncEnvelope("session.next.tool.failed", {
+        sessionID: "ses_1",
+        callID: "call_1",
+        error: { message: "boom" },
+      }),
+    )
+    const toolUpdate = sessionUpdates.find(
+      (u: any) => u.update.sessionUpdate === "tool_call_update" && u.update.status === "failed",
+    )
+    expect(toolUpdate).toBeDefined()
+    expect(toolUpdate.update.toolCallId).toBe("call_1")
+    expect(toolUpdate.update.content).toEqual([{ type: "content", content: { type: "text", text: "boom" } }])
+  })
+
+  test("handles session.next.tool.progress via sync envelope (in_progress)", async () => {
+    const { agent, sessionUpdates } = createTestAgent()
+    await (agent as any).handleEvent(syncEnvelope("session.next.tool.called", v2CalledProps()))
+    await (agent as any).handleEvent(
+      syncEnvelope("session.next.tool.progress", {
+        sessionID: "ses_1",
+        callID: "call_1",
+        structured: {},
+      }),
+    )
     const toolUpdate = sessionUpdates.find(
       (u: any) => u.update.sessionUpdate === "tool_call_update" && u.update.status === "in_progress",
     )
@@ -98,104 +141,40 @@ describe("ACP sync envelope unwrapping", () => {
     expect(toolUpdate.update.toolCallId).toBe("call_1")
   })
 
-  test("unwraps sync envelope for message.part.updated with error tool", async () => {
+  test("ignores version suffix from sync event type", async () => {
     const { agent, sessionUpdates } = createTestAgent()
-    const event = syncEnvelope("message.part.updated", {
-      sessionID: "ses_1",
-      time: Date.now(),
-      part: toolPart("error"),
-    })
+    const event = syncEnvelope("session.next.tool.called", v2CalledProps(), 1)
     await (agent as any).handleEvent(event)
-    expect(sessionUpdates.length).toBeGreaterThanOrEqual(2)
-    const toolUpdate = sessionUpdates.find(
-      (u: any) => u.update.sessionUpdate === "tool_call_update" && u.update.status === "failed",
-    )
-    expect(toolUpdate).toBeDefined()
-    expect(toolUpdate.update.toolCallId).toBe("call_1")
-    expect(toolUpdate.update.content).toEqual([
-      { type: "content", content: { type: "text", text: "boom" } },
-    ])
-  })
-
-  test("unwraps sync envelope for message.part.updated with pending tool", async () => {
-    const { agent, sessionUpdates } = createTestAgent()
-    const event = syncEnvelope("message.part.updated", {
-      sessionID: "ses_1",
-      time: Date.now(),
-      part: toolPart("pending"),
-    })
-    await (agent as any).handleEvent(event)
-    expect(sessionUpdates.length).toBeGreaterThanOrEqual(1)
     const toolCall = sessionUpdates.find((u: any) => u.update.sessionUpdate === "tool_call")
     expect(toolCall).toBeDefined()
-    expect(toolCall.update.status).toBe("pending")
     expect(toolCall.update.toolCallId).toBe("call_1")
   })
 
-  test("strips version suffix from sync event type", async () => {
+  test("handles raw Bus-path session.next.tool.called (unwrapped)", async () => {
     const { agent, sessionUpdates } = createTestAgent()
-    // Send a sync event with version suffix .1
-    const event = syncEnvelope("message.part.updated", {
-      sessionID: "ses_1",
-      time: Date.now(),
-      part: toolPart("completed"),
-    })
+    // The raw ProjectBus path delivers { type, properties } without the sync envelope
+    const event = rawEvent("session.next.tool.called", v2CalledProps())
     await (agent as any).handleEvent(event)
-    // Should be handled (not dropped) — we should see tool_call + tool_call_update
-    const toolCall = sessionUpdates.find((u: any) => u.update.sessionUpdate === "tool_call")
-    expect(toolCall).toBeDefined()
-    const toolUpdate = sessionUpdates.find((u: any) => u.update.sessionUpdate === "tool_call_update")
+    expect(sessionUpdates.length).toBe(1)
+    const toolUpdate = sessionUpdates.find((u: any) => u.update.sessionUpdate === "tool_call")
     expect(toolUpdate).toBeDefined()
-  })
-
-  test("passes through non-sync events unchanged", async () => {
-    const { agent, sessionUpdates } = createTestAgent()
-    // Send a raw message.part.updated event (not wrapped in sync)
-    const event = {
-      type: "message.part.updated",
-      properties: {
-        sessionID: "ses_1",
-        time: Date.now(),
-        part: toolPart("completed"),
-      },
-    }
-    await (agent as any).handleEvent(event)
-    expect(sessionUpdates.length).toBeGreaterThanOrEqual(2)
-    const toolUpdate = sessionUpdates.find(
-      (u: any) => u.update.sessionUpdate === "tool_call_update" && u.update.status === "completed",
-    )
-    expect(toolUpdate).toBeDefined()
-  })
-
-  test("ignores sync events for unknown sessions", async () => {
-    const { agent, sessionUpdates } = createTestAgent()
-    // Use a part with an unknown sessionID so the session lookup fails
-    const event = syncEnvelope("message.part.updated", {
-      sessionID: "unknown_session",
-      time: Date.now(),
-      part: { ...toolPart("completed"), sessionID: "unknown_session" },
-    })
-    await (agent as any).handleEvent(event)
-    expect(sessionUpdates).toHaveLength(0)
+    expect(toolUpdate.update.status).toBe("pending")
   })
 
   test("handles todowrite plan via sync envelope", async () => {
     const { agent, sessionUpdates } = createTestAgent()
-    const event = syncEnvelope("message.part.updated", {
-      sessionID: "ses_1",
-      time: Date.now(),
-      part: toolPart("completed", {
-        tool: "todowrite",
-        state: {
-          status: "completed",
-          input: {},
-          output: JSON.stringify([{ content: "task 1", status: "pending", priority: "medium" }]),
-          title: "todowrite",
-          metadata: {},
-        },
-      }),
-    })
-    await (agent as any).handleEvent(event)
+    await (agent as any).handleEvent(
+      syncEnvelope("session.next.tool.called", v2CalledProps({ tool: "todowrite", input: {} })),
+    )
+    await (agent as any).handleEvent(
+      syncEnvelope(
+        "session.next.tool.success",
+        v2SuccessProps({
+          tool: undefined,
+          content: [{ type: "text", text: JSON.stringify([{ content: "task 1", status: "pending", priority: "medium" }]) }],
+        }),
+      ),
+    )
     const planUpdate = sessionUpdates.find((u: any) => u.update.sessionUpdate === "plan")
     expect(planUpdate).toBeDefined()
     expect(planUpdate.update.entries).toHaveLength(1)
@@ -203,22 +182,24 @@ describe("ACP sync envelope unwrapping", () => {
     expect(planUpdate.update.entries[0].status).toBe("pending")
   })
 
-  test("handles message.part.delta via sync envelope", async () => {
+  test("ignores sync events for unknown sessions", async () => {
     const { agent, sessionUpdates } = createTestAgent()
-    // PartDelta is a BusEvent, NOT a SyncEvent — but handleEvent should handle
-    // a raw message.part.delta event (not wrapped in sync)
-    const event = {
-      type: "message.part.delta",
-      properties: {
-        sessionID: "ses_1",
-        messageID: "msg_1",
-        partID: "part_1",
-        field: "text",
-        delta: "hello world",
-      },
-    }
+    const event = syncEnvelope("session.next.tool.called", v2CalledProps({ sessionID: "unknown_session" }))
     await (agent as any).handleEvent(event)
-    // Should not crash — delta for unknown message is a no-op
+    expect(sessionUpdates).toHaveLength(0)
+  })
+
+  test("handles message.part.delta raw event without error", async () => {
+    const { agent, sessionUpdates } = createTestAgent()
+    // PartDelta is a BusEvent, NOT a SyncEvent — handleEvent must ignore it (no V1 part handler)
+    const event = rawEvent("message.part.delta", {
+      sessionID: "ses_1",
+      messageID: "msg_1",
+      partID: "part_1",
+      field: "text",
+      delta: "hello world",
+    })
+    await (agent as any).handleEvent(event)
     expect(sessionUpdates).toHaveLength(0)
   })
 
@@ -229,14 +210,12 @@ describe("ACP sync envelope unwrapping", () => {
       messageID: "msg_1",
       partID: "part_1",
     })
-    // Should not throw or crash
     await (agent as any).handleEvent(event)
     expect(sessionUpdates).toHaveLength(0)
   })
 
   test("handles message.part.delta wrapped in sync envelope defensively", async () => {
     const { agent, sessionUpdates } = createTestAgent()
-    // Defensive: if a sync-wrapped delta arrives, it should be handled too
     const event = syncEnvelope("message.part.delta", {
       sessionID: "ses_1",
       messageID: "msg_1",
@@ -244,9 +223,16 @@ describe("ACP sync envelope unwrapping", () => {
       field: "text",
       delta: "hello",
     })
-    // Should not throw or crash
     await (agent as any).handleEvent(event)
-    // No session update since the message doesn't exist
     expect(sessionUpdates).toHaveLength(0)
+  })
+
+  test("handles session.next.text.delta via sync envelope", async () => {
+    const { agent, sessionUpdates } = createTestAgent()
+    const event = syncEnvelope("session.next.text.delta", { sessionID: "ses_1", delta: "hello" })
+    await (agent as any).handleEvent(event)
+    const chunk = sessionUpdates.find((u: any) => u.update.sessionUpdate === "agent_message_chunk")
+    expect(chunk).toBeDefined()
+    expect(chunk.update.content.text).toBe("hello")
   })
 })

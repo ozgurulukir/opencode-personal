@@ -2,6 +2,10 @@
 
 ## Module layout
 
+## ACP test pattern: V2 SDK surface
+
+ACP tests must stub the **V2** SDK surface: session auto-recovery and creation go through `sdk.v2.session.get/create`, the replay path reads `sdk.v2.session.messages` returning `{ data: { items } }` (V1 shape was `{ data: [...] }` via `sdk.session.messages`), and permission replies go through `sdk.permission.reply` (not `respond`). V2 projected messages use `type: "user"|"assistant"` with `content[]` items (not `role`/`parts`); user/assistant messages need a `model: { providerID, id }` field for `restoreSessionStateFromMessages`. V2 replay tool items key the ACP `toolCallId` off the item `id` — live stream progress events are keyed by `callID`, so fixtures set `id === callID` for pending-after-replay continuity. V2 `session.next.*` event properties require a `timestamp` field (also on the wire from `EventV2.define` schemas).
+
 The ACP module is decomposed into focused files:
 
 - `agent.ts` — Thin orchestrator: Agent class with session lifecycle, event loop, prompt handling
@@ -42,6 +46,12 @@ Only `newSession`, `loadSession`, `resumeSession`, and `forkSession` include `cw
 ## `handleToolPartUpdate` deduplicates tool state logic
 
 The tool state switch (pending/running/completed/error + todowrite plan) was duplicated verbatim between `handleEvent` (live events) and `processMessage` (session replay). Extracted into `handleToolPartUpdate()` — both callers now delegate to it. The shell snapshot dedup (hash-based output dedup for shell tools) was only in `handleEvent`; it's safe to apply to `processMessage` too since the snapshot map is empty during replay.
+
+## Live event wire is V2-only (`session.next.*`)
+
+Since the V1/V2 consumer migration, `handleEvent` handles **only** V2 `session.next.*` events: `session.next.text.delta`, `session.next.reasoning.delta`, `session.next.tool.called|progress|success|failed`, and `session.next.permission.asked` (the V1 permission request is nested under `properties.request`). V1 `message.part.*` events still flow on the global stream (SyncEvent dual delivery) but are **intentionally ignored** by the live loop — historical content reaches ACP clients only through the replay path (`loadSession` → `sdk.v2.session.messages` → `processMessage`).
+
+V2 tool events carry only `callID` (+ `structured`/`content`), no tool name or input — the name/input recorded at `tool.called` is reused for later updates (`ToolCallInfo` registry), so `tool.called` must arrive before any progress/success/failed event is reflected. `session.next.permission.asked` wraps the whole V1 request under `properties.request`; read `permission.tool?.callID ?? permission.id` for the ACP `toolCallId`.
 
 ## ACP test pattern: `createTestAgent()` + standalone functions
 

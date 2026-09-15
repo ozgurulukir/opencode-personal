@@ -8,7 +8,7 @@ function createMockSdk(sessionGetResult?: any, sessionGetError?: Error) {
     return { data: sessionGetResult }
   })
   return {
-    sdk: { session: { get: sessionGet } } as unknown as OpencodeClient,
+    sdk: { v2: { session: { get: sessionGet } } } as unknown as OpencodeClient,
     sessionGet,
   }
 }
@@ -87,7 +87,7 @@ describe("ACPSessionManager", () => {
       resolveGet = resolve
     })
     const sessionGet = mock(async () => getPromise)
-    const sdk = { session: { get: sessionGet } } as unknown as OpencodeClient
+    const sdk = { v2: { session: { get: sessionGet } } } as unknown as OpencodeClient
     const mgr = new ACPSessionManager(sdk)
 
     // Start two concurrent getOrLoad calls
