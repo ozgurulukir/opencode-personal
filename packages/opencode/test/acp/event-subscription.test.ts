@@ -1,13 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { ACP } from "../../src/acp/agent"
 import type { AgentSideConnection } from "@agentclientprotocol/sdk"
-import type {
-  Event,
-  EventMessagePartUpdated,
-  ToolStateCompleted,
-  ToolStatePending,
-  ToolStateRunning,
-} from "@opencode-ai/sdk/v2"
+import type { Event } from "@opencode-ai/sdk/v2"
 import { WithInstance } from "../../src/project/with-instance"
 import { tmpdir } from "../fixture/fixture"
 
@@ -49,85 +43,76 @@ function completedToolUpdate(sessionUpdates: SessionUpdateParams[], sessionId: s
     .find((u) => u.toolCallId === callID && u.status === "completed")
 }
 
-function toolEvent(
-  sessionId: string,
-  cwd: string,
-  opts: {
-    callID: string
-    tool: string
-    input: Record<string, unknown>
-  } & ({ status: "running"; metadata?: Record<string, unknown> } | { status: "pending"; raw: string }),
-): GlobalEventEnvelope {
-  const state: ToolStatePending | ToolStateRunning =
-    opts.status === "running"
-      ? {
-          status: "running",
-          input: opts.input,
-          ...(opts.metadata && { metadata: opts.metadata }),
-          time: { start: Date.now() },
-        }
-      : {
-          status: "pending",
-          input: opts.input,
-          raw: opts.raw,
-        }
-  const payload: EventMessagePartUpdated = {
-    id: `evt_${opts.callID}`,
-    type: "message.part.updated",
+// V2 event factories — the global stream carries SessionEvent.* events
+// (session.next.tool.*) instead of V1 message.part.updated parts.
+function calledEvent(sessionId: string, cwd: string, callID: string, tool: string, input: Record<string, unknown>) {
+  const payload: Event = {
+    id: `evt_${callID}`,
+    type: "session.next.tool.called",
     properties: {
+      timestamp: Date.now(),
       sessionID: sessionId,
-      time: Date.now(),
-      part: {
-        id: `part_${opts.callID}`,
-        sessionID: sessionId,
-        messageID: `msg_${opts.callID}`,
-        type: "tool",
-        callID: opts.callID,
-        tool: opts.tool,
-        state,
-      },
+      callID,
+      tool,
+      input,
+      provider: { executed: false },
     },
-  }
+  } as Event
   return { directory: cwd, payload }
 }
 
-function completedToolEvent(
+function progressEvent(
   sessionId: string,
   cwd: string,
-  opts: {
-    callID: string
-    tool: string
-    input: Record<string, unknown>
-    output: string
-    attachments?: ToolStateCompleted["attachments"]
-  },
+  callID: string,
+  structured: Record<string, unknown> = {},
 ): GlobalEventEnvelope {
-  const state: ToolStateCompleted = {
-    status: "completed",
-    input: opts.input,
-    output: opts.output,
-    title: opts.tool,
-    metadata: {},
-    time: { start: Date.now() - 1, end: Date.now() },
-    ...(opts.attachments && { attachments: opts.attachments }),
-  }
-  const payload: EventMessagePartUpdated = {
-    id: `evt_${opts.callID}`,
-    type: "message.part.updated",
+  const payload: Event = {
+    id: `evt_${callID}`,
+    type: "session.next.tool.progress",
     properties: {
+      timestamp: Date.now(),
       sessionID: sessionId,
-      time: Date.now(),
-      part: {
-        id: `part_${opts.callID}`,
-        sessionID: sessionId,
-        messageID: `msg_${opts.callID}`,
-        type: "tool",
-        callID: opts.callID,
-        tool: opts.tool,
-        state,
-      },
+      callID,
+      structured,
+      content: [],
     },
-  }
+  } as Event
+  return { directory: cwd, payload }
+}
+
+function bashProgressEvent(
+  sessionId: string,
+  cwd: string,
+  callID: string,
+  output: string,
+): GlobalEventEnvelope {
+  return progressEvent(sessionId, cwd, callID, { output })
+}
+
+function successEvent(
+  sessionId: string,
+  cwd: string,
+  callID: string,
+  output: string,
+  structured: Record<string, unknown> = {},
+  attachments?: any[],
+): GlobalEventEnvelope {
+  const payload: Event = {
+    id: `evt_${callID}`,
+    type: "session.next.tool.success",
+    properties: {
+      timestamp: Date.now(),
+      sessionID: sessionId,
+      callID,
+      structured,
+      content: [
+        { type: "text", text: output },
+        ...(attachments ?? []).map((a) => ({ type: "file" as const, uri: a.url, mime: a.mime, name: a.filename })),
+      ],
+      provider: { executed: false },
+    },
+  } as Event
   return { directory: cwd, payload }
 }
 
@@ -208,6 +193,8 @@ function createFakeAgent() {
     sessionCreate: 0,
   }
 
+  // V2 SDK surface: ACPSessionManager and the replay path read sdk.v2.session.*;
+  // session.messages returns { data: { items } } in V2 (was { data: [] } in V1).
   const sdk = {
     global: {
       event: async (opts?: { signal?: AbortSignal }) => {
@@ -215,27 +202,33 @@ function createFakeAgent() {
         return { stream: stream(opts?.signal) }
       },
     },
+    v2: {
+      session: {
+        create: async (_params?: any) => {
+          calls.sessionCreate++
+          return {
+            data: {
+              id: `ses_${calls.sessionCreate}`,
+              directory: "/tmp/opencode-acp-test",
+              time: { created: Date.now(), updated: Date.now() },
+            },
+          }
+        },
+        get: async (_params?: any) => {
+          return {
+            data: {
+              id: "ses_1",
+              directory: "/tmp/opencode-acp-test",
+              time: { created: Date.now(), updated: Date.now() },
+            },
+          }
+        },
+        list: async () => ({ data: { items: [] } }),
+        messages: async () => ({ data: { items: [] } }),
+      },
+    },
     session: {
-      create: async (_params?: any) => {
-        calls.sessionCreate++
-        return {
-          data: {
-            id: `ses_${calls.sessionCreate}`,
-            time: { created: new Date().toISOString() },
-          },
-        }
-      },
-      get: async (_params?: any) => {
-        return {
-          data: {
-            id: "ses_1",
-            time: { created: new Date().toISOString() },
-          },
-        }
-      },
-      messages: async () => {
-        return { data: [] }
-      },
+      messages: async () => ({ data: { items: [] } }),
       message: async (params?: any) => {
         // Return a message with parts that can be looked up by partID
         return {
@@ -256,6 +249,9 @@ function createFakeAgent() {
     },
     permission: {
       respond: async () => {
+        return { data: true }
+      },
+      reply: async () => {
         return { data: true }
       },
     },
@@ -329,12 +325,9 @@ describe("acp.agent event subscription", () => {
         controller.push({
           directory: cwd,
           payload: {
-            type: "message.part.delta",
+            type: "session.next.text.delta",
             properties: {
               sessionID: sessionB,
-              messageID: "msg_1",
-              partID: "msg_1_part",
-              field: "text",
               delta: "hello",
             },
           },
@@ -350,7 +343,7 @@ describe("acp.agent event subscription", () => {
     })
   })
 
-  test("does not emit user_message_chunk for live prompt parts", async () => {
+  test("live stream emits only agent chunks (user content is replay-only)", async () => {
     await using tmp = await tmpdir()
     await WithInstance.provide({
       directory: tmp.path,
@@ -359,31 +352,27 @@ describe("acp.agent event subscription", () => {
         const cwd = "/tmp/opencode-acp-test"
         const sessionId = await agent.newSession({ cwd, mcpServers: [] } as any).then((x) => x.sessionId)
 
+        // The live event loop carries only assistant-side V2 events
+        // (text deltas, tool state). User content is replayed via the
+        // session.messages path — the live loop must never emit user chunks.
         controller.push({
           directory: cwd,
           payload: {
-            type: "message.part.updated",
-            properties: {
-              sessionID: sessionId,
-              time: Date.now(),
-              part: {
-                id: "part_1",
-                sessionID: sessionId,
-                messageID: "msg_user",
-                type: "text",
-                text: "hello",
-              },
-            },
+            type: "session.next.text.delta",
+            properties: { sessionID: sessionId, delta: "assistant streaming" },
           },
         } as any)
-
         await new Promise((r) => setTimeout(r, 20))
 
-        expect(
-          sessionUpdates
-            .filter((u) => u.sessionId === sessionId)
-            .some((u) => u.update.sessionUpdate === "user_message_chunk"),
-        ).toBe(false)
+        const userChunks = sessionUpdates.filter(
+          (u) => u.sessionId === sessionId && u.update.sessionUpdate === "user_message_chunk",
+        )
+        expect(userChunks).toHaveLength(0)
+
+        const agentChunks = sessionUpdates.filter(
+          (u) => u.sessionId === sessionId && u.update.sessionUpdate === "agent_message_chunk",
+        )
+        expect(agentChunks.length).toBeGreaterThanOrEqual(1)
 
         stop()
       },
@@ -404,16 +393,13 @@ describe("acp.agent event subscription", () => {
         const tokenA = ["ALPHA_", "111", "_X"]
         const tokenB = ["BETA_", "222", "_Y"]
 
-        const push = (sessionId: string, messageID: string, delta: string) => {
+        const push = (sessionId: string, _messageID: string, delta: string) => {
           controller.push({
             directory: cwd,
             payload: {
-              type: "message.part.delta",
+              type: "session.next.text.delta",
               properties: {
                 sessionID: sessionId,
-                messageID,
-                partID: `${messageID}_part`,
-                field: "text",
                 delta,
               },
             },
@@ -482,14 +468,17 @@ describe("acp.agent event subscription", () => {
         controller.push({
           directory: cwd,
           payload: {
-            type: "permission.asked",
+            type: "session.next.permission.asked",
             properties: {
-              id: "perm_1",
               sessionID: sessionA,
-              permission: "bash",
-              patterns: ["*"],
-              metadata: {},
-              always: [],
+              request: {
+                id: "perm_1",
+                sessionID: sessionA,
+                permission: "bash",
+                patterns: ["*"],
+                metadata: {},
+                always: [],
+              },
             },
           },
         } as any)
@@ -541,14 +530,17 @@ describe("acp.agent event subscription", () => {
         controller.push({
           directory: cwd,
           payload: {
-            type: "permission.asked",
+            type: "session.next.permission.asked",
             properties: {
-              id: "perm_a",
               sessionID: sessionA,
-              permission: "bash",
-              patterns: ["*"],
-              metadata: {},
-              always: [],
+              request: {
+                id: "perm_a",
+                sessionID: sessionA,
+                permission: "bash",
+                patterns: ["*"],
+                metadata: {},
+                always: [],
+              },
             },
           },
         } as any)
@@ -556,16 +548,13 @@ describe("acp.agent event subscription", () => {
         // Give time for permission handling to start
         await new Promise((r) => setTimeout(r, 10))
 
-        // Push message for session B while A's permission is pending
+        // Push message for session B while A's permission is still pending
         controller.push({
           directory: cwd,
           payload: {
-            type: "message.part.delta",
+            type: "session.next.text.delta",
             properties: {
               sessionID: sessionB,
-              messageID: "msg_b",
-              partID: "msg_b_part",
-              field: "text",
               delta: "session_b_message",
             },
           },
@@ -600,16 +589,9 @@ describe("acp.agent event subscription", () => {
         const sessionId = await agent.newSession({ cwd, mcpServers: [] } as any).then((x) => x.sessionId)
         const input = { command: "echo hello", description: "run command" }
 
+        controller.push(calledEvent(sessionId, cwd, "call_1", "bash", input))
         for (const output of ["a", "a", "ab"]) {
-          controller.push(
-            toolEvent(sessionId, cwd, {
-              callID: "call_1",
-              tool: "bash",
-              status: "running",
-              input,
-              metadata: { output },
-            }),
-          )
+          controller.push(bashProgressEvent(sessionId, cwd, "call_1", output))
         }
         await new Promise((r) => setTimeout(r, 20))
 
@@ -633,23 +615,10 @@ describe("acp.agent event subscription", () => {
         const cwd = "/tmp/opencode-acp-test"
         const sessionId = await agent.newSession({ cwd, mcpServers: [] } as any).then((x) => x.sessionId)
 
-        controller.push(
-          toolEvent(sessionId, cwd, {
-            callID: "call_bash",
-            tool: "bash",
-            status: "running",
-            input: { command: "echo hi", description: "run command" },
-            metadata: { output: "hi\n" },
-          }),
-        )
-        controller.push(
-          toolEvent(sessionId, cwd, {
-            callID: "call_read",
-            tool: "read",
-            status: "running",
-            input: { filePath: "/tmp/example.txt" },
-          }),
-        )
+        controller.push(calledEvent(sessionId, cwd, "call_bash", "bash", { command: "echo hi" }))
+        controller.push(bashProgressEvent(sessionId, cwd, "call_bash", "hi\n"))
+        controller.push(calledEvent(sessionId, cwd, "call_read", "read", { filePath: "/tmp/example.txt" }))
+        controller.push(progressEvent(sessionId, cwd, "call_read"))
         await new Promise((r) => setTimeout(r, 20))
 
         const types = sessionUpdates
@@ -679,33 +648,28 @@ describe("acp.agent event subscription", () => {
         const sessionId = await agent.newSession({ cwd, mcpServers: [] } as any).then((x) => x.sessionId)
         const data = Buffer.from("image-data").toString("base64")
 
+        controller.push(calledEvent(sessionId, cwd, "call_image", "read", { filePath: "/tmp/image.png" }))
         controller.push(
-          completedToolEvent(sessionId, cwd, {
-            callID: "call_image",
-            tool: "read",
-            input: { filePath: "/tmp/image.png" },
-            output: "Image read successfully",
-            attachments: [
-              {
-                id: "part_image",
-                sessionID: sessionId,
-                messageID: "msg_image",
-                type: "file",
-                mime: "image/png",
-                filename: "image.png",
-                url: `data:image/png;base64,${data}`,
-              },
-              {
-                id: "part_text",
-                sessionID: sessionId,
-                messageID: "msg_image",
-                type: "file",
-                mime: "text/plain",
-                filename: "note.txt",
-                url: "data:text/plain;base64,Zm9v",
-              },
-            ],
-          }),
+          successEvent(sessionId, cwd, "call_image", "Image read successfully", {}, [
+            {
+              id: "part_image",
+              sessionID: sessionId,
+              messageID: "msg_image",
+              type: "file",
+              mime: "image/png",
+              filename: "image.png",
+              url: `data:image/png;base64,${data}`,
+            },
+            {
+              id: "part_text",
+              sessionID: sessionId,
+              messageID: "msg_image",
+              type: "file",
+              mime: "text/plain",
+              filename: "note.txt",
+              url: "data:text/plain;base64,Zm9v",
+            },
+          ]),
         )
         await new Promise((r) => setTimeout(r, 20))
 
@@ -719,7 +683,6 @@ describe("acp.agent event subscription", () => {
           content: { type: "image", mimeType: "image/png", data },
         })
         expect(update?.content?.some((item) => item.type === "content" && item.content.type === "resource")).toBe(false)
-        expect((update?.rawOutput as { attachments?: unknown[] } | undefined)?.attachments?.length).toBe(2)
 
         stop()
       },
@@ -736,45 +699,43 @@ describe("acp.agent event subscription", () => {
         const sessionId = await agent.newSession({ cwd, mcpServers: [] } as any).then((x) => x.sessionId)
         const data = Buffer.from("replay-image").toString("base64")
 
-        sdk.session.messages = async () => ({
-          data: [
-            {
-              info: {
-                role: "assistant",
+        sdk.v2.session.messages = async () => ({
+          data: {
+            items: [
+              {
+                type: "assistant",
+                id: "msg_replay",
                 sessionID: sessionId,
-              },
-              parts: [
-                {
-                  id: "part_replay",
-                  sessionID: sessionId,
-                  messageID: "msg_replay",
-                  type: "tool",
-                  callID: "call_replay_image",
-                  tool: "webfetch",
-                  state: {
-                    status: "completed",
-                    input: { url: "https://example.com/image.png" },
-                    output: "Image fetched successfully",
-                    title: "webfetch",
-                    metadata: {},
-                    time: { start: Date.now() - 1, end: Date.now() },
-                    attachments: [
-                      {
-                        id: "part_replay_image",
-                        sessionID: sessionId,
-                        messageID: "msg_replay",
-                        type: "file",
-                        mime: "image/jpeg",
-                        filename: "image.jpg",
-                        url: `data:image/jpeg;base64,${data}`,
-                      },
-                    ],
+                model: { providerID: "opencode", id: "big-pickle" },
+                tokens: { input: 0, output: 0 },
+                cost: 0,
+                time: { created: Date.now() },
+                content: [
+                  {
+                    id: "call_replay_image",
+                    type: "tool",
+                    callID: "call_replay_image",
+                    name: "webfetch",
+                    state: {
+                      status: "completed",
+                      input: { url: "https://example.com/image.png" },
+                      structured: {},
+                      content: [
+                        { type: "text", text: "Image fetched successfully" },
+                        {
+                          type: "file",
+                          uri: `data:image/jpeg;base64,${data}`,
+                          mime: "image/jpeg",
+                          name: "image.jpg",
+                        },
+                      ],
+                    },
                   },
-                },
-              ],
-            },
-          ],
-        })
+                ],
+              },
+            ],
+          },
+        } as any)
 
         await agent.loadSession({ sessionId, cwd, mcpServers: [] } as any)
 
@@ -803,40 +764,41 @@ describe("acp.agent event subscription", () => {
         const sessionId = await agent.newSession({ cwd, mcpServers: [] } as any).then((x) => x.sessionId)
         const input = { command: "echo hi", description: "run command" }
 
-        sdk.session.messages = async () => ({
-          data: [
-            {
-              info: {
-                role: "assistant",
+        sdk.v2.session.messages = async () => ({
+          data: {
+            items: [
+              {
+                type: "assistant",
+                id: "msg_replay",
                 sessionID: sessionId,
-              },
-              parts: [
-                {
-                  type: "tool",
-                  callID: "call_1",
-                  tool: "bash",
-                  state: {
-                    status: "running",
-                    input,
-                    metadata: { output: "hi\n" },
-                    time: { start: Date.now() },
+                model: { providerID: "opencode", id: "big-pickle" },
+                tokens: { input: 0, output: 0 },
+                cost: 0,
+                time: { created: Date.now() },
+                content: [
+                  {
+                    // V2 replay: the tool item id doubles as the ACP toolCallId,
+                    // and the live stream keys progress updates by the same callID.
+                    id: "call_1",
+                    type: "tool",
+                    callID: "call_1",
+                    name: "bash",
+                    state: {
+                      status: "running",
+                      input,
+                      structured: { output: "hi\n" },
+                      content: [],
+                    },
                   },
-                },
-              ],
-            },
-          ],
-        })
+                ],
+              },
+            ],
+          },
+        } as any)
 
         await agent.loadSession({ sessionId, cwd, mcpServers: [] } as any)
-        controller.push(
-          toolEvent(sessionId, cwd, {
-            callID: "call_1",
-            tool: "bash",
-            status: "running",
-            input,
-            metadata: { output: "hi\nthere\n" },
-          }),
-        )
+        controller.push(calledEvent(sessionId, cwd, "call_1", "bash", input))
+        controller.push(bashProgressEvent(sessionId, cwd, "call_1", "hi\nthere\n"))
         await new Promise((r) => setTimeout(r, 20))
 
         const types = sessionUpdates
@@ -862,33 +824,11 @@ describe("acp.agent event subscription", () => {
         const sessionId = await agent.newSession({ cwd, mcpServers: [] } as any).then((x) => x.sessionId)
         const input = { command: "echo hello", description: "run command" }
 
-        controller.push(
-          toolEvent(sessionId, cwd, {
-            callID: "call_1",
-            tool: "bash",
-            status: "running",
-            input,
-            metadata: { output: "a" },
-          }),
-        )
-        controller.push(
-          toolEvent(sessionId, cwd, {
-            callID: "call_1",
-            tool: "bash",
-            status: "pending",
-            input,
-            raw: '{"command":"echo hello"}',
-          }),
-        )
-        controller.push(
-          toolEvent(sessionId, cwd, {
-            callID: "call_1",
-            tool: "bash",
-            status: "running",
-            input,
-            metadata: { output: "a" },
-          }),
-        )
+        controller.push(calledEvent(sessionId, cwd, "call_1", "bash", input))
+        controller.push(bashProgressEvent(sessionId, cwd, "call_1", "a"))
+        // A re-called tool starts a fresh output stream (pending reset)
+        controller.push(calledEvent(sessionId, cwd, "call_1", "bash", input))
+        controller.push(bashProgressEvent(sessionId, cwd, "call_1", "a"))
         await new Promise((r) => setTimeout(r, 20))
 
         const snapshots = sessionUpdates
