@@ -80,11 +80,14 @@ export async function handleToolProgress(
   shellSnapshots: Map<string, string>,
   toolCalls: Map<string, ToolCallInfo>,
   sessionId: string,
-  props: { callID: string; structured: Record<string, unknown> },
+  props: { callID: string; structured: Record<string, unknown>; content?: V2ToolContent[] },
 ) {
   const info = toolCalls.get(props.callID)
   if (!info) return
-  const output = info.tool === ShellID.ToolID ? structuredShellOutput(props.structured) : undefined
+  const output =
+    info.tool === ShellID.ToolID
+      ? (structuredShellOutput(props.structured) ?? textOutput(props.content ?? []))
+      : textOutput(props.content ?? [])
   const content: ToolCallContent[] = []
   if (output) {
     const hash = Hash.fast(output)
@@ -149,7 +152,8 @@ export async function handleToolSuccess(
   toolStarts.delete(props.callID)
   shellSnapshots.delete(props.callID)
   const kind = toToolKind(info.tool)
-  const content = completedToolContent(info.tool, info.input, props.content, kind)
+  const output = textOutput(props.content) || (info.tool === ShellID.ToolID ? structuredShellOutput(props.structured) : undefined)
+  const content = completedToolContent(info.tool, info.input, props.content, kind, output)
 
   if (info.tool === "todowrite") {
     const parsedTodos = decodeTodos(textOutput(props.content))
@@ -190,7 +194,7 @@ export async function handleToolSuccess(
         title: info.tool,
         rawInput: info.input,
         rawOutput: {
-          output: textOutput(props.content),
+          output,
           metadata: props.structured,
         },
       },
@@ -382,13 +386,14 @@ export function completedToolContent(
   input: Record<string, unknown>,
   content: V2ToolContent[],
   kind: ToolKind,
+  output?: string,
 ): ToolCallContent[] {
   const result: ToolCallContent[] = [
     {
       type: "content",
       content: {
         type: "text",
-        text: textOutput(content),
+        text: output ?? textOutput(content),
       },
     },
   ]
