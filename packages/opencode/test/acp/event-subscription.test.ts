@@ -45,9 +45,16 @@ function completedToolUpdate(sessionUpdates: SessionUpdateParams[], sessionId: s
 
 // V2 event factories — the global stream carries SessionEvent.* events
 // (session.next.tool.*) instead of V1 message.part.updated parts.
+let eventSequence = 0
+
+function eventID(callID: string) {
+  eventSequence += 1
+  return `evt_${callID}_${eventSequence}`
+}
+
 function calledEvent(sessionId: string, cwd: string, callID: string, tool: string, input: Record<string, unknown>) {
   const payload: Event = {
-    id: `evt_${callID}`,
+    id: eventID(callID),
     type: "session.next.tool.called",
     properties: {
       timestamp: Date.now(),
@@ -69,7 +76,7 @@ function progressEvent(
   content: Array<{ type: "text"; text: string }> = [],
 ): GlobalEventEnvelope {
   const payload: Event = {
-    id: `evt_${callID}`,
+    id: eventID(callID),
     type: "session.next.tool.progress",
     properties: {
       timestamp: Date.now(),
@@ -100,7 +107,7 @@ function successEvent(
   attachments?: any[],
 ): GlobalEventEnvelope {
   const payload: Event = {
-    id: `evt_${callID}`,
+    id: eventID(callID),
     type: "session.next.tool.success",
     properties: {
       timestamp: Date.now(),
@@ -196,13 +203,15 @@ function createFakeAgent() {
 
   // V2 SDK surface: ACPSessionManager and the replay path read sdk.v2.session.*;
   // session.messages returns { data: { items } } in V2 (was { data: [] } in V1).
-  const sdk = {
-    global: {
-      event: async (opts?: { signal?: AbortSignal }) => {
-        calls.eventSubscribe++
-        return { stream: stream(opts?.signal) }
-      },
+  const global = {
+    event: async function (this: object, opts?: { signal?: AbortSignal }) {
+      if (this !== global) throw new Error("global event receiver lost")
+      calls.eventSubscribe++
+      return { stream: stream(opts?.signal) }
     },
+  }
+  const sdk = {
+    global,
     v2: {
       session: {
         create: async (_params?: any) => {
@@ -375,6 +384,41 @@ describe("acp.agent event subscription", () => {
         )
         expect(agentChunks.length).toBeGreaterThanOrEqual(1)
 
+        stop()
+      },
+    })
+  })
+
+  test("deduplicates raw and sync envelope copies of the same event", async () => {
+    await using tmp = await tmpdir()
+    await WithInstance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        const { agent, controller, chunks, stop } = createFakeAgent()
+        const cwd = "/tmp/opencode-acp-test"
+        const sessionId = await agent.newSession({ cwd, mcpServers: [] } as any).then((x) => x.sessionId)
+        const eventID = "evt_duplicate_text"
+        const data = { sessionID: sessionId, delta: "assistant streaming" }
+
+        controller.push({
+          directory: cwd,
+          payload: { id: eventID, type: "session.next.text.delta", properties: data },
+        } as any)
+        controller.push({
+          id: eventID,
+          directory: cwd,
+          payload: {
+            type: "sync",
+            syncEvent: {
+              id: eventID,
+              type: "session.next.text.delta/1",
+              data,
+            },
+          },
+        } as any)
+        await new Promise((r) => setTimeout(r, 20))
+
+        expect(chunks.get(sessionId)).toBe("assistant streaming")
         stop()
       },
     })

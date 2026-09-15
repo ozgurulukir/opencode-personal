@@ -110,6 +110,7 @@ export class Agent implements ACPAgent {
   private sessionManager: ACPSessionManager
   private eventAbort = new AbortController()
   private eventStarted = false
+  private handledEventKeys = new Set<string>()
   private shellSnapshots = new Map<string, string>()
   private toolStarts = new Set<string>()
   private toolCalls = new Map<string, ToolCallInfo>()
@@ -138,7 +139,7 @@ export class Agent implements ACPAgent {
   }
 
   private async runEventSubscription() {
-    const subscribe = this.sdk.global?.event
+    const subscribe = this.sdk.global?.event?.bind(this.sdk.global)
     if (typeof subscribe !== "function") return
 
     while (true) {
@@ -166,6 +167,15 @@ export class Agent implements ACPAgent {
 
   private async handleEvent(rawEvent: Event) {
     const event = unwrapSyncEvent(rawEvent) as Event
+    const eventKey = event.id ? `${event.id}:${event.type}` : undefined
+    if (eventKey && this.handledEventKeys.has(eventKey)) return
+    if (eventKey) {
+      this.handledEventKeys.add(eventKey)
+      if (this.handledEventKeys.size > 4096) {
+        const oldest = this.handledEventKeys.values().next().value
+        if (oldest) this.handledEventKeys.delete(oldest)
+      }
+    }
     switch (event.type) {
       case "session.next.permission.asked": {
         // The V2 event wraps the whole V1 permission request as `request`.
