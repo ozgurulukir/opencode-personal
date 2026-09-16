@@ -321,6 +321,24 @@ function createFakeAgent() {
 }
 
 describe("acp.agent event subscription", () => {
+  test("awaits available commands update before returning session creation", async () => {
+    await using tmp = await tmpdir()
+    await WithInstance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        const { agent, sessionUpdates, stop } = createFakeAgent()
+        const sessionId = await agent.newSession({ cwd: "/tmp/opencode-acp-test", mcpServers: [] } as any).then((x) => x.sessionId)
+
+        expect(
+          sessionUpdates.some(
+            (update) => update.sessionId === sessionId && update.update.sessionUpdate === "available_commands_update",
+          ),
+        ).toBe(true)
+        stop()
+      },
+    })
+  })
+
   test("routes message.part.delta by the event sessionID (no cross-session pollution)", async () => {
     await using tmp = await tmpdir()
     await WithInstance.provide({

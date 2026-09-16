@@ -693,7 +693,8 @@ export class Agent implements ACPAgent {
       if (!availableModes.length) return undefined
       const defaultAgentName = await AppRuntime.runPromise(AgentModule.Service.use((svc) => svc.defaultAgent()))
       const resolvedModeId = availableModes.find((mode) => mode.name === defaultAgentName)?.id ?? availableModes[0].id
-      this.sessionManager.setMode(sessionId, resolvedModeId)
+      const currentSession = await this.sessionManager.getOrLoad(sessionId)
+      currentSession.modeId = resolvedModeId
       return resolvedModeId
     })()
 
@@ -785,15 +786,17 @@ export class Agent implements ACPAgent {
       }),
     )
 
-    setTimeout(() => {
-      void this.connection.sessionUpdate({
+    await this.connection
+      .sessionUpdate({
         sessionId,
         update: {
           sessionUpdate: "available_commands_update",
           availableCommands,
         },
       })
-    }, 0)
+      .catch((error) => {
+        log.warn("failed to send available commands update", { sessionId, error })
+      })
 
     return {
       sessionId,
@@ -823,7 +826,8 @@ export class Agent implements ACPAgent {
     if (!availableModes.some((mode) => mode.id === params.modeId)) {
       throw new Error(`Agent not found: ${params.modeId}`)
     }
-    this.sessionManager.setMode(params.sessionId, params.modeId)
+    const currentSession = await this.sessionManager.getOrLoad(params.sessionId)
+    currentSession.modeId = params.modeId
   }
 
   async setSessionConfigOption(params: SetSessionConfigOptionRequest): Promise<SetSessionConfigOptionResponse> {
@@ -836,8 +840,9 @@ export class Agent implements ACPAgent {
     if (params.configId === "model") {
       if (typeof params.value !== "string") throw RequestError.invalidParams("model value must be a string")
       const selection = parseModelSelection(params.value, providers)
-      this.sessionManager.setModel(session.id, selection.model)
-      this.sessionManager.setVariant(session.id, selection.variant)
+      const currentSession = await this.sessionManager.getOrLoad(session.id)
+      currentSession.model = selection.model
+      currentSession.variant = selection.variant
     } else if (params.configId === "effort") {
       if (typeof params.value !== "string") throw RequestError.invalidParams("effort value must be a string")
       const current = session.model ?? (await defaultModel(this.config, session.cwd))
@@ -845,14 +850,16 @@ export class Agent implements ACPAgent {
       if (!availableVariants.includes(params.value)) {
         throw RequestError.invalidParams(JSON.stringify({ error: `Effort not found: ${params.value}` }))
       }
-      this.sessionManager.setVariant(session.id, params.value)
+      const currentSession = await this.sessionManager.getOrLoad(session.id)
+      currentSession.variant = params.value
     } else if (params.configId === "mode") {
       if (typeof params.value !== "string") throw RequestError.invalidParams("mode value must be a string")
       const availableModes = await this.loadAvailableModes(session.cwd)
       if (!availableModes.some((mode) => mode.id === params.value)) {
         throw RequestError.invalidParams(JSON.stringify({ error: `Mode not found: ${params.value}` }))
       }
-      this.sessionManager.setMode(session.id, params.value)
+      const currentSession = await this.sessionManager.getOrLoad(session.id)
+      currentSession.modeId = params.value
     } else {
       throw RequestError.invalidParams(JSON.stringify({ error: `Unknown config option: ${params.configId}` }))
     }

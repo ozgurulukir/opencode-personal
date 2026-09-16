@@ -56,3 +56,25 @@ V2 tool events carry only `callID` (+ `structured`/`content`), no tool name or i
 ## ACP test pattern: `createTestAgent()` + standalone functions
 
 ACP tests use a `createTestAgent()` helper that creates a real `ACP.Agent` with a minimal mock `AgentSideConnection` and captures `sessionUpdates`. The helper also returns `connection`, `shellSnapshots`, and `toolStarts` for calling standalone functions like `processMessage` directly. Private methods like `handleEvent` are still accessed via `(agent as any)`. The `sessionManager.sessions` Map is populated directly via `(agent as any).sessionManager.sessions.set(...)` for tests that need a pre-existing session. Tests use `mock.function()` (not `mock.module()`) for SDK stubs, with `afterAll(() => mock.restore())` cleanup.
+
+## ACP terminal backend lifecycle
+
+`terminal-backend.ts` selects the backend per ACP session. The default is
+`auto`: `clientCapabilities.terminal === true` selects the client terminal;
+otherwise shell execution stays local. `OPENCODE_ACP_TERMINAL_BACKEND=client`
+requires the client capability and fails before execution when it is absent;
+`local` disables ACP terminals. Never fall back to local execution after
+`terminal/create` has been attempted, because that can execute a command twice.
+
+Client terminal handles are registered by `sessionID:callID`. Normal completion
+uses `releaseClientTerminal`; interruption, timeout, session close, or event
+stream shutdown uses `terminateClientTerminal` (`kill` then `release`). Both
+paths are idempotent. When changing this lifecycle, update
+`test/acp/terminal-backend.test.ts` and cover capability fallback, one-time
+cleanup, and session isolation.
+
+ACP shell text content is sent as a fenced code block so clients that render
+`ToolCallContent` text as Markdown cannot reinterpret command output. The
+unformatted value must remain in `rawOutput`. `handleShellStarted` sends the
+command tool call but must not emit an empty synthetic `in_progress` update;
+that update appears as a repetitive `working...` card in clients such as Zed.
