@@ -1558,61 +1558,7 @@ const layer: Layer.Layer<
         const chunkTimeout = resolveChunkTimeout(options["chunkTimeout"])
         delete options["chunkTimeout"]
 
-        options["fetch"] = async (input: any, init?: BunFetchRequestInit) => {
-          const fetchFn = customFetch ?? fetch
-          const opts = init ?? {}
-          const chunkAbortCtl = chunkTimeout === false ? undefined : new AbortController()
-          const timeout = resolveHttpTimeout(options["timeout"])
-          const signals: AbortSignal[] = []
-
-          if (opts.signal) signals.push(opts.signal)
-          if (chunkAbortCtl) signals.push(chunkAbortCtl.signal)
-          if (timeout !== false) signals.push(AbortSignal.timeout(timeout))
-
-          const { signal: combined, cleanup } = signals.length <= 1
-            ? { signal: signals[0] ?? null, cleanup: () => {} }
-            : combineSignals(signals)
-          if (combined) opts.signal = combined
-
-          // Strip openai itemId metadata following what codex does
-          if (
-            (model.api.npm === "@ai-sdk/openai" || model.api.npm === "@ai-sdk/azure") &&
-            opts.body &&
-            opts.method === "POST"
-          ) {
-            let body: Record<string, unknown>
-            try {
-              const bodyStr = opts.body instanceof Uint8Array ? new TextDecoder().decode(opts.body) : (opts.body as string)
-              body = JSON.parse(bodyStr)
-              if (!body || typeof body !== "object") throw new Error("Body is not an object")
-            } catch {
-              // Malformed JSON — pass through unmodified
-              return fetchFn(input, { ...opts, timeout: false })
-            }
-            const keepIds = body.store === true
-            if (!keepIds && Array.isArray(body.input)) {
-              for (const item of body.input) {
-                if ("id" in item) {
-                  delete item.id
-                }
-              }
-              opts.body = opts.body instanceof Uint8Array ? new TextEncoder().encode(JSON.stringify(body)) : JSON.stringify(body)
-            }
-          }
-
-          try {
-            const res = await fetchFn(input, {
-              ...opts,
-              // @ts-ignore see here: https://github.com/oven-sh/bun/issues/16682
-              timeout: false,
-            })
-
-            if (chunkTimeout === false) return res
-            return wrapSSE(res, chunkTimeout, chunkAbortCtl!)
-          } finally {
-            cleanup()
-          }
-        }
+        options["fetch"] = __exportTestFetchFn(options, model, customFetch, chunkTimeout)
 
         const bundledLoader = BUNDLED_PROVIDERS[model.api.npm]
         if (bundledLoader) {
