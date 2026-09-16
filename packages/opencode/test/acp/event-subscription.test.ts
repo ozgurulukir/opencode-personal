@@ -457,18 +457,17 @@ describe("acp.agent event subscription", () => {
             .filter((u) => u.sessionId === sessionId)
             .map((u) => u.update)
             .filter((u) => u.sessionUpdate === "tool_call" || u.sessionUpdate === "tool_call_update")
-          expect(updates.map((u) => u.sessionUpdate)).toEqual(["tool_call", "tool_call_update", "tool_call_update"])
+          expect(updates.map((u) => u.sessionUpdate)).toEqual(["tool_call", "tool_call_update"])
           expect((updates[0] as any).title).toBe("git status")
           expect((updates[0] as any).rawInput).toEqual({ command: "git status" })
           expect((updates[0] as any).content).toContainEqual({
             type: "content",
-            content: { type: "text", text: "$ git status" },
+            content: { type: "text", text: "```\n$ git status\n```" },
           })
-          expect((updates[1] as any).rawInput).toEqual({ command: "git status" })
-          expect((updates[2] as any).status).toBe("completed")
-          expect((updates[2] as any).content).toContainEqual({
+          expect((updates[1] as any).status).toBe("completed")
+          expect((updates[1] as any).content).toContainEqual({
             type: "content",
-            content: { type: "text", text: "On branch main" },
+            content: { type: "text", text: "```\nOn branch main\n```" },
           })
         } finally {
           stop()
@@ -698,7 +697,7 @@ describe("acp.agent event subscription", () => {
           .filter((u) => isToolCallUpdate(u.update))
           .map((u) => inProgressText(u.update))
 
-        expect(snapshots).toEqual(["a", undefined, "ab"])
+        expect(snapshots).toEqual(["```\na\n```", undefined, "```\nab\n```"])
         stop()
       },
     })
@@ -763,13 +762,13 @@ describe("acp.agent event subscription", () => {
         const progressContent = progress?.update.sessionUpdate === "tool_call_update" ? progress.update.content : undefined
         expect(progressContent).toContainEqual({
           type: "content",
-          content: { type: "text", text: "hi\n" },
+          content: { type: "text", text: "```\nhi\n\n```" },
         })
 
         const completed = completedToolUpdate(sessionUpdates, sessionId, "call_bash_content")
         expect(completed?.content).toContainEqual({
           type: "content",
-          content: { type: "text", text: "hi\n" },
+          content: { type: "text", text: "```\nhi\n\n```" },
         })
         expect(completed?.rawOutput).toEqual({ output: "hi\n", metadata: { output: "hi\n" } })
         stop()
@@ -975,7 +974,7 @@ describe("acp.agent event subscription", () => {
           .filter((u) => isToolCallUpdate(u.update))
           .map((u) => inProgressText(u.update))
 
-        expect(snapshots).toEqual(["a", "a"])
+        expect(snapshots).toEqual(["```\na\n```", "```\na\n```"])
         stop()
       },
     })

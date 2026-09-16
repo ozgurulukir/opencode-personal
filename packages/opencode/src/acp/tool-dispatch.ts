@@ -31,6 +31,11 @@ function structuredShellOutput(structured: Record<string, unknown>): string | un
   return typeof output === "string" ? output : undefined
 }
 
+function shellContentText(output: string) {
+  const fence = output.includes("```") ? "````" : "```"
+  return `${fence}\n${output}\n${fence}`
+}
+
 function toolTitle(tool: string, input: Record<string, unknown>) {
   const command = input.command
   return tool === ShellID.ToolID && typeof command === "string" && command.length > 0 ? command : tool
@@ -44,7 +49,7 @@ function shellCommandContent(tool: string, input: Record<string, unknown>, termi
       type: "content",
       content: {
         type: "text",
-        text: `$ ${command}`,
+        text: shellContentText(`$ ${command}`),
       },
     },
     ...(terminal ? [{ type: "terminal" as const, terminalId: terminal }] : []),
@@ -129,10 +134,6 @@ export async function handleShellStarted(
   toolCalls.set(props.callID, { tool: ShellID.ToolID, input })
   shellSnapshots.delete(props.callID)
   await toolStart(connection, toolStarts, sessionId, props.callID, ShellID.ToolID, input, props.terminalId)
-  await handleToolProgress(connection, shellSnapshots, toolCalls, sessionId, {
-    callID: props.callID,
-    structured: {},
-  })
 }
 
 export async function handleShellEnded(
@@ -191,7 +192,7 @@ export async function handleToolProgress(
       type: "content",
       content: {
         type: "text",
-        text: output,
+        text: info.tool === ShellID.ToolID ? shellContentText(output) : output,
       },
     })
   }
@@ -390,7 +391,7 @@ export async function handleShellMessage(
             type: "content",
             content: {
               type: "text",
-              text: shell.output,
+              text: shellContentText(shell.output),
             },
           },
         ],
@@ -474,7 +475,7 @@ export function completedToolContent(
       type: "content",
       content: {
         type: "text",
-        text,
+        text: toolName === ShellID.ToolID ? shellContentText(text) : text,
       },
     },
   ]
