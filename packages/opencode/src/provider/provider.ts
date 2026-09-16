@@ -177,6 +177,68 @@ function selectAzureLanguageModel(sdk: any, modelID: string, useChat: boolean) {
 }
 
 
+const utf8Decoder = new TextDecoder()
+const utf8Encoder = new TextEncoder()
+
+export const __exportTestFetchFn = (options: any, model: any, customFetch: any, chunkTimeout: any) => {
+  return async (input: any, init?: BunFetchRequestInit) => {
+    const fetchFn = customFetch ?? fetch
+    const opts = init ?? {}
+    const chunkAbortCtl = chunkTimeout === false ? undefined : new AbortController()
+    const timeout = resolveHttpTimeout(options["timeout"])
+    const signals: AbortSignal[] = []
+
+    if (opts.signal) signals.push(opts.signal)
+    if (chunkAbortCtl) signals.push(chunkAbortCtl.signal)
+    if (timeout !== false) signals.push(AbortSignal.timeout(timeout))
+
+    const { signal: combined, cleanup } = signals.length <= 1
+      ? { signal: signals[0] ?? null, cleanup: () => {} }
+      : combineSignals(signals)
+    if (combined) opts.signal = combined
+
+    // Strip openai itemId metadata following what codex does
+    if (
+      (model.api.npm === "@ai-sdk/openai" || model.api.npm === "@ai-sdk/azure") &&
+      opts.body &&
+      opts.method === "POST"
+    ) {
+      let body: Record<string, unknown>
+      try {
+        const bodyStr = opts.body instanceof Uint8Array ? utf8Decoder.decode(opts.body) : (opts.body as string)
+        body = JSON.parse(bodyStr)
+        // Deliberately throw so the catch block falls through to unmodified pass-through
+        if (!body || typeof body !== "object") throw new Error("Body is not an object")
+      } catch {
+        // Malformed JSON — pass through unmodified
+        return fetchFn(input, { ...opts, timeout: false })
+      }
+      const keepIds = body.store === true
+      if (!keepIds && Array.isArray(body.input)) {
+        for (const item of body.input) {
+          if ("id" in item) {
+            delete item.id
+          }
+        }
+        opts.body = opts.body instanceof Uint8Array ? utf8Encoder.encode(JSON.stringify(body)) : JSON.stringify(body)
+      }
+    }
+
+    try {
+      const res = await fetchFn(input, {
+        ...opts,
+        // @ts-ignore see here: https://github.com/oven-sh/bun/issues/16682
+        timeout: false,
+      })
+
+      if (chunkTimeout === false) return res
+      return wrapSSE(res, chunkTimeout, chunkAbortCtl!)
+    } finally {
+      cleanup()
+    }
+  }
+}
+
 export const rewriteMaxOutputTokens = (url: RequestInfo | URL, init?: RequestInit) => {
   if (init?.body) {
     let isUint8Array = false
@@ -186,7 +248,7 @@ export const rewriteMaxOutputTokens = (url: RequestInfo | URL, init?: RequestIni
       bodyString = init.body
     } else if (init.body instanceof Uint8Array) {
       isUint8Array = true
-      bodyString = new TextDecoder().decode(init.body)
+      bodyString = utf8Decoder.decode(init.body)
     }
 
     if (bodyString) {
@@ -196,7 +258,7 @@ export const rewriteMaxOutputTokens = (url: RequestInfo | URL, init?: RequestIni
           body.max_completion_tokens = body.max_output_tokens
           delete body.max_output_tokens
           const newBodyString = JSON.stringify(body)
-          init.body = isUint8Array ? new TextEncoder().encode(newBodyString) : newBodyString
+          init.body = isUint8Array ? utf8Encoder.encode(newBodyString) : newBodyString
         }
       } catch {
         // Silently swallow JSON.parse failures as this is intended for non-JSON passthrough
