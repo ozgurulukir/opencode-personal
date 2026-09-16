@@ -424,6 +424,59 @@ describe("acp.agent event subscription", () => {
     })
   })
 
+  test("forwards live shell commands and output", async () => {
+    await using tmp = await tmpdir()
+    await WithInstance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        const { agent, controller, sessionUpdates, stop } = createFakeAgent()
+        const cwd = "/tmp/opencode-acp-test"
+        const sessionId = await agent.newSession({ cwd, mcpServers: [] } as any).then((x) => x.sessionId)
+        const callID = "shell_1"
+
+        controller.push({
+          directory: cwd,
+          payload: {
+            id: "shell_started_1",
+            type: "session.next.shell.started",
+            properties: { timestamp: Date.now(), sessionID: sessionId, callID, command: "git status" },
+          },
+        } as any)
+        controller.push({
+          directory: cwd,
+          payload: {
+            id: "shell_ended_1",
+            type: "session.next.shell.ended",
+            properties: { timestamp: Date.now(), sessionID: sessionId, callID, output: "On branch main" },
+          },
+        } as any)
+        await new Promise((r) => setTimeout(r, 20))
+
+        try {
+          const updates = sessionUpdates
+            .filter((u) => u.sessionId === sessionId)
+            .map((u) => u.update)
+            .filter((u) => u.sessionUpdate === "tool_call" || u.sessionUpdate === "tool_call_update")
+          expect(updates.map((u) => u.sessionUpdate)).toEqual(["tool_call", "tool_call_update", "tool_call_update"])
+          expect((updates[0] as any).title).toBe("git status")
+          expect((updates[0] as any).rawInput).toEqual({ command: "git status" })
+          expect((updates[0] as any).content).toContainEqual({
+            type: "content",
+            content: { type: "text", text: "$ git status" },
+          })
+          expect((updates[1] as any).rawInput).toEqual({ command: "git status" })
+          expect((updates[2] as any).status).toBe("completed")
+          expect((updates[2] as any).content).toContainEqual({
+            type: "content",
+            content: { type: "text", text: "On branch main" },
+          })
+        } finally {
+          stop()
+        }
+      },
+    })
+  })
+
   test("keeps concurrent sessions isolated when message.part.delta events are interleaved", async () => {
     await using tmp = await tmpdir()
     await WithInstance.provide({

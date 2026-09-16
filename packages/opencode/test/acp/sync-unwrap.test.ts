@@ -235,4 +235,43 @@ describe("ACP sync envelope unwrapping", () => {
     expect(chunk).toBeDefined()
     expect(chunk.update.content.text).toBe("hello")
   })
+
+  test("characterization: suppresses duplicate completion for same callID when shell.ended and tool.success both fire", async () => {
+    const { agent, sessionUpdates } = createTestAgent()
+    const callID = "call_shell_dup"
+
+    // Tool starts via shell.started or tool.called
+    await (agent as any).handleEvent(
+      syncEnvelope("session.next.shell.started", {
+        sessionID: "ses_1",
+        callID,
+        command: "echo test",
+      }),
+    )
+
+    // Shell ends
+    await (agent as any).handleEvent(
+      syncEnvelope("session.next.shell.ended", {
+        sessionID: "ses_1",
+        callID,
+        output: "test\n",
+      }),
+    )
+
+    // Followed by tool.success for same callID
+    await (agent as any).handleEvent(
+      syncEnvelope("session.next.tool.success", {
+        sessionID: "ses_1",
+        callID,
+        structured: { output: "test\n" },
+        content: [{ type: "text", text: "test\n" }],
+      }),
+    )
+
+    const completedUpdates = sessionUpdates.filter(
+      (u: any) => u.update.sessionUpdate === "tool_call_update" && u.update.status === "completed" && u.update.toolCallId === callID,
+    )
+
+    expect(completedUpdates).toHaveLength(1)
+  })
 })

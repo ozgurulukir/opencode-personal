@@ -80,6 +80,7 @@ export const resolveTools = Effect.fn("SessionPrompt.resolveTools")(function* (
       bypassAgentCheck: input.bypassAgentCheck,
       promptOps,
       permissionRuleset: Permission.merge(input.agent.permission, input.session.permission ?? []),
+      sync: deps.sync,
     },
     agent: input.agent.name,
     messages: input.messages,

@@ -1,4 +1,4 @@
-import { Effect, Stream } from "effect"
+import { DateTime, Effect, Stream } from "effect"
 import { createWriteStream } from "node:fs"
 import * as Tool from "../tool"
 import path from "path"
@@ -17,6 +17,8 @@ import { ChildProcess } from "effect/unstable/process"
 import { ChildProcessSpawner } from "effect/unstable/process/ChildProcessSpawner"
 import { ShellPrompt, type Parameters } from "./prompt"
 import { BashArity } from "@/permission/arity"
+import { createClientTerminal, releaseClientTerminal } from "@/acp/terminal-backend"
+import { SessionEvent } from "@/v2/session-event"
 import {
   CWD,
   FILES,
@@ -242,6 +244,76 @@ export function createShellTool(
         },
       })
 
+      const clientTerminal = yield* Effect.promise(() =>
+        createClientTerminal({
+          sessionID: ctx.sessionID,
+          callID: ctx.callID ?? "shell",
+          command: input.shell,
+          args: Shell.args(input.shell, input.command, input.cwd),
+          cwd: input.cwd,
+          env: input.env,
+          outputByteLimit: keep,
+        }),
+      )
+
+      if (ctx.extra?.sync) {
+        yield* ctx.extra.sync.run(SessionEvent.Shell.Started.Sync, {
+          sessionID: ctx.sessionID,
+          timestamp: DateTime.makeUnsafe(Date.now()),
+          callID: ctx.callID ?? "shell",
+          command: input.command,
+        })
+      }
+
+      if (clientTerminal) {
+        const abort = Effect.callback<void>((resume) => {
+          if (ctx.abort.aborted) return resume(Effect.void)
+          const handler = () => resume(Effect.void)
+          ctx.abort.addEventListener("abort", handler, { once: true })
+          return Effect.sync(() => ctx.abort.removeEventListener("abort", handler))
+        })
+        const exit = yield* Effect.raceAll([
+          Effect.promise(() => clientTerminal.terminal.waitForExit()).pipe(
+            Effect.map((result) => ({ kind: "exit" as const, result })),
+          ),
+          abort.pipe(Effect.map(() => ({ kind: "abort" as const }))),
+          Effect.sleep(`${input.timeout + 100} millis`).pipe(Effect.map(() => ({ kind: "timeout" as const }))),
+        ])
+        const result =
+          exit.kind === "exit"
+            ? exit.result
+            : yield* Effect.promise(() => clientTerminal.terminal.kill()).pipe(
+                Effect.andThen(() => Effect.promise(() => clientTerminal.terminal.waitForExit())),
+              )
+        const terminalOutput = yield* Effect.promise(() => clientTerminal.terminal.currentOutput()).pipe(
+          Effect.ensuring(Effect.promise(() => releaseClientTerminal(clientTerminal))),
+        )
+        const output = terminalOutput.output || "(no output)"
+        const metadata = [
+          ...(exit.kind === "timeout" ? [`shell tool terminated command after exceeding timeout ${input.timeout} ms.`] : []),
+          ...(exit.kind === "abort" ? ["User aborted the command"] : []),
+        ]
+        const finalOutput = metadata.length > 0 ? `${output}\n\n<shell_metadata>\n${metadata.join("\n")}\n</shell_metadata>` : output
+        if (ctx.extra?.sync) {
+          yield* ctx.extra.sync.run(SessionEvent.Shell.Ended.Sync, {
+            sessionID: ctx.sessionID,
+            timestamp: DateTime.makeUnsafe(Date.now()),
+            callID: clientTerminal.callID,
+            output: finalOutput,
+          })
+        }
+        return {
+          title: input.description,
+          metadata: {
+            output: terminalOutput.output ?? "",
+            exit: result.exitCode ?? null,
+            description: input.description,
+            truncated: terminalOutput.truncated,
+          },
+            output: finalOutput,
+        }
+      }
+
       const code: number | null = yield* Effect.scoped(
         Effect.gen(function* () {
           const handle = yield* spawner.spawn(cmd(input.shell, input.command, input.cwd, input.env))
@@ -356,6 +428,15 @@ export function createShellTool(
               stream.on("error", () => resolve())
             }),
         )
+      }
+
+      if (ctx.extra?.sync) {
+        yield* ctx.extra.sync.run(SessionEvent.Shell.Ended.Sync, {
+          sessionID: ctx.sessionID,
+          timestamp: DateTime.makeUnsafe(Date.now()),
+          callID: ctx.callID ?? "shell",
+          output,
+        })
       }
 
       return {

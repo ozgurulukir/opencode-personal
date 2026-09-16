@@ -5,6 +5,7 @@ import type { SessionID, MessageID } from "../session/schema"
 import * as Truncate from "./truncate"
 import { Agent } from "@/agent/agent"
 import type { TaskPromptOps } from "./task"
+import type { SyncEvent } from "@/sync"
 
 interface Metadata {
   [key: string]: unknown
@@ -25,6 +26,8 @@ export interface ToolContextExtra {
   promptOps?: TaskPromptOps
   /** Merged permission ruleset (agent + session) for deny evaluation without asking. */
   permissionRuleset?: Permission.Ruleset
+  /** Session lifecycle event publisher used by tools with session-level events. */
+  sync?: SyncEvent.Interface
   /** Tool-specific extensions. */
   [key: string]: unknown
 }

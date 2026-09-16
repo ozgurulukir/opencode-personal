@@ -27,6 +27,7 @@ import { SessionRevert } from "../revert"
 import { ShellID } from "@/tool/shell/id"
 import { currentModel } from "./model"
 import type { ShellInput } from "../prompt"
+import { createClientTerminal, releaseClientTerminal, terminateClientTerminal } from "@/acp/terminal-backend"
 
 export interface ShellImplDeps {
   sessions: Session.Interface
@@ -94,7 +95,6 @@ export const shellImpl = Effect.fn("SessionPrompt.shellImpl")(
             providerID: model.providerID,
           }
           yield* deps.sessions.updateMessage(msg)
-          const callID = ulid()
           const started = Date.now()
           const part: MessageV2.ToolPart = {
             type: "tool",
@@ -110,20 +110,36 @@ export const shellImpl = Effect.fn("SessionPrompt.shellImpl")(
             },
           }
           yield* deps.sessions.updatePart(part)
-          yield* deps.sync.run(SessionEvent.Shell.Started.Sync, {
-            sessionID: input.sessionID,
-            timestamp: DateTime.makeUnsafe(started),
-            callID,
-            command: input.command,
-          })
           return { msg, part, cwd: ctx.directory }
         }).pipe(Effect.ensuring(markReady))
 
         const cfg = yield* deps.config.get()
         const sh = Shell.preferred(cfg.shell)
         const args = Shell.args(sh, input.command, cwd)
+        const shellEnv = yield* deps.plugin.trigger(
+          "shell.env",
+          { cwd, sessionID: input.sessionID, callID: part.callID },
+          { env: {} },
+        )
+        const clientTerminal = yield* Effect.promise(() =>
+          createClientTerminal({
+            sessionID: input.sessionID,
+            callID: part.callID,
+            command: sh,
+            args,
+            cwd,
+            env: { ...shellEnv.env, TERM: "dumb" },
+          }),
+        )
+        yield* deps.sync.run(SessionEvent.Shell.Started.Sync, {
+          sessionID: input.sessionID,
+          timestamp: DateTime.makeUnsafe(Date.now()),
+          callID: part.callID,
+          command: input.command,
+        })
         let output = ""
         let aborted = false
+        let terminalExited = false
 
         const finish = Effect.uninterruptible(
           Effect.gen(function* () {
@@ -157,11 +173,14 @@ export const shellImpl = Effect.fn("SessionPrompt.shellImpl")(
 
         const exit = yield* restore(
           Effect.gen(function* () {
-            const shellEnv = yield* deps.plugin.trigger(
-              "shell.env",
-              { cwd, sessionID: input.sessionID, callID: part.callID },
-              { env: {} },
-            )
+            if (clientTerminal) {
+              yield* Effect.promise(() => clientTerminal.terminal.waitForExit())
+              terminalExited = true
+              const result = yield* Effect.promise(() => clientTerminal.terminal.currentOutput())
+              output = result.output
+              yield* Effect.promise(() => releaseClientTerminal(clientTerminal))
+              return 0
+            }
             const cmd = ChildProcess.make(sh, args, {
               cwd,
               extendEnv: true,
@@ -180,7 +199,15 @@ export const shellImpl = Effect.fn("SessionPrompt.shellImpl")(
               }),
             )
             yield* handle.exitCode
-          }).pipe(Effect.scoped, Effect.orDie),
+          }).pipe(
+            Effect.ensuring(
+              clientTerminal
+                ? Effect.promise(() => (terminalExited ? releaseClientTerminal(clientTerminal) : terminateClientTerminal(clientTerminal)))
+                : Effect.void,
+            ),
+            Effect.scoped,
+            Effect.orDie,
+          ),
         ).pipe(Effect.exit)
 
         if (Exit.isFailure(exit) && Cause.hasInterrupts(exit.cause) && !Cause.hasDies(exit.cause)) {

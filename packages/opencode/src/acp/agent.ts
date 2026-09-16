@@ -44,6 +44,8 @@ import {
   handleToolFailed,
   handleToolProgress,
   handleToolSuccess,
+  handleShellEnded,
+  handleShellStarted,
   toToolKind,
   toLocations,
   type ToolCallInfo,
@@ -61,6 +63,7 @@ import {
   parseModelSelection,
   buildConfigOptions,
 } from "./session-config"
+import { registerConnection, unregisterConnection, unregisterConnectionTerminals, terminalId } from "./terminal-backend"
 
 const log = Log.create({ service: "acp-agent" })
 
@@ -115,6 +118,7 @@ export class Agent implements ACPAgent {
   private toolStarts = new Set<string>()
   private toolCalls = new Map<string, ToolCallInfo>()
   private permissionQueues = new Map<string, Promise<void>>()
+  private clientTerminalCapability = false
   private permissionOptions: PermissionOption[] = [
     { optionId: "once", kind: "allow_once", name: "Allow once" },
     { optionId: "always", kind: "allow_always", name: "Always allow" },
@@ -142,26 +146,30 @@ export class Agent implements ACPAgent {
     const subscribe = this.sdk.global?.event?.bind(this.sdk.global)
     if (typeof subscribe !== "function") return
 
-    while (true) {
-      if (this.eventAbort.signal.aborted) return
-      try {
-        const events = await subscribe({
-          signal: this.eventAbort.signal,
-        })
-        for await (const event of events.stream) {
-          if (this.eventAbort.signal.aborted) return
-          const payload = event?.payload
-          if (!payload) continue
-          await this.handleEvent(payload as Event).catch((error) => {
-            log.error("failed to handle event", { error, type: payload.type })
-          })
-        }
-        return
-      } catch (error) {
+    try {
+      while (true) {
         if (this.eventAbort.signal.aborted) return
-        log.error("event subscription failed; retrying", { error })
-        await new Promise((resolve) => setTimeout(resolve, 250))
+        try {
+          const events = await subscribe({
+            signal: this.eventAbort.signal,
+          })
+          for await (const event of events.stream) {
+            if (this.eventAbort.signal.aborted) return
+            const payload = event?.payload
+            if (!payload) continue
+            await this.handleEvent(payload as Event).catch((error) => {
+              log.error("failed to handle event", { error, type: payload.type })
+            })
+          }
+          return
+        } catch (error) {
+          if (this.eventAbort.signal.aborted) return
+          log.error("event subscription failed; retrying", { error })
+          await new Promise((resolve) => setTimeout(resolve, 250))
+        }
       }
+    } finally {
+      await unregisterConnectionTerminals(this.connection)
     }
   }
 
@@ -225,6 +233,36 @@ export class Agent implements ACPAgent {
           .catch((error) => {
             log.error("failed to send reasoning delta to ACP", { error })
           })
+        return
+      }
+
+      case "session.next.shell.started": {
+        const props = event.properties as { sessionID: string; callID: string; command: string }
+        const session = await this.sessionManager.tryGetOrLoad(props.sessionID)
+        if (!session) return
+        await handleShellStarted(
+          this.connection,
+          this.shellSnapshots,
+          this.toolStarts,
+          this.toolCalls,
+          session.id,
+          { ...props, terminalId: terminalId(props.sessionID, props.callID) },
+        )
+        return
+      }
+
+      case "session.next.shell.ended": {
+        const props = event.properties as { sessionID: string; callID: string; output: string }
+        const session = await this.sessionManager.tryGetOrLoad(props.sessionID)
+        if (!session) return
+        await handleShellEnded(
+          this.connection,
+          this.shellSnapshots,
+          this.toolStarts,
+          this.toolCalls,
+          session.id,
+          props,
+        )
         return
       }
 
@@ -365,6 +403,7 @@ export class Agent implements ACPAgent {
 
   async initialize(params: InitializeRequest): Promise<InitializeResponse> {
     log.info("initialize", { protocolVersion: params.protocolVersion })
+    this.clientTerminalCapability = params.clientCapabilities?.terminal === true
 
     const authMethod: AuthMethod = {
       description: "Run `opencode auth login` in the terminal",
@@ -422,6 +461,7 @@ export class Agent implements ACPAgent {
       // Store ACP session state
       const state = await this.sessionManager.create(params.cwd, params.mcpServers, model)
       const sessionId = state.id
+      registerConnection(sessionId, this.connection, this.clientTerminalCapability)
 
       log.info("creating_session", { sessionId, mcpServers: params.mcpServers.length })
 
@@ -452,6 +492,7 @@ export class Agent implements ACPAgent {
 
       // Store ACP session state
       await this.sessionManager.load(sessionId, params.cwd, params.mcpServers, model)
+      registerConnection(sessionId, this.connection, this.clientTerminalCapability)
 
       const messages = await this.loadSessionMessages(directory, sessionId)
       this.restoreSessionStateFromMessages(sessionId, messages)
@@ -540,6 +581,7 @@ export class Agent implements ACPAgent {
 
       const sessionId = forked.id
       await this.sessionManager.load(sessionId, directory, mcpServers, model)
+      registerConnection(sessionId, this.connection, this.clientTerminalCapability)
 
       const messages = await this.loadSessionMessages(directory, sessionId)
       this.restoreSessionStateFromMessages(sessionId, messages)
@@ -573,6 +615,7 @@ export class Agent implements ACPAgent {
     try {
       const model = await defaultModel(this.config, directory)
       await this.sessionManager.load(sessionId, directory, mcpServers, model)
+      registerConnection(sessionId, this.connection, this.clientTerminalCapability)
 
       const messages = await this.loadSessionMessages(directory, sessionId, 20)
       this.restoreSessionStateFromMessages(sessionId, messages)
@@ -612,6 +655,7 @@ export class Agent implements ACPAgent {
       })
 
     this.permissionQueues.delete(params.sessionId)
+    await unregisterConnection(params.sessionId)
     log.info("close_session", { sessionId: params.sessionId })
     return {}
   }
