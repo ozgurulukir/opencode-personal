@@ -345,6 +345,6 @@ describe("Agent.processMessage", () => {
     expect(sessionUpdates[0].update.status).toBe("completed")
     expect(sessionUpdates[0].update.toolCallId).toBe("call_shell")
     expect(sessionUpdates[0].update.rawInput).toEqual({ command: "echo hi" })
-    expect(sessionUpdates[0].update.content).toEqual([{ type: "content", content: { type: "text", text: "hi\n" } }])
+    expect(sessionUpdates[0].update.content).toEqual([{ type: "content", content: { type: "text", text: "```\nhi\n\n```" } }])
   })
 })
