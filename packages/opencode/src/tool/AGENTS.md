@@ -21,6 +21,21 @@ export interface ToolContextExtra {
 }
 ```
 
+## ACP shell event forwarding
+
+The session loop passes `extra.sync` to tools that need to publish V2 lifecycle
+events. The shell tool publishes `SessionEvent.Shell.Started.Sync` before
+execution and `Shell.Ended.Sync` after the final output is collected. In ACP,
+the client terminal is selected before any local `ChildProcess` is spawned;
+when selected, local execution must not also run.
+
+ACP shell output is deliberately formatted as a fenced code block only in the
+ACP `ToolCallContent` text projection. Keep tool return values, persisted
+output, and `rawOutput` as the original text so model context and replay are
+not changed. Do not add an empty shell progress update: the pending tool call
+already supplies the initial card state, and an empty `in_progress` update is
+rendered as a redundant `working...` message by some clients.
+
 **Producers** (`session/prompt.ts`): lines 454, 712, 1191 construct object literals matching this shape. **Consumers** (`tool/task.ts`, `tool/read.ts`, `tool/websearch.ts`) now access typed fields directly — no `as` casts or bracket notation needed.
 
 The index signature preserves backward compatibility for any other tool reading `ctx.extra` via bracket access.

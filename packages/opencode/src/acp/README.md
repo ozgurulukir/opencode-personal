@@ -10,14 +10,9 @@ The implementation follows a clean separation of concerns:
 
 - **`agent.ts`** - Implements the `Agent` interface from `@agentclientprotocol/sdk`
   - Handles initialization and capability negotiation
-  - Manages session lifecycle (`session/new`, `session/load`)
-  - Processes prompts and returns responses
-  - Properly implements ACP protocol v1
-
-- **`client.ts`** - Implements the `Client` interface for client-side capabilities
-  - File operations (`readTextFile`, `writeTextFile`)
-  - Permission requests (auto-approves for now)
-  - Capability-driven terminal support
+  - Manages session lifecycle and prompt handling
+  - Implements client-side capability calls such as permission, file-write,
+    and terminal requests on the injected `AgentSideConnection`
 
 - **`session.ts`** - Session state management
   - Creates and tracks ACP sessions
@@ -25,10 +20,10 @@ The implementation follows a clean separation of concerns:
   - Maintains working directory context
   - Handles MCP server configurations
 
-- **`server.ts`** - ACP server startup and lifecycle
-  - Sets up JSON-RPC over stdio using the official library
-  - Manages graceful shutdown on SIGTERM/SIGINT
-  - Provides Instance context for the agent
+- **`cli/cmd/acp.ts`** - ACP process entry point
+  - Starts the internal OpenCode HTTP server
+  - Creates the SDK client used by the ACP agent
+  - Connects the official JSON-RPC-over-stdio stream
 
 - **`types.ts`** - Type definitions for internal use
 
@@ -54,14 +49,6 @@ OPENCODE_ENABLE_QUESTION_TOOL=1 opencode acp
 
 Enable this only for ACP clients that support interactive question prompts.
 
-### Programmatic
-
-```typescript
-import { ACPServer } from "./acp/server"
-
-await ACPServer.start()
-```
-
 ### Integration with Zed
 
 Add to your Zed configuration (`~/.config/zed/settings.json`):
@@ -85,7 +72,9 @@ This implementation follows the ACP specification v1:
 
 - Proper `initialize` request/response with protocol version negotiation
 - Capability advertisement (`agentCapabilities`)
-- Authentication support (stub)
+- Authentication is advertised as an auth method, but the ACP
+  `authenticate` request is not implemented; users must run
+  `opencode auth login` out-of-band.
 
 ✅ **Session Management**
 
@@ -102,7 +91,7 @@ This implementation follows the ACP specification v1:
 
 ✅ **Client Capabilities**
 
-- File read/write operations
+- Client-side file writes for accepted edit permissions; file reads remain local
 - Permission requests
 - Terminal support via the client terminal backend when advertised
 
@@ -143,7 +132,7 @@ releasing them, and cleanup is idempotent.
 ### Future Enhancements
 
 - **Enhanced Permissions**: More sophisticated permission handling
-- **Terminal Integration**: Full terminal support via opencode's bash tool
+- **Protocol Authentication**: End-to-end ACP authentication when supported
 
 ## Testing
 
@@ -166,16 +155,14 @@ We use `@agentclientprotocol/sdk` instead of implementing JSON-RPC ourselves bec
 - Reduces maintenance burden
 - Works with other ACP clients automatically
 
-### Clean Architecture
+### Runtime architecture
 
-Each component has a single responsibility:
-
-- **Agent** = Protocol interface
-- **Client** = Client-side operations
-- **Session** = State management
-- **Server** = Lifecycle and I/O
-
-This makes the codebase maintainable and testable.
+`opencode acp` starts the normal OpenCode HTTP server and points an
+`OpencodeClient` at it. The ACP `Agent` translates protocol requests and V2
+session events into ACP responses and notifications. Session state is managed
+by `session.ts`; terminal handles are managed per ACP session by
+`terminal-backend.ts`. There are no separate `client.ts` or `server.ts`
+modules in this implementation.
 
 ### Mapping to OpenCode
 
