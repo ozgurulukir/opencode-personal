@@ -15,8 +15,6 @@ const log = Log.create({ service: "acp-tool-dispatch" })
 
 const decodeTodos = Schema.decodeUnknownResult(Schema.fromJsonString(Schema.Array(Todo.Info)))
 
-// V2 progress/success/failed events carry only `callID`, so the tool name and
-// input recorded at `tool.called` are reused for later updates.
 export type ToolCallInfo = { tool: string; input: Record<string, unknown> }
 
 type V2ToolContent = ToolTextContent | { type: "file"; uri: string; mime: string; name?: string }
@@ -33,26 +31,70 @@ function structuredShellOutput(structured: Record<string, unknown>): string | un
   return typeof output === "string" ? output : undefined
 }
 
+function toolTitle(tool: string, input: Record<string, unknown>) {
+  const command = input.command
+  return tool === ShellID.ToolID && typeof command === "string" && command.length > 0 ? command : tool
+}
+
+function shellCommandContent(tool: string, input: Record<string, unknown>, terminal?: string): ToolCallContent[] {
+  const command = input.command
+  if (tool !== ShellID.ToolID || typeof command !== "string" || command.length === 0) return []
+  return [
+    {
+      type: "content",
+      content: {
+        type: "text",
+        text: `$ ${command}`,
+      },
+    },
+    ...(terminal ? [{ type: "terminal" as const, terminalId: terminal }] : []),
+  ]
+}
+
 export async function toolStart(
   connection: AgentSideConnection,
   toolStarts: Set<string>,
   sessionId: string,
   callID: string,
   tool: string,
+  input: Record<string, unknown> = {},
+  terminal?: string,
 ) {
-  if (toolStarts.has(callID)) return
+  if (toolStarts.has(callID)) {
+    if (!terminal) return
+    const content = shellCommandContent(tool, input, terminal)
+    await connection
+      .sessionUpdate({
+        sessionId,
+        update: {
+          sessionUpdate: "tool_call_update",
+          toolCallId: callID,
+          status: "in_progress",
+          kind: toToolKind(tool),
+          title: toolTitle(tool, input),
+          rawInput: input,
+          content,
+        },
+      })
+      .catch((error) => {
+        log.error("failed to attach terminal to ACP tool call", { error })
+      })
+    return
+  }
   toolStarts.add(callID)
+  const content = shellCommandContent(tool, input, terminal)
   await connection
     .sessionUpdate({
       sessionId,
       update: {
         sessionUpdate: "tool_call",
         toolCallId: callID,
-        title: tool,
+        title: toolTitle(tool, input),
         kind: toToolKind(tool),
         status: "pending",
         locations: [],
-        rawInput: {},
+        rawInput: input,
+        ...(content.length > 0 && { content }),
       },
     })
     .catch((error) => {
@@ -73,6 +115,39 @@ export async function handleToolCalled(
   // the pending state).
   shellSnapshots.delete(props.callID)
   await toolStart(connection, toolStarts, sessionId, props.callID, props.tool)
+}
+
+export async function handleShellStarted(
+  connection: AgentSideConnection,
+  shellSnapshots: Map<string, string>,
+  toolStarts: Set<string>,
+  toolCalls: Map<string, ToolCallInfo>,
+  sessionId: string,
+  props: { callID: string; command: string; terminalId?: string },
+) {
+  const input = { command: props.command }
+  toolCalls.set(props.callID, { tool: ShellID.ToolID, input })
+  shellSnapshots.delete(props.callID)
+  await toolStart(connection, toolStarts, sessionId, props.callID, ShellID.ToolID, input, props.terminalId)
+  await handleToolProgress(connection, shellSnapshots, toolCalls, sessionId, {
+    callID: props.callID,
+    structured: {},
+  })
+}
+
+export async function handleShellEnded(
+  connection: AgentSideConnection,
+  shellSnapshots: Map<string, string>,
+  toolStarts: Set<string>,
+  toolCalls: Map<string, ToolCallInfo>,
+  sessionId: string,
+  props: { callID: string; output: string },
+) {
+  await handleToolSuccess(connection, shellSnapshots, toolStarts, toolCalls, sessionId, {
+    callID: props.callID,
+    structured: { output: props.output },
+    content: [],
+  })
 }
 
 export async function handleToolProgress(
@@ -101,7 +176,7 @@ export async function handleToolProgress(
             toolCallId: props.callID,
             status: "in_progress",
             kind: toToolKind(info.tool),
-            title: info.tool,
+            title: toolTitle(info.tool, info.input),
             locations: toLocations(info.tool, info.input),
             rawInput: info.input,
           },
@@ -128,7 +203,7 @@ export async function handleToolProgress(
         toolCallId: props.callID,
         status: "in_progress",
         kind: toToolKind(info.tool),
-        title: info.tool,
+        title: toolTitle(info.tool, info.input),
         locations: toLocations(info.tool, info.input),
         rawInput: info.input,
         ...(content.length > 0 && { content }),
@@ -191,7 +266,7 @@ export async function handleToolSuccess(
         status: "completed",
         kind,
         content,
-        title: info.tool,
+        title: toolTitle(info.tool, info.input),
         rawInput: info.input,
         rawOutput: {
           output,
@@ -202,6 +277,7 @@ export async function handleToolSuccess(
     .catch((error) => {
       log.error("failed to send tool completed to ACP", { error })
     })
+  toolCalls.delete(props.callID)
 }
 
 export async function handleToolFailed(
@@ -224,7 +300,7 @@ export async function handleToolFailed(
         toolCallId: props.callID,
         status: "failed",
         kind: toToolKind(info.tool),
-        title: info.tool,
+        title: toolTitle(info.tool, info.input),
         rawInput: info.input,
         content: [
           {
@@ -244,6 +320,7 @@ export async function handleToolFailed(
     .catch((error) => {
       log.error("failed to send tool error to ACP", { error })
     })
+  toolCalls.delete(props.callID)
 }
 
 // Replay path: a projected V2 assistant tool item carries its own name and
@@ -261,7 +338,7 @@ export async function handleToolPartUpdate(
   }
   // Ensure the pending tool_call exists before any state update (the replay
   // path has no prior `tool.called` event).
-  await toolStart(connection, toolStarts, sessionId, part.id, part.name)
+  await toolStart(connection, toolStarts, sessionId, part.id, part.name, info.input)
   switch (part.state.status) {
     case "pending":
       return
@@ -303,7 +380,7 @@ export async function handleShellMessage(
       update: {
         sessionUpdate: "tool_call",
         toolCallId: shell.callID,
-        title: ShellID.ToolID,
+        title: shell.command,
         kind: toToolKind(ShellID.ToolID),
         status: "completed",
         locations: [],
@@ -388,12 +465,16 @@ export function completedToolContent(
   kind: ToolKind,
   output?: string,
 ): ToolCallContent[] {
+  const text =
+    output ||
+    textOutput(content) ||
+    (toolName === ShellID.ToolID && typeof input.command === "string" ? `$ ${input.command}` : "")
   const result: ToolCallContent[] = [
     {
       type: "content",
       content: {
         type: "text",
-        text: output ?? textOutput(content),
+        text,
       },
     },
   ]

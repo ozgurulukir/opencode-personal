@@ -17,7 +17,7 @@ The implementation follows a clean separation of concerns:
 - **`client.ts`** - Implements the `Client` interface for client-side capabilities
   - File operations (`readTextFile`, `writeTextFile`)
   - Permission requests (auto-approves for now)
-  - Terminal support (stub implementation)
+  - Capability-driven terminal support
 
 - **`session.ts`** - Session state management
   - Creates and tracks ACP sessions
@@ -104,7 +104,7 @@ This implementation follows the ACP specification v1:
 
 - File read/write operations
 - Permission requests
-- Terminal support (stub for future)
+- Terminal support via the client terminal backend when advertised
 
 ## Current Limitations
 
@@ -118,10 +118,27 @@ This implementation follows the ACP specification v1:
 6. **Usage Tracking** - Token usage and cost reported via `usage_update` notifications
 7. **Permission Requests** - Forwarded to ACP client with allow/reject options
 
+### Terminal execution
+
+When the client advertises `clientCapabilities.terminal: true`, ACP shell
+commands are created through `terminal/create`. The terminal is embedded in
+the tool call for live rendering; final output is collected with `waitForExit`
+and `currentOutput`, then the terminal is released. Clients without this
+capability use the existing local shell backend. Set
+`OPENCODE_ACP_TERMINAL_BACKEND=client` to require the client terminal, or
+`local` to disable it; the default `auto` mode selects it only when the
+capability is advertised.
+
+Terminal selection is scoped to each ACP session. A failed `terminal/create`
+request is not silently retried locally, preventing double execution.
+Session close and interrupted executions kill active client terminals before
+releasing them, and cleanup is idempotent.
+
 ### Not Yet Implemented
 
 1. **Authentication** - No actual auth implementation (stub)
-2. **Terminal Support** - Placeholder only
+2. **Zed smoke coverage** - A real Zed session is still required for manual
+   verification of live terminal rendering.
 
 ### Future Enhancements
 
