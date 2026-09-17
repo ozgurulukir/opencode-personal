@@ -773,15 +773,16 @@ export const layer = Layer.effect(
             }).pipe(
               Effect.catchCause((cause) =>
                 Effect.gen(function* () {
+                  const squashed = Cause.squash(cause)
                   log.error("subagent failed", {
-                    cause: cause,
+                    cause: Cause.squash(cause),
                     parentID: input.parentID,
                     agent: input.agent,
                   })
                   yield* sync.run(SessionEvent.Synthetic.Sync, {
                     sessionID: input.parentID,
                     timestamp: DateTime.makeUnsafe(Date.now()),
-                    text: `Subagent error: ${Cause.squash(cause)}`,
+                    text: `Subagent error: ${squashed instanceof Error ? squashed.message : String(squashed)}`,
                   })
                 }),
               ),
