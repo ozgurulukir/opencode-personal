@@ -11,7 +11,7 @@ import { WithInstance } from "../../src/project/with-instance"
 import { Plugin } from "../../src/plugin/index"
 import { ModelsDev } from "@/provider/models"
 import { Provider } from "@/provider/provider"
-import { rewriteMaxOutputTokens } from "@/provider/provider"
+import { rewriteMaxOutputTokens, __exportTestFetchFn } from "@/provider/provider"
 import { ProviderID, ModelID } from "../../src/provider/schema"
 import { Filesystem } from "@/util/filesystem"
 import { Env } from "../../src/env"
@@ -2651,6 +2651,37 @@ test("rewriteMaxOutputTokens > rewrites max_output_tokens to max_completion_toke
   }
 })
 
+test("rewriteMaxOutputTokens > rewrites max_output_tokens to max_completion_tokens in Uint8Array body", async () => {
+  const originalFetch = globalThis.fetch
+  try {
+    globalThis.fetch = mock((url: RequestInfo | URL, init?: RequestInit) => {
+      return Promise.resolve(new Response("ok"))
+    }) as any
+
+    const init = {
+      body: new TextEncoder().encode(JSON.stringify({
+        model: "o1-preview",
+        max_output_tokens: 32000,
+        temperature: 0.7
+      }))
+    }
+
+    await rewriteMaxOutputTokens("https://api.openai.com/v1/responses", init)
+
+    expect(globalThis.fetch).toHaveBeenCalled()
+    const callArgs = (globalThis.fetch as any).mock.calls[0]
+    expect(callArgs[1].body).toBeInstanceOf(Uint8Array)
+    const body = JSON.parse(new TextDecoder().decode(callArgs[1].body))
+
+    expect(body.max_output_tokens).toBeUndefined()
+    expect(body.max_completion_tokens).toBe(32000)
+    expect(body.model).toBe("o1-preview")
+    expect(body.temperature).toBe(0.7)
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
 test("rewriteMaxOutputTokens > is a no-op if max_output_tokens is not present", async () => {
   const originalFetch = globalThis.fetch
   try {
@@ -2745,6 +2776,48 @@ test("rewriteMaxOutputTokens > end-to-end through @ai-sdk/openai responses model
   } finally {
     server.stop()
   }
+})
+
+test("fetchFn wrapper > strips tool id fields from Uint8Array body", async () => {
+  let capturedInit: RequestInit | undefined
+  const customFetch = (url: RequestInfo | URL | Request, init?: RequestInit): Promise<Response> => {
+    capturedInit = init as RequestInit
+    return Promise.resolve(new Response("ok"))
+  }
+
+  const model = {
+    api: { npm: "@ai-sdk/openai" }
+  }
+
+  const fetchWrapper = __exportTestFetchFn({ timeout: 1000 }, model, customFetch, false)
+
+  const initialBody = {
+    store: false,
+    input: [
+      { id: "item_1", content: "foo" },
+      { id: "item_2", content: "bar" }
+    ]
+  }
+
+  const encodedBody = new TextEncoder().encode(JSON.stringify(initialBody))
+
+  await fetchWrapper("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    body: encodedBody
+  })
+
+  expect(capturedInit).toBeDefined()
+  expect(capturedInit!.body).toBeInstanceOf(Uint8Array)
+
+  const bodyStr = new TextDecoder().decode(capturedInit!.body as Uint8Array)
+  const body = JSON.parse(bodyStr)
+
+  expect(body.store).toBe(false)
+  expect(body.input).toHaveLength(2)
+  expect(body.input[0].id).toBeUndefined()
+  expect(body.input[0].content).toBe("foo")
+  expect(body.input[1].id).toBeUndefined()
+  expect(body.input[1].content).toBe("bar")
 })
 
 test("toPublicInfo returns a safe provider when options contain a circular reference", () => {
