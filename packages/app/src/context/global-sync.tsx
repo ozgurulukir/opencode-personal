@@ -48,6 +48,10 @@ type GlobalStore = {
   reload: undefined | "pending" | "complete"
 }
 
+// Loading-state fallbacks, hoisted so each getter read does not allocate.
+const EMPTY_PATH: Path = { state: "", config: "", worktree: "", directory: "", home: "" }
+const EMPTY_PROVIDER: ProviderListResponse = { all: [], connected: [], default: {} }
+
 export const loadSessionsQueryKey = (directory: string) => [directory, "loadSessions"] as const
 
 export const mcpQueryKey = (directory: string) => [directory, "mcp"] as const
@@ -93,14 +97,12 @@ function createGlobalSync() {
     session_todo: {},
     provider_auth: {},
     get path() {
-      const EMPTY = { state: "", config: "", worktree: "", directory: "", home: "" }
-      if (pathQuery.isLoading) return EMPTY
-      return pathQuery.data ?? EMPTY
+      if (pathQuery.isLoading) return EMPTY_PATH
+      return pathQuery.data ?? EMPTY_PATH
     },
     get provider() {
-      const EMPTY = { all: [], connected: [], default: {} }
-      if (providerQuery.isLoading) return EMPTY
-      return providerQuery.data ?? EMPTY
+      if (providerQuery.isLoading) return EMPTY_PROVIDER
+      return providerQuery.data ?? EMPTY_PROVIDER
     },
     get config() {
       if (configQuery.isLoading) return {}
@@ -370,19 +372,24 @@ function createGlobalSync() {
     if (!existing) return
     children.mark(key)
     const [store, setStore] = existing
-    applyDirectoryEvent({
-      event,
-      directory,
-      store,
-      setStore,
-      push: queue.push,
-      setSessionTodo,
-      vcsCache: children.vcsCache.get(key),
-      loadLsp: () => {
-        void queryClient.fetchQuery(loadLspQuery(key, sdkFor(directory)))
-      },
-      resolveOptimistic: (sessionID, text) => optimisticResolver?.(directory, sessionID, text),
-    })
+    // Coalesce the multiple store writes a single event can perform (e.g.
+    // session.next.prompted resolves optimistic state and inserts message +
+    // parts) into one notification cycle during streaming bursts.
+    batch(() =>
+      applyDirectoryEvent({
+        event,
+        directory,
+        store,
+        setStore,
+        push: queue.push,
+        setSessionTodo,
+        vcsCache: children.vcsCache.get(key),
+        loadLsp: () => {
+          void queryClient.fetchQuery(loadLspQuery(key, sdkFor(directory)))
+        },
+        resolveOptimistic: (sessionID, text) => optimisticResolver?.(directory, sessionID, text),
+      }),
+    )
   })
 
   onCleanup(unsub)
