@@ -14,6 +14,7 @@ import {
   errorMessage,
   hasProjectPermissions,
   latestRootSession,
+  sessionIsWorking,
 } from "./helpers"
 import { pathKey } from "@/utils/path-key"
 
@@ -27,6 +28,15 @@ const session = (input: Partial<Session> & Pick<Session, "id" | "directory">) =>
     time: { created: 0, updated: 0, archived: undefined },
     ...input,
   }) as Session
+
+describe("session working state", () => {
+  test("only busy and retry statuses show the working indicator", () => {
+    expect(sessionIsWorking({ type: "busy" })).toBe(true)
+    expect(sessionIsWorking({ type: "retry", attempt: 1, message: "retrying", next: 1 })).toBe(true)
+    expect(sessionIsWorking({ type: "idle" })).toBe(false)
+    expect(sessionIsWorking(undefined)).toBe(false)
+  })
+})
 
 describe("layout deep links", () => {
   test("parses open-project deep links", () => {
