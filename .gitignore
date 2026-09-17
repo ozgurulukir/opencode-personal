@@ -43,3 +43,10 @@ packages/opencode/dist.old/opencode-windows-x64/bin/opencode.exe.old
 
 .soloncode/
 .zcode/
+
+# Agent session state (Rubik REPL)
+.rubik/
+
+# Ad-hoc local screenshots / PR review patches (root only; package assets unaffected)
+/*.png
+/*.diff
