@@ -178,16 +178,26 @@ function selectAzureLanguageModel(sdk: any, modelID: string, useChat: boolean) {
 
 
 export const rewriteMaxOutputTokens = (url: RequestInfo | URL, init?: RequestInit) => {
-  if (init?.body && typeof init.body === "string") {
-    try {
-      const body = JSON.parse(init.body)
-      if ("max_output_tokens" in body) {
-        body.max_completion_tokens = body.max_output_tokens
-        delete body.max_output_tokens
-        init.body = JSON.stringify(body)
+  if (init?.body) {
+    let bodyString: string | undefined
+
+    if (typeof init.body === "string") {
+      bodyString = init.body
+    } else if (init.body instanceof Uint8Array) {
+      bodyString = new TextDecoder().decode(init.body)
+    }
+
+    if (bodyString) {
+      try {
+        const body = JSON.parse(bodyString)
+        if ("max_output_tokens" in body) {
+          body.max_completion_tokens = body.max_output_tokens
+          delete body.max_output_tokens
+          init.body = JSON.stringify(body)
+        }
+      } catch {
+        // Silently swallow JSON.parse failures as this is intended for non-JSON passthrough
       }
-    } catch {
-      // Silently swallow JSON.parse failures as this is intended for non-JSON passthrough
     }
   }
   return fetch(url, init)
