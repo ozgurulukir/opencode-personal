@@ -90,18 +90,27 @@ export function cleanupDroppedSessionCaches(
   setSessionTodo?: (sessionID: string, todos: Todo[] | undefined) => void,
 ) {
   const keep = new Set(next.map((item) => item.id))
-  const stale = [
-    ...Object.keys(store.message),
-    ...Object.keys(store.session_diff),
-    ...Object.keys(store.todo),
-    ...Object.keys(store.permission),
-    ...Object.keys(store.question),
-    ...Object.keys(store.session_status),
-    ...Object.values(store.part)
-      .map((parts) => parts?.find((part) => !!part?.sessionID)?.sessionID)
-      .filter((sessionID): sessionID is string => !!sessionID),
-  ].filter((sessionID, index, list) => !keep.has(sessionID) && list.indexOf(sessionID) === index)
-  if (stale.length === 0) return
+  // Runs on every session.created event and sessions load. Collect into a Set
+  // in single passes — the previous spread + indexOf dedupe was O(N^2) over all
+  // cached sessions and parts.
+  const stale = new Set<string>()
+  for (const keys of [
+    Object.keys(store.message),
+    Object.keys(store.session_diff),
+    Object.keys(store.todo),
+    Object.keys(store.permission),
+    Object.keys(store.question),
+    Object.keys(store.session_status),
+  ]) {
+    for (const sessionID of keys) if (!keep.has(sessionID)) stale.add(sessionID)
+  }
+  // Parts are keyed by messageID; recover their sessionIDs (the first part of
+  // each entry carries it) so part-only sessions are dropped too.
+  for (const parts of Object.values(store.part)) {
+    const sessionID = parts?.find((part) => !!part?.sessionID)?.sessionID
+    if (sessionID && !keep.has(sessionID)) stale.add(sessionID)
+  }
+  if (stale.size === 0) return
   for (const sessionID of stale) {
     setSessionTodo?.(sessionID, undefined)
   }
@@ -291,7 +300,12 @@ function toV2Model(model: UserMessage["model"] | undefined) {
 }
 
 function activeAssistant(messages: Message[] | undefined): AssistantMessage | undefined {
-  return messages?.findLast(
+  if (!messages) return
+  // Hot path: called on every streaming delta. The active assistant is the
+  // newest message while streaming, so check it before paying for a full scan.
+  const last = messages[messages.length - 1]
+  if (last?.role === "assistant" && last.time.completed === undefined) return last
+  return messages.findLast(
     (message): message is AssistantMessage => message.role === "assistant" && message.time.completed === undefined,
   )
 }
