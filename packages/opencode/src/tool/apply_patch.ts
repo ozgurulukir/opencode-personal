@@ -63,7 +63,9 @@ export const ApplyPatchTool = Tool.define<
         const parseResult = Patch.parsePatch(params.patchText)
         hunks = parseResult.hunks
       } catch (error) {
-        return yield* Effect.fail(new Error(`apply_patch verification failed: ${error}`))
+        return yield* Effect.fail(
+          new Error(`apply_patch verification failed: ${error instanceof Error ? error.message : String(error)}`)
+        )
       }
 
       if (hunks.length === 0) {
@@ -183,7 +185,7 @@ export const ApplyPatchTool = Tool.define<
               } catch (error) {
                 failedHunks.push({
                   path: hunk.path,
-                  error: `Failed to derive contents from chunks: ${error}`,
+                  error: `Failed to derive contents from chunks: ${error instanceof Error ? error.message : String(error)}`,
                 })
                 break
               }
