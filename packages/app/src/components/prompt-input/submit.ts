@@ -263,6 +263,16 @@ export function createPromptSubmit(input: PromptSubmitInput) {
       variant,
     }
 
+    const optimisticBusy = sessionDirectory === projectDirectory
+    const setOptimisticBusy = () => {
+      if (!optimisticBusy) return
+      sync.set("session_status", session.id, { type: "busy" })
+    }
+    const setOptimisticIdle = () => {
+      if (!optimisticBusy) return
+      sync.set("session_status", session.id, { type: "idle" })
+    }
+
     const clearInput = () => {
       prompt.reset()
       input.setMode("normal")
@@ -293,6 +303,7 @@ export function createPromptSubmit(input: PromptSubmitInput) {
 
     if (mode === "shell") {
       clearInput()
+      setOptimisticBusy()
       client.session
         .shell({
           sessionID: session.id,
@@ -301,6 +312,7 @@ export function createPromptSubmit(input: PromptSubmitInput) {
           command: text,
         })
         .catch((err) => {
+          setOptimisticIdle()
           showToast({
             title: language.t("prompt.toast.shellSendFailed.title"),
             description: errorMessage(err),
@@ -313,6 +325,7 @@ export function createPromptSubmit(input: PromptSubmitInput) {
     const customCommand = detectCommand(text, sync.data.command)
     if (customCommand) {
       clearInput()
+      setOptimisticBusy()
       client.v2.session.command({
         sessionID: session.id,
         command: customCommand.name,
@@ -329,6 +342,7 @@ export function createPromptSubmit(input: PromptSubmitInput) {
         })),
       })
         .catch((err) => {
+          setOptimisticIdle()
           showToast({
             title: language.t("prompt.toast.commandSendFailed.title"),
             description: formatServerError(err, language.t, language.t("common.requestFailed")),
@@ -405,13 +419,11 @@ export function createPromptSubmit(input: PromptSubmitInput) {
       globalSync,
       draft,
       messageID,
-      optimisticBusy: sessionDirectory === projectDirectory,
+      optimisticBusy,
       before: waitForWorktree,
     }).catch((err) => {
       pending.delete(session.id)
-      if (sessionDirectory === projectDirectory) {
-        sync.set("session_status", session.id, { type: "idle" })
-      }
+      setOptimisticIdle()
       showToast({
         title: language.t("prompt.toast.promptSendFailed.title"),
         description: errorMessage(err),
