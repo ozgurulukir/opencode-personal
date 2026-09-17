@@ -1,5 +1,5 @@
 import { getFilename } from "@opencode-ai/core/util/path"
-import { type Session } from "@opencode-ai/sdk/v2/client"
+import { type Session, type SessionStatus } from "@opencode-ai/sdk/v2/client"
 import { pathKey } from "@/utils/path-key"
 
 type SessionStore = {
@@ -28,6 +28,8 @@ export const roots = (store: SessionStore) =>
   (store.session ?? []).filter((session) => isRootVisibleSession(session, store.path.directory))
 
 export const sortedRootSessions = (store: SessionStore, now: number) => roots(store).sort(sortSessions(now))
+
+export const sessionIsWorking = (status: SessionStatus | undefined) => status?.type === "busy" || status?.type === "retry"
 
 export const latestRootSession = (stores: SessionStore[], now: number) => {
   // ⚡ Bolt Optimization: Replace O(N log N) .flatMap().sort()[0] with a single O(N) pass
