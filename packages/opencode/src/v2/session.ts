@@ -658,6 +658,8 @@ export const layer = Layer.effect(
                       { permission: "edit", pattern: "*", action: "deny" },
                       { permission: "write", pattern: "*", action: "deny" },
                       { permission: "bash", pattern: "*", action: "deny" },
+                      { permission: "task", pattern: "*", action: "deny" },
+                      { permission: "todowrite", pattern: "*", action: "deny" },
                     ],
                   } as Agent.Info),
               ),
@@ -672,6 +674,8 @@ export const layer = Layer.effect(
                       { permission: "edit", pattern: "*", action: "deny" },
                       { permission: "write", pattern: "*", action: "deny" },
                       { permission: "bash", pattern: "*", action: "deny" },
+                      { permission: "task", pattern: "*", action: "deny" },
+                      { permission: "todowrite", pattern: "*", action: "deny" },
                     ],
                   } as Agent.Info
                 }),

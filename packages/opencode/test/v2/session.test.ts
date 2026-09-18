@@ -882,12 +882,14 @@ describe("v2.session", () => {
       const child = yield* session.get(childID)
       expect(child.parentID).toBe(parent.id)
       expect(child.permission).toBeDefined()
-      const editDeny = child.permission?.find((r) => r.permission === "edit" && r.action === "deny")
-      const writeDeny = child.permission?.find((r) => r.permission === "write" && r.action === "deny")
-      const bashDeny = child.permission?.find((r) => r.permission === "bash" && r.action === "deny")
-      expect(editDeny).toBeDefined()
-      expect(writeDeny).toBeDefined()
-      expect(bashDeny).toBeDefined()
+      // Fallback deny set must match V1 (task.ts): edit, write, bash, task,
+      // todowrite — otherwise a missing parent agent silently widens the
+      // subagent's tool surface (recursive task/todowrite).
+      const expected = ["edit", "write", "bash", "task", "todowrite"]
+      for (const perm of expected) {
+        const deny = child.permission?.find((r) => r.permission === perm && r.action === "deny")
+        expect(deny, `${perm} deny missing`).toBeDefined()
+      }
     }),
   )
 
