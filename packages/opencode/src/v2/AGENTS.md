@@ -108,11 +108,14 @@ synthetic message from the parent's `messages()`.
 ## V2 subagent() fallback deny rules when parent agent is not found
 
 When the parent session's agent is not found (e.g., deleted or renamed), `subagent()`
-applies a conservative fallback deny ruleset (`edit`, `write`, `bash` denied) instead
-of silently skipping all parent agent deny rules. This closes a security hole where
-Plan Mode's `edit: { "*": "deny" }` would be bypassed if the parent agent was missing.
+applies a conservative fallback deny ruleset (`edit`, `write`, `bash`, `task`,
+`todowrite` denied) instead of silently skipping all parent agent deny rules. This
+closes a security hole where Plan Mode's `edit: { "*": "deny" }` would be bypassed if
+the parent agent was missing. The V2 fallback set is identical to V1
+(`tool/task.ts`): denying `task`/`todowrite` too prevents a missing parent from
+silently widening the subagent's tool surface to recursive subagents and TodoWrite.
 The fallback is applied via `Effect.catchCause` in `v2/session.ts` and matches V1
-`tool/task.ts` behavior.
+behavior.
 
 ## V2 subagent() max nesting depth
 
