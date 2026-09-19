@@ -4,7 +4,6 @@ description: ใช้ผู้ให้บริการ LLM ใน OpenCode
 ---
 
 import config from "../../../../config.mjs"
-export const console = config.console
 
 
 OpenCode ใช้ [AI SDK](https://ai-sdk.dev/) และ [Models.dev](https://models.dev) เพื่อรองรับผู้ให้บริการ **75+ LLM** และรองรับการใช้งานโมเดลท้องถิ่น
@@ -46,73 +45,6 @@ OpenCode ใช้ [AI SDK](https://ai-sdk.dev/) และ [Models.dev](https://
   }
 }
 ```
-
----
-
-## OpenCode Zen
-
-OpenCode Zen คือรายชื่อโมเดลที่จัดทำโดยทีมงาน OpenCode ที่ได้รับ
-ทดสอบและตรวจสอบแล้วว่าทำงานได้ดีกับ OpenCode [เรียนรู้เพิ่มเติม](/docs/zen)
-
-:::tip
-หากคุณยังใหม่ เราขอแนะนำให้เริ่มต้นด้วย OpenCode Zen
-:::
-
-1. เรียกใช้คำสั่ง `/connect` ใน TUI เลือก opencode และไปที่ [opencode.ai/auth](https://opencode.ai/auth)
-
-   ```txt
-   /connect
-   ```
-
-2. ลงชื่อเข้าใช้ เพิ่มรายละเอียดการเรียกเก็บเงินของคุณ และคัดลอกรหัส API ของคุณ
-
-3. วางคีย์ API ของคุณ
-
-   ```txt
-   ┌ API key
-   │
-   │
-   └ enter
-   ```
-
-4. เรียกใช้ `/models` ใน TUI เพื่อดูรายการรุ่นที่เราแนะนำ
-
-   ```txt
-   /models
-   ```
-
-มันทำงานเหมือนกับผู้ให้บริการรายอื่นใน OpenCode และเป็นทางเลือกในการใช้งานโดยสมบูรณ์
-
----
-
-## OpenCode Go
-
-OpenCode Go คือแผนการสมัครสมาชิกราคาประหยัดที่ให้การเข้าถึงโมเดลการเขียนโค้ดแบบเปิดยอดนิยมที่เชื่อถือได้ ซึ่งจัดเตรียมโดยทีมงาน OpenCode ที่ได้รับการทดสอบและตรวจสอบแล้วว่าทำงานได้ดีกับ OpenCode
-
-1. เรียกใช้คำสั่ง `/connect` ใน TUI เลือก `OpenCode Go` และไปที่ [opencode.ai/auth](https://opencode.ai/zen)
-
-   ```txt
-   /connect
-   ```
-
-2. ลงชื่อเข้าใช้ เพิ่มรายละเอียดการเรียกเก็บเงินของคุณ และคัดลอกรหัส API ของคุณ
-
-3. วางคีย์ API ของคุณ
-
-   ```txt
-   ┌ API key
-   │
-   │
-   └ enter
-   ```
-
-4. เรียกใช้ `/models` ใน TUI เพื่อดูรายการรุ่นที่เราแนะนำ
-
-   ```txt
-   /models
-   ```
-
-มันทำงานเหมือนกับผู้ให้บริการรายอื่นใน OpenCode และเป็นทางเลือกในการใช้งานโดยสมบูรณ์
 
 ---
 
@@ -1396,35 +1328,6 @@ Ollama สามารถกำหนดค่าตัวเองสำหร�
 ##### การใช้ API Key
 
 หากคุณมีคีย์ API อยู่แล้ว คุณสามารถเลือก **Manually enter API Key** และวางลงใน terminal ของคุณ
-
----
-
-### OpenCode Zen
-
-OpenCode Zen คือรายการโมเดลที่ได้รับการทดสอบและตรวจสอบแล้วโดยทีมงาน OpenCode [เรียนรู้เพิ่มเติม](/docs/zen)
-
-1. ลงชื่อเข้าใช้ **<a href={console}>OpenCode Zen</a>** และคลิก **สร้าง API คีย์**
-
-2. เรียกใช้คำสั่ง `/connect` และค้นหา **OpenCode Zen**
-
-   ```txt
-   /connect
-   ```
-
-3. ป้อนคีย์ OpenCode API ของคุณ
-
-   ```txt
-   ┌ API key
-   │
-   │
-   └ enter
-   ```
-
-4. รันคำสั่ง `/models` เพื่อเลือกโมเดลเช่น _Qwen 3 Coder 480B_
-
-   ```txt
-   /models
-   ```
 
 ---
 

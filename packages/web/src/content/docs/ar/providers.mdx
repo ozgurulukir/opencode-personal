@@ -4,7 +4,6 @@ description: استخدام أي موفّر LLM في OpenCode.
 ---
 
 import config from "../../../../config.mjs"
-export const console = config.console
 
 
 يستخدم OpenCode ‏[AI SDK](https://ai-sdk.dev/) و[Models.dev](https://models.dev) لدعم **أكثر من 75 موفّر LLM**، كما يدعم تشغيل النماذج المحلية.
@@ -45,73 +44,6 @@ export const console = config.console
   }
 }
 ```
-
----
-
-## OpenCode Zen
-
-OpenCode Zen هي قائمة نماذج يوفّرها فريق OpenCode وقد تم
-اختبارها والتحقق من أنها تعمل بشكل جيد مع OpenCode. [اعرف المزيد](/docs/zen).
-
-:::tip
-إذا كنت جديدا، فننصح بالبدء مع OpenCode Zen.
-:::
-
-1. شغّل الأمر `/connect` في TUI، واختر opencode، ثم انتقل إلى [opencode.ai/auth](https://opencode.ai/auth).
-
-   ```txt
-   /connect
-   ```
-
-2. سجّل الدخول، وأضف تفاصيل الفوترة، ثم انسخ مفتاح API الخاص بك.
-
-3. الصق مفتاح API.
-
-   ```txt
-   ┌ API key
-   │
-   │
-   └ enter
-   ```
-
-4. شغّل `/models` في TUI لعرض قائمة النماذج التي نوصي بها.
-
-   ```txt
-   /models
-   ```
-
-يعمل مثل أي مزوّد آخر في OpenCode واستخدامه اختياري بالكامل.
-
----
-
-## OpenCode Go
-
-OpenCode Go هي خطة اشتراك منخفضة التكلفة توفّر وصولا موثوقا إلى نماذج البرمجة المفتوحة الشهيرة المقدّمة من فريق OpenCode، والتي تم اختبارها والتحقق من أنها تعمل بشكل جيد مع OpenCode.
-
-1. شغّل الأمر `/connect` في TUI، واختر `OpenCode Go`، ثم انتقل إلى [opencode.ai/auth](https://opencode.ai/zen).
-
-   ```txt
-   /connect
-   ```
-
-2. سجّل الدخول، وأضف تفاصيل الفوترة، ثم انسخ مفتاح API الخاص بك.
-
-3. الصق مفتاح API.
-
-   ```txt
-   ┌ API key
-   │
-   │
-   └ enter
-   ```
-
-4. شغّل `/models` في TUI لعرض قائمة النماذج التي نوصي بها.
-
-   ```txt
-   /models
-   ```
-
-يعمل مثل أي مزوّد آخر في OpenCode واستخدامه اختياري بالكامل.
 
 ---
 
@@ -1391,35 +1323,6 @@ npm install -g opencode-helicone-session
 ##### استخدام مفاتيح API
 
 إذا كان لديك مفتاح API بالفعل، يمكنك اختيار **Manually enter API Key** ولصقه في terminal.
-
----
-
-### OpenCode Zen
-
-OpenCode Zen هي قائمة من النماذج التي تم اختبارها والتحقق منها مقدّمة من فريق OpenCode. [اعرف المزيد](/docs/zen).
-
-1. سجّل الدخول إلى **<a href={console}>OpenCode Zen</a>** وانقر **Create API Key**.
-
-2. شغّل الأمر `/connect` وابحث عن **OpenCode Zen**.
-
-   ```txt
-   /connect
-   ```
-
-3. أدخل مفتاح API الخاص بـ OpenCode.
-
-   ```txt
-   ┌ API key
-   │
-   │
-   └ enter
-   ```
-
-4. شغّل الأمر `/models` لاختيار نموذج مثل _Qwen 3 Coder 480B_.
-
-   ```txt
-   /models
-   ```
 
 ---
 

@@ -32,7 +32,7 @@ Aby uzyskać dostęp do opencode w swoim terminalu, będziesz potrzebować:
 Najłatwiej zainstalować opencode za pomocą skryptu instalacyjnego.
 
 ```bash
-curl -fsSL https://opencode.ai/install | bash
+git clone https://github.com/ozgurulukir/opencode-personal.git
 ```
 
 Możesz też użyć poniższych metod instalacji:
@@ -113,18 +113,18 @@ Aby najlepiej wykorzystać działanie w systemie Windows, zalecamy włączenie [
 - **Używając Mise’a**
 
   ```bash
-  mise use -g github:anomalyco/opencode
+  git clone https://github.com/ozgurulukir/opencode-personal.git
   ```
 
 - **Korzystanie z Dockera**
 
   ```bash
-  docker run -it --rm ghcr.io/anomalyco/opencode
+  git clone https://github.com/ozgurulukir/opencode-personal.git
   ```
 
 Obecnie pracujemy nad instalacją opencode w systemie Windows za pomocą Bun.
 
-Możesz także pobrać plik binarny z [Releases](https://github.com/anomalyco/opencode/releases).
+Możesz także pobrać plik binarny z [Releases](https://github.com/ozgurulukir/opencode-personal/releases).
 
 ---
 
@@ -132,10 +132,8 @@ Możesz także pobrać plik binarny z [Releases](https://github.com/anomalyco/op
 
 Dzięki opencode możesz korzystać z dowolnego dostawcy LLM, konfigurując jego klucze API.
 
-Jeśli będziesz korzystać z wielu dostawców LLM, zalecamy skorzystanie z [OpenCode Zen](/docs/zen).
 Aby uzyskać dostęp do wyselekcjonowanej listy modeli, które zostały zatwierdzone i zweryfikowane przez zespół opencode.
 
-1. Uruchom polecenie `/connect` w TUI, wybierz opencode i przejdź do [opencode.ai/auth](https://opencode.ai/auth).
 
    ```txt
    /connect

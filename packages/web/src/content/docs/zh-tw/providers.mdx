@@ -4,7 +4,6 @@ description: 在 OpenCode 中使用任意 LLM 提供商。
 ---
 
 import config from "../../../../config.mjs"
-export const console = config.console
 
 
 OpenCode 使用 [AI SDK](https://ai-sdk.dev/) 和 [Models.dev](https://models.dev)，支援 **75+ LLM 提供商**，同時也支援執行本地模型。
@@ -45,72 +44,6 @@ OpenCode 使用 [AI SDK](https://ai-sdk.dev/) 和 [Models.dev](https://models.de
   }
 }
 ```
-
----
-
-## OpenCode Zen
-
-OpenCode Zen 是由 OpenCode 團隊提供的模型列表，這些模型已經過測試和驗證，能夠與 OpenCode 良好配合使用。[了解更多](/docs/zen)。
-
-:::tip
-如果您是新使用者，我們建議從 OpenCode Zen 開始。
-:::
-
-1. 在 TUI 中執行 `/connect` 指令，選擇 `OpenCode Zen`，然後前往 [opencode.ai/auth](https://opencode.ai/zen)。
-
-   ```txt
-   /connect
-   ```
-
-2. 登入後新增帳單資訊，然後複製您的 API 金鑰。
-
-3. 貼上您的 API 金鑰。
-
-   ```txt
-   ┌ API key
-   │
-   │
-   └ enter
-   ```
-
-4. 在 TUI 中執行 `/models` 查看我們推薦的模型列表。
-
-   ```txt
-   /models
-   ```
-
-它的使用方式與 OpenCode 中的其他提供商完全相同，且完全可選。
-
----
-
-## OpenCode Go
-
-OpenCode Go 是一個低成本的訂閱計畫，提供對 OpenCode 團隊提供的流行開放編碼模型的可靠存取，這些模型已經過測試和驗證，能夠與 OpenCode 良好配合使用。
-
-1. 在 TUI 中執行 `/connect` 指令，選擇 `OpenCode Go`，然後前往 [opencode.ai/auth](https://opencode.ai/zen)。
-
-   ```txt
-   /connect
-   ```
-
-2. 登入後新增帳單資訊，然後複製您的 API 金鑰。
-
-3. 貼上您的 API 金鑰。
-
-   ```txt
-   ┌ API key
-   │
-   │
-   └ enter
-   ```
-
-4. 在 TUI 中執行 `/models` 查看我們推薦的模型列表。
-
-   ```txt
-   /models
-   ```
-
-它的使用方式與 OpenCode 中的任何其他提供商相同，且完全可選。
 
 ---
 
@@ -1379,35 +1312,6 @@ Ollama 可以自動為 OpenCode 進行設定。詳見 [Ollama 整合文件](http
 ##### 使用 API 金鑰
 
 如果您已經有 API 金鑰，可以選擇 **Manually enter API Key** 並將其貼上到終端機中。
-
----
-
-### OpenCode Zen
-
-OpenCode Zen 是由 OpenCode 團隊提供的經過測試和驗證的模型列表。[了解更多](/docs/zen)。
-
-1. 登入 **<a href={console}>OpenCode Zen</a>** 並點擊 **Create API Key**。
-
-2. 執行 `/connect` 指令並搜尋 **OpenCode Zen**。
-
-   ```txt
-   /connect
-   ```
-
-3. 輸入您的 OpenCode API 金鑰。
-
-   ```txt
-   ┌ API key
-   │
-   │
-   └ enter
-   ```
-
-4. 執行 `/models` 指令選擇模型，例如 _Qwen 3 Coder 480B_。
-
-   ```txt
-   /models
-   ```
 
 ---
 

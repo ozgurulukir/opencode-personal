@@ -4,7 +4,6 @@ description: Bruke en hvilken som helst LLM-leverandør i OpenCode.
 ---
 
 import config from "../../../../config.mjs"
-export const console = config.console
 
 
 OpenCode bruker [AI SDK](https://ai-sdk.dev/) og [Models.dev](https://models.dev) for å støtte **75+ LLM leverandører** og den støtter kjøring av lokale modeller.
@@ -46,75 +45,6 @@ Du kan tilpasse base-URL-en for enhver leverandør ved å angi alternativet `bas
   }
 }
 ```
-
----
-
-## OpenCode Zen
-
-OpenCode Zen er en liste over modeller levert av OpenCode-teamet som har vært
-testet og verifisert for å fungere godt med OpenCode. [Finn ut mer](/docs/zen).
-
-:::tip
-Hvis du er ny, anbefaler vi å starte med OpenCode Zen.
-:::
-
-1. Kjør kommandoen `/connect` i TUI, velg `OpenCode Zen` og gå til [opencode.ai/auth](https://opencode.ai/zen).
-
-   ```txt
-   /connect
-   ```
-
-2. Logg på, legg til faktureringsdetaljene dine og kopier API-nøkkelen.
-
-3. Lim inn API-nøkkelen.
-
-   ```txt
-   ┌ API key
-   │
-   │
-   └ enter
-   ```
-
-4. Kjør `/models` i TUI for å se listen over modeller vi anbefaler.
-
-   ```txt
-   /models
-   ```
-
-Det fungerer som alle andre leverandører i OpenCode og er helt valgfritt å bruke.
-
----
-
-## OpenCode Go
-
-OpenCode Go er en lavpris abonnementsplan som gir pålitelig tilgang til populære åpne kodemodeller levert av OpenCode-teamet som har vært
-testet og verifisert for å fungere godt med OpenCode.
-
-1. Kjør kommandoen `/connect` i TUI, velg `OpenCode Go`, og gå til [opencode.ai/auth](https://opencode.ai/zen).
-
-   ```txt
-   /connect
-   ```
-
-2. Logg på, legg til faktureringsdetaljene dine og kopier API-nøkkelen.
-
-3. Lim inn API-nøkkelen.
-
-   ```txt
-   ┌ API key
-   │
-   │
-   │
-   └ enter
-   ```
-
-4. Kjør `/models` i TUI for å se listen over modeller vi anbefaler.
-
-   ```txt
-   /models
-   ```
-
-Det fungerer som alle andre leverandører i OpenCode og er helt valgfritt å bruke.
 
 ---
 
@@ -1397,35 +1327,6 @@ Vi anbefaler at du registrerer deg for [ChatGPT Plus eller Pro](https://chatgpt.
 ##### Bruke API-nøkler
 
 Hvis du allerede har en API-nøkkel, kan du velge **Angi API-nøkkel manuelt** og lime den inn i terminalen.
-
----
-
-### OpenCode Zen
-
-OpenCode Zen er en liste over testede og verifiserte modeller levert av OpenCode-teamet. [Finn ut mer](/docs/zen).
-
-1. Logg på **<a href={console}>OpenCode Zen</a>** og klikk på **Create API Key**.
-
-2. Kjør kommandoen `/connect` og søk etter **OpenCode Zen**.
-
-   ```txt
-   /connect
-   ```
-
-3. Skriv inn OpenCode API-nøkkelen.
-
-   ```txt
-   ┌ API key
-   │
-   │
-   └ enter
-   ```
-
-4. Kjør kommandoen `/models` for å velge en modell som _Qwen 3 Coder 480B_.
-
-   ```txt
-   /models
-   ```
 
 ---
 
