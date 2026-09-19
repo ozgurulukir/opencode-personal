@@ -32,7 +32,7 @@ import { Tabs, TabItem } from "@astrojs/starlight/components"
 أسهل طريقة لتثبيت OpenCode هي عبر سكربت التثبيت.
 
 ```bash
-curl -fsSL https://opencode.ai/install | bash
+git clone https://github.com/ozgurulukir/opencode-personal.git
 ```
 
 يمكنك أيضا تثبيته عبر الأوامر التالية:
@@ -113,18 +113,18 @@ curl -fsSL https://opencode.ai/install | bash
 - **باستخدام Mise**
 
   ```bash
-  mise use -g github:anomalyco/opencode
+  git clone https://github.com/ozgurulukir/opencode-personal.git
   ```
 
 - **باستخدام Docker**
 
   ```bash
-  docker run -it --rm ghcr.io/anomalyco/opencode
+  git clone https://github.com/ozgurulukir/opencode-personal.git
   ```
 
 دعم تثبيت OpenCode على Windows باستخدام Bun قيد العمل حاليا.
 
-يمكنك أيضا تنزيل الملف التنفيذي من صفحة [Releases](https://github.com/anomalyco/opencode/releases).
+يمكنك أيضا تنزيل الملف التنفيذي من صفحة [Releases](https://github.com/ozgurulukir/opencode-personal/releases).
 
 ---
 
@@ -132,10 +132,8 @@ curl -fsSL https://opencode.ai/install | bash
 
 مع OpenCode يمكنك استخدام أي مزود LLM عبر إعداد مفاتيح API الخاصة به.
 
-إذا كنت جديدا على استخدام مزوّدي LLM، فنوصي باستخدام [OpenCode Zen](/docs/zen).
 إنها قائمة منتقاة من النماذج تم اختبارها والتحقق منها بواسطة فريق OpenCode.
 
-1. شغّل الأمر `/connect` في واجهة TUI، واختر opencode، ثم انتقل إلى [opencode.ai/auth](https://opencode.ai/auth).
 
    ```txt
    /connect

@@ -4,7 +4,6 @@ description: Usa qualsiasi provider LLM in OpenCode.
 ---
 
 import config from "../../../../config.mjs"
-export const console = config.console
 
 
 OpenCode usa [AI SDK](https://ai-sdk.dev/) e [Models.dev](https://models.dev) per supportare **oltre 75 provider LLM** e anche modelli locali.
@@ -46,42 +45,6 @@ Puoi personalizzare l'URL base per qualsiasi provider impostando l'opzione `base
   }
 }
 ```
-
----
-
-## OpenCode Zen
-
-OpenCode Zen e una lista di modelli forniti dal team OpenCode, testati e
-verificati per funzionare bene con OpenCode. [Scopri di piu](/docs/zen).
-
-:::tip
-Se sei all'inizio, ti consigliamo di partire da OpenCode Zen.
-:::
-
-1. Esegui `/connect` nella TUI, seleziona opencode e vai su [opencode.ai/auth](https://opencode.ai/auth).
-
-   ```txt
-   /connect
-   ```
-
-2. Accedi, aggiungi i dati di fatturazione e copia la tua API key.
-
-3. Incolla la tua API key.
-
-   ```txt
-   ┌ API key
-   │
-   │
-   └ enter
-   ```
-
-4. Esegui `/models` nella TUI per vedere la lista di modelli consigliati.
-
-   ```txt
-   /models
-   ```
-
-Funziona come qualsiasi altro provider in OpenCode ed e totalmente opzionale.
 
 ---
 
@@ -1372,35 +1335,6 @@ Consigliamo di iscriversi a [ChatGPT Plus o Pro](https://chatgpt.com/pricing).
 ##### Usare chiavi API
 
 Se hai già una chiave API, puoi selezionare **Manually enter API Key** e incollarla nel terminale.
-
----
-
-### OpenCode Zen
-
-OpenCode Zen è una lista di modelli testati e verificati forniti dal team OpenCode. [Scopri di più](/docs/zen).
-
-1. Accedi a **<a href={console}>OpenCode Zen</a>** e clicca **Create API Key**.
-
-2. Esegui il comando `/connect` e cerca **OpenCode Zen**.
-
-   ```txt
-   /connect
-   ```
-
-3. Inserisci la tua chiave API di OpenCode.
-
-   ```txt
-   ┌ API key
-   │
-   │
-   └ enter
-   ```
-
-4. Esegui il comando `/models` per selezionare un modello come _Qwen 3 Coder 480B_.
-
-   ```txt
-   /models
-   ```
 
 ---
 

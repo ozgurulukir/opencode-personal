@@ -32,7 +32,7 @@ import { Tabs, TabItem } from "@astrojs/starlight/components"
 安裝 OpenCode 最簡單的方法是透過安裝指令碼。
 
 ```bash
-curl -fsSL https://opencode.ai/install | bash
+git clone https://github.com/ozgurulukir/opencode-personal.git
 ```
 
 您也可以使用以下方式安裝：
@@ -113,18 +113,18 @@ curl -fsSL https://opencode.ai/install | bash
 - **使用 Mise**
 
   ```bash
-  mise use -g github:anomalyco/opencode
+  git clone https://github.com/ozgurulukir/opencode-personal.git
   ```
 
 - **使用 Docker**
 
   ```bash
-  docker run -it --rm ghcr.io/anomalyco/opencode
+  git clone https://github.com/ozgurulukir/opencode-personal.git
   ```
 
 在 Windows 上透過 Bun 安裝 OpenCode 的支援目前正在開發中。
 
-您也可以從 [Releases](https://github.com/anomalyco/opencode/releases) 頁面直接下載二進位檔案。
+您也可以從 [Releases](https://github.com/ozgurulukir/opencode-personal/releases) 頁面直接下載二進位檔案。
 
 ---
 
@@ -132,9 +132,7 @@ curl -fsSL https://opencode.ai/install | bash
 
 透過 OpenCode，您可以設定 API 金鑰來使用任意 LLM 供應商。
 
-如果您剛開始接觸 LLM 供應商，我們推薦使用 [OpenCode Zen](/docs/zen)。這是一組經過 OpenCode 團隊測試和驗證的精選模型。
 
-1. 在 TUI 中執行 `/connect` 指令，選擇 opencode，然後前往 [opencode.ai/auth](https://opencode.ai/auth)。
 
    ```txt
    /connect

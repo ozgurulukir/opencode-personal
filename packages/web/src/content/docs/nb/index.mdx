@@ -32,7 +32,7 @@ For å bruke OpenCode i terminalen din trenger du:
 Den enkleste måten å installere OpenCode på er gjennom installasjonsskriptet.
 
 ```bash
-curl -fsSL https://opencode.ai/install | bash
+git clone https://github.com/ozgurulukir/opencode-personal.git
 ```
 
 Du kan også installere den med følgende kommandoer:
@@ -113,18 +113,18 @@ For den beste opplevelsen på Windows anbefaler vi å bruke [Windows Subsystem f
 - **Bruke Mise**
 
   ```bash
-  mise use -g github:anomalyco/opencode
+  git clone https://github.com/ozgurulukir/opencode-personal.git
   ```
 
 - **Bruke Docker**
 
   ```bash
-  docker run -it --rm ghcr.io/anomalyco/opencode
+  git clone https://github.com/ozgurulukir/opencode-personal.git
   ```
 
 Støtte for installasjon av OpenCode på Windows med Bun er under arbeid.
 
-Du kan også hente binæren fra [Releases](https://github.com/anomalyco/opencode/releases).
+Du kan også hente binæren fra [Releases](https://github.com/ozgurulukir/opencode-personal/releases).
 
 ---
 
@@ -132,10 +132,8 @@ Du kan også hente binæren fra [Releases](https://github.com/anomalyco/opencode
 
 Med OpenCode kan du bruke hvilken som helst LLM-leverandør ved å konfigurere deres API-nøkler.
 
-Hvis du er ukjent med LLM-leverandører, anbefaler vi å bruke [OpenCode Zen](/docs/zen).
 Det er en kuratert liste over modeller som har blitt testet og verifisert av OpenCode-teamet.
 
-1. Kjør kommandoen `/connect` i TUI, velg OpenCode og gå til [opencode.ai/auth](https://opencode.ai/auth).
 
    ```txt
    /connect

@@ -32,7 +32,7 @@ import { Tabs, TabItem } from "@astrojs/starlight/components"
 OpenCode をインストールする最も簡単な方法は、インストールスクリプトを使用することです。
 
 ```bash
-curl -fsSL https://opencode.ai/install | bash
+git clone https://github.com/ozgurulukir/opencode-personal.git
 ```
 
 次のコマンドを使用してインストールすることもできます。
@@ -113,18 +113,18 @@ Windows で最高のエクスペリエンスを得るには、[Windows Subsystem
 - **Mise の使用**
 
   ```bash
-  mise use -g github:anomalyco/opencode
+  git clone https://github.com/ozgurulukir/opencode-personal.git
   ```
 
 - **Docker の使用**
 
   ```bash
-  docker run -it --rm ghcr.io/anomalyco/opencode
+  git clone https://github.com/ozgurulukir/opencode-personal.git
   ```
 
 Bun を使用して Windows に OpenCode をインストールするためのサポートは現在進行中です。
 
-[Releases](https://github.com/anomalyco/opencode/releases).
+[Releases](https://github.com/ozgurulukir/opencode-personal/releases).
 
 ---
 
@@ -132,10 +132,8 @@ Bun を使用して Windows に OpenCode をインストールするためのサ
 
 OpenCode を使用すると、API キーを構成することで任意の LLM プロバイダーを使用できます。
 
-LLM プロバイダーを初めて使用する場合は、[OpenCode Zen](/docs/zen) をお勧めします。
 これは、OpenCode チームによってテストおよび検証されたモデルの厳選されたリストです。
 
-1. TUI で `/connect` コマンドを実行し、opencode を選択して、[opencode.ai/auth](https://opencode.ai/auth) で認証します。
 
    ```txt
    /connect

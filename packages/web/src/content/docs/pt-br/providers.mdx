@@ -4,7 +4,6 @@ description: Usando qualquer provedor LLM no opencode.
 ---
 
 import config from "../../../../config.mjs"
-export const console = config.console
 
 
 opencode usa o [AI SDK](https://ai-sdk.dev/) e [Models.dev](https://models.dev) para suportar **75+ provedores LLM** e suporta a execução de modelos locais.
@@ -44,73 +43,6 @@ Você pode personalizar a URL base para qualquer provedor definindo a opção `b
   }
 }
 ```
-
----
-
-## OpenCode Zen
-
-OpenCode Zen é uma lista de modelos fornecidos pela equipe do opencode que foram testados e verificados para funcionar bem com o opencode. [Saiba mais](/docs/zen).
-
-:::tip
-Se você é novo, recomendamos começar com o OpenCode Zen.
-:::
-
-1. Execute o comando `/connect` no TUI, selecione `OpenCode Zen` e acesse [opencode.ai/zen](https://opencode.ai/zen).
-
-   ```txt
-   /connect
-   ```
-
-2. Faça login, adicione seus dados de cobrança e copie sua chave da API.
-
-3. Cole sua chave da API.
-
-   ```txt
-   ┌ API key
-   │
-   │
-   └ enter
-   ```
-
-4. Execute `/models` no TUI para ver a lista de modelos que recomendamos.
-
-   ```txt
-   /models
-   ```
-
-Funciona como qualquer outro provedor no opencode e é completamente opcional.
-
----
-
-## OpenCode Go
-
-OpenCode Go é um plano de assinatura de baixo custo que fornece acesso confiável a modelos de codificação abertos populares fornecidos pela equipe do opencode que foram
-testados e verificados para funcionar bem com o opencode.
-
-1. Execute o comando `/connect` no TUI, selecione `OpenCode Go` e acesse [opencode.ai/zen](https://opencode.ai/zen).
-
-   ```txt
-   /connect
-   ```
-
-2. Faça login, adicione seus dados de cobrança e copie sua chave da API.
-
-3. Cole sua chave da API.
-
-   ```txt
-   ┌ API key
-   │
-   │
-   └ enter
-   ```
-
-4. Execute `/models` no TUI para ver a lista de modelos que recomendamos.
-
-   ```txt
-   /models
-   ```
-
-Funciona como qualquer outro provedor no opencode e é completamente opcional.
 
 ---
 
@@ -1397,35 +1329,6 @@ Recomendamos se inscrever para [ChatGPT Plus ou Pro](https://chatgpt.com/pricing
 ##### Usando chaves da API
 
 Se você já tiver uma chave da API, pode selecionar **Inserir chave da API manualmente** e colá-la no seu terminal.
-
----
-
-### OpenCode Zen
-
-OpenCode Zen é uma lista de modelos testados e verificados fornecidos pela equipe do opencode. [Saiba mais](/docs/zen).
-
-1. Faça login em **<a href={console}>OpenCode Zen</a>** e clique em **Criar Chave da API**.
-
-2. Execute o comando `/connect` e procure por **OpenCode Zen**.
-
-   ```txt
-   /connect
-   ```
-
-3. Insira sua chave da API do opencode.
-
-   ```txt
-   ┌ API key
-   │
-   │
-   └ enter
-   ```
-
-4. Execute o comando `/models` para selecionar um modelo como _Qwen 3 Coder 480B_.
-
-   ```txt
-   /models
-   ```
 
 ---
 
