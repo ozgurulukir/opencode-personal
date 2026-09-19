@@ -32,89 +32,9 @@ export default defineConfig({
           lang: "en",
           dir: "ltr",
         },
-        ar: {
-          label: "العربية",
-          lang: "ar",
-          dir: "rtl",
-        },
-        bs: {
-          label: "Bosanski",
-          lang: "bs-BA",
-          dir: "ltr",
-        },
-        da: {
-          label: "Dansk",
-          lang: "da-DK",
-          dir: "ltr",
-        },
-        de: {
-          label: "Deutsch",
-          lang: "de-DE",
-          dir: "ltr",
-        },
-        es: {
-          label: "Espa\u00f1ol",
-          lang: "es-ES",
-          dir: "ltr",
-        },
-        fr: {
-          label: "Fran\u00e7ais",
-          lang: "fr-FR",
-          dir: "ltr",
-        },
-        it: {
-          label: "Italiano",
-          lang: "it-IT",
-          dir: "ltr",
-        },
-        ja: {
-          label: "日本語",
-          lang: "ja-JP",
-          dir: "ltr",
-        },
-        ko: {
-          label: "한국어",
-          lang: "ko-KR",
-          dir: "ltr",
-        },
-        nb: {
-          label: "Norsk Bokm\u00e5l",
-          lang: "nb-NO",
-          dir: "ltr",
-        },
-        pl: {
-          label: "Polski",
-          lang: "pl-PL",
-          dir: "ltr",
-        },
-        "pt-br": {
-          label: "Portugu\u00eas (Brasil)",
-          lang: "pt-BR",
-          dir: "ltr",
-        },
-        ru: {
-          label: "Русский",
-          lang: "ru-RU",
-          dir: "ltr",
-        },
-        th: {
-          label: "ไทย",
-          lang: "th-TH",
-          dir: "ltr",
-        },
         tr: {
           label: "T\u00fcrk\u00e7e",
           lang: "tr-TR",
-          dir: "ltr",
-        },
-        "zh-cn": {
-          label: "简体中文",
-          lang: "zh-CN",
-          dir: "ltr",
-        },
-        "zh-tw": {
-          label: "繁體中文",
-          lang: "zh-TW",
           dir: "ltr",
         },
       },
