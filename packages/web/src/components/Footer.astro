@@ -5,6 +5,7 @@ import { Icon } from "@astrojs/starlight/components"
 
 const { lang, editUrl, lastUpdated, entry } = Astro.locals.starlightRoute
 const template = entry.data.template
+const issueLink = Astro.locals.t("app.footer.issueLink", "Open an issue")
 const github = config.social?.find((item) => item.icon === "github")
 ---
 
