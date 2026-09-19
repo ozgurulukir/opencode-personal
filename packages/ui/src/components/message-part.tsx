@@ -1785,7 +1785,12 @@ ToolRegistry.register({
       if (typeof value === "string" && value) return value
       return childSessionId()
     })
-    const running = createMemo(() => props.status === "pending" || props.status === "running")
+    const running = createMemo(() => {
+      const id = childSessionId()
+      const status = id ? data.store.session_status[id] : undefined
+      if (status) return status.type !== "idle"
+      return props.status === "pending" || props.status === "running"
+    })
 
     const href = createMemo(() => sessionLink(childSessionId(), location.pathname, data.sessionHref))
     const clickable = createMemo(() => !!(childSessionId() && (data.navigateToSession || href())))
