@@ -2,21 +2,16 @@
 import { defineConfig } from "astro/config"
 import starlight from "@astrojs/starlight"
 import solidJs from "@astrojs/solid-js"
-import cloudflare from "@astrojs/cloudflare"
 import theme from "toolbeam-docs-theme"
 import config from "./config.mjs"
 import { rehypeHeadingIds } from "@astrojs/markdown-remark"
 import rehypeAutolinkHeadings from "rehype-autolink-headings"
-import { spawnSync } from "child_process"
 
 // https://astro.build/config
 export default defineConfig({
   site: config.url,
-  base: "/docs",
-  output: "server",
-  adapter: cloudflare({
-    imageService: "passthrough",
-  }),
+  base: config.base,
+  output: "static",
   devToolbar: {
     enabled: false,
   },
@@ -28,7 +23,6 @@ export default defineConfig({
   },
   build: {},
   integrations: [
-    configSchema(),
     solidJs(),
     starlight({
       title: "OpenCode",
@@ -155,13 +149,8 @@ export default defineConfig({
       ],
       lastUpdated: true,
       expressiveCode: { themes: ["github-light", "github-dark"] },
-      social: [
-        { icon: "github", label: "GitHub", href: config.github },
-        { icon: "discord", label: "Discord", href: config.discord },
-      ],
-      editLink: {
-        baseUrl: `${config.github}/edit/dev/packages/web/`,
-      },
+      social: [{ icon: "github", label: "GitHub", href: config.github }],
+      editLink: { baseUrl: `${config.github}/edit/main/packages/web/src/content/docs/` },
       markdown: {
         headingLinks: false,
       },
@@ -176,7 +165,6 @@ export default defineConfig({
         "config",
         "providers",
         "network",
-        "enterprise",
         "troubleshooting",
         {
           label: "Windows",
@@ -224,7 +212,7 @@ export default defineConfig({
             "zh-CN": "使用",
             "zh-TW": "使用",
           },
-          items: ["go", "tui", "cli", "web", "ide", "zen", "share", "github", "gitlab"],
+          items: ["tui", "cli", "web", "ide", "github", "gitlab"],
         },
 
         {
@@ -293,29 +281,13 @@ export default defineConfig({
         },
       ],
       components: {
-        Hero: "./src/components/Hero.astro",
         Head: "./src/components/Head.astro",
+        Hero: "./src/components/Hero.astro",
         Header: "./src/components/Header.astro",
         Footer: "./src/components/Footer.astro",
         SiteTitle: "./src/components/SiteTitle.astro",
       },
-      plugins: [
-        theme({
-          headerLinks: config.headerLinks,
-        }),
-      ],
+      plugins: [theme({ headerLinks: config.headerLinks })],
     }),
   ],
 })
-
-function configSchema() {
-  return {
-    name: "configSchema",
-    hooks: {
-      "astro:build:done": async () => {
-        console.log("generating config schema")
-        spawnSync("../opencode/script/schema.ts", ["./dist/config.json", "./dist/tui.json"])
-      },
-    },
-  }
-}
