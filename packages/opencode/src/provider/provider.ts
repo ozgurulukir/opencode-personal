@@ -310,6 +310,11 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
         },
         options: { fetch: rewriteMaxOutputTokens },
       }),
+    "openai-compatible": () =>
+      Effect.succeed({
+        autoload: false,
+        options: { fetch: rewriteMaxOutputTokens },
+      }),
     xai: () =>
       Effect.succeed({
         autoload: false,
