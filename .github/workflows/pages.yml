@@ -9,6 +9,8 @@ on:
       - "packages/core/**"
       - "packages/sdk/js/**"
       - "packages/opencode/src/config/**"
+      - "packages/opencode/src/cli/cmd/tui/config/**"
+      - "packages/opencode/script/schema.ts"
       - "packages/diff-wasm/**"
       - "bun.lock"
       - "package.json"
@@ -34,6 +36,13 @@ jobs:
           bun-version: 1.4.2
       - uses: actions/configure-pages@v5
       - run: bun install --frozen-lockfile
+      - name: Generate config schemas
+        run: bun run --cwd packages/opencode script/schema.ts ../web/public/config.json ../web/public/tui.json
+        env:
+          XDG_CONFIG_HOME: ${{ runner.temp }}/opencode-config
+          XDG_DATA_HOME: ${{ runner.temp }}/opencode-data
+          XDG_CACHE_HOME: ${{ runner.temp }}/opencode-cache
+          XDG_STATE_HOME: ${{ runner.temp }}/opencode-state
       - run: bun run --cwd packages/web build
       - uses: actions/upload-pages-artifact@v3
         with:

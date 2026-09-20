@@ -8,9 +8,9 @@
 
 opencode validates its own config strictly and refuses to start when a field
 is wrong. The shapes below are the accepted shapes. When in doubt, fetch
-`https://opencode.ai/config.json` (the JSON Schema) and validate against it.
+`https://ozgurulukir.github.io/opencode-personal/config.json` (the JSON Schema) and validate against it.
 
-Every `opencode.json` should declare `"$schema": "https://opencode.ai/config.json"`
+Every `opencode.json` should declare `"$schema": "https://ozgurulukir.github.io/opencode-personal/config.json"`
 so the user's editor catches mistakes as they type.
 
 ## Where files live
@@ -34,7 +34,7 @@ Every field is optional.
 
 ```json
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://ozgurulukir.github.io/opencode-personal/config.json",
   "username": "string",
   "model": "provider/model-id",
   "small_model": "provider/model-id",
@@ -332,7 +332,7 @@ When a user's config is broken and opencode won't start, these env vars help:
   and start from globals only. Run from the project directory, opencode loads,
   the user edits the broken file, then they restart without the flag.
 - `OPENCODE_CONFIG=/path/to/file.json`: load an additional explicit config.
-- `OPENCODE_CONFIG_CONTENT='{"$schema":"https://opencode.ai/config.json"}'`:
+- `OPENCODE_CONFIG_CONTENT='{"$schema":"https://ozgurulukir.github.io/opencode-personal/config.json"}'`:
   inject inline JSON as a final local-scope merge.
 - `OPENCODE_DISABLE_DEFAULT_PLUGINS=1`: skip default plugins.
 - `OPENCODE_PURE=1`: skip external plugins entirely.
@@ -343,7 +343,7 @@ When a user's config is broken and opencode won't start, these env vars help:
 ## When proposing edits
 
 - Validate against the schema before writing. If you are unsure of a field's
-  exact shape, fetch `https://opencode.ai/config.json` rather than guessing.
+  exact shape, fetch `https://ozgurulukir.github.io/opencode-personal/config.json` rather than guessing.
 - Preserve `$schema` and any existing fields the user did not ask to change.
 - For agent, skill, and plugin definitions, prefer creating new files in the
   correct location over inlining everything in `opencode.json`.

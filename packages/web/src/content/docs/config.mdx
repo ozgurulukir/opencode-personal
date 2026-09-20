@@ -13,7 +13,7 @@ OpenCode supports both **JSON** and **JSONC** (JSON with Comments) formats.
 
 ```jsonc title="opencode.jsonc"
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://ozgurulukir.github.io/opencode-personal/config.json",
   "model": "anthropic/claude-sonnet-4-5",
   "autoupdate": true,
   "server": {
@@ -253,9 +253,9 @@ All managed preference keys appear in the resolved config and cannot be overridd
 
 ## Schema
 
-The server/runtime config schema is defined in [**`opencode.ai/config.json`**](https://opencode.ai/config.json).
+The server/runtime config schema is published with this fork at [**`config.json`**](https://ozgurulukir.github.io/opencode-personal/config.json).
 
-TUI config uses [**`opencode.ai/tui.json`**](https://opencode.ai/tui.json).
+TUI config uses [**`tui.json`**](https://ozgurulukir.github.io/opencode-personal/tui.json).
 
 Your editor should be able to validate and autocomplete based on the schema.
 
@@ -267,7 +267,7 @@ Use a dedicated `tui.json` (or `tui.jsonc`) file for TUI-specific settings.
 
 ```json title="tui.json"
 {
-  "$schema": "https://opencode.ai/tui.json",
+  "$schema": "https://ozgurulukir.github.io/opencode-personal/tui.json",
   "scroll_speed": 3,
   "scroll_acceleration": {
     "enabled": true
@@ -289,7 +289,7 @@ You can configure server settings for the `opencode serve` and `opencode web` co
 
 ```json title="opencode.json"
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://ozgurulukir.github.io/opencode-personal/config.json",
   "server": {
     "port": 4096,
     "hostname": "0.0.0.0",
@@ -318,7 +318,7 @@ You can configure the shell used for the interactive terminal using the `shell` 
 
 ```json title="opencode.json"
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://ozgurulukir.github.io/opencode-personal/config.json",
   "shell": "pwsh"
 }
 ```
@@ -333,7 +333,7 @@ You can manage the tools an LLM can use through the `tools` option.
 
 ```json title="opencode.json"
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://ozgurulukir.github.io/opencode-personal/config.json",
   "tools": {
     "write": false,
     "bash": false
@@ -351,7 +351,7 @@ You can configure the providers and models you want to use in your OpenCode conf
 
 ```json title="opencode.json"
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://ozgurulukir.github.io/opencode-personal/config.json",
   "provider": {},
   "model": "anthropic/claude-sonnet-4-5",
   "small_model": "anthropic/claude-haiku-4-5"
@@ -364,7 +364,7 @@ Provider options can include `timeout`, `chunkTimeout`, and `setCacheKey`:
 
 ```json title="opencode.json"
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://ozgurulukir.github.io/opencode-personal/config.json",
   "provider": {
     "anthropic": {
       "options": {
@@ -395,7 +395,7 @@ Amazon Bedrock supports AWS-specific configuration:
 
 ```json title="opencode.json"
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://ozgurulukir.github.io/opencode-personal/config.json",
   "provider": {
     "amazon-bedrock": {
       "options": {
@@ -426,7 +426,7 @@ Set your UI theme in `tui.json`.
 
 ```json title="tui.json"
 {
-  "$schema": "https://opencode.ai/tui.json",
+  "$schema": "https://ozgurulukir.github.io/opencode-personal/tui.json",
   "theme": "tokyonight"
 }
 ```
@@ -441,7 +441,7 @@ You can configure specialized agents for specific tasks through the `agent` opti
 
 ```jsonc title="opencode.jsonc"
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://ozgurulukir.github.io/opencode-personal/config.json",
   "agent": {
     "code-reviewer": {
       "description": "Reviews code for best practices and potential issues",
@@ -467,7 +467,7 @@ You can set the default agent using the `default_agent` option. This determines 
 
 ```json title="opencode.json"
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://ozgurulukir.github.io/opencode-personal/config.json",
   "default_agent": "plan"
 }
 ```
@@ -484,7 +484,7 @@ You can configure the [share](/docs/share) feature through the `share` option.
 
 ```json title="opencode.json"
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://ozgurulukir.github.io/opencode-personal/config.json",
   "share": "manual"
 }
 ```
@@ -505,7 +505,7 @@ You can configure custom commands for repetitive tasks through the `command` opt
 
 ```jsonc title="opencode.jsonc"
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://ozgurulukir.github.io/opencode-personal/config.json",
   "command": {
     "test": {
       "template": "Run the full test suite with coverage report and show any failures.\nFocus on the failing tests and suggest fixes.",
@@ -531,7 +531,7 @@ Customize TUI keyboard shortcuts in `tui.json` with `keybinds`.
 
 ```json title="tui.json"
 {
-  "$schema": "https://opencode.ai/tui.json",
+  "$schema": "https://ozgurulukir.github.io/opencode-personal/tui.json",
   "keybinds": {
     "command_list": "ctrl+p"
   }
@@ -552,7 +552,7 @@ For large repositories or projects with many submodules, the snapshot system can
 
 ```json title="opencode.json"
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://ozgurulukir.github.io/opencode-personal/config.json",
   "snapshot": false
 }
 ```
@@ -567,7 +567,7 @@ OpenCode will automatically download any new updates when it starts up. You can 
 
 ```json title="opencode.json"
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://ozgurulukir.github.io/opencode-personal/config.json",
   "autoupdate": false
 }
 ```
@@ -583,7 +583,7 @@ You can enable and configure code formatters through the `formatter` option. Omi
 
 ```json title="opencode.json"
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://ozgurulukir.github.io/opencode-personal/config.json",
   "formatter": true
 }
 ```
@@ -592,7 +592,7 @@ Use an object to keep built-ins enabled while configuring overrides or custom fo
 
 ```json title="opencode.json"
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://ozgurulukir.github.io/opencode-personal/config.json",
   "formatter": {
     "prettier": {
       "disabled": true
@@ -618,7 +618,7 @@ You can enable and configure LSP servers through the `lsp` option. Omit it to ke
 
 ```json title="opencode.json"
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://ozgurulukir.github.io/opencode-personal/config.json",
   "lsp": true
 }
 ```
@@ -627,7 +627,7 @@ Use an object to keep built-ins enabled while configuring overrides or custom LS
 
 ```json title="opencode.json"
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://ozgurulukir.github.io/opencode-personal/config.json",
   "lsp": {
     "typescript": {
       "disabled": true
@@ -648,7 +648,7 @@ For example, to ensure that the `edit` and `bash` tools require user approval:
 
 ```json title="opencode.json"
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://ozgurulukir.github.io/opencode-personal/config.json",
   "permission": {
     "edit": "ask",
     "bash": "ask"
@@ -666,7 +666,7 @@ You can control context compaction behavior through the `compaction` option.
 
 ```json title="opencode.json"
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://ozgurulukir.github.io/opencode-personal/config.json",
   "compaction": {
     "auto": true,
     "prune": true,
@@ -706,7 +706,7 @@ You can configure file watcher ignore patterns through the `watcher` option.
 
 ```json title="opencode.json"
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://ozgurulukir.github.io/opencode-personal/config.json",
   "watcher": {
     "ignore": ["node_modules/**", "dist/**", ".git/**"]
   }
@@ -723,7 +723,7 @@ You can configure MCP servers you want to use through the `mcp` option.
 
 ```json title="opencode.json"
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://ozgurulukir.github.io/opencode-personal/config.json",
   "mcp": {}
 }
 ```
@@ -738,7 +738,7 @@ Configure skill discovery and auto-matching through the `skills` option.
 
 ```json title="opencode.json"
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://ozgurulukir.github.io/opencode-personal/config.json",
   "skills": {
     "paths": ["./custom-skills"],
     "urls": ["https://example.com/.well-known/skills/"],
@@ -767,7 +767,7 @@ Configure the embedding provider used by workspace semantic search through `sear
 
 ```json title="opencode.json"
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://ozgurulukir.github.io/opencode-personal/config.json",
   "search": {
     "embedding": {
       "provider": "openai",
@@ -798,7 +798,7 @@ Place plugin files in `.opencode/plugins/` or `~/.config/opencode/plugins/`. You
 
 ```json title="opencode.json"
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://ozgurulukir.github.io/opencode-personal/config.json",
   "plugin": ["opencode-helicone-session", "@my-org/custom-plugin"]
 }
 ```
@@ -813,7 +813,7 @@ You can configure the instructions for the model you're using through the `instr
 
 ```json title="opencode.json"
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://ozgurulukir.github.io/opencode-personal/config.json",
   "instructions": ["CONTRIBUTING.md", "docs/guidelines.md", ".cursor/rules/*.md"]
 }
 ```
@@ -829,7 +829,7 @@ You can disable providers that are loaded automatically through the `disabled_pr
 
 ```json title="opencode.json"
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://ozgurulukir.github.io/opencode-personal/config.json",
   "disabled_providers": ["openai", "gemini"]
 }
 ```
@@ -852,7 +852,7 @@ You can specify an allowlist of providers through the `enabled_providers` option
 
 ```json title="opencode.json"
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://ozgurulukir.github.io/opencode-personal/config.json",
   "enabled_providers": ["anthropic", "openai"]
 }
 ```
@@ -873,7 +873,7 @@ The `experimental` key contains options that are under active development. Each 
 
 ```json title="opencode.json"
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://ozgurulukir.github.io/opencode-personal/config.json",
   "experimental": {
     "batch_tool": true,
     "openTelemetry": true,
@@ -931,7 +931,7 @@ Use `{env:VARIABLE_NAME}` to substitute environment variables:
 
 ```json title="opencode.json"
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://ozgurulukir.github.io/opencode-personal/config.json",
   "model": "{env:OPENCODE_MODEL}",
   "provider": {
     "anthropic": {
@@ -954,7 +954,7 @@ Use `{file:path/to/file}` to substitute the contents of a file:
 
 ```json title="opencode.json"
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://ozgurulukir.github.io/opencode-personal/config.json",
   "instructions": ["./custom-instructions.md"],
   "provider": {
     "openai": {
