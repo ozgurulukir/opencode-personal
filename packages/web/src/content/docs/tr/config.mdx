@@ -512,8 +512,71 @@ Bağlam sıkıştırma davranışını `compaction` seçeneği aracılığıyla 
 
 - `prune` - Belirteçleri kaydetmek için eski araç çıktılarını kaldırın (varsayılan: `true`).
 - `tail_turns` - Sıkıştırma sırasında aynen korunacak son kullanıcı tur sayısı (varsayılan: `2`).
+- `preserve_recent_tokens` - Son turlardan aynen korunacak en fazla belirteç sayısı. Belirtilmezse bütçe otomatik hesaplanır.
+- `min_preserve_recent_tokens` / `max_preserve_recent_tokens` - Otomatik hesaplanan son tur belirteç bütçesinin alt ve üst sınırları (varsayılanlar: `2000` ve `8000`).
 - `summary_max_tokens` - Sıkıştırma özeti için maksimum token. Varsayılan: `min(model çıktı limiti, 8000)`.
+- `prune_minimum_tokens` - Eski araç çıktıları budanmadan önce gereken en az belirteç tasarrufu (varsayılan: `20000`).
+- `prune_protect_tokens` - Budamadan korunan en son araç çıktısı belirteçlerinin sayısı (varsayılan: `40000`).
+- `tool_output_max_chars` - Sıkıştırma boyutu tahmininde hesaba katılan her araç çıktısının en fazla karakter sayısı (varsayılan: `2000`).
 - `prune_protected_tools` - Çıktısı asla budanmayacak araç adları (varsayılan: `["skill"]`).
+
+---
+
+### Beceriler
+
+Beceri keşfini ve otomatik eşleştirmeyi `skills` seçeneğiyle yapılandırabilirsiniz.
+
+```json title="opencode.json"
+{
+  "$schema": "https://opencode.ai/config.json",
+  "skills": {
+    "paths": ["./custom-skills"],
+    "urls": ["https://example.com/.well-known/skills/"],
+    "autoMatch": true,
+    "autoMatchCount": 3,
+    "autoMatchThreshold": 0.25
+  }
+}
+```
+
+| Alan | Tür | Varsayılan | Açıklama |
+|---|---|---|---|
+| `paths` | `string[]` | `[]` | `SKILL.md` dosyalarının aranacağı ek dizinler. |
+| `urls` | `string[]` | `[]` | Beceri tanımlarının alınacağı uzak URL'ler. |
+| `autoMatch` | `boolean` | `false` | Anlamsal aramayla eşleşen becerileri bağlama otomatik ekler. |
+| `autoMatchCount` | `number` | `3` | `autoMatch` etkin olduğunda eklenecek en iyi eşleşme sayısı. |
+| `autoMatchThreshold` | `number` | `0.25` | En düşük kosinüs benzerliği (0–1); altındaki beceriler eklenmez. |
+
+[Beceriler hakkında daha fazla bilgi](/docs/skills).
+
+---
+
+### Anlamsal arama
+
+Çalışma alanında anlamsal arama için kullanılan gömme sağlayıcısını `search.embedding` üzerinden yapılandırabilirsiniz. Varsayılan sağlayıcı yereldir ve API anahtarı gerektirmez. Yerel model varsayılan olarak `Xenova/all-MiniLM-L6-v2` ve 384 boyut kullanır.
+
+```json title="opencode.json"
+{
+  "$schema": "https://opencode.ai/config.json",
+  "search": {
+    "embedding": {
+      "provider": "openai",
+      "model": "text-embedding-3-small",
+      "dimension": 1536,
+      "openaiApiKey": "api-anahtariniz"
+    }
+  }
+}
+```
+
+| Alan | Tür | Varsayılan | Açıklama |
+|---|---|---|---|
+| `provider` | `"local"` \| `"openai"` | `"local"` | Gömme sağlayıcısı. Yerel sağlayıcı CPU üzerinde çalışır; OpenAI API anahtarı gerektirir. |
+| `model` | `string` | Sağlayıcı varsayılanı | Model kimliği. Yerel gömmeler için Hugging Face model kimliği, OpenAI için bir gömme modeli adı kullanın. |
+| `dimension` | `number` | Yerel `384`, OpenAI `1536` | Gömme vektörünün boyutu. Seçilen modelin çıktısıyla eşleşmelidir. |
+| `openaiApiKey` | `string` | `OPENAI_API_KEY` | OpenAI API anahtarı. Ortam değişkeni tanımlı değilse config değeri kullanılır. |
+
+Çalışma alanını indekslemek için [Araçlar](/docs/tools#index_workspace), arama yapmak için [semantic search](/docs/tools#semantic_search) sayfasına bakın.
 
 ---
 
@@ -627,14 +690,51 @@ Bir sağlayıcı hem `enabled_providers` hem de `disabled_providers`'de görün�
 
 ### Deneysel
 
-`experimental` anahtarı aktif olarak geliştirilmekte olan seçenekleri içerir.
+`experimental` anahtarı aktif olarak geliştirilmekte olan seçenekleri içerir. Her alan isteğe bağlıdır; kodda tanımlı varsayılanlar tabloda gösterilmiştir.
 
 ```json title="opencode.json"
 {
   "$schema": "https://opencode.ai/config.json",
-  "experimental": {}
+  "experimental": {
+    "batch_tool": true,
+    "openTelemetry": true,
+    "primary_tools": ["my_custom_tool"],
+    "continue_loop_on_deny": true,
+    "mcp_timeout": 10000,
+    "predict_next_prompt": false
+  }
 }
 ```
+
+| Seçenek | Tür | Varsayılan | Açıklama |
+|---|---|---|---|
+| `disable_paste_summary` | `boolean` | — | Uzun metin yapıştırıldığında oluşturulan özeti devre dışı bırakır. |
+| `batch_tool` | `boolean` | — | Batch aracını etkinleştirir. |
+| `openTelemetry` | `boolean` | — | AI SDK çağrıları için OpenTelemetry span'lerini etkinleştirir. |
+| `primary_tools` | `string[]` | — | Yalnızca birincil agent'ların kullanabildiği araç adları; alt agent'lar bu araçları doğrudan çağıramaz. |
+| `continue_loop_on_deny` | `boolean` | `false` | Bir araç çağrısı reddedilince agent döngüsünün devam etmesini sağlar. |
+| `mcp_timeout` | `number` | — | Sunucuya özel zaman aşımı yoksa MCP istekleri için varsayılan milisaniye cinsinden zaman aşımı. |
+| `predict_next_prompt` | `boolean` | etkin | TUI giriş alanında sonraki olası istemi hayalet metin olarak gösterir; Tab ile kabul edilir. Devre dışı bırakmak için `false` kullanın. |
+
+### Diğer seçenekler
+
+Aşağıdaki üst düzey seçenekler de config şemasında bulunur:
+
+| Seçenek | Açıklama |
+|---|---|
+| `logLevel` | Asgari günlük seviyesi: `DEBUG`, `INFO`, `WARN` veya `ERROR`. |
+| `shell` | Terminal ve Bash aracı için varsayılan kabuk. |
+| `username` | Konuşmalarda kullanıcı için gösterilen ad; OpenTelemetry kullanıcı kimliği olarak da kullanılır. |
+| `reference` | `@` ile anılabilen Scout referansları olarak kullanılacak adlandırılmış yerel veya Git dizinleri. |
+| `snapshot` | Oturum sırasında dosya değişikliklerini geri almayı sağlayan anlık görüntü takibini etkinleştirir; varsayılan `true` değeridir. `false` yapılırsa geri alma/kurtarma dosya değişikliklerini geri getiremez. |
+| `attachment.image` | Görsel eklerin boyutlandırma ve boyut sınırları: `auto_resize` (varsayılan `true`), `max_width` ve `max_height` (her biri varsayılan `2000`), `max_base64_bytes` (varsayılan `4718592`). |
+| `tool_output` | Araç çıktısı kesme sınırları: `max_lines` (varsayılan `2000`) ve `max_bytes` (varsayılan `51200`). Bu sınırlardan biri aşılırsa tam çıktı dosyaya kaydedilir. |
+| `enterprise.url` | Kurumsal dağıtım gerektiriyorsa kurumsal servis URL'si. |
+| `autoshare` | `share: "auto"` için kullanımdan kaldırılmış takma ad; bunun yerine `share` kullanın. |
+| `mode` | Kullanımdan kaldırılmış agent yapılandırma alanı; bunun yerine `agent` kullanın. |
+| `layout` | Kullanımdan kaldırılmış düzen ayarı; uygulama her zaman stretch düzenini kullanır. |
+
+Üst düzey config anahtarlarının tamamı: `$schema`, `shell`, `logLevel`, `server`, `command`, `skills`, `reference`, `watcher`, `snapshot`, `plugin`, `share`, `autoshare`, `autoupdate`, `disabled_providers`, `enabled_providers`, `model`, `small_model`, `default_agent`, `username`, `mode`, `agent`, `provider`, `mcp`, `formatter`, `lsp`, `instructions`, `layout`, `permission`, `tools`, `attachment`, `enterprise`, `tool_output`, `compaction`, `experimental` ve `search`. Açıklamaları ve iç içe seçenekleri yukarıda veya bağlantılı sayfalarda bulabilirsiniz.
 
 :::caution
 Deneysel seçenekler kararlı değildir. Bildirim yapılmaksızın değişebilir veya kaldırılabilirler.

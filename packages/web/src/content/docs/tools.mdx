@@ -30,12 +30,14 @@ You can also use wildcards to control multiple tools at once. For example, to re
 {
   "$schema": "https://opencode.ai/config.json",
   "permission": {
-    "mymcp_*": "ask"
+    "mcp_mymcp_*": "ask"
   }
 }
 ```
 
 [Learn more](/docs/permissions) about configuring permissions.
+
+MCP permission keys use the form `mcp_<server>_<tool>`. Use `mcp_*` for every MCP tool or `mcp_<server>_*` for all tools from one server. Server and tool names are sanitized: characters other than letters, numbers, `_`, and `-` become `_`.
 
 ---
 
@@ -148,6 +150,40 @@ Find files by pattern matching.
 ```
 
 Search for files using glob patterns like `**/*.js` or `src/**/*.ts`. Returns matching file paths sorted by modification time.
+
+---
+
+### index_workspace
+
+Index workspace files for semantic search.
+
+```json title="opencode.json" {4}
+{
+  "$schema": "https://opencode.ai/config.json",
+  "permission": {
+    "index_workspace": "allow"
+  }
+}
+```
+
+Call this before using [`semantic_search`](#semantic_search), and again after significant code changes. It chunks supported source files and generates vector embeddings. The local embedding provider is used by default; configure `search.embedding` to use OpenAI. Set `force` to `true` to rebuild the index instead of updating it incrementally.
+
+---
+
+### semantic_search
+
+Find code passages by meaning, even when the query does not use the same words as the code.
+
+```json title="opencode.json" {4}
+{
+  "$schema": "https://opencode.ai/config.json",
+  "permission": {
+    "semantic_search": "allow"
+  }
+}
+```
+
+The workspace must be indexed first with [`index_workspace`](#index_workspace). Pass a natural-language `query`; `topK` optionally sets the number of results to return (default: `10`). Results include file paths, relevance scores, and matching code passages. Use `grep` for exact strings, symbols, or regular expressions.
 
 ---
 

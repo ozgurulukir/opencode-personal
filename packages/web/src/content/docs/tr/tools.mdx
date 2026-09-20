@@ -30,12 +30,14 @@ Birden fazla aracı aynı anda kontrol etmek için joker karakterler de kullanab
 {
   "$schema": "https://opencode.ai/config.json",
   "permission": {
-    "mymcp_*": "ask"
+    "mcp_mymcp_*": "ask"
   }
 }
 ```
 
 İzin yapılandırması için [daha fazla bilgi alın](/docs/permissions).
+
+MCP izin anahtarları `mcp_<sunucu>_<araç>` biçimindedir. Tüm MCP araçları için `mcp_*`, tek bir sunucunun araçları için `mcp_<sunucu>_*` kullanın. Sunucu ve araç adlarında harf, rakam, `_` ve `-` dışındaki karakterler `_` ile değiştirilir.
 
 ---
 
@@ -148,6 +150,40 @@ Desen eşleştirme ile dosya bulur.
 ```
 
 `**/*.js` veya `src/**/*.ts` gibi glob desenleriyle dosya arar. Eşleşen dosya yollarını değişim zamanına göre sıralar.
+
+---
+
+### index_workspace
+
+Anlamsal arama için çalışma alanındaki dosyaları indeksler.
+
+```json title="opencode.json" {4}
+{
+  "$schema": "https://opencode.ai/config.json",
+  "permission": {
+    "index_workspace": "allow"
+  }
+}
+```
+
+[`semantic_search`](#semantic_search) kullanmadan önce ve kodda önemli değişiklikler yaptıktan sonra bu aracı çağırın. Desteklenen kaynak dosyalarını parçalara ayırır ve vektör gömmeleri oluşturur. Varsayılan olarak yerel gömme sağlayıcısı kullanılır; OpenAI kullanmak için `search.embedding` ayarını yapın. `force` değerini `true` yaparsanız indeks artımlı güncellenmek yerine baştan oluşturulur.
+
+---
+
+### semantic_search
+
+Sorgudaki kelimeler kodda birebir geçmese bile anlam bakımından eşleşen kod parçalarını bulur.
+
+```json title="opencode.json" {4}
+{
+  "$schema": "https://opencode.ai/config.json",
+  "permission": {
+    "semantic_search": "allow"
+  }
+}
+```
+
+Önce [`index_workspace`](#index_workspace) ile çalışma alanını indeksleyin. Doğal dilde bir `query` verin; `topK` döndürülecek sonuç sayısını belirler (varsayılan: `10`). Sonuçlarda dosya yolları, ilgililik puanları ve eşleşen kod parçaları bulunur. Birebir metin, sembol veya düzenli ifade aramak için `grep` kullanın.
 
 ---
 
