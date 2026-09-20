@@ -15,7 +15,7 @@ Araç davranışını kontrol etmek için `permission` alanını kullanın. Her 
 
 ```json title="opencode.json"
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://ozgurulukir.github.io/opencode-personal/config.json",
   "permission": {
     "edit": "deny",
     "bash": "ask",
@@ -28,7 +28,7 @@ Birden fazla aracı aynı anda kontrol etmek için joker karakterler de kullanab
 
 ```json title="opencode.json"
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://ozgurulukir.github.io/opencode-personal/config.json",
   "permission": {
     "mcp_mymcp_*": "ask"
   }
@@ -53,7 +53,7 @@ Proje ortamınızda kabuk komutları çalıştırır.
 
 ```json title="opencode.json" {4}
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://ozgurulukir.github.io/opencode-personal/config.json",
   "permission": {
     "bash": "allow"
   }
@@ -70,7 +70,7 @@ Birebir metin değiştirme ile mevcut dosyaları düzenler.
 
 ```json title="opencode.json" {4}
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://ozgurulukir.github.io/opencode-personal/config.json",
   "permission": {
     "edit": "allow"
   }
@@ -87,7 +87,7 @@ Yeni dosyalar oluşturur veya mevcut dosyaları üzerine yazar.
 
 ```json title="opencode.json" {4}
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://ozgurulukir.github.io/opencode-personal/config.json",
   "permission": {
     "edit": "allow"
   }
@@ -108,7 +108,7 @@ Kod tabanınızdan dosya içeriği okur.
 
 ```json title="opencode.json" {4}
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://ozgurulukir.github.io/opencode-personal/config.json",
   "permission": {
     "read": "allow"
   }
@@ -125,7 +125,7 @@ Düzenli ifadelerle dosya içeriğinde arama yapar.
 
 ```json title="opencode.json" {4}
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://ozgurulukir.github.io/opencode-personal/config.json",
   "permission": {
     "grep": "allow"
   }
@@ -142,7 +142,7 @@ Desen eşleştirme ile dosya bulur.
 
 ```json title="opencode.json" {4}
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://ozgurulukir.github.io/opencode-personal/config.json",
   "permission": {
     "glob": "allow"
   }
@@ -159,7 +159,7 @@ Anlamsal arama için çalışma alanındaki dosyaları indeksler.
 
 ```json title="opencode.json" {4}
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://ozgurulukir.github.io/opencode-personal/config.json",
   "permission": {
     "index_workspace": "allow"
   }
@@ -176,7 +176,7 @@ Sorgudaki kelimeler kodda birebir geçmese bile anlam bakımından eşleşen kod
 
 ```json title="opencode.json" {4}
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://ozgurulukir.github.io/opencode-personal/config.json",
   "permission": {
     "semantic_search": "allow"
   }
@@ -197,7 +197,7 @@ Bu araç yalnızca `OPENCODE_EXPERIMENTAL_LSP_TOOL=true` (veya `OPENCODE_EXPERIM
 
 ```json title="opencode.json" {4}
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://ozgurulukir.github.io/opencode-personal/config.json",
   "permission": {
     "lsp": "allow"
   }
@@ -216,7 +216,7 @@ Dosyalara patch uygular.
 
 ```json title="opencode.json" {4}
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://ozgurulukir.github.io/opencode-personal/config.json",
   "permission": {
     "edit": "allow"
   }
@@ -237,7 +237,7 @@ Bir [skill](/docs/skills) (`SKILL.md` dosyası) yükler ve içeriğini konuşmay
 
 ```json title="opencode.json" {4}
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://ozgurulukir.github.io/opencode-personal/config.json",
   "permission": {
     "skill": "allow"
   }
@@ -252,7 +252,7 @@ Kodlama oturumlarında yapılacaklar listesini yönetir.
 
 ```json title="opencode.json" {4}
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://ozgurulukir.github.io/opencode-personal/config.json",
   "permission": {
     "todowrite": "allow"
   }
@@ -273,7 +273,7 @@ Web içeriği getirir.
 
 ```json title="opencode.json" {4}
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://ozgurulukir.github.io/opencode-personal/config.json",
   "permission": {
     "webfetch": "allow"
   }
@@ -301,7 +301,7 @@ OPENCODE_ENABLE_EXA=1 opencode
 
 ```json title="opencode.json" {4}
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://ozgurulukir.github.io/opencode-personal/config.json",
   "permission": {
     "websearch": "allow"
   }
@@ -324,7 +324,7 @@ Bilgi keşfetmeniz gerekiyorsa `websearch`, belirli bir URL'den içerik çekmeni
 
 ```json title="opencode.json" {4}
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://ozgurulukir.github.io/opencode-personal/config.json",
   "permission": {
     "question": "allow"
   }
