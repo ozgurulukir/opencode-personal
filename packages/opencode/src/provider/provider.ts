@@ -313,6 +313,10 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
     "openai-compatible": () =>
       Effect.succeed({
         autoload: false,
+        async getModel(sdk: any, modelID: string, _options?: Record<string, any>) {
+          if (useLanguageModel(sdk)) return sdk.languageModel(modelID)
+          return sdk.responses ? sdk.responses(modelID) : sdk.chat(modelID)
+        },
         options: { fetch: rewriteMaxOutputTokens },
       }),
     xai: () =>
