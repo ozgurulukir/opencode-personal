@@ -140,17 +140,42 @@ Bu yapılandırma, CodeCompanion'ı opencode'u sohbet için ACP ajanı olarak ku
 
 Ortam değişkenlerini (`OPENCODE_API_KEY` gibi) iletmeniz gerekiyorsa, tüm ayrıntılar için CodeCompanion.nvim belgelerindeki [Configuring Adapters: Environment Variables](https://codecompanion.olimorris.dev/getting-started#setting-an-api-key)'ye bakın.
 
+## Oturum seçenekleri
+
+ACP istemcileri kullanılabilir modelleri, oturum modlarını, efor düzeylerini ve
+komutları alabilir. İstemci bu kontrolleri sunuyorsa geçerli oturumun modelini,
+modunu veya efor düzeyini değiştirebilirsiniz. İstemci ilgili ACP
+güncellemelerini desteklediğinde opencode yanıtı ve araç ilerlemesini aktarır,
+izin isteklerini iletir ve token kullanımını bildirir.
+
+## Terminal desteği
+
+ACP istemcisi terminal desteği bildirdiğinde opencode kabuk aracı çağrılarını
+istemcinin oluşturduğu terminalde çalıştırır. Aksi durumda yerel kabuk kullanılır.
+`OPENCODE_ACP_TERMINAL_BACKEND` değişkeniyle davranışı ayarlayın: `auto`
+(varsayılan), `client` (istemci terminalini zorunlu kılar) veya `local` (her
+zaman yerel kabuk kullanır):
+
+```bash
+OPENCODE_ACP_TERMINAL_BACKEND=client opencode acp
+```
+
+İstemci terminali başlatılamazsa aynı komutu yerel kabukta ikinci kez çalıştırmak
+yerine hata bildirilir.
+
+## Question aracı
+
+Her ACP istemcisi etkileşimli soru istemlerini desteklemediği için `question`
+aracı varsayılan olarak devre dışıdır. Yalnızca uyumlu bir istemciyle etkinleştirin:
+
+```bash
+OPENCODE_ENABLE_QUESTION_TOOL=1 opencode acp
+```
+
 ## Destek
 
-opencode, terminalde olduğu gibi ACP aracılığıyla aynı şekilde çalışır. Tüm özellikler desteklenir:
-
-:::note
-`/undo` ve `/redo` gibi bazı yerleşik slash komutları şu anda desteklenmemektedir.
-:::
-
-- Yerleşik araçlar (dosya işlemleri, terminal komutları vb.)
-- Özel araçlar ve slash komutları
-- opencode yapılandırmanızda yapılandırılmış MCP sunucuları
-- `AGENTS.md`'dan projeye özel kurallar
-- Özel biçimlendiriciler ve linter'lar
-- Aracılar ve izin sistemi
+ACP, opencode oturumlarını protokol üzerinden sunar; istemci desteği değişebilir.
+Yerleşik ve özel araçlar, MCP sunucuları, proje talimatları, biçimlendiriciler,
+agent'lar ve izinler istemcinin yeteneklerine bağlı olarak kullanılabilir.
+ACP `authenticate` isteği uygulanmamıştır; önce `opencode auth login` ile giriş
+yapın. `/undo` ve `/redo` gibi slash komutları ACP üzerinden kullanılamaz.

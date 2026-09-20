@@ -26,29 +26,27 @@ Mevcut bir `AGENTS.md` dosyanız varsa, bu dosyaya eklemeye çalışacaktır.
 Bu dosyayı manuel olarak da oluşturabilirsiniz. İşte bir `AGENTS.md` dosyasına koyabileceğiniz bazı şeylere bir örnek.
 
 ```markdown title="AGENTS.md"
-# SST v3 Monorepo Project
+# opencode-personal
 
-This is an SST v3 monorepo with TypeScript. The project uses bun workspaces for package management.
+This is a Bun workspace monorepo with TypeScript packages.
 
 ## Project Structure
 
-- `packages/` - Contains all workspace packages (functions, core, web, etc.)
-- `infra/` - Infrastructure definitions split by service (storage.ts, api.ts, web.ts)
-- `sst.config.ts` - Main SST configuration with dynamic imports
+- `packages/opencode/` - CLI, server, and agent runtime
+- `packages/app/` - Browser interface
+- `packages/web/` - Astro and Starlight documentation site
+- `packages/sdk/js/` - Generated JavaScript and TypeScript SDK
+- `packages/ui/` and `packages/plugin/` - Shared UI and plugin APIs
 
-## Code Standards
+## Development
 
-- Use TypeScript with strict mode enabled
-- Shared code goes in `packages/core/` with proper exports configuration
-- Functions go in `packages/functions/`
-- Infrastructure should be split into logical files in `infra/`
-
-## Monorepo Conventions
-
-- Import shared modules using workspace names: `@my-app/core/example`
+- Install workspace dependencies from the repository root with `bun install`
+- Run `bun typecheck` from the package directory you changed
+- Run tests from their package directories; the root test command is intentionally disabled
+- Regenerate the SDK after changing server API schemas
 ```
 
-Buraya projeye özel talimatlar ekliyoruz ve bu, ekibiniz arasında paylaşılacaktır.
+Depodaki geliştirme kurallarına uyması için buraya projeye özel talimatlar ekleyin.
 
 ---
 
@@ -64,7 +62,7 @@ Projeye özel kurallar için proje kökünüze bir `AGENTS.md` yerleştirin. Bun
 
 Ayrıca `~/.config/opencode/AGENTS.md` dosyasında genel kurallara sahip olabilirsiniz. Bu, tüm opencode oturumlarına uygulanır.
 
-Bu Git'e kaydedilmediği veya ekibinizle paylaşılmadığı için, LLM'ın uyması gereken kişisel kuralları belirtmek için bunu kullanmanızı öneririz.
+Bu dosya Git'e kaydedilmediği için tüm opencode oturumlarında geçerli olmasını istediğiniz kişisel kuralları burada belirtebilirsiniz.
 
 ### Claude Code uyumluluğu
 
@@ -98,7 +96,7 @@ Her kategoride ilk eşleşen dosya kazanır. Örneğin, hem `AGENTS.md` hem de `
 
 ## Özel talimatlar
 
-Özel talimat dosyalarını `opencode.json` veya global `~/.config/opencode/opencode.json`'de belirtebilirsiniz. Bu, sizin ve ekibinizin, mevcut kuralları AGENTS.md'ye kopyalamak yerine yeniden kullanmasına olanak tanır.
+Özel talimat dosyalarını `opencode.json` veya global `~/.config/opencode/opencode.json`'de belirtebilirsiniz. Bu sayede proje mevcut kılavuzları AGENTS.md dosyasına kopyalamadan yükleyebilir.
 
 Örnek:
 

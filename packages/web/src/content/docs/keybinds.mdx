@@ -295,3 +295,18 @@ Add this to the root-level `keybindings` array:
 ```
 
 Save the file and restart Windows Terminal or open a new tab.
+
+## Workspaces
+
+Use the `workspace_set` action to open the workspace picker. It is disabled by default, so assign a shortcut in `tui.json`:
+
+```json title="tui.json"
+{
+  "$schema": "https://opencode.ai/tui.json",
+  "keybinds": {
+    "workspace_set": "<leader>w"
+  }
+}
+```
+
+The picker can select an existing workspace or create one with an available workspace adapter. See [Web](/docs/web) for the browser workspace sidebar.

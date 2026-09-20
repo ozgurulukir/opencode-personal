@@ -4,7 +4,7 @@ description: opencode sunucusuyla HTTP uzerinden etkilesin.
 ---
 
 import config from "../../../../config.mjs"
-export const typesUrl = `${config.github}/blob/dev/packages/sdk/js/src/gen/types.gen.ts`
+export const typesUrl = `${config.github}/blob/main/packages/sdk/js/src/v2/gen/types.gen.ts`
 
 `opencode serve` komutu, opencode istemcisinin kullanabileceği bir OpenAPI endpoint'i açan headless bir HTTP sunucusu çalıştırır.
 
@@ -82,6 +82,29 @@ http://<hostname>:<port>/doc
 ## API'ler
 
 opencode sunucusu aşağıdaki API'leri sunar.
+
+Aşağıdaki tablolar uyumluluk API'sini açıklar. Sunucu ayrıca `/api/session`
+altında deneysel bir V2 oturum API'si sunar. Bu API'nin yöntemleri ve veri
+şekilleri JavaScript SDK'da `client.v2.session` üzerinden kullanılabilir. Her
+iki API de `/doc` adresindeki OpenAPI sayfasında listelenir.
+
+### V2 oturumları (deneysel)
+
+| Yöntem   | Yol                                       | Açıklama                                           |
+| -------- | ----------------------------------------- | ------------------------------------------------- |
+| `GET`    | `/api/session`                            | Oturumları imleç tabanlı sayfalama ile listeler    |
+| `GET`    | `/api/session/{sessionID}`                | Bir oturumun ayrıntılarını getirir                 |
+| `POST`   | `/api/session/{sessionID}/prompt`          | İstem gönderir ve oturum yanıtını bekler            |
+| `POST`   | `/api/session/{sessionID}/prompt_async`    | İstemi arka planda işlenmek üzere sıraya alır       |
+| `GET`    | `/api/session/{sessionID}/message`         | Mesajları imleç tabanlı sayfalama ile listeler     |
+| `GET`    | `/api/session/{sessionID}/context`         | Son sıkıştırmadan sonraki etkin bağlamı getirir    |
+| `POST`   | `/api/session/{sessionID}/compact`         | Oturumu sıkıştırır                                 |
+| `POST`   | `/api/session/{sessionID}/wait`            | Oturum agent döngüsü boşta kalana kadar bekler     |
+
+V2 oturum API'sinde ayrıca komut çalıştırma, kabuk komutları, izinler,
+paylaşım, diff, yapılacaklar, mesaj ve parça güncellemeleri ile geri alma
+işlemleri bulunur. İstek ve yanıt şemalarının tamamı için `/doc` adresine bakın.
+V2 uç noktaları deneyseldir ve değişebilir.
 
 ---
 

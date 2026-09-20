@@ -107,8 +107,8 @@ You can ask OpenCode to explain the codebase to you.
 Use the `@` key to fuzzy search for files in the project.
 :::
 
-```txt frame="none" "@packages/functions/src/api/index.ts"
-How is authentication handled in @packages/functions/src/api/index.ts
+```txt frame="none" "@src/api/index.ts"
+How is authentication handled in @src/api/index.ts
 ```
 
 This is helpful if there's a part of the codebase that you didn't work on.
@@ -139,7 +139,7 @@ You can ask OpenCode to add new features to your project. Though we first recomm
    ```
 
    You want to give OpenCode enough details to understand what you want. It helps
-   to talk to it like you are talking to a junior developer on your team.
+   to talk to it like you are talking to a junior developer working in this codebase.
 
    :::tip
    Give OpenCode plenty of context and examples to help it understand what you
@@ -184,10 +184,10 @@ You can ask OpenCode to add new features to your project. Though we first recomm
 For more straightforward changes, you can ask OpenCode to directly build it
 without having to review the plan first.
 
-```txt frame="none" "@packages/functions/src/settings.ts" "@packages/functions/src/notes.ts"
+```txt frame="none" "@src/settings.ts" "@src/notes.ts"
 We need to add authentication to the /settings route. Take a look at how this is
-handled in the /notes route in @packages/functions/src/notes.ts and implement
-the same logic in @packages/functions/src/settings.ts
+handled in the /notes route in @src/notes.ts and implement
+the same logic in @src/settings.ts
 ```
 
 You want to make sure you provide a good amount of detail so OpenCode makes the right
@@ -199,8 +199,8 @@ changes.
 
 Let's say you ask OpenCode to make some changes.
 
-```txt frame="none" "@packages/functions/src/api/index.ts"
-Can you refactor the function in @packages/functions/src/api/index.ts?
+```txt frame="none" "@src/api/index.ts"
+Can you refactor the function in @src/api/index.ts?
 ```
 
 But you realize that it is not what you wanted. You **can undo** the changes
@@ -213,8 +213,8 @@ using the `/undo` command.
 OpenCode will now revert the changes you made and show your original message
 again.
 
-```txt frame="none" "@packages/functions/src/api/index.ts"
-Can you refactor the function in @packages/functions/src/api/index.ts?
+```txt frame="none" "@src/api/index.ts"
+Can you refactor the function in @src/api/index.ts?
 ```
 
 From here you can tweak the prompt and ask OpenCode to try again.
@@ -233,8 +233,7 @@ Or you **can redo** the changes using the `/redo` command.
 
 ## Share
 
-The conversations that you have with OpenCode can be [shared with your
-team](/docs/share).
+OpenCode conversations can be [shared](/docs/share) using a public link.
 
 ```bash frame="none"
 /share
@@ -245,8 +244,6 @@ This will create a link to the current conversation and copy it to your clipboar
 :::note
 Conversations are not shared by default.
 :::
-
-Here's an [example conversation](https://opencode.ai/s/4XP1fce5) with OpenCode.
 
 ---
 

@@ -4,7 +4,7 @@ description: Interact with opencode server over HTTP.
 ---
 
 import config from "../../../config.mjs"
-export const typesUrl = `${config.github}/blob/dev/packages/sdk/js/src/gen/types.gen.ts`
+export const typesUrl = `${config.github}/blob/main/packages/sdk/js/src/v2/gen/types.gen.ts`
 
 The `opencode serve` command runs a headless HTTP server that exposes an OpenAPI endpoint that an opencode client can use.
 
@@ -84,6 +84,29 @@ For example, `http://localhost:4096/doc`. Use the spec to generate clients or in
 ## APIs
 
 The opencode server exposes the following APIs.
+
+The tables below describe the compatibility API. The server also exposes an
+experimental V2 session API under `/api/session`; its methods and data shapes
+are available through `client.v2.session` in the JavaScript SDK. Both APIs are
+listed in the OpenAPI page at `/doc`.
+
+### V2 sessions (experimental)
+
+| Method   | Path                                      | Description                                      |
+| -------- | ----------------------------------------- | ------------------------------------------------ |
+| `GET`    | `/api/session`                            | List sessions with cursor pagination             |
+| `GET`    | `/api/session/{sessionID}`                | Get a session                                    |
+| `POST`   | `/api/session/{sessionID}/prompt`          | Send a prompt and wait for the session response  |
+| `POST`   | `/api/session/{sessionID}/prompt_async`    | Queue a prompt for background processing         |
+| `GET`    | `/api/session/{sessionID}/message`         | List messages with cursor pagination             |
+| `GET`    | `/api/session/{sessionID}/context`         | Get active context after the latest compaction   |
+| `POST`   | `/api/session/{sessionID}/compact`         | Compact the session                              |
+| `POST`   | `/api/session/{sessionID}/wait`            | Wait for the session agent loop to become idle   |
+
+The V2 session API also includes session commands, shell execution, permissions,
+sharing, diffs, todos, message and part updates, and revert operations. See
+`/doc` for the complete request and response schemas. V2 routes are experimental
+and may change.
 
 ---
 

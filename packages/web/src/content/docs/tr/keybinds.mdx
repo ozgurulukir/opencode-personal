@@ -192,3 +192,18 @@ Bunu kök düzeyindeki `keybindings` dizisine ekleyin:
 ```
 
 Dosyayı kaydedin ve Windows Terminalini yeniden başlatın veya yeni bir sekme açın.
+
+## Çalışma alanları
+
+Çalışma alanı seçiciyi açmak için `workspace_set` eylemini kullanın. Varsayılan olarak devre dışıdır; `tui.json` dosyasında bir kısayol atayın:
+
+```json title="tui.json"
+{
+  "$schema": "https://opencode.ai/tui.json",
+  "keybinds": {
+    "workspace_set": "<leader>w"
+  }
+}
+```
+
+Seçicide mevcut bir çalışma alanını seçebilir veya kullanılabilir bir çalışma alanı adaptörüyle yenisini oluşturabilirsiniz. Tarayıcıdaki çalışma alanı kenar çubuğu için [Web](/docs/web) sayfasına bakın.

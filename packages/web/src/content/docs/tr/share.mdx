@@ -3,7 +3,7 @@ title: Paylasim
 description: opencode konusmalarini genel baglantilarla paylasin.
 ---
 
-opencode'un paylasim ozelligi, konusmalariniz icin genel baglantilar olusturmanizi saglar. Boylece ekip arkadaslarinizla birlikte calisabilir veya diger kisilerden yardim alabilirsiniz.
+opencode'un paylaşım özelliği, konuşmalar için herkese açık bağlantılar oluşturur. Paylaşılan veriler yapılandırılmış paylaşım hizmetine gönderilir. Varsayılan adres `https://opncd.ai`'dir; bu depo ayrı bir paylaşım sunucusu içermez.
 
 :::note
 Paylasilan konusmalar, baglantiya sahip herkes tarafindan gorulebilir.
@@ -16,8 +16,8 @@ Paylasilan konusmalar, baglantiya sahip herkes tarafindan gorulebilir.
 Bir konusmayi paylastiginizda opencode:
 
 1. Oturumunuz icin benzersiz bir genel URL olusturur
-2. Konusma gecmisinizi sunucularimiza senkronize eder
-3. Konusmayi paylasim baglantisiyla erisilebilir hale getirir - `opncd.ai/s/<share-id>`
+2. Konuşma geçmişinizi yapılandırılmış paylaşım hizmetiyle senkronize eder
+3. Konuşmayı `https://opncd.ai/share/<share-id>` adresinde erişilebilir hale getirir
 
 ---
 
@@ -74,7 +74,7 @@ Paylasimi tamamen kapatmak icin [config dosyanizda](/docs/config) `share` degeri
 }
 ```
 
-Bunu belirli bir projede tum ekip icin zorunlu kilmak icin proje icindeki `opencode.json` dosyasina ekleyip Git'e commit edin.
+Bu ayarı bir projeye uygulamak için proje içindeki `opencode.json` dosyasına ekleyip commit edin.
 
 ---
 
@@ -110,16 +110,6 @@ Paylasilan konusmalar, siz acikca paylasimi kaldirana kadar erisilebilir kalir. 
 
 - Hassas bilgi icermeyen konusmalari paylasin.
 - Paylasmadan once konusma icerigini gozden gecirin.
-- Is birligi bittiginde paylasimi kaldirin.
+- Artık herkese açık olması gerekmeyen konuşmaların paylaşımını kaldırın.
 - Tescilli kod veya gizli veri iceren konusmalari paylasmayin.
 - Hassas projelerde paylasimi tamamen kapatin.
-
----
-
-## Kurumsal kullanim
-
-Kurumsal kurulumlarda paylasim ozelligi su sekillerde yapilandirilabilir:
-
-- Guvenlik uyumu icin tamamen **devre disi** birakilabilir
-- Sadece SSO ile dogrulanan kullanicilarla **sinirlandirilabilir**
-- Kendi altyapinizda **self-hosted** olarak calistirilabilir
