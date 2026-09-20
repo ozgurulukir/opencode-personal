@@ -34,29 +34,27 @@ If you already have an `AGENTS.md`, `/init` will improve it in place instead of 
 You can also just create this file manually. Here's an example of some things you can put into an `AGENTS.md` file.
 
 ```markdown title="AGENTS.md"
-# SST v3 Monorepo Project
+# opencode-personal
 
-This is an SST v3 monorepo with TypeScript. The project uses bun workspaces for package management.
+This is a Bun workspace monorepo with TypeScript packages.
 
 ## Project Structure
 
-- `packages/` - Contains all workspace packages (functions, core, web, etc.)
-- `infra/` - Infrastructure definitions split by service (storage.ts, api.ts, web.ts)
-- `sst.config.ts` - Main SST configuration with dynamic imports
+- `packages/opencode/` - CLI, server, and agent runtime
+- `packages/app/` - Browser interface
+- `packages/web/` - Astro and Starlight documentation site
+- `packages/sdk/js/` - Generated JavaScript and TypeScript SDK
+- `packages/ui/` and `packages/plugin/` - Shared UI and plugin APIs
 
-## Code Standards
+## Development
 
-- Use TypeScript with strict mode enabled
-- Shared code goes in `packages/core/` with proper exports configuration
-- Functions go in `packages/functions/`
-- Infrastructure should be split into logical files in `infra/`
-
-## Monorepo Conventions
-
-- Import shared modules using workspace names: `@my-app/core/example`
+- Install workspace dependencies from the repository root with `bun install`
+- Run `bun typecheck` from the package directory you changed
+- Run tests from their package directories; the root test command is intentionally disabled
+- Regenerate the SDK after changing server API schemas
 ```
 
-We are adding project-specific instructions here and this will be shared across your team.
+Add project-specific instructions here so the agent follows the conventions used in this repository.
 
 ---
 
@@ -72,7 +70,7 @@ Place an `AGENTS.md` in your project root for project-specific rules. These only
 
 You can also have global rules in a `~/.config/opencode/AGENTS.md` file. This gets applied across all opencode sessions.
 
-Since this isn't committed to Git or shared with your team, we recommend using this to specify any personal rules that the LLM should follow.
+Since this file is not committed to Git, use it for personal rules that should apply across your OpenCode sessions.
 
 ### Claude Code Compatibility
 
@@ -106,7 +104,7 @@ The first matching file wins in each category. For example, if you have both `AG
 
 ## Custom Instructions
 
-You can specify custom instruction files in your `opencode.json` or the global `~/.config/opencode/opencode.json`. This allows you and your team to reuse existing rules rather than having to duplicate them to AGENTS.md.
+You can specify custom instruction files in your `opencode.json` or the global `~/.config/opencode/opencode.json`. This lets a project load existing guidance without copying it into AGENTS.md.
 
 Example:
 

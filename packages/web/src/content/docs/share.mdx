@@ -3,7 +3,7 @@ title: Share
 description: Share your OpenCode conversations.
 ---
 
-OpenCode's share feature allows you to create public links to your OpenCode conversations, so you can collaborate with teammates or get help from others.
+OpenCode's share feature creates public links to conversations. Shared data is sent to the configured share service, which defaults to `https://opncd.ai`; this repository does not run a separate share backend.
 
 :::note
 Shared conversations are publicly accessible to anyone with the link.
@@ -16,8 +16,8 @@ Shared conversations are publicly accessible to anyone with the link.
 When you share a conversation, OpenCode:
 
 1. Creates a unique public URL for your session
-2. Syncs your conversation history to our servers
-3. Makes the conversation accessible via the shareable link — `opncd.ai/s/<share-id>`
+2. Syncs your conversation history to the configured share service
+3. Makes the conversation accessible via the shareable link — `https://opncd.ai/share/<share-id>`
 
 ---
 
@@ -74,7 +74,7 @@ You can disable sharing entirely by setting the `share` option to `"disabled"` i
 }
 ```
 
-To enforce this across your team for a given project, add it to the `opencode.json` in your project and check into Git.
+To apply this setting to a project, add it to that project's `opencode.json` and commit the file.
 
 ---
 
@@ -111,16 +111,6 @@ includes:
 
 - Only share conversations that don't contain sensitive information.
 - Review conversation content before sharing.
-- Unshare conversations when collaboration is complete.
+- Unshare conversations when they no longer need to be public.
 - Avoid sharing conversations with proprietary code or confidential data.
 - For sensitive projects, disable sharing entirely.
-
----
-
-## For enterprises
-
-For enterprise deployments, the share feature can be:
-
-- **Disabled** entirely for security compliance
-- **Restricted** to users authenticated through SSO only
-- **Self-hosted** on your own infrastructure

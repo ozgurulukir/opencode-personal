@@ -4,12 +4,12 @@ description: Type-safe JS client for opencode server.
 ---
 
 import config from "../../../config.mjs"
-export const typesUrl = `${config.github}/blob/dev/packages/sdk/js/src/gen/types.gen.ts`
+export const typesUrl = `${config.github}/blob/main/packages/sdk/js/src/v2/gen/types.gen.ts`
 
 The opencode JS/TS SDK provides a type-safe client for interacting with the server.
 Use it to build integrations and control opencode programmatically.
 
-[Learn more](/docs/server) about how the server works. For examples, check out the [projects](/docs/ecosystem#projects) built by the community.
+[Learn more](/docs/server) about how the server works, or see the [extension points](/docs/ecosystem) available in this fork.
 
 ---
 
@@ -114,6 +114,27 @@ try {
   console.error("Failed to get session:", (error as Error).message)
 }
 ```
+
+## V2 session API (experimental)
+
+The root SDK export uses the generated V2 client. Its `client.v2.session` group
+targets the `/api/session` routes and uses the V2 session and message types.
+The unprefixed groups remain available for the compatibility API.
+
+```typescript
+const result = await client.v2.session.prompt({
+  path: { sessionID },
+  body: {
+    prompt: { text: "Summarize the current session" },
+  },
+})
+
+console.log(result.data.assistant)
+```
+
+Use `client.v2.session.list()` and `client.v2.session.messages()` to read
+sessions and their messages. V2 routes are experimental; see the server's
+OpenAPI page at `/doc` for the full endpoint list and schemas.
 
 ---
 

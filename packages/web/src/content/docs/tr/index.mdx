@@ -102,8 +102,8 @@ OpenCode'dan kod tabanını size açıklamasını isteyebilirsiniz.
 Projedeki dosyaları bulanık aramak için `@` tuşunu kullanın.
 :::
 
-```txt frame="none" "@packages/functions/src/api/index.ts"
-How is authentication handled in @packages/functions/src/api/index.ts
+```txt frame="none" "@src/api/index.ts"
+How is authentication handled in @src/api/index.ts
 ```
 
 Kod tabanının üzerinde çalışmadığınız bir kısmı varsa bu yararlı olur.
@@ -134,7 +134,7 @@ OpenCode'dan projenize yeni özellikler eklemesini isteyebilirsiniz. Yine de ön
    ```
 
    OpenCode'un isteğinizi anlaması için yeterli ayrıntı verin.
-   Ekibinizdeki junior bir geliştiriciyle konuşur gibi yazmak genelde iyi sonuç verir.
+   Bu kod tabanında çalışan bir geliştiriciyle konuşur gibi yazmak genelde iyi sonuç verir.
 
    :::tip
    OpenCode'a ne istediğinizi anlamasına yardımcı olacak bol miktarda bağlam ve örnek verin.
@@ -176,10 +176,10 @@ OpenCode'dan projenize yeni özellikler eklemesini isteyebilirsiniz. Yine de ön
 
 Daha basit değişikliklerde, önce planı incelemeden OpenCode'dan doğrudan değişiklik yapmasını isteyebilirsiniz.
 
-```txt frame="none" "@packages/functions/src/settings.ts" "@packages/functions/src/notes.ts"
+```txt frame="none" "@src/settings.ts" "@src/notes.ts"
 We need to add authentication to the /settings route. Take a look at how this is
-handled in the /notes route in @packages/functions/src/notes.ts and implement
-the same logic in @packages/functions/src/settings.ts
+handled in the /notes route in @src/notes.ts and implement
+the same logic in @src/settings.ts
 ```
 
 OpenCode'un doğru değişiklikleri yapması için yeterli ayrıntı verdiğinizden emin olun.
@@ -190,8 +190,8 @@ OpenCode'un doğru değişiklikleri yapması için yeterli ayrıntı verdiğiniz
 
 Diyelim ki OpenCode'dan bazı değişiklikler yapmasını istediniz.
 
-```txt frame="none" "@packages/functions/src/api/index.ts"
-Can you refactor the function in @packages/functions/src/api/index.ts?
+```txt frame="none" "@src/api/index.ts"
+Can you refactor the function in @src/api/index.ts?
 ```
 
 Ama istediğinin bu olmadığını anlıyorsun. `/undo` komutunu kullanarak değişiklikleri **geri alabilirsiniz**.
@@ -202,8 +202,8 @@ Ama istediğinin bu olmadığını anlıyorsun. `/undo` komutunu kullanarak değ
 
 OpenCode değişiklikleri geri alır ve orijinal mesajınızı tekrar gösterir.
 
-```txt frame="none" "@packages/functions/src/api/index.ts"
-Can you refactor the function in @packages/functions/src/api/index.ts?
+```txt frame="none" "@src/api/index.ts"
+Can you refactor the function in @src/api/index.ts?
 ```
 
 Buradan komut isteminde ince ayar yapabilir ve OpenCode'dan tekrar denemesini isteyebilirsiniz.
@@ -222,7 +222,7 @@ Veya `/redo` komutunu kullanarak değişiklikleri **yeniden yapabilirsiniz**.
 
 ## Paylaşma
 
-OpenCode ile yaptığınız görüşmeleri [ekibinizle paylaşabilirsiniz](/docs/share).
+OpenCode görüşmelerini [herkese açık bir bağlantıyla paylaşabilirsiniz](/docs/share).
 
 ```bash frame="none"
 /share
@@ -233,8 +233,6 @@ Bu, mevcut konuşmaya bir bağlantı oluşturacak ve bunu panonuza kopyalayacakt
 :::note
 Konuşmalar varsayılan olarak paylaşılmaz.
 :::
-
-İşte OpenCode ile bir [örnek konuşma](https://opencode.ai/s/4XP1fce5).
 
 ---
 

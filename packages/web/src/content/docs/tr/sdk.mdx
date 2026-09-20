@@ -4,12 +4,12 @@ description: opencode sunucusu için type-safe JS istemcisi.
 ---
 
 import config from "../../../../config.mjs"
-export const typesUrl = `${config.github}/blob/dev/packages/sdk/js/src/gen/types.gen.ts`
+export const typesUrl = `${config.github}/blob/main/packages/sdk/js/src/v2/gen/types.gen.ts`
 
 opencode JS/TS SDK, sunucu ile etkileşmek için type-safe bir istemci sağlar.
 opencode'u programatik olarak kontrol etmek ve entegrasyonlar oluşturmak için kullanabilirsiniz.
 
-[Sunucu](/docs/server) sayfasında nasıl çalıştığını görebilir, örnekler için topluluğun oluşturduğu [projeler](/docs/ecosystem#projects) bölümüne bakabilirsiniz.
+[Sunucu](/docs/server) sayfasında nasıl çalıştığını ve bu forkta bulunan [genişletme noktalarını](/docs/ecosystem) görebilirsiniz.
 
 ---
 
@@ -114,6 +114,28 @@ try {
   console.error("Failed to get session:", (error as Error).message)
 }
 ```
+
+## V2 oturum API'si (deneysel)
+
+SDK'nın kök dışa aktarımı, oluşturulan V2 istemcisini kullanır.
+`client.v2.session` grubu `/api/session` uç noktalarına yönelir ve V2 oturum
+ileti türlerini kullanır. Öneksiz gruplar uyumluluk API'si için kullanılabilir.
+
+```typescript
+const result = await client.v2.session.prompt({
+  path: { sessionID },
+  body: {
+    prompt: { text: "Geçerli oturumu özetle" },
+  },
+})
+
+console.log(result.data.assistant)
+```
+
+Oturumları ve mesajları okumak için `client.v2.session.list()` ve
+`client.v2.session.messages()` yöntemlerini kullanın. V2 uç noktaları
+deneyseldir. Tüm uç noktalar ve şemalar için sunucunun `/doc` OpenAPI sayfasına
+bakın.
 
 ---
 

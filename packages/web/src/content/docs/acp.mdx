@@ -140,17 +140,43 @@ This config sets up CodeCompanion to use OpenCode as the ACP agent for chat.
 
 If you need to pass environment variables (like `OPENCODE_API_KEY`), refer to [Configuring Adapters: Environment Variables](https://codecompanion.olimorris.dev/getting-started#setting-an-api-key) in the CodeCompanion.nvim documentation for full details.
 
+## Session options
+
+ACP clients can read the available models, session modes, effort levels, and
+commands. When the client exposes these controls, you can change the model,
+mode, or effort for the current session. OpenCode also streams response and
+tool progress, forwards permission requests, and reports token usage when the
+client supports the corresponding ACP updates.
+
+## Terminal support
+
+When an ACP client advertises terminal support, OpenCode runs shell tool calls
+in a terminal created by that client. Otherwise, it uses a local shell. You can
+set `OPENCODE_ACP_TERMINAL_BACKEND` to `auto` (default), `client` (require the
+client terminal), or `local` (always use a local shell):
+
+```bash
+OPENCODE_ACP_TERMINAL_BACKEND=client opencode acp
+```
+
+If the client terminal fails to start, OpenCode reports the error instead of
+running the same command a second time in a local shell.
+
+## Question tool
+
+The interactive `question` tool is disabled by default because not every ACP
+client supports interactive question prompts. Enable it only with a compatible
+client:
+
+```bash
+OPENCODE_ENABLE_QUESTION_TOOL=1 opencode acp
+```
+
 ## Support
 
-OpenCode works the same via ACP as it does in the terminal. All features are supported:
-
-:::note
-Some built-in slash commands like `/undo` and `/redo` are currently unsupported.
-:::
-
-- Built-in tools (file operations, terminal commands, etc.)
-- Custom tools and slash commands
-- MCP servers configured in your OpenCode config
-- Project-specific rules from `AGENTS.md`
-- Custom formatters and linters
-- Agents and permissions system
+ACP exposes OpenCode sessions through the protocol, but client support varies.
+Built-in tools, custom tools, MCP servers, project instructions, formatters,
+agents, and permissions are available subject to the client's capabilities.
+The ACP `authenticate` request is not implemented; sign in beforehand with
+`opencode auth login`. Slash commands such as `/undo` and `/redo` are not
+available through ACP.
