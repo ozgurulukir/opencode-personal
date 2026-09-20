@@ -334,12 +334,12 @@ Eşleşen tüm MCP'leri devre dışı bırakmak için bir glob modeli de kullana
     }
   },
   "tools": {
-    "my-mcp*": false
+    "mcp_my-mcp_*": false
   }
 }
 ```
 
-Burada tüm MCP'leri devre dışı bırakmak için `my-mcp*` glob modelini kullanıyoruz.
+Burada `my-mcp` sunucusundaki tüm araçları devre dışı bırakmak için `mcp_my-mcp_*` glob modelini kullanıyoruz. Tüm MCP araçlarını devre dışı bırakmak için `mcp_*` kullanın.
 
 ---
 
@@ -361,12 +361,12 @@ Burada tüm MCP'leri devre dışı bırakmak için `my-mcp*` glob modelini kulla
     }
   },
   "tools": {
-    "my-mcp*": false
+    "mcp_my-mcp_*": false
   },
   "agent": {
     "my-agent": {
       "tools": {
-        "my-mcp*": true
+        "mcp_my-mcp_*": true
       }
     }
   }
@@ -379,15 +379,15 @@ Burada tüm MCP'leri devre dışı bırakmak için `my-mcp*` glob modelini kulla
 
 Glob modeli, basit normal ifade globbing modellerini kullanır:
 
-- `*` herhangi bir karakterin sıfır veya daha fazlasıyla eşleşir (örneğin, `"my-mcp*"` `my-mcp_search`, `my-mcp_list` vb. ile eşleşir)
+- `*` herhangi bir karakterin sıfır veya daha fazlasıyla eşleşir (örneğin, `"mcp_my-mcp_*"` `mcp_my-mcp_search`, `mcp_my-mcp_list` vb. ile eşleşir)
 - `?` matches exactly one character
 - All other characters match literally
 
 :::note
-MCP sunucu araçları önek olarak sunucu adıyla kayıtlıdır, dolayısıyla bir sunucuya ilişkin tüm araçları devre dışı bırakmak için aşağıdakileri kullanmanız yeterlidir:
+MCP sunucu araçları `mcp_<sunucu>_<araç>` biçiminde kayıtlıdır; bir sunucunun tüm araçlarını devre dışı bırakmak için:
 
 ```
-"mymcpservername_*": false
+"mcp_mymcpservername_*": false
 ```
 
 :::

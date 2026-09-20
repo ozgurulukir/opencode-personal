@@ -690,7 +690,12 @@ You can control context compaction behavior through the `compaction` option.
 
 - `prune` - Remove old tool outputs to save tokens (default: `true`).
 - `tail_turns` - Number of recent user turns to keep verbatim during compaction (default: `2`).
+- `preserve_recent_tokens` - Maximum number of tokens from recent turns to preserve verbatim. When omitted, the budget is calculated automatically.
+- `min_preserve_recent_tokens` / `max_preserve_recent_tokens` - Lower and upper bounds for the automatically calculated recent-turn token budget (defaults: `2000` and `8000`).
 - `summary_max_tokens` - Maximum tokens for the compaction summary. Defaults to `min(model output limit, 8000)`.
+- `prune_minimum_tokens` - Minimum token savings required before pruning old tool output (default: `20000`).
+- `prune_protect_tokens` - Number of recent tool-output tokens protected from pruning (default: `40000`).
+- `tool_output_max_chars` - Maximum characters of each tool output counted when estimating compaction size (default: `2000`).
 - `prune_protected_tools` - Tool names whose output is never pruned (default: `["skill"]`).
 
 ---
@@ -753,6 +758,35 @@ Configure skill discovery and auto-matching through the `skills` option.
 | `autoMatchThreshold` | `number` | `0.25` | Minimum cosine similarity score (0–1) for auto-match. Skills below this threshold are not injected |
 
 [Learn more about skills](/docs/skills).
+
+---
+
+### Search
+
+Configure the embedding provider used by workspace semantic search through `search.embedding`. The default provider is local and does not require an API key. The local model defaults to `Xenova/all-MiniLM-L6-v2` with 384 dimensions.
+
+```json title="opencode.json"
+{
+  "$schema": "https://opencode.ai/config.json",
+  "search": {
+    "embedding": {
+      "provider": "openai",
+      "model": "text-embedding-3-small",
+      "dimension": 1536,
+      "openaiApiKey": "your-api-key"
+    }
+  }
+}
+```
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `provider` | `"local"` \| `"openai"` | `"local"` | Embedding provider. The local provider runs on CPU; OpenAI requires an API key. |
+| `model` | `string` | Provider default | Model identifier. For local embeddings, use a Hugging Face model ID; for OpenAI, use an embedding model name. |
+| `dimension` | `number` | `384` local, `1536` OpenAI | Embedding vector size. It must match the selected model's output. |
+| `openaiApiKey` | `string` | `OPENAI_API_KEY` | OpenAI API key. The config value is used when the environment variable is not set. |
+
+See [Tools](/docs/tools#index_workspace) for indexing a workspace and [semantic search](/docs/tools#semantic_search) for searching it.
 
 ---
 
@@ -835,14 +869,49 @@ If a provider appears in both `enabled_providers` and `disabled_providers`, the 
 
 ### Experimental
 
-The `experimental` key contains options that are under active development.
+The `experimental` key contains options that are under active development. Each option is optional; defaults are shown where the code defines one.
 
 ```json title="opencode.json"
 {
   "$schema": "https://opencode.ai/config.json",
-  "experimental": {}
+  "experimental": {
+    "batch_tool": true,
+    "openTelemetry": true,
+    "primary_tools": ["my_custom_tool"],
+    "continue_loop_on_deny": true,
+    "mcp_timeout": 10000,
+    "predict_next_prompt": false
+  }
 }
 ```
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `disable_paste_summary` | `boolean` | — | Disable the summary generated when pasted text is too long. |
+| `batch_tool` | `boolean` | — | Enable the batch tool. |
+| `openTelemetry` | `boolean` | — | Enable OpenTelemetry spans for AI SDK calls. |
+| `primary_tools` | `string[]` | — | Tool names reserved for primary agents; subagents cannot use them directly. |
+| `continue_loop_on_deny` | `boolean` | `false` | Continue the agent loop after a tool call is denied. |
+| `mcp_timeout` | `number` | — | Default timeout in milliseconds for MCP requests when a server has no per-server timeout. |
+| `predict_next_prompt` | `boolean` | enabled | Show a predicted next prompt as ghost text in the empty TUI input; accept it with Tab. Set to `false` to disable. |
+
+### Other options
+
+These top-level options are also part of the config schema:
+
+| Option | Description |
+|---|---|
+| `logLevel` | Minimum log level: `DEBUG`, `INFO`, `WARN`, or `ERROR`. |
+| `username` | Name shown for the user in conversations; also used as the OpenTelemetry user identifier. |
+| `reference` | Named local or Git directories available as `@`-mentioned Scout references. |
+| `attachment.image` | Image attachment resizing and size limits: `auto_resize` (default `true`), `max_width` and `max_height` (default `2000` each), and `max_base64_bytes` (default `4718592`). |
+| `tool_output` | Truncation thresholds for tool results: `max_lines` (default `2000`) and `max_bytes` (default `51200`). Full output is saved when either threshold is exceeded. |
+| `enterprise.url` | Enterprise service URL, when required by an enterprise deployment. |
+| `autoshare` | Deprecated alias for `share: "auto"`; use `share` instead. |
+| `mode` | Deprecated agent configuration key; use `agent` instead. |
+| `layout` | Deprecated layout setting; the application always uses stretch layout. |
+
+Top-level config keys are: `$schema`, `shell`, `logLevel`, `server`, `command`, `skills`, `reference`, `watcher`, `snapshot`, `plugin`, `share`, `autoshare`, `autoupdate`, `disabled_providers`, `enabled_providers`, `model`, `small_model`, `default_agent`, `username`, `mode`, `agent`, `provider`, `mcp`, `formatter`, `lsp`, `instructions`, `layout`, `permission`, `tools`, `attachment`, `enterprise`, `tool_output`, `compaction`, `experimental`, and `search`. Their purposes and nested settings are covered above or in the linked pages.
 
 :::caution
 Experimental options are not stable. They may change or be removed without notice.

@@ -334,12 +334,12 @@ We can also use a glob pattern to disable all matching MCPs.
     }
   },
   "tools": {
-    "my-mcp*": false
+    "mcp_my-mcp_*": false
   }
 }
 ```
 
-Here we are using the glob pattern `my-mcp*` to disable all MCPs.
+Here we are using the glob pattern `mcp_my-mcp_*` to disable all tools from the `my-mcp` server. Use `mcp_*` to disable all MCP tools.
 
 ---
 
@@ -361,12 +361,12 @@ If you have a large number of MCP servers you may want to only enable them per a
     }
   },
   "tools": {
-    "my-mcp*": false
+    "mcp_my-mcp_*": false
   },
   "agent": {
     "my-agent": {
       "tools": {
-        "my-mcp*": true
+        "mcp_my-mcp_*": true
       }
     }
   }
@@ -379,15 +379,15 @@ If you have a large number of MCP servers you may want to only enable them per a
 
 The glob pattern uses simple regex globbing patterns:
 
-- `*` matches zero or more of any character (e.g., `"my-mcp*"` matches `my-mcp_search`, `my-mcp_list`, etc.)
+- `*` matches zero or more of any character (e.g., `"mcp_my-mcp_*"` matches `mcp_my-mcp_search`, `mcp_my-mcp_list`, etc.)
 - `?` matches exactly one character
 - All other characters match literally
 
 :::note
-MCP server tools are registered with server name as prefix, so to disable all tools for a server simply use:
+MCP server tools are registered as `mcp_<server>_<tool>`, so to disable all tools for a server simply use:
 
 ```
-"mymcpservername_*": false
+"mcp_mymcpservername_*": false
 ```
 
 :::
