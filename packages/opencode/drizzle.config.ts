@@ -1,3 +1,5 @@
+import path from "path"
+import os from "os"
 import { defineConfig } from "drizzle-kit"
 
 export default defineConfig({
@@ -5,6 +7,8 @@ export default defineConfig({
   schema: "./src/**/*.sql.ts",
   out: "./migration",
   dbCredentials: {
-    url: "/home/thdxr/.local/share/opencode/opencode.db",
+    // Override with OPENCODE_DB_PATH to point at a specific db file.
+    // Defaults to the runtime location under the user's home directory.
+    url: process.env.OPENCODE_DB_PATH ?? path.join(os.homedir(), ".local", "share", "opencode", "opencode.db"),
   },
 })
