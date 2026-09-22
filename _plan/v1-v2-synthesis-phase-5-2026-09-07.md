@@ -1,6 +1,10 @@
 # V1/V2 Synthesis — Phase 5: message model adoption, engine re-homing, V1 deletion
 
 Date: 2026-09-07
+
+**Status:** 🟡 PARTIAL (reviewed 2026-09-22) — all implementation batches landed: 5c `505df60`/`8af52e5`, 5d `96e7564`, 5e `8f7016b`/`39313b8`, 5f consumer migration `857b145`, plus `e87d943` and `f38ca01` (review-gap fixes).
+
+Outstanding: the explicitly deferred 5f deletions — `SessionPrompt.Service` remains as the V1 compatibility facade (`v2/session.ts:556,1002`). Refines the IN PROGRESS header below: only the deferred deletions remain.
 Status: IN PROGRESS — 5a/5b/5c/5d done, 5e-1 + 5e-2 + 5e-3 done (shared engine re-homed behind V2Session, legacy message compatibility added), binary regression guard DONE (2026-09-08), app pipeline batch DONE (2026-09-08, Option A: V1-shaped store + V2→V1 adapter), 5f consumer migration DONE (2026-09-08), 5f deletions explicitly deferred
 Depends on: Phase 4 (complete — commit `9d9fe54bc`, build verified)
 

@@ -1,5 +1,7 @@
 # V1/V2 Synthesis — Phase 1+2 (Brands + Event System) — 2026-09-06
 
+**Status:** ✅ EXECUTED (reviewed 2026-09-22) — landed in `cb7fbd9` and descendants (brands, events, V2 HTTP surface). Matches the COMPLETE header below.
+
 Status: COMPLETE — implementation landed in `cb7fbd990` and its descendants; post-implementation audit recorded 2026-09-08.
 
 > This document preserves the 2026-09-06 planning baseline. Current-state claims and line anchors below are historical unless explicitly marked as an audit.

@@ -1,6 +1,10 @@
 # Plan: Fix intermittent chat ordering breaks & conversation disappearance in TUI/chat
 
 **Date:** 2026-08-14
+
+**Status:** 🟡 PARTIAL (reviewed 2026-09-22) — TUI-side ordering was reworked via the V2 message store (`bdddf62` reducer extraction, newest-first contract in `cli/cmd/tui/AGENTS.md`, `6da0dc0`, `64941f4`), but the plan's core Step 1 is NOT implemented: V1 still orders `(time_created, id)` (`message-v2.ts:521`) and V2 likewise (`v2/session.ts:525`).
+
+Remaining: Step 1 id-only DB ordering (V1+V2), Step 2b scrollback pagination, Step 4 projector id-sort (`v2/session-message-updater.ts:86` still raw push).
 **Author:** strategic-planning agent
 **Scope:** research + implementation plan (no code executed)
 

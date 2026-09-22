@@ -1,5 +1,7 @@
 # Nested (depth 2+) Subagent Permission Ask Hangs in TUI
 
+**Status:** ✅ EXECUTED (reviewed 2026-09-22) — landed in `f888efc` (TUI surfacing + permission timeout guard); evidence `test/cli/cmd/tui/session-tree.test.ts` (added in that commit) and `test/permission/next.test.ts` (pre-existing, extended with the timeout-guard cases).
+
 ## Goal
 
 Fix the bug where a subagent at depth 2+ (grandchild / deeper) whose `bash`/`shell` tool invokes

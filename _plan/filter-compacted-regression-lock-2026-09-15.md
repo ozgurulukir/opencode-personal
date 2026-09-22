@@ -1,6 +1,10 @@
 # FilterCompacted Regression Lock — docs + test (no production change)
 
 Date: 2026-09-15
+
+**Status:** ⬜ PENDING (reviewed 2026-09-22) — neither deliverable landed: the regression test for the no-`tail_start_id` pre-boundary-history case is absent from `test/session/messages-pagination.test.ts`, and the false claim still stands at `packages/opencode/src/session/AGENTS.md:76-78`. Plan tracked in `e54ba95`.
+
+Risk mitigated: motivating PR #139 was CLOSED unmerged, so the load-bearing block survives at `message-v2.ts:662`.
 Author: planner (verified against tree)
 
 ## Goal

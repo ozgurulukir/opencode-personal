@@ -1,6 +1,8 @@
 # Implementation Plan: Subagent Implementation Fixes
 
 **Date:** 2026-08-11  
+
+**Status:** ✅ EXECUTED (reviewed 2026-09-22) — landed in `2388c2a` (parent-child permission resolution, task_id resume, queue bugs) plus `a3e1440` / PR #103 (permission bypass + compaction bugs).
 **Scope:** Fix 9 issues in the subagent implementation (V1 `tool/task.ts`, V2 `v2/session.ts`, shared `agent/subagent-permissions.ts`, `session/loop/subtask.ts`, `session/loop/run-loop.ts`, `session/loop/tools.ts`)  
 **Priority order:** Security → Correctness → Robustness → Documentation
 

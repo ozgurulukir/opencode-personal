@@ -1,5 +1,7 @@
 # V1/V2 Synthesis — Phase 3 (HTTP API Unification) — 2026-09-06
 
+**Status:** ✅ EXECUTED (reviewed 2026-09-22) — landed across `cb7fbd9`..`d633008` (batch 3e intentionally partial by design; `d633008` completes the session action call-site migration). Matches the COMPLETE header below.
+
 Status: COMPLETE for the planned 3a–3e implementation, with 3e intentionally partial by design; post-implementation audit recorded 2026-09-08.
 
 > This document preserves the 2026-09-06 planning baseline. Later phases supersede selected migration decisions; those changes are recorded in the batch notes and the audit below.

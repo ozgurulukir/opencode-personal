@@ -1,5 +1,7 @@
 # Fix stuck/hanging provider LLM requests
 
+**Status:** ✅ EXECUTED (reviewed 2026-09-22) — landed in `7e9466e`; evidence `provider/provider.ts:49-58` (`DEFAULT_HTTP_TIMEOUT` / `resolveHttpTimeout`) applied at `:188`, plus bridged subagent cancel (V1 `tool/task.ts` and V2 `v2/session.ts`).
+
 ## Goal
 
 Provider LLM requests can hang **indefinitely** for two independent reasons, both confirmed by source inspection:

@@ -1,5 +1,7 @@
 # Verify chat-message-drop — two proof tests (Test A / Test B)
 
+**Status:** ⬜ PENDING (reviewed 2026-09-22) — neither proof test exists: `test/session/prompt-rejects-busy.test.ts` and `test/cli/cmd/tui/context/global-event-gap.test.ts` are absent from the tree. The targeted runner behavior is still current (`src/effect/runner.ts:120-122` ignores new work while Running).
+
 ## Goal
 
 TUI'de yazılan mesaj bazen chat'e düşmüyor / modele gönderilmiyor / streaming başlamıyor.

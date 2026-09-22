@@ -1,5 +1,7 @@
 # Graceful SSE Retry on Connection Drop
 
+**Status:** ✅ EXECUTED (reviewed 2026-09-22) — PR #119 merged as `1795d16` (2026-08-29); evidence `cli/cmd/run/stream.transport.ts:670` (`recover()`) and updated `test/cli/run/stream.transport.test.ts`.
+
 ## Goal
 
 Prevent SSE connection drops from permanently killing the session. When the global event stream ends or errors, reconnect transparently instead of setting `state.fault` and failing all subsequent prompt turns.

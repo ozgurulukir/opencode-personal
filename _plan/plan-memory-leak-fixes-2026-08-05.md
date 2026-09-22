@@ -1,6 +1,8 @@
 # Plan: Memory Leak Fixes — LSP Diagnostic Maps & Prefetch Queue Cleanup
 
 **Date:** 2026-08-05  
+
+**Status:** ✅ EXECUTED (reviewed 2026-09-22) — landed in `40ae66a` (prefetch queue cleanup + bounded diagnostic maps; queue extracted to `pages/layout/prefetch-queue.ts` per the plan's deviation note) and `dc88d8c` (`onCleanup` in `pages/layout.tsx`); earlier `2609257`, later `5f52117`. Matches the Implemented header below.
 **Author:** Coding Soul  
 **Status:** Implemented  
 **Scope:** Fix two confirmed memory leaks in `packages/opencode/src/lsp/client.ts` and `packages/app/src/pages/layout.tsx`.

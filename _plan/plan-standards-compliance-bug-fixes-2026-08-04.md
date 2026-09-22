@@ -1,6 +1,8 @@
 # Plan: Standards Compliance & Bug Fixes — OpenCode Agent Skills & Permission System
 
 **Date:** 2026-08-04  
+
+**Status:** ✅ EXECUTED (reviewed 2026-09-22) — landed in `b796a61` (strict skill validation, `skill.warning`/`skill.loaded`/`skill.unloaded` events at `skill/index.ts:37-51`, `debug skill validate`, wildcard cap `util/wildcard.ts:3`) plus `3b81949` and `9ca7f1e` (permission fixes). Matches the Implemented header below.
 **Author:** Coding Soul  
 **Status:** Implemented (2026-08-05)  
 **Scope:** Fix agentskills.io compliance gaps, permission system bugs, and reliability issues in the skill/tool/permission subsystems.

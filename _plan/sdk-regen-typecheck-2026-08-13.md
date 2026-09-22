@@ -1,6 +1,8 @@
 # Fix SDK-regen typecheck failures in `opencode`
 
 - **Date:** 2026-08-13
+
+**Status:** ✅ EXECUTED (reviewed 2026-09-22) — landed in `a4e2e8d` (adapt opencode to regenerated SDK: `cli/cmd/tui/context/sync.tsx` batch events, `test/server/httpapi-sdk.test.ts` optional response). App-side follow-up in `4f1fe2f`. Supersedes the `Status: plan (not yet implemented)` line below.
 - **Author:** strategic planning agent
 - **Status:** plan (not yet implemented)
 
