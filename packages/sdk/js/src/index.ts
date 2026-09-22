@@ -3,7 +3,6 @@
 // consumed by any internal caller; it is removed in the consolidation cleanup.
 // External consumers importing from "@opencode-ai/sdk" get the v2 surface.
 export * from "./v2/index.js"
-export * as data from "./v2/data.js"
 
 import { createOpencodeClient } from "./v2/client.js"
 import { createOpencodeServer } from "./v2/server.js"
