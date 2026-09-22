@@ -1,7 +1,8 @@
 # Plan: Fix verified _review/CODE_REVIEW.md findings
 
 **Date:** 2026-09-22
-**Source:** `_review/CODE_REVIEW.md` (repo root)
+**Status:** ✅ EXECUTED (verified 2026-09-22) — see Execution Record below.
+**Source:** `_review/CODE_REVIEW.md` (repo root) *(Rev 2026-09-22: now tracked at `_review/CODE_REVIEW.md`, moved by `734b185`.)*
 **Scope:** Planning only — no source files modified in this phase.
 
 ---
@@ -187,7 +188,7 @@ return "continue" as const
 
 - **Finding 2 is INVALID — definitively, not a hedge.** Verified against the tree: `SessionCompaction.Interface.create` returns `Effect<void>` (`compaction.ts:214-223`), the implementation returns nothing (`compaction.ts:677-711`), and the `"continue" | "stop"` union belongs to `process` (`compaction.ts:207-213`). Therefore **NO code change is made to `run-loop.ts`** beyond the clarifying comment below.
 - Add a one-line comment at `run-loop.ts:361` (`// create() is Effect<void>; the next iteration re-reads compacted messages`) to prevent this exact false positive recurring. Include in the same commit as finding 1's fix — trivial, reviewable.
-- **`CODE_REVIEW.md` correction note — committed, not left untracked.** `CODE_REVIEW.md` is currently untracked (`git status` shows `?? CODE_REVIEW.md`); an uncommitted note would not persist. Append a dated correction under finding #2 (return type is `void`; recommendation voided) and include `CODE_REVIEW.md` in the commit alongside the code fixes. This is documentation, not a silent edit of review conclusions — the note states the verification evidence.
+- **`CODE_REVIEW.md` correction note — committed, not left untracked.** ~~`CODE_REVIEW.md` is currently untracked (`git status` shows `?? CODE_REVIEW.md`)~~ **Rev 2026-09-22: stale — the file is now tracked at `_review/CODE_REVIEW.md` (committed `a68c62f`, moved by `734b185`).** An uncommitted note would not persist. Append a dated correction under finding #2 (return type is `void`; recommendation voided) and include `CODE_REVIEW.md` in the commit alongside the code fixes. This is documentation, not a silent edit of review conclusions — the note states the verification evidence. **(Executed: correction block at `_review/CODE_REVIEW.md:71`.)**
 
 ---
 
@@ -291,9 +292,32 @@ export const message = {
 2. **Step 2 — Finding 1b:** Replace in-place mutation at `run-loop.ts:348-356` (json_schema error path) with the same copy pattern.
 3. **Step 3:** `cd packages/opencode && bun typecheck`; run `bun test test/session/structured-output.test.ts test/session/structured-output-integration.test.ts` then the full `test/session/` suite.
 4. **Step 4 — Finding 1 regression test:** add sync-event reference-identity + field assertion to `structured-output-integration.test.ts` using the fresh `Bus.subscribe(MessageV2.Event.Updated, ...)` capture specified above (no existing capture infra in that file; pattern precedent `test/session/session.test.ts:44,120`).
-5. **Step 5 — Finding 2 doc:** append dated correction to `CODE_REVIEW.md` finding #2 (stale return-type claim) and add the one-line clarifying comment at `run-loop.ts:361`. Include `CODE_REVIEW.md` in the commit (it is currently untracked; an uncommitted note would not persist).
+5. **Step 5 — Finding 2 doc:** append dated correction to `CODE_REVIEW.md` finding #2 (stale return-type claim) and add the one-line clarifying comment at `run-loop.ts:361`. Include `CODE_REVIEW.md` in the commit (it is currently untracked; an uncommitted note would not persist). *(Rev 2026-09-22: anchors/state stale — see Execution Record. Executed as one commit `6e4a27f`; comment landed at `:367`, correction at `_review/CODE_REVIEW.md:71`.)*
 6. **Step 6 — Finding 3 (atomic):** delete `packages/sdk/js/src/v2/data.ts`; remove the re-export line from `packages/sdk/js/src/index.ts:6` (`export * as data from "./v2/data.js"`) AND from `packages/sdk/js/src/v2/index.ts:10` (`export * as data from "./data.js"`) in the same commit.
 7. **Step 7:** `cd packages/sdk/js && bun typecheck` (tsgo), `cd packages/opencode && bun typecheck` and `cd packages/app && bun typecheck` (clear stale `*.tsbuildinfo` first per root AGENTS.md if SDK surface changed); run `bun test test/server/sdk-error-shape.test.ts` from `packages/opencode`. Confirm `rg -F '"./data.js"'` and `rg -F '"./v2/data.js"'` return zero code hits.
 8. **Step 8:** `detect_changes` graph analysis before commit (repo GitNexus rule); note it may overcount due to file-granular `touched` marking — cross-check `git diff`.
 
 Keep steps 1-2, 5, 6 as separate small commits if desired; steps are independently reviewable.
+
+---
+
+## Execution Record (appended 2026-09-22 — plan fully executed)
+
+All steps verified against HEAD `bcdc6d2`. Commits (oldest first): `6e4a27f` (findings 1+2), `d8d6ffc` (finding 3), `a68c62f`/`d7d2f9a`/`734b185` (review docs + reorg).
+
+| Step | Finding | Status | Commit | Evidence (current tree) |
+|---|---|---|---|---|
+| 1-2 | Finding 1 — in-place mutation → shallow copy | ✅ DONE | `6e4a27f` | structured branch `run-loop.ts:340-348`; json_schema error branch `:351-363` — both build `const message = { ...handle.message, ... }` and pass the copy to `deps.sessions.updateMessage` |
+| 4 | Finding 1 regression test | ✅ DONE (relocated — see Deviation A) | `6e4a27f` | `packages/opencode/test/session/run-loop.characterization.test.ts:609-619` — `expect(firstPayload).not.toBe(structuredPayload)` + `firstPayload!.structured` toBeUndefined |
+| 5 | Finding 2 — clarifying comment + CODE_REVIEW correction | ✅ DONE (anchor drift — see Deviation B) | `6e4a27f` | comment now at `run-loop.ts:367` (plan said `:361`); dated correction block at `_review/CODE_REVIEW.md:71` (file moved from root to `_review/` by `734b185`) |
+| 6-7 | Finding 3 — delete `data.ts` + both re-exports | ✅ DONE | `d8d6ffc` | `packages/sdk/js/src/v2/data.ts` absent; `git grep -F "data.js" -- packages/sdk/js/src` → zero hits; stat touched exactly `src/index.ts`, `src/v2/data.ts` (deleted), `src/v2/index.ts` |
+| 3, 8 | Typecheck/tests + graph analysis | ✅ DONE | — | tests for finding 1 live in the characterization suite (Deviation A) |
+
+### Deviations
+
+- **Deviation A — regression test relocated.** The plan's Step 4 specified adding the capture to `structured-output-integration.test.ts`. The test was instead added to `packages/opencode/test/session/run-loop.characterization.test.ts:609-619` (file first created in `6e4a27f`, +120 lines). Reconfirmed 2026-09-22: `structured-output-integration.test.ts` still has zero `Bus.subscribe`/capture infrastructure. The plan's premise ("no existing capture infra in that file") was true, but the executing change chose the characterization suite as the better home.
+- **Deviation B — anchor drift.** Plan cited `run-loop.ts:361` for the Finding-2 comment and `:340-345`/`:348-356` for Finding 1; actual post-fix anchors are `:367`, `:340-348`, `:351-363` (file is now 384 lines). Plan also asserted `CODE_REVIEW.md` was UNTRACKED at repo root — it is now TRACKED at `_review/CODE_REVIEW.md` (committed in `a68c62f`, moved to `_review/` by `734b185`). Original prose above is preserved as pre-execution intent; do not re-apply the "add regression test to structured-output-integration.test.ts" instruction.
+
+### Cross-plan note
+
+The "ordering conflict" recorded in `_plan/repo-hygiene-2026-09-22.md:77-79` (this plan's stale root/untracked assumptions vs the repo reorg) is **RESOLVED** — both this plan and `_plan/verify-arch-review-2026-09-22.md` are fully executed, and the review docs now live tracked under `_review/`.

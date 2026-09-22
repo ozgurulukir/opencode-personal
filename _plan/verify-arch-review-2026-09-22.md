@@ -1,7 +1,8 @@
 # Plan: Verify `_review/_arch-review.md` claims and append dated corrections
 
 **Date:** 2026-09-22 (rev 4 — line-count methodology corrected; false STALE verdicts removed)
-**Source:** `_review/_arch-review.md` (repo root, UNTRACKED, last modified 22.09.2026 09:25)
+**Status:** ✅ EXECUTED (verified 2026-09-22) — see Execution Record below.
+**Source:** `_review/_arch-review.md` (repo root, UNTRACKED, last modified 22.09.2026 09:25) *(Rev 2026-09-22: stale — now TRACKED at `_review/_arch-review.md` (moved by `734b185`), 226 lines total; the plan's `:122/:123` and other `_arch-review.md` line anchors below are historical pre-correction offsets.)*
 **Scope:** Planning only — no source files modified in this phase. Only `_review/_arch-review.md` (and this plan file) change in the Code stage.
 
 ---
@@ -337,3 +338,38 @@ These are recorded here for the Code stage's awareness only; nothing is appended
 - Only `_review/_arch-review.md` (corrections) and this plan file change. **No source files are edited.**
 - `_review/_arch-review.md` is currently UNTRACKED (`?? _review/_arch-review.md`); it MUST be committed WITH the corrections so they persist.
 - Repo style: no semicolons, 120 printWidth — applies to any prose wrapping in the correction blocks.
+
+---
+
+## Execution Record (appended 2026-09-22 — plan fully executed)
+
+Verified against HEAD `bcdc6d2`. Executing commit: `d7d2f9a` (`git log -S "run-loop anchor moved"` matches only `d7d2f9a`; its stat created `_arch-review.md` at the ROOT — the move to `_review/_arch-review.md` happened in `734b185`).
+
+| Edit | Status | Evidence (current `_review/_arch-review.md`) |
+|---|---|---|
+| E2 | ✅ DONE | correction block at line 27 ("run-loop anchor moved") |
+| E3 | ✅ DONE | line 38 (domain list / AGENTS.md coverage) |
+| E4 | ✅ DONE | line 55 (wrong-file anchor) |
+| E5 | ✅ DONE | line 78 (orval → hey-api) |
+| E6 | ✅ DONE | line 85 (v1 removed) |
+| E7 | ✅ DONE | line 100 (drizzle risk voided by `0bd91a8`) |
+| E8 | ✅ DONE | line 119 (provider nesting order) |
+| E10a | ✅ DONE | line 130 (app spec count drifted) |
+| E9 | ✅ DONE | line 156 (test tasks ^build) |
+| E10b | ✅ DONE | line 166 (app test-file count drifted) |
+| E13 | ✅ DONE | line 171 (SDK tests in another package) |
+| E12 | ✅ DONE | line 192 (dependsOn explicitly empty) |
+| E14a | ✅ DONE | `> **Downgraded (2026-09-22)**` at line 206 (rec 2) |
+| E14b | ✅ DONE | line 213 (rec 3) |
+| E1 / E11 | ✅ correctly ABSENT | no blocks exist for them (verified — 12 Correction + 2 Downgraded blocks total, no others) |
+
+Total: 12 `Correction (2026-09-22)` blocks + 2 `Downgraded (2026-09-22)` blocks — matches the plan's edit spec exactly.
+
+### Stale-assumption reconciliation
+
+- Plan says the source is `_review/_arch-review.md` "repo root, UNTRACKED", 132 lines, and cites `_arch-review.md:122/:123` for §6. **Stale:** the file is TRACKED at `_review/_arch-review.md` (committed via `d7d2f9a` at root, moved by `734b185`) and is **226 lines** total. All `_arch-review.md` line anchors in the body above are **historical pre-correction offsets** (the 132-line pre-correction file); after correction-block insertion they shifted — e.g. §6 recs cited at `:122/:123` now sit at `:204/:211`. Body preserved as pre-execution intent; the Execution Record table carries the post-execution anchors.
+- Plan Step 5 says `_review/_arch-review.md` is untracked — stale (tracked since `d7d2f9a`/`734b185`).
+
+### Cross-plan note
+
+The "ordering conflict" recorded in `_plan/repo-hygiene-2026-09-22.md:77-79` (this plan's stale root/untracked assumptions vs the repo reorg) is **RESOLVED** — this plan and `_plan/fix-code-review-findings-2026-09-22.md` are both fully executed, and the review docs now live tracked under `_review/`.
