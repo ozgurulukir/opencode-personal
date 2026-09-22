@@ -24,6 +24,7 @@ import { describe, expect } from "bun:test"
 import { Effect, Layer, Stream } from "effect"
 import { Agent as AgentSvc } from "../../src/agent/agent"
 import { Bus } from "../../src/bus"
+import { GlobalBus, type GlobalEvent } from "../../src/bus/global"
 import { Command } from "../../src/command"
 import { Config } from "@/config/config"
 import { LSP } from "@/lsp/lsp"
@@ -222,6 +223,52 @@ function replyToolCall(toolName: string, input: object, toolCallId = "call-1"): 
       totalUsage: usage,
     } satisfies LLM.Event,
   )
+}
+
+/**
+ * A structured-output call. In the real pipeline the AI SDK executes the
+ * `StructuredOutput` tool and emits its events; this stub replaces `LLM.stream`,
+ * so it must invoke the tool's `execute` itself to fire the loop's `onSuccess`
+ * capture (that is what sets `runLoop`'s `structured` value), then emit the
+ * events the processor records for a tool call.
+ */
+function replyStructured(
+  payload: Record<string, unknown>,
+): (input: LLM.StreamInput) => Stream.Stream<LLM.Event, unknown> {
+  return (input) =>
+    Stream.unwrap(
+      Effect.promise(async () => {
+        const tool = input.tools["StructuredOutput"] as unknown as
+          | { execute?: (args: unknown) => unknown }
+          | undefined
+        if (!tool?.execute) throw new Error("StructuredOutput tool not registered on the stream")
+        await tool.execute(payload)
+        return Stream.make(
+          { type: "start" } satisfies LLM.Event,
+          { type: "tool-input-start", id: "call-structured", toolName: "StructuredOutput" } satisfies LLM.Event,
+          {
+            type: "tool-call",
+            toolCallId: "call-structured",
+            toolName: "StructuredOutput",
+            input: payload,
+          } satisfies LLM.Event,
+          {
+            type: "finish-step",
+            finishReason: "tool-calls",
+            rawFinishReason: "tool_calls",
+            response: { id: "res", modelId: "test-model", timestamp: new Date() },
+            providerMetadata: undefined,
+            usage,
+          } satisfies LLM.Event,
+          {
+            type: "finish",
+            finishReason: "tool-calls",
+            rawFinishReason: "tool_calls",
+            totalUsage: usage,
+          } satisfies LLM.Event,
+        )
+      }),
+    )
 }
 
 // --- layer composition (makeHttp from prompt.test.ts:164-233, minus TestLLMServer + LLM.defaultLayer) ---
@@ -500,6 +547,79 @@ describe("runLoop characterization", () => {
           expect(result.info.role).toBe("assistant")
           expect(result.parts.length).toBeGreaterThan(0)
           expect(llm.calls).toBe(1)
+        }),
+      { git: true, config: cfg },
+    ),
+  )
+
+  // ---------------------------------------------------------------------------
+  // Scenario E: structured-output persistence must not alias the live message.
+  //   The assistant message object created at run-loop.ts:224 is the processor's
+  //   live `ctx.assistantMessage`; run-loop.ts:239 and processor.ts:522/709 publish
+  //   that same reference. The structured-output branch (run-loop.ts:340) must
+  //   publish a detached copy instead of mutating the live object in place.
+  //
+  //   Capture surface: the per-instance `Bus` payload is deep-copied by
+  //   `encodeDateTimes` (sync/index.ts `process`) before it reaches subscribers,
+  //   so identity there can never fail. The GlobalBus `sync` envelope forwards the
+  //   raw `event.data`, i.e. the live `info` reference — the only in-process
+  //   surface where this aliasing is observable.
+  // ---------------------------------------------------------------------------
+  it.live("E: structured output publishes a detached copy (no live-message aliasing)", () =>
+    provideTmpdirInstance(
+      () =>
+        Effect.gen(function* () {
+          llm.reset()
+          const prompt = yield* SessionPrompt.Service
+          const sessions = yield* Session.Service
+          const chat = yield* sessions.create({ title: "char-e", permission: ALLOW_ALL })
+
+          const published: MessageV2.Assistant[] = []
+          const handler = (event: GlobalEvent) => {
+            const payload = event.payload
+            if (payload?.type !== "sync") return
+            if (payload.syncEvent?.type !== "message.updated.1") return
+            const info = payload.syncEvent.data?.info
+            if (info?.role === "assistant" && info.sessionID === chat.id) published.push(info)
+          }
+          GlobalBus.on("event", handler)
+
+          try {
+            const payload = { answer: 42 }
+            llm.push(replyStructured(payload))
+
+            const result = yield* prompt.prompt({
+              sessionID: chat.id,
+              agent: "build",
+              parts: [{ type: "text", text: "answer in a structured format" }],
+              format: {
+                type: "json_schema",
+                schema: {
+                  type: "object",
+                  properties: { answer: { type: "number" } },
+                  required: ["answer"],
+                },
+                retryCount: 0,
+              },
+            })
+
+            expect(result.info.role).toBe("assistant")
+            if (result.info.role === "assistant") expect(result.info.structured).toEqual(payload)
+
+            const structuredPayload = published.find((m) => m.structured !== undefined)
+            expect(structuredPayload).toBeDefined()
+            expect(structuredPayload!.structured).toEqual(payload)
+
+            // The first envelope for this message carries the live assistant
+            // object; the branch's envelope must carry a different (copied) object
+            // and must not have retroactively mutated the earlier snapshot.
+            const firstPayload = published.find((m) => m.id === structuredPayload!.id)
+            expect(firstPayload).toBeDefined()
+            expect(firstPayload).not.toBe(structuredPayload)
+            expect(firstPayload!.structured).toBeUndefined()
+          } finally {
+            GlobalBus.off("event", handler)
+          }
         }),
       { git: true, config: cfg },
     ),
