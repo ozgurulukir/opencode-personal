@@ -325,7 +325,7 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
           if (useLanguageModel(sdk)) return sdk.languageModel(modelID)
           return shouldUseCopilotResponsesApi(modelID) ? sdk.responses(modelID) : sdk.chat(modelID)
         },
-        options: {},
+        options: { fetch: rewriteMaxOutputTokens },
       }),
     azure: Effect.fnUntraced(function* (provider: Info) {
       const env = yield* dep.env()
