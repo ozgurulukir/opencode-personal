@@ -338,26 +338,33 @@ export const runLoop: (deps: RunLoopDeps, sessionID: SessionID) => Effect.Effect
       })
 
       if (structured !== undefined) {
-        handle.message.structured = structured
-        handle.message.finish = handle.message.finish ?? "stop"
-        yield* deps.sessions.updateMessage(handle.message)
+        const message: MessageV2.Assistant = {
+          ...handle.message,
+          structured,
+          finish: handle.message.finish ?? "stop",
+        }
+        yield* deps.sessions.updateMessage(message)
         return "break" as const
       }
 
       const finished = handle.message.finish && !["tool-calls", "unknown"].includes(handle.message.finish)
       if (finished && !handle.message.error) {
         if (format.type === "json_schema") {
-          handle.message.error = new MessageV2.StructuredOutputError({
-            message: "Model did not produce structured output",
-            retries: 0,
-          }).toObject()
-          yield* deps.sessions.updateMessage(handle.message)
+          const message: MessageV2.Assistant = {
+            ...handle.message,
+            error: new MessageV2.StructuredOutputError({
+              message: "Model did not produce structured output",
+              retries: 0,
+            }).toObject(),
+          }
+          yield* deps.sessions.updateMessage(message)
           return "break" as const
         }
       }
 
       if (result === "stop") return "break" as const
       if (result === "compact") {
+        // create() is Effect<void>; the next iteration re-reads compacted messages
         yield* deps.compaction.create({
           sessionID,
           agent: lastUser.agent,
