@@ -1,14 +1,14 @@
-# Plan: Fix verified CODE_REVIEW.md findings
+# Plan: Fix verified _review/CODE_REVIEW.md findings
 
 **Date:** 2026-09-22
-**Source:** `CODE_REVIEW.md` (repo root)
+**Source:** `_review/CODE_REVIEW.md` (repo root)
 **Scope:** Planning only — no source files modified in this phase.
 
 ---
 
 ## Goal
 
-Address the three verified findings from `CODE_REVIEW.md`:
+Address the three verified findings from `_review/CODE_REVIEW.md`:
 
 1. `run-loop.ts:341-343` — `handle.message` mutated in place before persist.
 2. `run-loop.ts:360-368` — `compaction.create` return value "discarded".
@@ -277,7 +277,7 @@ export const message = {
 
 ## Out of scope / explicitly not changed
 
-- All RETRACTED findings in `CODE_REVIEW.md` (step increment, busy reset, transform literal, Gemini sanitize, types.gen) — verified incorrect, no action.
+- All RETRACTED findings in `_review/CODE_REVIEW.md` (step increment, busy reset, transform literal, Gemini sanitize, types.gen) — verified incorrect, no action.
 - WEAK finding (`v2/server.ts:43-103` readiness/abort race) — review itself downgrades to a nit; not addressed.
 - `updateMessage`'s lack of `structuredClone` in `Session.Service` (contrast `updatePart`) — the copy at the call site (finding 1) mitigates the specific hazard; changing `updateMessage` clone semantics globally is a larger change affecting all ~30 call sites.
 - `processor.ts` `ctx.assistantMessage` internal mutation during streaming — inherent to the streaming design; out of scope.

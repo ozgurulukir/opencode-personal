@@ -1,3 +1,0 @@
-{"ts":"2026-09-01T18:33:54+03:00","type":"user_turn","payload":{"role":"user","content":"installed @opentui/core@0.5.9"}}
-{"ts":"2026-09-01T18:34:11+03:00","type":"cancelled_turn","payload":{"question":"installed @opentui/core@0.5.9","reason":"Interrupted by user (^C)"}}
-{"ts":"2026-09-01T18:34:11+03:00","type":"assistant_response","payload":{"role":"assistant","content":"[Turn cancelled by user (^C)]\nPartial progress before this outcome:\nTools used: read_file, grep_search(x3)\nFiles touched: C:/Github/opencode-personal/packages/opencode/package.json, C:/Github/opencode-personal/packages/opencode, C:/Github/opencode-personal\nTool errors encountered: 1"}}

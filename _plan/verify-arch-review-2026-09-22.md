@@ -1,22 +1,22 @@
-# Plan: Verify `_arch-review.md` claims and append dated corrections
+# Plan: Verify `_review/_arch-review.md` claims and append dated corrections
 
 **Date:** 2026-09-22 (rev 4 — line-count methodology corrected; false STALE verdicts removed)
-**Source:** `_arch-review.md` (repo root, UNTRACKED, last modified 22.09.2026 09:25)
-**Scope:** Planning only — no source files modified in this phase. Only `_arch-review.md` (and this plan file) change in the Code stage.
+**Source:** `_review/_arch-review.md` (repo root, UNTRACKED, last modified 22.09.2026 09:25)
+**Scope:** Planning only — no source files modified in this phase. Only `_review/_arch-review.md` (and this plan file) change in the Code stage.
 
 ---
 
 ## Goal
 
-`_arch-review.md` was written by 4 read-only research agents. Before its conclusions are acted on, every factual claim in the review must be verified against the CURRENT working tree, and every STALE / INACCURATE claim must get an exact, dated correction appended under the affected item — mirroring the integrity-notice pattern of `CODE_REVIEW.md` (original text preserved, dated correction block appended, evidence cited as `file:line`) and the plan precedent `_plan/fix-code-review-findings-2026-09-22.md` (verification outcome recorded before any work; stale claims documented, not silently rewritten).
+`_review/_arch-review.md` was written by 4 read-only research agents. Before its conclusions are acted on, every factual claim in the review must be verified against the CURRENT working tree, and every STALE / INACCURATE claim must get an exact, dated correction appended under the affected item — mirroring the integrity-notice pattern of `_review/CODE_REVIEW.md` (original text preserved, dated correction block appended, evidence cited as `file:line`) and the plan precedent `_plan/fix-code-review-findings-2026-09-22.md` (verification outcome recorded before any work; stale claims documented, not silently rewritten).
 
 **Scope of "every factual claim":** all checkable assertions in §1–§6, including the §1 At-a-Glance table, §2 findings/risks/strengths, §3 findings/risks, §4 findings/risks, §5 paragraphs/risks, and the validity of the 8 §6 recommendations. Purely evaluative judgments (e.g. "production-grade", "mature") are out of scope.
 
 **Method:** every claim below was checked against the current tree via direct source reads, `rg`/`Get-Content` (text/config/JSON/docs — where graph tools are blind), and file listings. Line anchors were re-measured after recent commits (`6e4a27f` touched `run-loop.ts`; `0bd91a8` touched `drizzle.config.ts` + `trace-imports.ts` — verified via `git show --stat`; neither touched `index.ts`). No claim is marked without evidence; nothing was invented.
 
-**File-length methodology (rev 3 correction):** file-length claims are measured with **`(Get-Content <file>).Count`** — TOTAL lines including blanks — which is the same numbering the review's "N lines" claims use and the same array numbering this plan uses for its own anchors (`_arch-review.md:122/123` of 132 total). `Measure-Object -Line` counts NON-BLANK lines only and is NOT used for length claims (rev 1/2 used it and produced false "STALE" verdicts for `index.ts` and `build.ts`; both reclassified VERIFIED in this revision). Sanity check: `_arch-review.md` → `.Count` = 132, `Measure-Object -Line` = 98.
+**File-length methodology (rev 3 correction):** file-length claims are measured with **`(Get-Content <file>).Count`** — TOTAL lines including blanks — which is the same numbering the review's "N lines" claims use and the same array numbering this plan uses for its own anchors (`_review/_arch-review.md:122/123` of 132 total). `Measure-Object -Line` counts NON-BLANK lines only and is NOT used for length claims (rev 1/2 used it and produced false "STALE" verdicts for `index.ts` and `build.ts`; both reclassified VERIFIED in this revision). Sanity check: `_review/_arch-review.md` → `.Count` = 132, `Measure-Object -Line` = 98.
 
-**Precedent reference:** `_plan/fix-code-review-findings-2026-09-22.md` (structure: verified-code → outcome → action) and `CODE_REVIEW.md` (integrity notice + dated correction blocks under each affected finding; verified block format `> **Correction (2026-09-22) — …**`, `CODE_REVIEW.md:71`).
+**Precedent reference:** `_plan/fix-code-review-findings-2026-09-22.md` (structure: verified-code → outcome → action) and `_review/CODE_REVIEW.md` (integrity notice + dated correction blocks under each affected finding; verified block format `> **Correction (2026-09-22) — …**`, `_review/CODE_REVIEW.md:71`).
 
 **Verdict rules (applied consistently):**
 - VERIFIED / STALE (was true, anchor or value moved) / INACCURATE (wrong against current tree) / OBSERVATIONAL (true as observed, not a hard contract) / UNRESOLVED.
@@ -117,7 +117,7 @@
 | 5 | `typecheck` uncached-freeflow | OBSERVATIONAL | `"typecheck": {}` in `turbo.json` — no outputs declared; caching semantics not further verifiable from config alone |
 | 5 | all `test*` depend on `^build` | **INACCURATE** | `turbo.json:20,29,38` special-case `opencode#test:ci`, `@opencode-ai/app#test:ci`, `@opencode-ai/ui#test:ci` with `dependsOn: ["^build"]`, and the package-scoped `#test` tasks likewise — BUT the generic `"test:ci"` at `turbo.json:16` has **no `dependsOn`**, and `packages/core/package.json:10` defines `test:ci` with no package-scoped override → `@opencode-ai/core#test:ci` runs WITHOUT `^build` |
 | 5 | "`build` task has no `dependsOn`" | **INACCURATE (phrasing)** | `turbo.json` declares `"build": { "dependsOn": [] }` — an explicit EMPTY array, not a missing key. Substance holds (no upstream deps → stale-build risk real) |
-| 5 | ~310 tests in `opencode`, 24 in `core`, 67 in app | VERIFIED (approx; unit note) — EXCEPT the unhedged "67 in app" | the review's "~310 **tests**" vs measured **316 test FILES** in `packages/opencode/test` is a unit mismatch (test cases number ~2929 via `rg -o "^\s*(test|it)\("`); file breakdown confirmed: **310 `.test.ts` + 6 `.test.tsx` = 316**; core = **24** files (180 cases); app = **68** files (495 cases via the same `rg` pattern). The hedged "~310" and confirmed "24" fall under the approximation rule (no block); the UNHEDGED "67 in app" is stale (68) and is corrected via **E10 at `_arch-review.md:100`** (same block also covers the `:76` instance) |
+| 5 | ~310 tests in `opencode`, 24 in `core`, 67 in app | VERIFIED (approx; unit note) — EXCEPT the unhedged "67 in app" | the review's "~310 **tests**" vs measured **316 test FILES** in `packages/opencode/test` is a unit mismatch (test cases number ~2929 via `rg -o "^\s*(test|it)\("`); file breakdown confirmed: **310 `.test.ts` + 6 `.test.tsx` = 316**; core = **24** files (180 cases); app = **68** files (495 cases via the same `rg` pattern). The hedged "~310" and confirmed "24" fall under the approximation rule (no block); the UNHEDGED "67 in app" is stale (68) and is corrected via **E10 at `_review/_arch-review.md:100`** (same block also covers the `:76` instance) |
 | 5 | "SDK/JS has zero unit tests — a gap" | **INACCURATE (framing)** | literally true for `packages/sdk/js` (no `test/` dir, 0 `test(` occurrences) — but SDK behavior tests live in **`packages/opencode/test/server/`** (root AGENTS.md rule; dir exists with `httpapi-*.test.ts`, `routes/`, etc.). The externally-consumed surface IS tested; the gap is location, not absence |
 | 5 | `as any` count = 67 (opencode 29, ui 33, core 5) | VERIFIED | `rg -o "as any"` → 29 + 33 + 5 = 67 |
 | 5 | no `constantTimeEqual` exists | VERIFIED | zero matches across `packages/` |
@@ -139,13 +139,13 @@
 
 ---
 
-## Exact edit specs for `_arch-review.md` (Code stage)
+## Exact edit specs for `_review/_arch-review.md` (Code stage)
 
-All blocks use the verified precedent string from `CODE_REVIEW.md:71`: `> **Correction (2026-09-22) — <summary>**`. For each item: KEEP the original sentence at the cited `_arch-review.md` line, append the dated correction block directly under it. Do not rewrite review conclusions.
+All blocks use the verified precedent string from `_review/CODE_REVIEW.md:71`: `> **Correction (2026-09-22) — <summary>**`. For each item: KEEP the original sentence at the cited `_review/_arch-review.md` line, append the dated correction block directly under it. Do not rewrite review conclusions.
 
-**E1 — DELETED (rev 3).** The rev-2 E1 block ("index.ts is now 242 lines") was a FALSE correction produced by the non-blank `Measure-Object -Line` methodology. `(Get-Content packages/opencode/src/index.ts).Count` = **258**, matching the review's claim exactly, and neither `6e4a27f` nor `0bd91a8` touched `index.ts`. The §2 row is VERIFIED; nothing is appended to `_arch-review.md` for it.
+**E1 — DELETED (rev 3).** The rev-2 E1 block ("index.ts is now 242 lines") was a FALSE correction produced by the non-blank `Measure-Object -Line` methodology. `(Get-Content packages/opencode/src/index.ts).Count` = **258**, matching the review's claim exactly, and neither `6e4a27f` nor `0bd91a8` touched `index.ts`. The §2 row is VERIFIED; nothing is appended to `_review/_arch-review.md` for it.
 
-**E2 — `_arch-review.md:25` (§2, run-loop bullet; anchor moved by `6e4a27f`).** Append:
+**E2 — `_review/_arch-review.md:25` (§2, run-loop bullet; anchor moved by `6e4a27f`).** Append:
 
 ```markdown
 > **Correction (2026-09-22) — run-loop anchor moved.**
@@ -158,7 +158,7 @@ All blocks use the verified precedent string from `CODE_REVIEW.md:71`: `> **Corr
 > `tools.ts`.
 ```
 
-**E3 — `_arch-review.md:26` (§2, topology bullet; domain list + AGENTS.md claim).** Append:
+**E3 — `_review/_arch-review.md:26` (§2, topology bullet; domain list + AGENTS.md claim).** Append:
 
 ```markdown
 > **Correction (2026-09-22) — domain list incomplete; AGENTS.md coverage overstated.**
@@ -170,7 +170,7 @@ All blocks use the verified precedent string from `CODE_REVIEW.md:71`: `> **Corr
 > accurate.
 ```
 
-**E4 — `_arch-review.md:35` (§2, event-schema-evolution risk; wrong-file anchor).** Append:
+**E4 — `_review/_arch-review.md:35` (§2, event-schema-evolution risk; wrong-file anchor).** Append:
 
 ```markdown
 > **Correction (2026-09-22) — anchor cites the wrong file.**
@@ -180,7 +180,7 @@ All blocks use the verified precedent string from `CODE_REVIEW.md:71`: `> **Corr
 > no-backfill observation stands.
 ```
 
-**E5 — `_arch-review.md:51` (§3, SDK-client bullet; orval claim).** Append:
+**E5 — `_review/_arch-review.md:51` (§3, SDK-client bullet; orval claim).** Append:
 
 ```markdown
 > **Correction (2026-09-22) — the generator is @hey-api/openapi-ts, not orval.**
@@ -191,7 +191,7 @@ All blocks use the verified precedent string from `CODE_REVIEW.md:71`: `> **Corr
 > Zero `orval` references exist in `packages/sdk/js`.
 ```
 
-**E6 — `_arch-review.md:51` (§3, same bullet; v1 frozen/stale claim).** Append:
+**E6 — `_review/_arch-review.md:51` (§3, same bullet; v1 frozen/stale claim).** Append:
 
 ```markdown
 > **Correction (2026-09-22) — v1 was removed, not frozen.**
@@ -200,7 +200,7 @@ All blocks use the verified precedent string from `CODE_REVIEW.md:71`: `> **Corr
 > `error-interceptor.ts`, `index.ts`, `process.ts`; the root export re-exports v2.
 ```
 
-**E7 — `_arch-review.md:60` (§3, non-portable drizzle risk; fixed by `0bd91a8`).** Append:
+**E7 — `_review/_arch-review.md:60` (§3, non-portable drizzle risk; fixed by `0bd91a8`).** Append:
 
 ```markdown
 > **Correction (2026-09-22) — risk voided by commit 0bd91a8.**
@@ -210,7 +210,7 @@ All blocks use the verified precedent string from `CODE_REVIEW.md:71`: `> **Corr
 > remains. The Bun/Node migration-path divergence (next risk) is unaffected.
 ```
 
-**E8 — `_arch-review.md:72` (§4, app bullet; provider chain order).** Append:
+**E8 — `_review/_arch-review.md:72` (§4, app bullet; provider chain order).** Append:
 
 ```markdown
 > **Correction (2026-09-22) — provider nesting is the reverse of the stated order.**
@@ -220,7 +220,7 @@ All blocks use the verified precedent string from `CODE_REVIEW.md:71`: `> **Corr
 > (`app.tsx:318-320`).
 ```
 
-**E9 — `_arch-review.md:98` (§5, orchestration paragraph; "all `test*` depend on `^build`").** Append:
+**E9 — `_review/_arch-review.md:98` (§5, orchestration paragraph; "all `test*` depend on `^build`").** Append:
 
 ```markdown
 > **Correction (2026-09-22) — not all test tasks depend on ^build.**
@@ -232,9 +232,9 @@ All blocks use the verified precedent string from `CODE_REVIEW.md:71`: `> **Corr
 > `@opencode-ai/core#test:ci` runs without `^build`.
 ```
 
-**E10 — `_arch-review.md:76` AND `_arch-review.md:100` (§4 testing bullet + §5 testing-scale paragraph; the SAME unhedged "67 app" figure appears in both).** Append under EACH line:
+**E10 — `_review/_arch-review.md:76` AND `_review/_arch-review.md:100` (§4 testing bullet + §5 testing-scale paragraph; the SAME unhedged "67 app" figure appears in both).** Append under EACH line:
 
-At `_arch-review.md:76`:
+At `_review/_arch-review.md:76`:
 
 ```markdown
 > **Correction (2026-09-22) — app spec count drifted.**
@@ -242,7 +242,7 @@ At `_arch-review.md:76`:
 > bun-test + `happydom` preload and Chromium-only Playwright verified current.
 ```
 
-At `_arch-review.md:100`:
+At `_review/_arch-review.md:100`:
 
 ```markdown
 > **Correction (2026-09-22) — app test-file count drifted.**
@@ -253,9 +253,9 @@ At `_arch-review.md:100`:
 
 Rationale for the split ruling: the "~310" figure is hedged by the review itself (approximation rule → VERIFIED approx, no block), but "67 in app" is UNHEDGED in both places and both instances are stale (68 measured) — so both get the same E10 correction. The §5 row's VERIFIED (approx) verdict applies to the hedged opencode/core figures; the unhedged app figure is corrected via E10 at both locations.
 
-**E11 — DELETED (rev 3).** The rev-2 E11 block ("`script/build.ts` is now 404 lines") was a FALSE correction from the same non-blank-count methodology. `(Get-Content packages/opencode/script/build.ts).Count` = **437**, matching the review's claim exactly. The §5 row is VERIFIED; nothing is appended to `_arch-review.md` for it.
+**E11 — DELETED (rev 3).** The rev-2 E11 block ("`script/build.ts` is now 404 lines") was a FALSE correction from the same non-blank-count methodology. `(Get-Content packages/opencode/script/build.ts).Count` = **437**, matching the review's claim exactly. The §5 row is VERIFIED; nothing is appended to `_review/_arch-review.md` for it.
 
-**E12 — `_arch-review.md:114` (§5 **Risks** bullet: "`build` task has no `dependsOn` in `turbo.json` → risk of stale upstream builds").** NOTE: this is a DISTINCT risk bullet, NOT the orchestration paragraph at `:98` (which carries E9's `test*`→`^build` correction). Append under `:114` only:
+**E12 — `_review/_arch-review.md:114` (§5 **Risks** bullet: "`build` task has no `dependsOn` in `turbo.json` → risk of stale upstream builds").** NOTE: this is a DISTINCT risk bullet, NOT the orchestration paragraph at `:98` (which carries E9's `test*`→`^build` correction). Append under `:114` only:
 
 ```markdown
 > **Correction (2026-09-22) — dependsOn is explicitly empty, not absent.**
@@ -264,7 +264,7 @@ Rationale for the split ruling: the "~310" figure is hedged by the review itself
 > deps → stale-build risk) holds.
 ```
 
-**E13 — `_arch-review.md:100` (§5, testing-scale paragraph; SDK zero-tests framing).** Append:
+**E13 — `_review/_arch-review.md:100` (§5, testing-scale paragraph; SDK zero-tests framing).** Append:
 
 ```markdown
 > **Correction (2026-09-22) — SDK tests exist, but in another package.**
@@ -275,7 +275,7 @@ Rationale for the split ruling: the "~310" figure is hedged by the review itself
 > location/proximity, not missing coverage of the consumed surface.
 ```
 
-**E14 — §6 recommendation adjustments.** Under `_arch-review.md:122` (recommendation 2), append:
+**E14 — §6 recommendation adjustments.** Under `_review/_arch-review.md:122` (recommendation 2), append:
 
 ```markdown
 > **Downgraded (2026-09-22) — partially done.**
@@ -284,7 +284,7 @@ Rationale for the split ruling: the "~310" figure is hedged by the review itself
 > paths (`storage/db.ts:105-107`).
 ```
 
-Under `_arch-review.md:123` (recommendation 3), append:
+Under `_review/_arch-review.md:123` (recommendation 3), append:
 
 ```markdown
 > **Downgraded (2026-09-22) — reframed.**
@@ -299,7 +299,7 @@ Recommendations 1, 4, 5, 6, 7, 8 remain valid — no edits.
 
 ## No-op notes (VERIFIED items with anchor/incompleteness observations — NO correction blocks)
 
-These are recorded here for the Code stage's awareness only; nothing is appended to `_arch-review.md` for them, because the claims are accurate and correction blocks are reserved for STALE/INACCURATE items.
+These are recorded here for the Code stage's awareness only; nothing is appended to `_review/_arch-review.md` for them, because the claims are accurate and correction blocks are reserved for STALE/INACCURATE items.
 
 - **N1 (§4 event-reducer path):** actual path is `packages/app/src/context/global-sync/event-reducer.ts` (with co-located `event-reducer.test.ts`), not bare `global-sync/event-reducer.ts`. Claim verified; path shorthand only.
 - **N2 (§5 patchedDependencies):** the map also includes `@standard-community/standard-openapi@0.2.9` (5 entries total). The review's 4 named entries are all present — the list is incomplete, not false.
@@ -324,16 +324,16 @@ These are recorded here for the Code stage's awareness only; nothing is appended
 
 ## Ordered steps for the Code stage
 
-1. **Step 1:** Apply edits E2–E9 and E11–E13 to `_arch-review.md` at the cited lines (append-only correction blocks; never delete or rewrite original sentences). E1 and E11 are DELETED — no block for them. E9 appends under `:98` (orchestration paragraph) ONLY; E12 appends under `:114` (the `build`-dependsOn risk bullet) ONLY — they are different locations. E10 appends under BOTH `:76` and `:100` (the same unhedged "67 app" figure appears in both). Apply the two §6 downgrade blocks (E14) under `_arch-review.md:122` and `:123`. Apply NO block for the No-op notes N1–N5.
-2. **Step 2:** Re-read the modified file top-to-bottom; confirm every `> **Correction (2026-09-22) —` block sits directly under its cited `_arch-review.md` line and cites `file:line` evidence exactly as specified above.
+1. **Step 1:** Apply edits E2–E9 and E11–E13 to `_review/_arch-review.md` at the cited lines (append-only correction blocks; never delete or rewrite original sentences). E1 and E11 are DELETED — no block for them. E9 appends under `:98` (orchestration paragraph) ONLY; E12 appends under `:114` (the `build`-dependsOn risk bullet) ONLY — they are different locations. E10 appends under BOTH `:76` and `:100` (the same unhedged "67 app" figure appears in both). Apply the two §6 downgrade blocks (E14) under `_review/_arch-review.md:122` and `:123`. Apply NO block for the No-op notes N1–N5.
+2. **Step 2:** Re-read the modified file top-to-bottom; confirm every `> **Correction (2026-09-22) —` block sits directly under its cited `_review/_arch-review.md` line and cites `file:line` evidence exactly as specified above.
 3. **Step 3:** Verification commands (no package builds needed — docs only):
-   - `git status --short` → expect AT MINIMUM `?? _arch-review.md` and `?? _plan/verify-arch-review-2026-09-22.md`; pre-existing untracked files (e.g. `?? .zcodeignore`) may also appear and are NOT part of this change — do not stage them.
+   - `git status --short` → expect AT MINIMUM `?? _review/_arch-review.md` and `?? _plan/verify-arch-review-2026-09-22.md`; pre-existing untracked files (e.g. `?? .zcodeignore`) may also appear and are NOT part of this change — do not stage them.
    - Spot re-check anchors cited in corrections: `rg -n "hey-api" packages/sdk/js/script/build.ts`, `rg -n "OPENCODE_DB_PATH" packages/opencode/drizzle.config.ts`, `rg -n "Effect.fn" packages/opencode/src/session/loop/run-loop.ts`, `rg -n "ServerProvider|ConnectionGate|QueryProvider" packages/app/src/app.tsx`, `rg -n '"test:ci"' turbo.json packages/core/package.json`, `(Get-Content packages/opencode/src/index.ts).Count`, `(Get-Content packages/opencode/script/build.ts).Count`.
 4. **Step 4:** No typecheck/test runs required (no source changes). Do NOT run tests from repo root (repo guard).
-5. **Step 5:** Commit BOTH `_arch-review.md` and this plan file together (stage them explicitly; leave pre-existing untracked files like `.zcodeignore` unstaged). `_arch-review.md` is UNTRACKED — an uncommitted correction would not persist (same rationale as the `CODE_REVIEW.md` precedent in `_plan/fix-code-review-findings-2026-09-22.md`, Finding 2 action).
+5. **Step 5:** Commit BOTH `_review/_arch-review.md` and this plan file together (stage them explicitly; leave pre-existing untracked files like `.zcodeignore` unstaged). `_review/_arch-review.md` is UNTRACKED — an uncommitted correction would not persist (same rationale as the `_review/CODE_REVIEW.md` precedent in `_plan/fix-code-review-findings-2026-09-22.md`, Finding 2 action).
 
 ## Scope note
 
-- Only `_arch-review.md` (corrections) and this plan file change. **No source files are edited.**
-- `_arch-review.md` is currently UNTRACKED (`?? _arch-review.md`); it MUST be committed WITH the corrections so they persist.
+- Only `_review/_arch-review.md` (corrections) and this plan file change. **No source files are edited.**
+- `_review/_arch-review.md` is currently UNTRACKED (`?? _review/_arch-review.md`); it MUST be committed WITH the corrections so they persist.
 - Repo style: no semicolons, 120 printWidth — applies to any prose wrapping in the correction blocks.

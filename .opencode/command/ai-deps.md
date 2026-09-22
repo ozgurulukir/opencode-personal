@@ -21,4 +21,4 @@ Here is a short list of some deps (please be comprehensive tho):
 
 DO NOT upgrade the dependencies yet, just make a list of all dependencies and their versions that can be upgraded to minor or patch versions only.
 
-Write up your findings to ai-sdk-updates.md
+Write up your findings to _review/ai-sdk-updates.md
