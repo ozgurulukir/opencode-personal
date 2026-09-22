@@ -1,5 +1,7 @@
 # Fix `@opencode-ai/diff-wasm` Async API Consumers
 
+**Status:** ✅ EXECUTED (reviewed 2026-09-22) — landed in `d83ad7c` (async API + binary embed), `aa27a80` (JS fallback + tests), `547bf2d` (retry-once hygiene), `c9b2f1d` (bindings refresh); evidence `packages/diff-wasm/src/index.ts:66` (async `diffLines`), all consumer call sites migrated.
+
 ## Summary
 
 `packages/diff-wasm/src/index.ts` now exposes `async` versions of `diffLines`, `createTwoFilesPatch`, and `structuredPatch` (WASM init is async). `parsePatch` and `applyPatch` remain sync (delegating to the `diff` npm package). Seven consumer files call the now-async functions and must be updated to propagate `async`/`await` up their call chains.

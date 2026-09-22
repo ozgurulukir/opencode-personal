@@ -1,6 +1,8 @@
 # Plan: opencode Ana Süreç Bellek Tüketimini Azaltma
 
 **Tarih:** 2026-08-02
+
+**Status:** ✅ EXECUTED (reviewed 2026-09-22) — landed in `dc1c307`: lazy provider database (`provider/provider.ts:1166-1172` `getDatabaseProvider` cache) and lazy onnxruntime (`search/embedding.ts:8` type-only import, `:150` dynamic import); LSP diagnostic maps bounded in `40ae66a` / `5f52117`. Supersedes the `Durum: Taslak` line below.
 **Durum:** Taslak
 **Hedef:** opencode ana sürecinin runtime bellek footprint'ini azaltmak
 

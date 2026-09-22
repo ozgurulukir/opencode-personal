@@ -1,6 +1,8 @@
 # V1/V2 Synthesis — Phase 4: TUI sync unification + remaining read migrations
 
 Date: 2026-09-07
+
+**Status:** ✅ EXECUTED (reviewed 2026-09-22) — landed in `9d9fe54` (event bridge, unified TUI sync, v2 read/prompt migration; the bridge itself was later deleted in `39313b8` per Phase 5). Matches the COMPLETE header below.
 Status: COMPLETE — 4a done, 4b done, 4c done, 4d done; post-implementation audit recorded 2026-09-08.
 
 > This document preserves the Phase 4 historical plan and batch snapshots. Phase 5 supersedes the temporary event-bridge and ACP decisions noted below.

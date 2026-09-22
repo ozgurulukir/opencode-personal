@@ -1,5 +1,7 @@
 # Goal
 
+**Status:** ✅ EXECUTED (reviewed 2026-09-22) — landed in `cce27b0` (`combineSignals` replaces `AbortSignal.any`; evidence `util/abort.ts:13`) plus `EventEmitter.defaultMaxListeners = 100` at `src/index.ts:50`; related `7e9466e`, `f888efc`.
+
 Fix the `MaxListenersExceededWarning` memory leak in the opencode server caused by `AbortSignal.any()` accumulating internal EventTarget listeners on abort signals that are never aborted.
 
 ## Problem

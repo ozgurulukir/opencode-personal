@@ -1,6 +1,8 @@
 # Implementation Plan: Fix Codebase Review Issues
 
 **Date:** 2026-08-11  
+
+**Status:** ✅ EXECUTED (reviewed 2026-09-22) — landed in `aa27a80` (SSRF guard, symlink resolve, permission snapshot, ripgrep regex-error handling at `file/ripgrep.ts:407`, ReDoS cap, malformed-JSON pass-through, wildcard doc) plus `a52a6b8` / PR #138 (SSRF hardening).
 **Scope:** Security and correctness fixes for `packages/opencode`  
 **Priority order:** Critical → Major → Minor → Nit
 

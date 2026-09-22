@@ -1,6 +1,8 @@
 # Review Fixes — Implementation Plan
 
 **Date:** 2026-08-11  
+
+**Status:** ✅ EXECUTED (reviewed 2026-09-22) — landed in `547bf2d` + `aa27a80`: evidence `tool/task.ts:211-213` and `v2/session.ts:758-771` (fallback differentiation), `agent/subagent-permissions.ts:4` (`MAX_SUBAGENT_NESTING_LEVELS`), `diff-wasm/src/index.ts:13` (`wasmFailed`), write.ts containment guards, permission comment.
 **Scope:** Minimal, focused fixes for 13 verified code review issues across 8 files. No breaking changes.
 
 ---

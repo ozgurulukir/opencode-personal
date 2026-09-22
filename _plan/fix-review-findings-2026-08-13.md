@@ -1,6 +1,8 @@
 # Fix tool layer review findings
 
 **Date:** 2026-08-13  
+
+**Status:** ✅ EXECUTED (reviewed 2026-09-22) — landed in `eacd296` (apply_patch `resolvePath` at `tool/apply_patch.ts:99,216`, file-path.ts extraction, webfetch charset handling) plus `547bf2d` (move_path guard) and `761bb0e` / PR #112 (read-tool symlink escape).
 **Package:** `packages/opencode`  
 **Scope:** `src/tool/*.ts`, `test/tool/*.test.ts`
 

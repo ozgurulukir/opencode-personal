@@ -1,5 +1,9 @@
 # Subagent Implementation Fixes — 2026-08-12
 
+**Status:** 🟡 PARTIAL (reviewed 2026-09-22) — items 1-5 and 7 landed in `649e9d9` (description param, cancelChild catch, `Cause.squash`, error-path test in `test/v2/session.test.ts`).
+
+Outstanding: item 6 — the dead `message.part.updated` ternary is still present at `cli/cmd/run/subagent-data.ts:782-784`.
+
 ## Goal
 
 Align V2 `subagent()` behavior with the proven V1 `TaskTool` patterns and remove dead code in the subagent data reducer. Fixes are scoped to 6 small, low-risk changes in `packages/opencode`.

@@ -1,6 +1,10 @@
 # ACP Terminal Backend Entegrasyonu
 
 **Tarih:** 2026-09-16  
+
+**Status:** ✅ EXECUTED (reviewed 2026-09-22) — landed in `56dd7dd` (terminal backend lifecycle) plus `ee025f0`, `d86cf50`, `41993ad`, `9fe655a`, `dba330a`, `c21ae65`; evidence `packages/opencode/src/acp/agent.ts` (terminal-backend wiring) and `test/acp/terminal-backend.test.ts`.
+
+The substance of the plan's own Durum note stands — a real Zed smoke test is still outstanding — but the line's status value is superseded by this block.
 **Durum:** Uygulandı — gerçek Zed smoke testi bekliyor  
 **Kapsam:** OpenCode’un ACP üzerinden Zed ve diğer client’larda gerçek terminal akışı, canlı çıktı ve güvenilir tool-call lifecycle desteği
 

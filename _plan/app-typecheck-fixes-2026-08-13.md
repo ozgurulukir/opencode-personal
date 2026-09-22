@@ -1,6 +1,8 @@
 # Fix 12 typecheck errors in `packages/app`
 
 **Date:** 2026-08-13
+
+**Status:** ✅ EXECUTED (reviewed 2026-09-22) — landed in `4f1fe2f` (fix(app): adapt to regenerated SDK contract); touched exactly the planned 5 files (dialog-connect-provider.tsx, terminal.tsx, event-reducer.test.ts, context/sync.tsx, pages/layout.tsx). Supersedes the `Status: Plan (approval pending)` line below.
 **Status:** Plan (approval pending)
 **Scope:** `packages/app` only. Do NOT touch SDK regenerated files (`packages/sdk/js/src/v2/gen/`) or the `opencode` package.
 
