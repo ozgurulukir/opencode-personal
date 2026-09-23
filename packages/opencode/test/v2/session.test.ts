@@ -12,6 +12,7 @@ import { SessionStatus } from "../../src/session/status"
 import { Bus } from "@/bus"
 import { SyncEvent } from "@/sync"
 import { SessionID, MessageID, PartID } from "../../src/session/schema"
+import { Identifier } from "../../src/id/id"
 import { ModelID, ProviderID } from "../../src/provider/schema"
 import { MessageV2 } from "../../src/session/message-v2"
 import { disposeAllInstances } from "../fixture/fixture"
@@ -527,6 +528,92 @@ describe("v2.session", () => {
         status: "running",
         input: { content: "legacy source" },
       })
+    }),
+  )
+
+  // Characterization for the V2 id-only ordering contract. Rows are seeded with
+  // hand-crafted evt_ ids whose lexicographic order is the opposite of their
+  // time_created column, so any surviving (time_created, id) ordering shows up.
+  it.instance("messages and context order by id under time_created skew", () =>
+    Effect.gen(function* () {
+      const session = yield* SessionV2.Service
+      const info = yield* session.create({ agent: "build" })
+
+      const idA = SessionMessage.ID.make(Identifier.create("evt", "ascending", 1_700_000_002_000))
+      const idB = SessionMessage.ID.make(Identifier.create("evt", "ascending", 1_700_000_000_000))
+      const idC = SessionMessage.ID.make(Identifier.create("evt", "ascending", 1_700_000_001_000))
+      const userData = (created: number) => ({ text: "m", files: [], agents: [], time: { created } })
+
+      Database.use((db) => {
+        db.insert(SessionMessageTable)
+          .values([
+            // idA: lexically largest id, smallest time_created
+            { id: idA, session_id: info.id, type: "user", time_created: 100, data: userData(100) },
+            // idB: lexically smallest id, largest time_created
+            { id: idB, session_id: info.id, type: "user", time_created: 300, data: userData(300) },
+            // idC: middle id, the compaction summary row
+            {
+              id: idC,
+              session_id: info.id,
+              type: "compaction",
+              time_created: 200,
+              data: { reason: "manual", summary: "summary", time: { created: 200 } },
+            },
+          ] as (typeof SessionMessageTable.$inferInsert)[])
+          .run()
+      })
+
+      // Default desc is id-descending, ignoring the time_created skew.
+      expect((yield* session.messages({ sessionID: info.id })).map((m) => m.id)).toEqual([idA, idC, idB])
+      // Explicit asc is id-ascending.
+      expect((yield* session.messages({ sessionID: info.id, order: "asc" })).map((m) => m.id)).toEqual([idB, idC, idA])
+
+      // Cursor pagination across the skew uses the id-only boundary.
+      expect(
+        (yield* session.messages({ sessionID: info.id, cursor: { id: idA, direction: "next" } })).map((m) => m.id),
+      ).toEqual([idC, idB])
+      expect(
+        (
+          yield* session.messages({
+            sessionID: info.id,
+            order: "asc",
+            cursor: { id: idB, direction: "next" },
+          })
+        ).map((m) => m.id),
+      ).toEqual([idC, idA])
+      expect(
+        (yield* session.messages({ sessionID: info.id, cursor: { id: idB, direction: "previous" } })).map((m) => m.id),
+      ).toEqual([idA, idC])
+
+      // context() window is inclusive on the compaction row's id (gte, not gt),
+      // ordered by id, and excludes rows whose id < compaction.id even when
+      // their time_created exceeds the compaction's.
+      const context = yield* session.context(info.id)
+      expect(context.map((m) => m.id)).toEqual([idC, idA])
+      expect(context.some((m) => m.id === idC && m.type === "compaction")).toBe(true)
+      expect(context.some((m) => m.id === idB)).toBe(false)
+    }),
+  )
+
+  it.instance("context orders by id with no compaction", () =>
+    Effect.gen(function* () {
+      const session = yield* SessionV2.Service
+      const info = yield* session.create({ agent: "build" })
+
+      const idA = SessionMessage.ID.make(Identifier.create("evt", "ascending", 1_700_000_002_000))
+      const idB = SessionMessage.ID.make(Identifier.create("evt", "ascending", 1_700_000_000_000))
+      const userData = (created: number) => ({ text: "m", files: [], agents: [], time: { created } })
+
+      Database.use((db) => {
+        db.insert(SessionMessageTable)
+          .values([
+            { id: idA, session_id: info.id, type: "user", time_created: 100, data: userData(100) },
+            { id: idB, session_id: info.id, type: "user", time_created: 200, data: userData(200) },
+          ] as (typeof SessionMessageTable.$inferInsert)[])
+          .run()
+      })
+
+      expect((yield* session.context(info.id)).map((m) => m.id)).toEqual([idB, idA])
     }),
   )
 

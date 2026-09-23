@@ -116,7 +116,9 @@ export interface Interface {
     order?: "asc" | "desc"
     cursor?: {
       id: SessionMessage.ID
-      time: number
+      // Deprecated: ordering is id-only. Kept optional for internal callers
+      // that still pass the time they decoded from an in-flight opaque cursor.
+      time?: number
       direction: "previous" | "next"
     }
   }) => Effect.Effect<SessionMessage.Message[], never>
@@ -482,20 +484,8 @@ export const layer = Layer.effect(
         if (direction === "previous" && order === "desc") order = "asc"
         const boundary = input.cursor
           ? order === "asc"
-            ? or(
-                gt(SessionMessageTable.time_created, input.cursor.time),
-                and(
-                  eq(SessionMessageTable.time_created, input.cursor.time),
-                  gt(SessionMessageTable.id, input.cursor.id),
-                ),
-              )
-            : or(
-                lt(SessionMessageTable.time_created, input.cursor.time),
-                and(
-                  eq(SessionMessageTable.time_created, input.cursor.time),
-                  lt(SessionMessageTable.id, input.cursor.id),
-                ),
-              )
+            ? gt(SessionMessageTable.id, input.cursor.id)
+            : lt(SessionMessageTable.id, input.cursor.id)
           : undefined
         const where = boundary
           ? and(eq(SessionMessageTable.session_id, input.sessionID), boundary)
@@ -506,10 +496,7 @@ export const layer = Layer.effect(
             .select()
             .from(SessionMessageTable)
             .where(where)
-            .orderBy(
-              order === "asc" ? asc(SessionMessageTable.time_created) : desc(SessionMessageTable.time_created),
-              order === "asc" ? asc(SessionMessageTable.id) : desc(SessionMessageTable.id),
-            )
+            .orderBy(order === "asc" ? asc(SessionMessageTable.id) : desc(SessionMessageTable.id))
           const rows = input.limit === undefined ? query.all() : query.limit(input.limit).all()
           return direction === "previous" ? rows.toReversed() : rows
         })
@@ -522,7 +509,7 @@ export const layer = Layer.effect(
             .select()
             .from(SessionMessageTable)
             .where(and(eq(SessionMessageTable.session_id, sessionID), eq(SessionMessageTable.type, "compaction")))
-            .orderBy(desc(SessionMessageTable.time_created), desc(SessionMessageTable.id))
+            .orderBy(desc(SessionMessageTable.id))
             .limit(1)
             .get()
 
@@ -532,18 +519,10 @@ export const layer = Layer.effect(
             .where(
               and(
                 eq(SessionMessageTable.session_id, sessionID),
-                compaction
-                  ? or(
-                      gt(SessionMessageTable.time_created, compaction.time_created),
-                      and(
-                        eq(SessionMessageTable.time_created, compaction.time_created),
-                        gte(SessionMessageTable.id, compaction.id),
-                      ),
-                    )
-                  : undefined,
+                compaction ? gte(SessionMessageTable.id, compaction.id) : undefined,
               ),
             )
-            .orderBy(asc(SessionMessageTable.time_created), asc(SessionMessageTable.id))
+            .orderBy(asc(SessionMessageTable.id))
             .all()
         })
         const defaults = legacyMessageDefaults(sessionID)
