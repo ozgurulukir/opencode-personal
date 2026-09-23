@@ -20,6 +20,7 @@
 The plan's body anchors below are **pre-synthesis and stale** — use the mapping under Step 1 to translate them to current lines.
 
 Remaining: Step 1 id-only DB ordering (V1+V2), Step 2b scrollback pagination, Step 4 projector id-sort (`v2/session-message-updater.ts:86` still raw push).
+**Execution plan:** Step 1 implementation plan (with scope decisions + Q2/Q3 resolutions) → `_plan/chat-ordering-step1-2026-09-23.md`.
 **Author:** strategic-planning agent
 **Scope:** research + implementation plan (no code executed)
 
