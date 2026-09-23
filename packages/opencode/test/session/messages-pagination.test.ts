@@ -6,6 +6,7 @@ import { WithInstance } from "../../src/project/with-instance"
 import { Session as SessionNs } from "@/session/session"
 import { MessageV2 } from "../../src/session/message-v2"
 import { MessageID, PartID, type SessionID } from "../../src/session/schema"
+import { Identifier } from "../../src/id/id"
 import { ModelID, ProviderID } from "../../src/provider/schema"
 import * as Log from "@opencode-ai/core/util/log"
 
@@ -83,6 +84,22 @@ async function addUser(sessionID: SessionID, text?: string) {
     })
   }
   return id
+}
+
+// Inserts a user message with a hand-crafted id and an explicit time_created so
+// tests can create an id-vs-time_created skew (the fill() helper hardcodes
+// MessageID.ascending() so it cannot produce one).
+async function addUserWithId(sessionID: SessionID, id: MessageID, created: number) {
+  await svc.updateMessage({
+    id,
+    sessionID,
+    role: "user",
+    time: { created },
+    agent: "test",
+    model: { providerID: "test", modelID: "test" },
+    tools: {},
+    mode: "",
+  } as unknown as MessageV2.Info)
 }
 
 async function addAssistant(
@@ -338,6 +355,53 @@ describe("MessageV2.page", () => {
         expect(result.items.map((item) => item.info.id)).toEqual(ids)
         expect(result.more).toBe(false)
         expect(result.cursor).toBeUndefined()
+
+        await svc.remove(session.id)
+      },
+    })
+  })
+
+  // Characterization for the id-only ordering contract: message order derives
+  // from the monotonic message id, not the (time_created, id) tuple. Row A has a
+  // lexically larger id but an earlier time_created; row B the opposite.
+  test("orders by id regardless of time_created skew", async () => {
+    await WithInstance.provide({
+      directory: root,
+      fn: async () => {
+        const session = await svc.create({})
+        // id-timestamps chosen close together (same 48-bit id window) so the
+        // lexicographic order is deterministic: idA > idB.
+        const idA = MessageID.make(Identifier.create("msg", "ascending", 1_700_000_001_000))
+        const idB = MessageID.make(Identifier.create("msg", "ascending", 1_700_000_000_000))
+        await addUserWithId(session.id, idA, 100)
+        await addUserWithId(session.id, idB, 200)
+
+        // Ascending id order, ignoring the time_created skew (old code returned [A, B]).
+        const all = MessageV2.page({ sessionID: session.id, limit: 10 })
+        expect(all.items.map((item) => item.info.id)).toEqual([idB, idA])
+        expect(all.more).toBe(false)
+
+        // limit 1 returns the newest row in ascending id order (A), whose cursor
+        // encodes id-only (no `time`).
+        const first = MessageV2.page({ sessionID: session.id, limit: 1 })
+        expect(first.items.map((item) => item.info.id)).toEqual([idA])
+        expect(first.more).toBe(true)
+        expect(first.cursor).toBeTruthy()
+        const decoded = MessageV2.cursor.decode(first.cursor!)
+        expect(decoded.id).toBe(idA)
+        expect("time" in decoded).toBe(false)
+
+        // The id-only `older()` predicate paginates across the skew.
+        const second = MessageV2.page({ sessionID: session.id, limit: 1, before: first.cursor! })
+        expect(second.items.map((item) => item.info.id)).toEqual([idB])
+        expect(second.more).toBe(false)
+
+        // Back-compat: an in-flight cursor issued before this change still
+        // carries `time`; the schema tolerates and strips the excess key.
+        const legacy = Buffer.from(JSON.stringify({ id: idB, time: 123 })).toString("base64url")
+        const decodedLegacy = MessageV2.cursor.decode(legacy)
+        expect(decodedLegacy.id).toBe(idB)
+        expect("time" in decodedLegacy).toBe(false)
 
         await svc.remove(session.id)
       },
@@ -1072,22 +1136,14 @@ describe("MessageV2.filterCompacted", () => {
 
 describe("MessageV2.cursor", () => {
   test("encode/decode roundtrip", () => {
-    const input = { id: MessageID.ascending(), time: 1234567890 }
+    const input = { id: MessageID.ascending() }
     const encoded = MessageV2.cursor.encode(input)
     const decoded = MessageV2.cursor.decode(encoded)
     expect(decoded.id).toBe(input.id)
-    expect(decoded.time).toBe(input.time)
-  })
-
-  test("encode/decode with fractional time", () => {
-    const input = { id: MessageID.ascending(), time: 1234567890.5 }
-    const encoded = MessageV2.cursor.encode(input)
-    const decoded = MessageV2.cursor.decode(encoded)
-    expect(decoded.time).toBe(1234567890.5)
   })
 
   test("encoded cursor is base64url", () => {
-    const encoded = MessageV2.cursor.encode({ id: MessageID.ascending(), time: 0 })
+    const encoded = MessageV2.cursor.encode({ id: MessageID.ascending() })
     expect(encoded).toMatch(/^[A-Za-z0-9_-]+$/)
   })
 })

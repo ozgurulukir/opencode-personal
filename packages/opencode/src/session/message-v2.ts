@@ -150,9 +150,11 @@ export type WithParts = {
   parts: Part[]
 }
 
+// The cursor carries only the id: message order derives from the monotonic id,
+// not from time_created. Old cursors still carrying `time` decode cleanly —
+// Schema.Struct strips unknown keys.
 const Cursor = Schema.Struct({
   id: MessageID,
-  time: Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0)),
 })
 type Cursor = typeof Cursor.Type
 
@@ -182,8 +184,7 @@ const part = (row: typeof PartTable.$inferSelect) =>
     messageID: row.message_id,
   }) as Part
 
-const older = (row: Cursor) =>
-  or(lt(MessageTable.time_created, row.time), and(eq(MessageTable.time_created, row.time), lt(MessageTable.id, row.id)))
+const older = (row: Cursor) => lt(MessageTable.id, row.id)
 
 function hydrate(rows: (typeof MessageTable.$inferSelect)[]) {
   const ids = rows.map((row) => row.id)
@@ -518,7 +519,7 @@ export function page(input: { sessionID: SessionID; limit: number; before?: stri
       .select()
       .from(MessageTable)
       .where(where)
-      .orderBy(desc(MessageTable.time_created), desc(MessageTable.id))
+      .orderBy(desc(MessageTable.id))
       .limit(input.limit + 1)
       .all(),
   )
@@ -541,7 +542,7 @@ export function page(input: { sessionID: SessionID; limit: number; before?: stri
   return {
     items,
     more,
-    cursor: more && tail ? cursor.encode({ id: tail.id, time: tail.time_created }) : undefined,
+    cursor: more && tail ? cursor.encode({ id: tail.id }) : undefined,
   }
 }
 
@@ -625,7 +626,7 @@ export function messagesForSummary(input: { sessionID: SessionID; messageID: Mes
           ),
         ),
       )
-      .orderBy(MessageTable.time_created, MessageTable.id)
+      .orderBy(MessageTable.id)
       .all(),
   )
   return hydrate(rows)

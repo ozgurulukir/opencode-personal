@@ -44,7 +44,7 @@ export const messageHandlers = HttpApiBuilder.group(InstanceHttpApi, "v2.message
           sessionID: ctx.params.sessionID,
           limit: ctx.query.limit ?? DefaultMessagesLimit,
           order,
-          cursor: decoded ? { id: decoded.id, time: decoded.time, direction: decoded.direction } : undefined,
+          cursor: decoded ? { id: decoded.id, direction: decoded.direction } : undefined,
         })
         const first = messages[0]
         const last = messages.at(-1)
