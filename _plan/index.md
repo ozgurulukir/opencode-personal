@@ -44,6 +44,7 @@
 | [verify-arch-review](./verify-arch-review-2026-09-22.md) | 2026-09-22 | Architecture review verification | ✅ EXECUTED | Finalized; see plan header |
 | [repo-hygiene](./repo-hygiene-2026-09-22.md) | 2026-09-22 | Repository hygiene | ✅ EXECUTED | Finalized; see plan header |
 | [chat-ordering-step1](./chat-ordering-step1-2026-09-23.md) | 2026-09-23 | Step 1 execution plan: id-only message ordering (V1+V2) | ✅ EXECUTED | `3ac0678`; extracted from [chat-ordering](./chat-ordering-2026-08-14.md) |
+| [check-updates-hardening](./check-updates-hardening-2026-09-23.md) | 2026-09-23 | Script hardening: catalog/apply/prerelease/boundary | ⬜ PENDING | — |
 
 ## Series: v1-v2-synthesis
 
