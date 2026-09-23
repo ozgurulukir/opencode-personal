@@ -2,7 +2,22 @@
 
 **Date:** 2026-08-14
 
-**Status:** 🟡 PARTIAL (reviewed 2026-09-22) — TUI-side ordering was reworked via the V2 message store (`bdddf62` reducer extraction, newest-first contract in `cli/cmd/tui/AGENTS.md`, `6da0dc0`, `64941f4`), but the plan's core Step 1 is NOT implemented: V1 still orders `(time_created, id)` (`message-v2.ts:521`) and V2 likewise (`v2/session.ts:525`).
+**Status:** 🟡 PARTIAL (revised 2026-09-23, re-verified against tree; prior review 2026-09-22) — **Step 1's code change remains valid and UNIMPLEMENTED**: every V1/V2 message read path still orders by the dual `(time_created, id)` key. The plan's **original §2.1 root-cause narrative is superseded**: after the V1/V2 synthesis, the TUI no longer id-sorts messages via `Binary.search` — it consumes V2 `messages()` order (newest-first) and `unshift`s live `session.next.*` events via `reduceMessageEvent` (`sync-messages.shared.ts:70,114,254`). See the dated Rev notes under §2.1 and Step 1. TUI-rework provenance: `bdddf62` (refactor(tui): extract message reducer and revert-boundary helpers from session route) and `6da0dc0` (docs(agents): record newest-first message store contract); `64941f4` (fix(tui): show latest assistant token usage instead of oldest) is the context-meter fix that surfaced the newest-first store contract, cited for that reason only.
+
+**Residual risk (the remaining justification for Step 1):** (a) live `unshift` arrival order vs server `(time_created, id)` order can still disagree when id-created-time ≠ insert-time (the same skew §2.1 documents), and (b) any consumer that still assumes id-ascending order. Keeping ONE authoritative key (`id`) removes the whole divergence class rather than any single manifestation.
+
+**Step 1 unimplemented — current verified anchors (2026-09-23):**
+- V1 `MessageV2.page` orderBy `desc(time_created), desc(id)` — `packages/opencode/src/session/message-v2.ts:521`
+- V1 `older()` tuple cursor predicate — `message-v2.ts:185-186`
+- V1 `Cursor` schema still encodes `time` (required) — `message-v2.ts:153-156`; encode with `time` at `message-v2.ts:544`
+- V1 `messagesForSummary` tuple orderBy — `message-v2.ts:628`
+- V1 `Session.messages` (limit + no-limit) flows through `page()`/`stream()` — `packages/opencode/src/session/session.ts:711-716`
+- V2 `messages()` cursor boundary `(time_created, id)` — `packages/opencode/src/v2/session.ts:483-498`; orderBy — `:509-512`
+- V2 `context()` last-compaction lookup `desc(time_created), desc(id)` — `:525`; filter boundary tuple — `:536-542`; result orderBy — `:546`
+- V2 message handler cursor `time` still required (wire + service call) — `packages/opencode/src/server/routes/instance/httpapi/handlers/v2/message.ts:12,47`
+- No divergent-order regression test exists.
+
+The plan's body anchors below are **pre-synthesis and stale** — use the mapping under Step 1 to translate them to current lines.
 
 Remaining: Step 1 id-only DB ordering (V1+V2), Step 2b scrollback pagination, Step 4 projector id-sort (`v2/session-message-updater.ts:86` still raw push).
 **Author:** strategic-planning agent
@@ -57,6 +72,16 @@ The two paths use **different sort keys**:
   - `session/compaction.ts:460,529,578,660` — compaction marker + synthetic user messages.
 - With concurrency (tools, subagents, shell) or network latency, a message whose **id** says "older" can be **inserted into the DB later** (larger `time_created`). `page()` then orders it by `time_created` placement, while `sync.tsx` positions it by `id` placement.
 - **Net effect:** the TUI array is id-sorted but the DB is `(time_created, id)`-sorted. Under the right interleaving (same-millisecond messages, or id-created-time ≠ insert-time), `Binary.search` returns a wrong insert index → out-of-order display. Because all ordering derives from these two keys, this is the primary **ordering-break** candidate.
+
+> **Rev 2026-09-23 — §2.1 divergence mechanism SUPERSEDED.** The narrative above predates the V1/V2 synthesis and no longer describes the TUI. Verified against the current tree:
+> - `context/sync.tsx` contains **no message-level `Binary.search`** — all 10 remaining call sites (lines ~113, 127, 154, 163, 184, 203, 222, 249, 464, 497) operate on **session or request ids** (`store.session`, `draft.session`, `requests`), never on messages.
+> - The TUI message slice is **V2-backed, newest-first**: initial load calls `sdk.client.v2.session.messages({ sessionID })` (`sync.tsx:493` in `sync()`, `:511` in `message.sync()`) → `store.messages[sessionID]` (`:504`, `:512`).
+> - Live `session.next.*` events are applied by `reduceMessageEvent` in `context/sync-messages.shared.ts`, which **`unshift`s** new messages in arrival order (newest-first) — `:70` (prompted), `:114` (step.started), `:254` (compaction.started); also `:84` (synthetic), `:94` (shell.started).
+> - `cli/cmd/tui/AGENTS.md` documents this contract ("Message store ordering — newest-first (`find`, not `findLast`)"; V2 `messages()` default `desc(time_created), desc(id)`), and `cli/cmd/tui/context/AGENTS.md` documents `reduceMessageEvent` as the V2-backed reducer.
+>
+> So "TUI id-sorts via `Binary.search` vs DB `(time_created, id)`" is no longer the live mechanism. **What survives:** the skew between id-created-time and insert-time is still real, and the live `unshift` arrival order can still disagree with the server's `(time_created, id)` order — the divergence class persists, just through different plumbing. That residual risk is the remaining justification for Step 1 (single authoritative key), not the removed Binary.search path.
+>
+> Provenance for this rework: `bdddf62` (refactor(tui): extract message reducer — `reduceMessageEvent`/`sync-messages.shared.ts` is exactly the path this Rev note describes), `6da0dc0` (docs(agents): record newest-first message store contract — the AGENTS.md contract cited above), and `64941f4` (fix(tui): show latest assistant token usage — the context-meter fix that first surfaced the newest-first store, included for that reason, not as message-store rework itself).
 
 **Concrete replication scenario (for the Step 1.1 characterization test):**
 Insert two rows directly into `MessageTable` such that their **id order disagrees with their `time_created` order**. `MessageID` is `Date.now()*4096 + counter` + random suffix (`id/id.ts:59-68`); `time_created` is `$default(() => Date.now())` at insert (`session/session.sql.ts`). Force the inversion:
@@ -136,6 +161,23 @@ Well covered (good baseline for Rule 3 characterization):
    - **`list()` (Major 2) — REMOVED from Step 1 scope.** `list()` at `v2/session.ts:279-317` orders `SessionTable` rows (sessions, **not** messages), by `(time_created, id)` (lines 310-313) with a `(time_created, id)` cursor boundary (lines 293-305). It is **not** a message-ordering write path (§2.1 catalogs only run-loop/subtask/shell/compaction message writes), so it does not contribute to the message-reorder bug this plan fixes. Leaving it out avoids scope creep and the cascading cursor `time` work. Kept **unchanged** (still `(time_created, id)`). If a future pass wants session ordering to match, that is a separate concern. Because `list()` stays as-is, its cursor type (`v2/session.ts:91-95`) and handler (`handlers/v2/session.ts:9-20`) are untouched.
 
 **Why:** eliminates the dual-sort-key divergence that corrupts the TUI array via `Binary.search`, and keeps V1/V2 on one key so no new divergence class is introduced. `id` is monotonic (`id/id.ts`), so `id`-ascending IS chronological; `time_created` measures insert time, not conversation time.
+
+> **Rev 2026-09-23 — Step 1 premise refresh (scope unchanged).** The code change remains exactly as specified: id-only ordering across V1 + V2. Its **rationale is updated**: not "fix the TUI `Binary.search` id-sort" (that path no longer exists — the TUI is V2-backed newest-first, see §2.1 Rev note), but "**single authoritative key** (`id`) + remove the arrival-order-vs-server-order divergence class" — live `unshift` ordering vs DB `(time_created, id)` ordering can still disagree under id-created-time ≠ insert-time skew, and any consumer assuming id-ascending remains exposed.
+>
+> **Current line anchors (verified 2026-09-23)** — translate the pre-synthesis body anchors as follows; original citations above are kept as provenance:
+> - `message-v2.ts:519` (page orderBy) → **:521**
+> - `message-v2.ts:184-185` (older predicate) → **:185-186**
+> - `message-v2.ts:542` (cursor encode with `time`) → **:544**; `Cursor` schema `time` required — **:153-156**
+> - `message-v2.ts:626` (messagesForSummary orderBy) → **:628**
+> - `session/session.ts` Session.messages → **:711-716** (limit path → `page()`, no-limit path → `stream()` → `page()`)
+> - `v2/session.ts:324-340` (messages cursor boundary) → **:483-498** (boundary var at :483)
+> - `v2/session.ts:350-352` (messages orderBy) → **:509-512**
+> - `v2/session.ts:101-105` (Interface cursor `time`) → **:117-121** (`time` still required in the Interface input)
+> - `v2/session.ts:365` (context compaction lookup) → **:525**
+> - `v2/session.ts:376-382` (context filter boundary, `gte(..., compaction.id)` at :380) → **:536-542** (`gte` at :540 — inclusive behavior unchanged, Step 1 wording still applies)
+> - `v2/session.ts:386` (context result orderBy) → **:546**
+> - `handlers/v2/message.ts:10-15,22` (cursor schema + opaque encode) → **:10-15, :22** (unchanged; `time` still required at :12, passed at :47)
+> - `handlers/v2/session.ts:9-20` — `list()` handler untouched as planned.
 
 **Files:**
 - `packages/opencode/src/session/message-v2.ts` (`page`, `older`, `stream`, `messagesForSummary`, cursor encode)

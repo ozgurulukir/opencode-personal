@@ -31,7 +31,7 @@
 | [llm-request-timeout-fix](./llm-request-timeout-fix-2026-08-13.md) | 2026-08-13 | Bound hung provider LLM requests | ✅ EXECUTED | `7e9466e` |
 | [nested-subagent-permission-hang](./nested-subagent-permission-hang-2026-08-13.md) | 2026-08-13 | Depth 2+ subagent permission ask hang | ✅ EXECUTED | `f888efc` |
 | [sdk-regen-typecheck](./sdk-regen-typecheck-2026-08-13.md) | 2026-08-13 | opencode typecheck after SDK regen | ✅ EXECUTED | `a4e2e8d` |
-| [chat-ordering](./chat-ordering-2026-08-14.md) | 2026-08-14 | TUI chat ordering + disappearance | 🟡 PARTIAL | TUI reworked (`bdddf62`); Step 1 id-only DB ordering NOT implemented |
+| [chat-ordering](./chat-ordering-2026-08-14.md) | 2026-08-14 | TUI chat ordering + disappearance | 🟡 PARTIAL | Step 1 id-only DB ordering (V1+V2) still open — dual `(time_created, id)` key persists; §2.1 TUI Binary.search narrative superseded by V2-backed newest-first store (revised 2026-09-23; rework provenance `bdddf62`, `6da0dc0`) |
 | [verify-chat-message-drop](./verify-chat-message-drop-2026-08-14.md) | 2026-08-14 | Proof tests A/B for message drop | ⬜ PENDING | Neither test file exists |
 | [sse-graceful-retry](./sse-graceful-retry-2026-08-28.md) | 2026-08-28 | SSE reconnect instead of fatal fault | ✅ EXECUTED | PR #119 → `1795d16` |
 | [v1-v2-synthesis-phase-1-2](./v1-v2-synthesis-phase-1-2-2026-09-06.md) | 2026-09-06 | Brands + event system | ✅ EXECUTED | `cb7fbd9` + descendants |
@@ -59,7 +59,7 @@ Order: 1+2 → 3 → 4 → 5. Phase 5 supersedes the temporary event-bridge and 
 
 ### Active / Pending
 
-- [chat-ordering](./chat-ordering-2026-08-14.md) — core Step 1 (id-only DB ordering, V1+V2) still open
+- [chat-ordering](./chat-ordering-2026-08-14.md) — core Step 1 (id-only DB ordering, V1+V2) still open; rationale refreshed 2026-09-23 (single authoritative key + arrival-vs-server divergence class; TUI Binary.search path no longer exists)
 - [v1-v2-synthesis-phase-5](./v1-v2-synthesis-phase-5-2026-09-07.md) — deferred 5f deletions (V1 compatibility facade)
 - [subagent-fixes-08-12](./subagent-fixes-2026-08-12.md) — one dead-code removal outstanding
 - [filter-compacted-regression-lock](./filter-compacted-regression-lock-2026-09-15.md) — regression test + AGENTS.md correction
