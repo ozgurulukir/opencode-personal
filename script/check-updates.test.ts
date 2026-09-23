@@ -81,6 +81,45 @@ describe("sameChannelVersion", () => {
   test("within-channel ordering: alphanumeric prerelease segments compare lexically", () => {
     expect(sameChannelVersion(parsed("4.0.0-beta.dev"), ["4.0.0-beta.fix"])).toBe("4.0.0-beta.fix")
   })
+
+  test("hash-aware ordering: hash-suffixed build numbers order numerically (drizzle fix)", () => {
+    expect(
+      sameChannelVersion(parsed("1.0.0-beta.19-d95b7a4"), [
+        "1.0.0-beta.9-e89174b",
+        "1.0.0-beta.19-d95b7a4",
+        "1.0.0-beta.22",
+        "1.0.0-beta.24",
+      ]),
+    ).toBe("1.0.0-beta.24")
+    expect(sameChannelVersion(parsed("1.0.0-beta.9-e89174b"), ["1.0.0-beta.19-d95b7a4"])).toBe(
+      "1.0.0-beta.19-d95b7a4",
+    )
+  })
+
+  test("hash-aware ordering: hash-suffixed build outranks the equal clean build (expansion, not strip)", () => {
+    expect(sameChannelVersion(parsed("1.0.0-beta.19"), ["1.0.0-beta.19-d95b7a4"])).toBe("1.0.0-beta.19-d95b7a4")
+  })
+
+  test("no-regression: numeric segments still compare numerically past hash suffixes", () => {
+    expect(sameChannelVersion(parsed("4.0.0-beta.65"), ["4.0.0-beta.107"])).toBe("4.0.0-beta.107")
+    expect(sameChannelVersion(parsed("1.0.0-beta.9-e89174b"), ["1.0.0-beta.10-abcdef1", "1.0.0-beta.24"])).toBe(
+      "1.0.0-beta.24",
+    )
+  })
+
+  test("semver-standard: non-hash numeric < alphanumeric, missing identifier sorts lower", () => {
+    expect(sameChannelVersion(parsed("1.0.0-beta.1"), ["1.0.0-beta.a"])).toBe("1.0.0-beta.a")
+    expect(sameChannelVersion(parsed("1.0.0-alpha"), ["1.0.0-alpha.1"])).toBe("1.0.0-alpha.1")
+  })
+
+  test("short or non-hex tails are not expanded and stay plain alphanumerics", () => {
+    expect(sameChannelVersion(parsed("1.0.0-beta.10"), ["1.0.0-beta.9-deadbe"])).toBe("1.0.0-beta.9-deadbe")
+    expect(sameChannelVersion(parsed("1.0.0-beta.2"), ["1.0.0-beta.10-abc"])).toBe("1.0.0-beta.10-abc")
+  })
+
+  test("plain numeric chain is unaffected (@pierre/diffs)", () => {
+    expect(sameChannelVersion(parsed("1.1.0-beta.18"), ["1.1.0-beta.22"])).toBe("1.1.0-beta.22")
+  })
 })
 
 describe("collectPinnedDeps", () => {

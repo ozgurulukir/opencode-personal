@@ -135,10 +135,26 @@ export function parseSemver(v: string): ParsedSemver | null {
   return { major: Number(match[1]), minor: Number(match[2]), patch: Number(match[3]), prerelease: match[4] ?? null }
 }
 
-/** Compare two prerelease strings per semver precedence: numeric < alphanumeric, lexical within a kind. */
+/** A numeric build number suffixed with a commit hash (e.g. `19-d95b7a4`). */
+const HASH_SUFFIXED = /^\d+-[0-9a-f]{7,}$/i
+
+/** Expand a `<build>-<hash>` identifier into its numeric and hash halves; other identifiers pass through. */
+function normalizePrereleaseIdentifiers(prerelease: string): string[] {
+  return prerelease.split(".").flatMap((id) => {
+    if (!HASH_SUFFIXED.test(id)) return [id]
+    const at = id.indexOf("-")
+    return [id.slice(0, at), id.slice(at + 1)]
+  })
+}
+
+/**
+ * Compare two prerelease strings per semver precedence: numeric < alphanumeric, lexical within a kind.
+ * Deliberately deviates from strict semver for hash-suffixed numeric identifiers: `19-d95b7a4` is expanded
+ * into `["19", "d95b7a4"]` so this non-conformant build scheme orders numerically by build number.
+ */
 function comparePrerelease(a: string, b: string): number {
-  const left = a.split(".")
-  const right = b.split(".")
+  const left = normalizePrereleaseIdentifiers(a)
+  const right = normalizePrereleaseIdentifiers(b)
   for (let i = 0; i < Math.max(left.length, right.length); i++) {
     const x = left[i]
     const y = right[i]
