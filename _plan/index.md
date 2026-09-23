@@ -31,7 +31,7 @@
 | [llm-request-timeout-fix](./llm-request-timeout-fix-2026-08-13.md) | 2026-08-13 | Bound hung provider LLM requests | ✅ EXECUTED | `7e9466e` |
 | [nested-subagent-permission-hang](./nested-subagent-permission-hang-2026-08-13.md) | 2026-08-13 | Depth 2+ subagent permission ask hang | ✅ EXECUTED | `f888efc` |
 | [sdk-regen-typecheck](./sdk-regen-typecheck-2026-08-13.md) | 2026-08-13 | opencode typecheck after SDK regen | ✅ EXECUTED | `a4e2e8d` |
-| [chat-ordering](./chat-ordering-2026-08-14.md) | 2026-08-14 | TUI chat ordering + disappearance | 🟡 PARTIAL | Step 1 id-only DB ordering (V1+V2) still open — dual `(time_created, id)` key persists; §2.1 TUI Binary.search narrative superseded by V2-backed newest-first store (revised 2026-09-23; rework provenance `bdddf62`, `6da0dc0`) |
+| [chat-ordering](./chat-ordering-2026-08-14.md) | 2026-08-14 | TUI chat ordering + disappearance | 🟡 PARTIAL | Step 1 landed (`3ac0678`, plan doc `c072db6` → [step1 plan](./chat-ordering-step1-2026-09-23.md)); Step 2a obsolete (TUI 100-cap removed by V2 store rewrite); Step 2b deferred pending product decision Q1; §2.1 TUI Binary.search narrative superseded by V2-backed newest-first store (revised 2026-09-23; rework provenance `bdddf62`, `6da0dc0`) |
 | [verify-chat-message-drop](./verify-chat-message-drop-2026-08-14.md) | 2026-08-14 | Proof tests A/B for message drop | ⬜ PENDING | Neither test file exists (re-verified 2026-09-23); Test A premise current; Test B partially superseded by the V2 newest-first store (core GlobalBus-drop hypothesis survives) |
 | [sse-graceful-retry](./sse-graceful-retry-2026-08-28.md) | 2026-08-28 | SSE reconnect instead of fatal fault | ✅ EXECUTED | PR #119 → `1795d16` |
 | [v1-v2-synthesis-phase-1-2](./v1-v2-synthesis-phase-1-2-2026-09-06.md) | 2026-09-06 | Brands + event system | ✅ EXECUTED | `cb7fbd9` + descendants |
@@ -43,6 +43,7 @@
 | [fix-code-review-findings](./fix-code-review-findings-2026-09-22.md) | 2026-09-22 | Code review findings (finalized) | ✅ EXECUTED | Finalized; see plan header |
 | [verify-arch-review](./verify-arch-review-2026-09-22.md) | 2026-09-22 | Architecture review verification | ✅ EXECUTED | Finalized; see plan header |
 | [repo-hygiene](./repo-hygiene-2026-09-22.md) | 2026-09-22 | Repository hygiene | ✅ EXECUTED | Finalized; see plan header |
+| [chat-ordering-step1](./chat-ordering-step1-2026-09-23.md) | 2026-09-23 | Step 1 execution plan: id-only message ordering (V1+V2) | ✅ EXECUTED | `3ac0678`; extracted from [chat-ordering](./chat-ordering-2026-08-14.md) |
 
 ## Series: v1-v2-synthesis
 
@@ -59,7 +60,7 @@ Order: 1+2 → 3 → 4 → 5. Phase 5 supersedes the temporary event-bridge and 
 
 ### Active / Pending
 
-- [chat-ordering](./chat-ordering-2026-08-14.md) — core Step 1 (id-only DB ordering, V1+V2) still open; rationale refreshed 2026-09-23 (single authoritative key + arrival-vs-server divergence class; TUI Binary.search path no longer exists)
+- [chat-ordering](./chat-ordering-2026-08-14.md) — Step 1 landed (`3ac0678`); Step 2b deferred pending product decision Q1 (Step 2a obsolete — TUI cap removed by V2 store rewrite)
 - [v1-v2-synthesis-phase-5](./v1-v2-synthesis-phase-5-2026-09-07.md) — deferred 5f deletions (V1 compatibility facade; anchors re-verified 2026-09-23)
 - [filter-compacted-regression-lock](./filter-compacted-regression-lock-2026-09-15.md) — regression test + AGENTS.md correction (re-verified 2026-09-23, still absent)
 - [verify-chat-message-drop](./verify-chat-message-drop-2026-08-14.md) — both proof tests (re-verified 2026-09-23; Test B fixture needs V2-store re-scope)
@@ -67,7 +68,9 @@ Order: 1+2 → 3 → 4 → 5. Phase 5 supersedes the temporary event-bridge and 
 
 ### Executed (for reference)
 
-The remaining 20 non-finalized plans (23 ✅ rows in the table including the 3 finalized) — see the table above; each plan file cites its own landing commits and current `file:line` anchors.
+- [chat-ordering-step1](./chat-ordering-step1-2026-09-23.md) — executed Step 1 execution plan (id-only ordering, V1+V2; landed in `3ac0678`)
+
+The 21 executed non-finalized plans (24 ✅ rows in the table including the 3 finalized, 2 🟡 PARTIAL, 2 ⬜ PENDING) — see the table above; each plan file cites its own landing commits and current `file:line` anchors.
 
 ### Superseded / Unverified
 
