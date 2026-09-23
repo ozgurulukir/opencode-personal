@@ -1,6 +1,6 @@
 # Verify chat-message-drop — two proof tests (Test A / Test B)
 
-**Status:** ⬜ PENDING (reviewed 2026-09-22) — neither proof test exists: `test/session/prompt-rejects-busy.test.ts` and `test/cli/cmd/tui/context/global-event-gap.test.ts` are absent from the tree. The targeted runner behavior is still current (`src/effect/runner.ts:120-122` ignores new work while Running).
+**Status:** ⬜ PENDING (re-verified 2026-09-23; prior review 2026-09-22) — neither proof test exists: `test/session/prompt-rejects-busy.test.ts` and `test/cli/cmd/tui/context/global-event-gap.test.ts` are absent from the tree. Test A's runner premise is still current (`src/effect/runner.ts:120-122` ignores new work while Running). Test B's TUI premise is **partially superseded by the V2-backed newest-first store rework** — the hypothesis's core (GlobalBus drops listener-less events) survives, but its `sync.tsx:506-529` V1-contract anchor and TUI-store reasoning are stale; see the Rev 2026-09-23 notes under Steps 1 and 2.
 
 ## Goal
 
@@ -91,6 +91,8 @@ için regresyon kanıtı olur; hipotez yanlışsa test gerçek davranışı orta
 için assistant event'i üretilir ve assert patlar. Mevcut kodda `runner.ts:120-122` work'ü yok saydığı
 için test deterministik şekilde GEÇER → bug mevcut.
 
+> **Rev 2026-09-23 — Test A premise RE-VERIFIED, anchors updated.** The runner behavior is unchanged: `ensureRunning`'s switch (`packages/opencode/src/effect/runner.ts:115-138`) still has `case "Running": case "ShellThenRun": return [awaitDone(st.run.done), st]` at `:120-122` — new `work` is ignored while a run is in flight. The call chain is intact but line-shifted: `SessionPrompt.prompt` now persists via `createUserMessage` at `packages/opencode/src/session/prompt.ts:208` (plan cited `:195`) and gates the loop through `state.ensureRunning` at `prompt.ts:231` inside `SessionPrompt.loop` (`prompt.ts:228`); `SessionRunState.ensureRunning` delegates to the per-session `Runner` at `session/run-state.ts:87-93` (unchanged). The TUI input-unlock anchor also drifted: `routes/session/index.tsx:193` (`disabled` = pending permissions OR questions only; wired to the prompt at `:1288,:1295` — plan cited `:182`). Hypothesis holds; the plan's Step 1 fixture design is unaffected by the V2 store rework (the drop happens server-side, before any TUI store sees the message).
+
 ---
 
 ### Step 2 — Test B dosyası: SSE reconnect gap / replay-yok davranışını kanıtla
@@ -158,6 +160,14 @@ doluyordu) step 3'te DB'de varken event'lerin `0` ulaşması assert'i patlar. Me
 `GlobalBus.emit` (bus/index.ts:101) dinleyici yokken event'i düşürdüğü için test GEÇER → bug mevcut.
 `session.sync()` DB-read'i (sync.tsx:506-529) mesajları kurtardığı için "reload sistemde görünür"
 koşulu da sağlanır.
+
+> **Rev 2026-09-23 — Test B premise PARTIALLY SUPERSEDED by the V2 newest-first store; core hypothesis survives.** After this plan was written, the TUI message store was reworked to be V2-backed newest-first (provenance: `bdddf62` extracted `reduceMessageEvent` into `context/sync-messages.shared.ts`, which `unshift`s new messages in arrival order — `:70,84,94,114,254`; `6da0dc0` documented the newest-first contract in `cli/cmd/tui/AGENTS.md:39-41` and `cli/cmd/tui/context/AGENTS.md:11-12`; initial load now goes through `sdk.client.v2.session.messages` at `context/sync.tsx:493,511` into `store.messages`). Two consequences for this plan:
+>
+> 1. **Stale anchors:** the plan's `sync.tsx:506-529` "session.sync() DB-read restores the chat" contract and its `sdk.client.session.messages` V1 fetch no longer describe the TUI — the V1 `message`/`part` slices were deleted in the 5c final batch (see `_plan/v1-v2-synthesis-phase-5-2026-09-07.md`, 5c final). The reducer also does not consume `message.updated`/`message.part.delta` at all — it handles `session.next.*` only — so Test B's assertion vocabulary ("`message.updated` / `message.part.delta` event'lerinin sayısı 0") must be re-expressed over `session.next.*` families (or over the raw `GlobalBus.emit` counter at `bus/index.ts:101`, which is unchanged and is the cleaner invariant anyway).
+>
+> 2. **The hypothesis itself is NOT obviated — it is sharpened.** The V2 rework changed *how* the store fills (unshift on live `session.next.*` events) but not the *transport* it depends on: the SSE reconnect path (`sdk.tsx` `startSSE()`) still has no replay/backfill, and `GlobalBus` (`bus/global.ts`) is still a plain EventEmitter whose `emit` drops events with zero listeners (`bus/index.ts:101` unchanged, verified 2026-09-23; `handlers/global.ts:36-44` `eventResponse()` still registers `GlobalBus.on("event", handler)` only while connected). A gap during a live run now means messages are missing from `store.messages` until the next full V2 `messages()` reload — the same "chat stays empty until sync" symptom, one mechanism deeper. The "sync restores from DB" leg is *stronger* post-rework: the V2 load fetches ALL rows (no 100-cap; the old V1 cap died with the V1 slices), so a reconnect-triggered `session.sync()` recovers the full history deterministically.
+>
+> **Verdict: keep Test B, re-scope its Step 2 fixture** — assert against `store.messages` (the V2 slice) or the `GlobalBus.emit` listener-less drop directly, replace the V1 event-name assertions with `session.next.*` (or transport-level) equivalents, and update the "sync kurtarması" leg to the V2 `sdk.client.v2.session.messages` contract. Status stays ⬜ PENDING: neither test file exists, and both hypotheses still hold against the current tree.
 
 ---
 

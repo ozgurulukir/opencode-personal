@@ -2,9 +2,9 @@
 
 Date: 2026-09-15
 
-**Status:** ⬜ PENDING (reviewed 2026-09-22) — neither deliverable landed: the regression test for the no-`tail_start_id` pre-boundary-history case is absent from `test/session/messages-pagination.test.ts`, and the false claim still stands at `packages/opencode/src/session/AGENTS.md:76-78`. Plan tracked in `e54ba95`.
+**Status:** ⬜ PENDING (re-verified 2026-09-23; prior review 2026-09-22) — neither deliverable landed: the regression test for the no-`tail_start_id` pre-boundary-history case is absent from `test/session/messages-pagination.test.ts`, and the false claim still stands at `packages/opencode/src/session/AGENTS.md:76-78` (now with a **confirmed stale internal anchor** — see the Rev 2026-09-23 note under Verified anchors). Plan tracked in `e54ba95`.
 
-Risk mitigated: motivating PR #139 was CLOSED unmerged, so the load-bearing block survives at `message-v2.ts:662`.
+Risk mitigated: motivating PR #139 was CLOSED unmerged (re-confirmed via `gh pr view 139` on 2026-09-23), so the load-bearing block survives at `message-v2.ts:662`.
 Author: planner (verified against tree)
 
 ## Goal
@@ -84,6 +84,14 @@ PR #139 and the regression would ship silently.
 
 No anchor drift. The AGENTS.md section's *internal* line numbers are stale but
 the section itself is present verbatim.
+
+> **Rev 2026-09-23 — re-verified; stale-anchor detail CONFIRMED with current lines.** All load-bearing anchors above re-checked against the tree (HEAD `52aafc1`) and still accurate: `if (!part.tail_start_id) break` at `packages/opencode/src/session/message-v2.ts:662`; `filterCompacted` starts at `:649`; the `role === "user" && completed.has(msg.info.id)` block opens at `:659` with the `.find` compaction-part check at `:660` (and the reorder-slice scans: a `.some` at `:674` and a `.find` at `:677-678`); `completed.add(msg.info.parentID)` at `:668`; reorder slice `:670-697`. `tail_start_id` producers unchanged (`compaction.ts:275,278,315`) and consumer tests still assert `undefined` (`compaction.test.ts:1341,1377`).
+>
+> **Stale AGENTS.md anchor — confirmed and now precisely mapped.** `packages/opencode/src/session/AGENTS.md:76-78` still carries the section "`filterCompacted` has unreachable dead code" citing `message-v2.ts:651-652` plus a "line 643 already handles" reference. In the CURRENT tree `:651-652` is `const completed = new Set<string>()` / `let retain: MessageID | undefined` (declaration lines, not the condition), and the condition the note describes (`msg.info.role === "user" && completed.has(msg.info.id)` with the compaction-part check) now sits at `message-v2.ts:659` (the check itself is a `.find` at `:660`; the later reorder-slice scans use `.some` at `:674` and `.find` at `:677-678`). So the note's own line refs are doubly stale (both `:651-652` and `:643` have drifted) — Step 2's replacement text should cite `:659-666` and drop the `:643` reference.
+>
+> **Regression test — still absent.** `test/session/messages-pagination.test.ts` (`describe("MessageV2.filterCompacted")` at `:662`; helpers `addUser` `:64`, `addAssistant` `:88`, `addCompactionPart` `:114`) still only covers the `tail_start_id`-present case ("retains original tail when compaction stores tail_start_id", `:788`) and the fork-remap case (`:844`) — no test exercises the `!part.tail_start_id` early-`break` path with pre-boundary history. The "stops at compaction boundary" test (`:680`) still has the compaction user as the first message, so it cannot catch the deletion.
+>
+> **The AGENTS.md claim itself — still FALSE, still unresolved.** The block remains reachable: `stream()` still yields newest-first (`page()` DESC orderBy at `message-v2.ts:521`, `items.reverse()` at `:539`, `stream()` re-flips to DESC), so the summary assistant is visited before its parent user message and `completed.add(msg.info.parentID)` runs first. The claim was not resolved anywhere since the 2026-09-22 review (`git log` on `message-v2.ts` since then: only `857b145`/`27b6eee`, both predating the plan). Status stays ⬜ PENDING.
 
 ## Steps
 
