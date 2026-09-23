@@ -1,7 +1,7 @@
 # Plan: Harden `script/check-updates.ts` — catalog coverage, safe apply, prerelease policy, observability
 
 **Date:** 2026-09-23
-**Status:** ⬜ PENDING (rev 3 — revised after @review rejection of rev 2; all rev-1/rev-2 findings preserved, rev-3 selection/emission contradictions fixed)
+**Status:** ✅ EXECUTED (2026-09-23) — landed in `c25068d` (all R1–R7: catalog coverage, section-scoped `--apply`, same-channel prerelease policy, workspace scan boundary, `--check`/`--typecheck`); accepted in-plan deferrals (Q2 `patchedDependencies` rewrite, Q3 `script/tsconfig.json`) remain as documented scope decisions, not pending work.
 **Provenance:** New plan. Scope fixed by the 2026-09-23 hardening request (7 verified findings, decisions R1–R7). Repo state at planning time: branch `main`, clean tree.
 
 ---

@@ -44,7 +44,8 @@
 | [verify-arch-review](./verify-arch-review-2026-09-22.md) | 2026-09-22 | Architecture review verification | ✅ EXECUTED | Finalized; see plan header |
 | [repo-hygiene](./repo-hygiene-2026-09-22.md) | 2026-09-22 | Repository hygiene | ✅ EXECUTED | Finalized; see plan header |
 | [chat-ordering-step1](./chat-ordering-step1-2026-09-23.md) | 2026-09-23 | Step 1 execution plan: id-only message ordering (V1+V2) | ✅ EXECUTED | `3ac0678`; extracted from [chat-ordering](./chat-ordering-2026-08-14.md) |
-| [check-updates-hardening](./check-updates-hardening-2026-09-23.md) | 2026-09-23 | Script hardening: catalog/apply/prerelease/boundary | ⬜ PENDING | — |
+| [check-updates-hardening](./check-updates-hardening-2026-09-23.md) | 2026-09-23 | Script hardening: catalog/apply/prerelease/boundary | ✅ EXECUTED | `c25068d` |
+| [check-updates-hash-prerelease](./check-updates-hash-prerelease-2026-09-23.md) | 2026-09-23 | Hash-aware prerelease ordering (drizzle downgrade fix) | ✅ EXECUTED | `0cb59f1` |
 
 ## Series: v1-v2-synthesis
 
@@ -71,7 +72,7 @@ Order: 1+2 → 3 → 4 → 5. Phase 5 supersedes the temporary event-bridge and 
 
 - [chat-ordering-step1](./chat-ordering-step1-2026-09-23.md) — executed Step 1 execution plan (id-only ordering, V1+V2; landed in `3ac0678`)
 
-The 21 executed non-finalized plans (24 ✅ rows in the table including the 3 finalized, 2 🟡 PARTIAL, 2 ⬜ PENDING) — see the table above; each plan file cites its own landing commits and current `file:line` anchors.
+The 23 executed non-finalized plans (26 ✅ rows in the table including the 3 finalized, 2 🟡 PARTIAL, 2 ⬜ PENDING) — see the table above; each plan file cites its own landing commits and current `file:line` anchors.
 
 ### Superseded / Unverified
 
