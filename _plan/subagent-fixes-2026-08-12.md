@@ -1,8 +1,6 @@
 # Subagent Implementation Fixes — 2026-08-12
 
-**Status:** 🟡 PARTIAL (reviewed 2026-09-22) — items 1-5 and 7 landed in `649e9d9` (description param, cancelChild catch, `Cause.squash`, error-path test in `test/v2/session.test.ts`).
-
-Outstanding: item 6 — the dead `message.part.updated` ternary is still present at `cli/cmd/run/subagent-data.ts:782-784`.
+**Status:** ✅ EXECUTED (2026-09-23) — items 1-5 and 7 landed in `649e9d9` (description param, cancelChild catch, `Cause.squash`, error-path test in `test/v2/session.test.ts`). Item 6 resolved as NOT-APPLICABLE: the `message.part.updated` ternary at `subagent-data.ts:782-784` is reachable and load-bearing — removing it would drop child-session part updates. No remaining work in this plan.
 
 ## Goal
 
@@ -110,6 +108,12 @@ text: `Subagent error: ${Cause.squash(cause)}`,
   : undefined
 ```
 The ternary should end at line 781 with `: undefined`.
+
+> **Rev 2026-09-23 — Step 6 premise CORRECTED: the branch is reachable, do NOT remove it.** Re-verified against the tree (`subagent-data.ts` is 825 lines; the ternary sits verbatim at `:782-784`, the early-return handler at `:760-769`). The plan's original reasoning — "the `event.type === \"message.part.updated\"` case is already handled at lines 760-768 with an early return, so the ternary is dead" — is false because the early return is conditional: it fires only when `part.sessionID === input.sessionID` (`:762`) AND the part is a tool (`:763`). When `reduceSubagentData` receives a `message.part.updated` event for a **different** session (cross-session part update, e.g. from a child subagent), the handler at `:760-769` falls through without returning and the ternary at `:782-784` extracts `event.properties.part.sessionID` so the child's tool-part updates still reach `knownSession`/`ensureDetail` — exactly the subagent bootstrap path this reducer exists for.
+>
+> Reachability proof: `reduceSubagentData`'s `event` parameter is typed `Event` from `@opencode-ai/sdk/v2` (`subagent-data.ts:1`), and that union includes `EventMessagePartUpdated` (`packages/sdk/js/src/v2/gen/types.gen.ts:3321`, member `message.part.updated` in the `Event` union at `types.gen.ts:7`). Callers feed it V1-vocabulary SDK events (`applyChildEvent`/`bootstrapChildEvent` at `subagent-data.ts:500,520`, including `v2-legacy.ts`-translated `message.part.updated` payloads).
+>
+> This correction is already codified in `packages/opencode/src/cli/cmd/run/AGENTS.md` (section "`reduceSubagentData` — `message.part.updated` branch is reachable"), which explicitly instructs: "Do not remove this branch as dead code without verifying the `part.sessionID` invariant." Item 6 should be treated as **rejected, not pending** — deleting lines 782-784 as the plan originally specified would silently drop cross-session subagent tool-part updates.
 
 ### 7. Add V2 subagent error-path test
 **File:** `packages/opencode/test/v2/session.test.ts`

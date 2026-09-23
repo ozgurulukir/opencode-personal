@@ -25,20 +25,20 @@
 | [review-fixes](./review-fixes-2026-08-11.md) | 2026-08-11 | 13 review fixes across 8 files | ✅ EXECUTED | `547bf2d` + `aa27a80` |
 | [subagent-fixes](./subagent-fixes-2026-08-11.md) | 2026-08-11 | 9 subagent implementation issues | ✅ EXECUTED | `2388c2a`, PR #103 |
 | [lsp-fixes](./lsp-fixes-2026-08-12.md) | 2026-08-12 | LSP LRU eviction + retry backoff | ✅ EXECUTED | `5f52117`, `40ae66a`, `d60f0b7` |
-| [subagent-fixes](./subagent-fixes-2026-08-12.md) | 2026-08-12 | V2 subagent parity + dead code | 🟡 PARTIAL | `649e9d9`; dead ternary at `subagent-data.ts:782` outstanding |
+| [subagent-fixes](./subagent-fixes-2026-08-12.md) | 2026-08-12 | V2 subagent parity + dead code | ✅ EXECUTED | `649e9d9`; item 6 resolved not-applicable — the `subagent-data.ts:782` ternary is reachable and load-bearing, not dead (`cli/cmd/run/AGENTS.md` documents it) |
 | [app-typecheck-fixes](./app-typecheck-fixes-2026-08-13.md) | 2026-08-13 | 12 app typecheck errors after SDK regen | ✅ EXECUTED | `4f1fe2f` |
 | [fix-review-findings](./fix-review-findings-2026-08-13.md) | 2026-08-13 | 6 tool-layer review findings | ✅ EXECUTED | `eacd296`, `547bf2d`, PR #112 |
 | [llm-request-timeout-fix](./llm-request-timeout-fix-2026-08-13.md) | 2026-08-13 | Bound hung provider LLM requests | ✅ EXECUTED | `7e9466e` |
 | [nested-subagent-permission-hang](./nested-subagent-permission-hang-2026-08-13.md) | 2026-08-13 | Depth 2+ subagent permission ask hang | ✅ EXECUTED | `f888efc` |
 | [sdk-regen-typecheck](./sdk-regen-typecheck-2026-08-13.md) | 2026-08-13 | opencode typecheck after SDK regen | ✅ EXECUTED | `a4e2e8d` |
 | [chat-ordering](./chat-ordering-2026-08-14.md) | 2026-08-14 | TUI chat ordering + disappearance | 🟡 PARTIAL | Step 1 id-only DB ordering (V1+V2) still open — dual `(time_created, id)` key persists; §2.1 TUI Binary.search narrative superseded by V2-backed newest-first store (revised 2026-09-23; rework provenance `bdddf62`, `6da0dc0`) |
-| [verify-chat-message-drop](./verify-chat-message-drop-2026-08-14.md) | 2026-08-14 | Proof tests A/B for message drop | ⬜ PENDING | Neither test file exists |
+| [verify-chat-message-drop](./verify-chat-message-drop-2026-08-14.md) | 2026-08-14 | Proof tests A/B for message drop | ⬜ PENDING | Neither test file exists (re-verified 2026-09-23); Test A premise current; Test B partially superseded by the V2 newest-first store (core GlobalBus-drop hypothesis survives) |
 | [sse-graceful-retry](./sse-graceful-retry-2026-08-28.md) | 2026-08-28 | SSE reconnect instead of fatal fault | ✅ EXECUTED | PR #119 → `1795d16` |
 | [v1-v2-synthesis-phase-1-2](./v1-v2-synthesis-phase-1-2-2026-09-06.md) | 2026-09-06 | Brands + event system | ✅ EXECUTED | `cb7fbd9` + descendants |
 | [v1-v2-synthesis-phase-3](./v1-v2-synthesis-phase-3-2026-09-06.md) | 2026-09-06 | HTTP API unification | ✅ EXECUTED | `cb7fbd9`..`d633008` (3e partial by design) |
 | [v1-v2-synthesis-phase-4](./v1-v2-synthesis-phase-4-2026-09-07.md) | 2026-09-07 | TUI sync unification + read migration | ✅ EXECUTED | `9d9fe54` |
-| [v1-v2-synthesis-phase-5](./v1-v2-synthesis-phase-5-2026-09-07.md) | 2026-09-07 | Message model + engine re-homing | 🟡 PARTIAL | All batches landed (`857b145`, `39313b8`); deferred 5f deletions remain |
-| [filter-compacted-regression-lock](./filter-compacted-regression-lock-2026-09-15.md) | 2026-09-15 | Regression test + AGENTS.md correction | ⬜ PENDING | Tracked in `e54ba95`; PR #139 closed unmerged (risk mitigated) |
+| [v1-v2-synthesis-phase-5](./v1-v2-synthesis-phase-5-2026-09-07.md) | 2026-09-07 | Message model + engine re-homing | 🟡 PARTIAL | All batches landed (`857b145`, `39313b8`); deferred 5f deletions remain (facade anchors re-verified 2026-09-23) |
+| [filter-compacted-regression-lock](./filter-compacted-regression-lock-2026-09-15.md) | 2026-09-15 | Regression test + AGENTS.md correction | ⬜ PENDING | Tracked in `e54ba95`; PR #139 closed unmerged (risk mitigated); re-verified 2026-09-23 — AGENTS.md stale-anchor confirmed (`:651-652` now declarations; condition at `message-v2.ts:659`, break at `:662`) |
 | [acp-terminal-backend-integration](./acp-terminal-backend-integration-2026-09-16.md) | 2026-09-16 | ACP terminal backend for Zed et al | ✅ EXECUTED | `56dd7dd` + 6 follow-ups; Zed smoke test outstanding |
 | [fix-code-review-findings](./fix-code-review-findings-2026-09-22.md) | 2026-09-22 | Code review findings (finalized) | ✅ EXECUTED | Finalized; see plan header |
 | [verify-arch-review](./verify-arch-review-2026-09-22.md) | 2026-09-22 | Architecture review verification | ✅ EXECUTED | Finalized; see plan header |
@@ -60,15 +60,14 @@ Order: 1+2 → 3 → 4 → 5. Phase 5 supersedes the temporary event-bridge and 
 ### Active / Pending
 
 - [chat-ordering](./chat-ordering-2026-08-14.md) — core Step 1 (id-only DB ordering, V1+V2) still open; rationale refreshed 2026-09-23 (single authoritative key + arrival-vs-server divergence class; TUI Binary.search path no longer exists)
-- [v1-v2-synthesis-phase-5](./v1-v2-synthesis-phase-5-2026-09-07.md) — deferred 5f deletions (V1 compatibility facade)
-- [subagent-fixes-08-12](./subagent-fixes-2026-08-12.md) — one dead-code removal outstanding
-- [filter-compacted-regression-lock](./filter-compacted-regression-lock-2026-09-15.md) — regression test + AGENTS.md correction
-- [verify-chat-message-drop](./verify-chat-message-drop-2026-08-14.md) — both proof tests
+- [v1-v2-synthesis-phase-5](./v1-v2-synthesis-phase-5-2026-09-07.md) — deferred 5f deletions (V1 compatibility facade; anchors re-verified 2026-09-23)
+- [filter-compacted-regression-lock](./filter-compacted-regression-lock-2026-09-15.md) — regression test + AGENTS.md correction (re-verified 2026-09-23, still absent)
+- [verify-chat-message-drop](./verify-chat-message-drop-2026-08-14.md) — both proof tests (re-verified 2026-09-23; Test B fixture needs V2-store re-scope)
 - ACP: real Zed smoke test (external verification only)
 
 ### Executed (for reference)
 
-The remaining 19 non-finalized plans (22 ✅ rows in the table including the 3 finalized) — see the table above; each plan file cites its own landing commits and current `file:line` anchors.
+The remaining 20 non-finalized plans (23 ✅ rows in the table including the 3 finalized) — see the table above; each plan file cites its own landing commits and current `file:line` anchors.
 
 ### Superseded / Unverified
 

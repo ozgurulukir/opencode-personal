@@ -2,11 +2,13 @@
 
 Date: 2026-09-07
 
-**Status:** 🟡 PARTIAL (reviewed 2026-09-22) — all implementation batches landed: 5c `505df60`/`8af52e5`, 5d `96e7564`, 5e `8f7016b`/`39313b8`, 5f consumer migration `857b145`, plus `e87d943` and `f38ca01` (review-gap fixes).
+**Status:** 🟡 PARTIAL (re-verified 2026-09-23, anchors confirmed current; prior review 2026-09-22) — all implementation batches landed: 5c `505df60`/`8af52e5`, 5d `96e7564`, 5e `8f7016b`/`39313b8`, 5f consumer migration `857b145`, plus `e87d943` and `f38ca01` (review-gap fixes).
 
 Outstanding: the explicitly deferred 5f deletions — `SessionPrompt.Service` remains as the V1 compatibility facade (`v2/session.ts:556,1002`). Refines the IN PROGRESS header below: only the deferred deletions remain.
 Status: IN PROGRESS — 5a/5b/5c/5d done, 5e-1 + 5e-2 + 5e-3 done (shared engine re-homed behind V2Session, legacy message compatibility added), binary regression guard DONE (2026-09-08), app pipeline batch DONE (2026-09-08, Option A: V1-shaped store + V2→V1 adapter), 5f consumer migration DONE (2026-09-08), 5f deletions explicitly deferred
 Depends on: Phase 4 (complete — commit `9d9fe54bc`, build verified)
+
+> **Rev 2026-09-23 — re-verified; facade anchors confirmed current; deletions still deferred.** Checked every cited anchor against the tree (HEAD `52aafc1`): facade comment at `packages/opencode/src/v2/session.ts:556` ("SessionPrompt.Service remains the V1 compatibility facade") and `:1002` ("compatibility facade" on `runDeferred`'s engine delegation); consumers `cli/cmd/github.ts:435`, `control-plane/workspace.ts:173`, `server/routes/instance/httpapi/handlers/session.ts:46` (V1 prediction route), `handlers/v2/session.ts:98` (promptAsync); documented at `v2/AGENTS.md:20` and `:94`. No drift, no new work surfaced — the 5f deletion gate remains closed by user instruction. This plan's status is unchanged.
 
 ## Goal
 
