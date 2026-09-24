@@ -48,6 +48,7 @@
 | [check-updates-hash-prerelease](./check-updates-hash-prerelease-2026-09-23.md) | 2026-09-23 | Hash-aware prerelease ordering (drizzle downgrade fix) | ✅ EXECUTED | `0cb59f1` |
 | [dep-bump-tier01](./dep-bump-tier01-2026-09-23.md) | 2026-09-23 | Tier 0/Tier 1 targeted dependency bump (bump-only) | ✅ EXECUTED | `b5fc1f9` |
 | [continue-dummy-sessionid](./continue-dummy-sessionid-2026-09-24.md) | 2026-09-24 | `opencode -c` fabricated "dummy" sessionID fix | ✅ EXECUTED | `bece62b` |
+| [continue-dummy-sessionid-regression-test](./continue-dummy-sessionid-regression-test-2026-09-24.md) | 2026-09-24 | Regression guard for `opencode -c` dummy sessionID fix | ✅ EXECUTED | `5e2bf46` |
 
 ## Series: v1-v2-synthesis
 
@@ -74,7 +75,7 @@ Order: 1+2 → 3 → 4 → 5. Phase 5 supersedes the temporary event-bridge and 
 
 - [chat-ordering-step1](./chat-ordering-step1-2026-09-23.md) — executed Step 1 execution plan (id-only ordering, V1+V2; landed in `3ac0678`)
 
-The 25 executed non-finalized plans (28 ✅ rows in the table including the 3 finalized, 2 🟡 PARTIAL, 2 ⬜ PENDING) — see the table above; each plan file cites its own landing commits and current `file:line` anchors.
+The 26 executed non-finalized plans (29 ✅ rows in the table including the 3 finalized, 2 🟡 PARTIAL, 2 ⬜ PENDING) — see the table above; each plan file cites its own landing commits and current `file:line` anchors.
 
 ### Superseded / Unverified
 
