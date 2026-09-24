@@ -197,16 +197,7 @@ export function tui(input: {
               <ExitProvider onBeforeExit={onBeforeExit} onExit={onExit}>
                 <KVProvider>
                   <ToastProvider>
-                    <RouteProvider
-                      initialRoute={
-                        input.args.continue
-                          ? {
-                              type: "session",
-                              sessionID: "dummy",
-                            }
-                          : undefined
-                      }
-                    >
+                    <RouteProvider>
                       <TuiConfigProvider config={input.config}>
                         <SDKProvider
                           url={input.url}
