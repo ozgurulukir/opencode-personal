@@ -23,7 +23,7 @@
     "@opencode-ai/diff-wasm": "workspace:*",
     "diff": "catalog:",
     "isomorphic-dompurify": "3.22.0",
-    "js-base64": "3.9.2",
+    "js-base64": "3.9.4",
     "lang-map": "0.4.0",
     "luxon": "catalog:",
     "marked": "catalog:",
@@ -32,7 +32,7 @@
     "remeda": "catalog:",
     "shiki": "catalog:",
     "solid-js": "catalog:",
-    "vscode-languageserver-types": "3.18.0"
+    "vscode-languageserver-types": "3.18.3"
   },
   "devDependencies": {
     "opencode": "workspace:*",
