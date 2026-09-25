@@ -167,13 +167,13 @@ async function contributors(from: string, to: string) {
 }
 
 async function published(to: string) {
-  if (to === "HEAD") return
+  if (to === "HEAD") return undefined
   const body = await $`gh release view ${ref(to)} --repo ${repo} --json body --jq .body`.text().catch(() => "")
-  if (!body) return
+  if (!body) return undefined
 
   const lines = body.split(/\r?\n/)
   const start = lines.findIndex((line) => line.startsWith("**Thank you to "))
-  if (start < 0) return
+  if (start < 0) return undefined
   return lines.slice(start).join("\n").trim()
 }
 

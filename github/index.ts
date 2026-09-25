@@ -147,8 +147,8 @@ try {
   session = await client.session.create({}, { throwOnError: true }).then((r) => r.data)
   await subscribeSessionEvents()
   shareId = await (async () => {
-    if (useEnvShare() === false) return
-    if (!useEnvShare() && repoData.data.private) return
+    if (useEnvShare() === false) return undefined
+    if (!useEnvShare() && repoData.data.private) return undefined
     await client.session.share({ sessionID: session.id }, { throwOnError: true })
     return session.id.slice(-8)
   })()
@@ -784,7 +784,7 @@ async function assertPermissions() {
 }
 
 async function updateComment(body: string) {
-  if (!commentId) return
+  if (!commentId) return undefined
 
   console.log("Updating comment...")
 
