@@ -239,33 +239,35 @@ export const __exportTestFetchFn = (options: any, model: any, customFetch: any, 
   }
 }
 
-export const rewriteMaxOutputTokens = (url: RequestInfo | URL, init?: RequestInit) => {
-  if (init?.body) {
-    let isUint8Array = false
-    let bodyString = ""
+export const rewriteMaxOutputTokens = (fetchFn: typeof fetch = fetch) => {
+  return (url: RequestInfo | URL, init?: RequestInit) => {
+    if (init?.body) {
+      let isUint8Array = false
+      let bodyString = ""
 
-    if (typeof init.body === "string") {
-      bodyString = init.body
-    } else if (init.body instanceof Uint8Array) {
-      isUint8Array = true
-      bodyString = utf8Decoder.decode(init.body)
-    }
+      if (typeof init.body === "string") {
+        bodyString = init.body
+      } else if (init.body instanceof Uint8Array) {
+        isUint8Array = true
+        bodyString = utf8Decoder.decode(init.body)
+      }
 
-    if (bodyString) {
-      try {
-        const body = JSON.parse(bodyString)
-        if (body && typeof body === "object" && "max_output_tokens" in body) {
-          body.max_completion_tokens = body.max_output_tokens
-          delete body.max_output_tokens
-          const newBodyString = JSON.stringify(body)
-          init.body = isUint8Array ? utf8Encoder.encode(newBodyString) : newBodyString
+      if (bodyString) {
+        try {
+          const body = JSON.parse(bodyString)
+          if (body && typeof body === "object" && "max_output_tokens" in body) {
+            body.max_completion_tokens = body.max_output_tokens
+            delete body.max_output_tokens
+            const newBodyString = JSON.stringify(body)
+            init.body = isUint8Array ? utf8Encoder.encode(newBodyString) : newBodyString
+          }
+        } catch {
+          // Silently swallow JSON.parse failures as this is intended for non-JSON passthrough
         }
-      } catch {
-        // Silently swallow JSON.parse failures as this is intended for non-JSON passthrough
       }
     }
+    return fetchFn(url, init)
   }
-  return fetch(url, init)
 }
 
 function custom(dep: CustomDep): Record<string, CustomLoader> {
@@ -308,7 +310,7 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
         async getModel(sdk: any, modelID: string, _options?: Record<string, any>) {
           return sdk.responses(modelID)
         },
-        options: { fetch: rewriteMaxOutputTokens },
+        options: { fetch: rewriteMaxOutputTokens(fetch) },
       }),
     xai: () =>
       Effect.succeed({
@@ -316,7 +318,7 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
         async getModel(sdk: any, modelID: string, _options?: Record<string, any>) {
           return sdk.responses(modelID)
         },
-        options: { fetch: rewriteMaxOutputTokens },
+        options: { fetch: rewriteMaxOutputTokens(fetch) },
       }),
     "github-copilot": () =>
       Effect.succeed({
@@ -325,7 +327,7 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
           if (useLanguageModel(sdk)) return sdk.languageModel(modelID)
           return shouldUseCopilotResponsesApi(modelID) ? sdk.responses(modelID) : sdk.chat(modelID)
         },
-        options: { fetch: rewriteMaxOutputTokens },
+        options: {},
       }),
     azure: Effect.fnUntraced(function* (provider: Info) {
       const env = yield* dep.env()
