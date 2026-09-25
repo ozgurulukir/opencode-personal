@@ -22,8 +22,7 @@
     "@types/bun": "catalog:",
     "@types/cross-spawn": "catalog:",
     "@types/npm-package-arg": "6.1.4",
-    "@types/npmcli__arborist": "6.3.3",
-    "@types/semver": "catalog:"
+    "@types/npmcli__arborist": "6.3.3"
   },
   "dependencies": {
     "@effect/opentelemetry": "catalog:",
@@ -40,7 +39,6 @@
     "mime-types": "3.0.2",
     "minimatch": "10.2.6",
     "npm-package-arg": "13.0.2",
-    "semver": "^7.6.3",
     "xdg-basedir": "5.1.0",
     "zod": "catalog:"
   },

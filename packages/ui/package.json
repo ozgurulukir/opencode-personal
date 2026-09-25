@@ -35,7 +35,6 @@
     "@tsconfig/node22": "catalog:",
     "@types/bun": "catalog:",
     "@types/katex": "0.16.8",
-    "@types/luxon": "catalog:",
     "@typescript/native-preview": "catalog:",
     "tailwindcss": "catalog:",
     "typescript": "catalog:",
@@ -48,8 +47,6 @@
     "@opencode-ai/sdk": "workspace:*",
     "@opencode-ai/core": "workspace:*",
     "@pierre/diffs": "catalog:",
-    "@shikijs/transformers": "3.23.0",
-    "@solid-primitives/bounds": "0.1.7",
     "@solid-primitives/event-listener": "2.4.6",
     "@solid-primitives/media": "2.3.6",
     "@solid-primitives/resize-observer": "2.2.0",
@@ -60,7 +57,6 @@
     "dompurify": "3.4.16",
     "fuzzysort": "catalog:",
     "katex": "0.18.9",
-    "luxon": "catalog:",
     "marked": "catalog:",
     "marked-katex-extension": "5.1.13",
     "marked-shiki": "catalog:",
@@ -73,7 +69,6 @@
     "shiki": "catalog:",
     "solid-js": "catalog:",
     "solid-list": "catalog:",
-    "strip-ansi": "7.2.0",
-    "virtua": "catalog:"
+    "strip-ansi": "7.2.0"
   }
 }

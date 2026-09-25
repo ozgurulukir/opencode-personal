@@ -49,6 +49,7 @@
 | [dep-bump-tier01](./dep-bump-tier01-2026-09-23.md) | 2026-09-23 | Tier 0/Tier 1 targeted dependency bump (bump-only) | ✅ EXECUTED | `b5fc1f9` |
 | [continue-dummy-sessionid](./continue-dummy-sessionid-2026-09-24.md) | 2026-09-24 | `opencode -c` fabricated "dummy" sessionID fix | ✅ EXECUTED | `bece62b` |
 | [continue-dummy-sessionid-regression-test](./continue-dummy-sessionid-regression-test-2026-09-24.md) | 2026-09-24 | Regression guard for `opencode -c` dummy sessionID fix | ✅ EXECUTED | `5e2bf46` |
+| [remove-unused-deps](./remove-unused-deps-2026-09-25.md) | 2026-09-25 | Unused-dependency removal across 6 manifests (7 batches) | ✅ EXECUTED | 7 manifests + bun.lock; zero source changes |
 
 ## Series: v1-v2-synthesis
 
