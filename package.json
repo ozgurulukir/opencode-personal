@@ -14,8 +14,6 @@
     "upgrade-opentui": "bun run script/upgrade-opentui.ts",
     "postinstall": "bun run script/dedupe-opentui.ts && bun run --cwd packages/opencode fix-node-pty && bun run --cwd packages/opencode copy-wasm-glue",
     "prepare": "husky",
-    "random": "echo 'Random script'",
-    "hello": "echo 'Hello World!'",
     "test": "echo 'do not run tests from root' && exit 1"
   },
   "workspaces": {
@@ -38,7 +36,6 @@
       "@kobalte/core": "0.13.14",
       "@types/luxon": "3.7.5",
       "@types/node": "24.13.6",
-      "@types/semver": "7.8.0",
       "@tsconfig/node22": "22.0.6",
       "@tsconfig/bun": "1.0.11",
       "@cloudflare/workers-types": "4.20260702.1",
@@ -62,7 +59,6 @@
       "marked-shiki": "1.2.1",
       "remend": "1.3.1",
       "@playwright/test": "1.59.1",
-      "semver": "7.7.4",
       "typescript": "5.8.2",
       "@typescript/native-preview": "7.0.0-dev.20251207.1",
       "zod": "4.1.8",
@@ -83,28 +79,23 @@
     }
   },
   "devDependencies": {
-    "@actions/artifact": "5.0.3",
     "@opentui/core": "catalog:",
     "@opentui/keymap": "catalog:",
     "@opentui/solid": "catalog:",
     "@tsconfig/bun": "catalog:",
     "@types/mime-types": "3.0.1",
     "@typescript/native-preview": "catalog:",
-    "glob": "13.0.6",
     "husky": "9.1.7",
     "oxlint": "1.85.0",
     "oxlint-tsgolint": "0.25.0",
     "prettier": "3.9.9",
-    "semver": "^7.8.5",
     "sst": "3.19.3",
     "turbo": "2.11.3"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "3.1138.0",
     "@opencode-ai/plugin": "workspace:*",
     "@opencode-ai/script": "workspace:*",
     "@opencode-ai/sdk": "workspace:*",
-    "heap-snapshot-toolkit": "1.1.3",
     "typescript": "catalog:"
   },
   "repository": {
