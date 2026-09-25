@@ -2825,3 +2825,27 @@ test("toPublicInfo returns a safe provider when options contain a circular refer
     models: {},
   })
 })
+
+test("provider merge > preserves custom fetch in plugin auth loader (prevents 401)", async () => {
+  const mockAuthFetch = mock((url: RequestInfo | URL, init?: RequestInit) => {
+    return Promise.resolve(new Response("ok"))
+  }) as any
+
+  const composedFetch = rewriteMaxOutputTokens(mockAuthFetch)
+
+  const init = {
+    body: JSON.stringify({
+      model: "gpt-5",
+      max_output_tokens: 32000,
+    })
+  }
+
+  await composedFetch("https://api.githubcopilot.com/responses", init)
+
+  expect(mockAuthFetch).toHaveBeenCalled()
+  const callArgs = mockAuthFetch.mock.calls[0]
+  const body = JSON.parse(callArgs[1].body)
+
+  expect(body.max_output_tokens).toBeUndefined()
+  expect(body.max_completion_tokens).toBe(32000)
+})
