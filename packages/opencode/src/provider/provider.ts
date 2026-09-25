@@ -310,15 +310,6 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
         },
         options: { fetch: rewriteMaxOutputTokens },
       }),
-    "openai-compatible": () =>
-      Effect.succeed({
-        autoload: false,
-        async getModel(sdk: any, modelID: string, _options?: Record<string, any>) {
-          if (useLanguageModel(sdk)) return sdk.languageModel(modelID)
-          return sdk.responses ? sdk.responses(modelID) : sdk.chat(modelID)
-        },
-        options: { fetch: rewriteMaxOutputTokens },
-      }),
     xai: () =>
       Effect.succeed({
         autoload: false,
@@ -1567,7 +1558,11 @@ const layer: Layer.Layer<
         const chunkTimeout = resolveChunkTimeout(options["chunkTimeout"])
         delete options["chunkTimeout"]
 
-        options["fetch"] = __exportTestFetchFn(options, model, customFetch, chunkTimeout)
+        if (model.api.npm === "@ai-sdk/openai-compatible") {
+          options["fetch"] = rewriteMaxOutputTokens
+        }
+
+        options["fetch"] = __exportTestFetchFn(options, model, customFetch || options["fetch"], chunkTimeout)
 
         const bundledLoader = BUNDLED_PROVIDERS[model.api.npm]
         if (bundledLoader) {
