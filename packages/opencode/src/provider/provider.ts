@@ -1558,11 +1558,12 @@ const layer: Layer.Layer<
         const chunkTimeout = resolveChunkTimeout(options["chunkTimeout"])
         delete options["chunkTimeout"]
 
+        let defaultFetch = fetch
         if (model.api.npm === "@ai-sdk/openai-compatible") {
-          options["fetch"] = rewriteMaxOutputTokens
+          defaultFetch = rewriteMaxOutputTokens as typeof fetch
         }
 
-        options["fetch"] = __exportTestFetchFn(options, model, customFetch || options["fetch"], chunkTimeout)
+        options["fetch"] = __exportTestFetchFn(options, model, customFetch ?? defaultFetch, chunkTimeout)
 
         const bundledLoader = BUNDLED_PROVIDERS[model.api.npm]
         if (bundledLoader) {
