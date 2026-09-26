@@ -144,6 +144,7 @@ interface State {
   servers: Record<string, LSPServer.Info>
   broken: Map<string, { attempts: number; lastAttempt: number }>
   spawning: Map<string, Promise<LSPClient.Info | undefined>>
+  disposed: boolean
 }
 
 export interface Interface {
@@ -221,11 +222,14 @@ export const layer = Layer.effect(
           servers,
           broken: new Map(),
           spawning: new Map(),
+          disposed: false,
         }
 
         yield* Effect.addFinalizer(() =>
           Effect.promise(async () => {
-            await Promise.all(s.clients.map((client) => client.shutdown()))
+            s.disposed = true
+            await Promise.allSettled([...s.spawning.values()])
+            await Promise.allSettled(s.clients.map((client) => client.shutdown()))
             s.clients.length = 0
             s.broken.clear()
             s.spawning.clear()
@@ -241,10 +245,14 @@ export const layer = Layer.effect(
       if (!containsPath(file, ctx)) return [] as LSPClient.Info[]
       const s = yield* InstanceState.get(state)
       return yield* Effect.promise(async () => {
+        if (s.disposed) return [] as LSPClient.Info[]
+
         const extension = path.parse(file).ext || file
         const result: LSPClient.Info[] = []
 
         async function schedule(server: LSPServer.Info, root: string, key: string) {
+          if (s.disposed) return undefined
+
           const handle = await server
             .spawn(root, ctx)
             .then((value) => {
@@ -274,6 +282,11 @@ export const layer = Layer.effect(
 
           if (!client) return undefined
 
+          if (s.disposed) {
+            await client.shutdown()
+            return undefined
+          }
+
           s.broken.delete(key)
 
           const existing = s.clients.find((x) => x.root === root && x.serverID === server.id)
@@ -302,10 +315,12 @@ export const layer = Layer.effect(
           const inflight = s.spawning.get(root + server.id)
           if (inflight) {
             const client = await inflight
-            if (!client) continue
+            if (!client || s.disposed) continue
             result.push(client)
             continue
           }
+
+          if (s.disposed) continue
 
           const task = schedule(server, root, root + server.id)
           s.spawning.set(root + server.id, task)
@@ -317,7 +332,7 @@ export const layer = Layer.effect(
           })
 
           const client = await task
-          if (!client) continue
+          if (!client || s.disposed) continue
 
           result.push(client)
           Bus.publish(Event.Updated, {})
@@ -344,6 +359,7 @@ export const layer = Layer.effect(
     const status = Effect.fn("LSP.status")(function* () {
       const ctx = yield* InstanceState.context
       const s = yield* InstanceState.get(state)
+      if (s.disposed) return []
       const result: Status[] = []
       for (const client of s.clients) {
         result.push({
@@ -360,6 +376,8 @@ export const layer = Layer.effect(
       const ctx = yield* InstanceState.context
       const s = yield* InstanceState.get(state)
       return yield* Effect.promise(async () => {
+        if (s.disposed) return false
+
         const extension = path.parse(file).ext || file
         for (const server of Object.values(s.servers)) {
           if (server.extensions.length && !server.extensions.includes(extension)) continue
@@ -378,7 +396,8 @@ export const layer = Layer.effect(
     const touchFile = Effect.fn("LSP.touchFile")(function* (input: string, diagnostics?: "document" | "full") {
       log.info("touching file", { file: input })
       const clients = yield* getClients(input)
-      if (!clients.length) return
+      const s = yield* InstanceState.get(state)
+      if (s.disposed || !clients.length) return
 
       const results = yield* Effect.forEach(
         clients,
