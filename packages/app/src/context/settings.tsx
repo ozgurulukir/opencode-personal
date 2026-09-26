@@ -33,9 +33,6 @@ export interface Settings {
     editToolPartsExpanded: boolean
     showSessionProgressBar: boolean
   }
-  updates: {
-    startup: boolean
-  }
   appearance: {
     fontSize: number
     mono: string
@@ -117,9 +114,6 @@ const defaultSettings: Settings = {
     shellToolPartsExpanded: false,
     editToolPartsExpanded: false,
     showSessionProgressBar: true,
-  },
-  updates: {
-    startup: true,
   },
   appearance: {
     fontSize: 14,
@@ -235,12 +229,6 @@ export const { use: useSettings, provider: SettingsProvider } = createSimpleCont
         ),
         setShowSessionProgressBar(value: boolean) {
           setStore("general", "showSessionProgressBar", value)
-        },
-      },
-      updates: {
-        startup: withFallback(() => store.updates?.startup, defaultSettings.updates.startup),
-        setStartup(value: boolean) {
-          setStore("updates", "startup", value)
         },
       },
       appearance: {

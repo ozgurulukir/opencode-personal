@@ -7,7 +7,6 @@ type PickerPaths = string | string[] | null
 type OpenDirectoryPickerOptions = { title?: string; multiple?: boolean }
 type OpenFilePickerOptions = { title?: string; multiple?: boolean; accept?: string[]; extensions?: string[] }
 type SaveFilePickerOptions = { title?: string; defaultPath?: string }
-type UpdateInfo = { updateAvailable: boolean; version?: string }
 
 export type Platform = {
   /** Platform discriminator */
@@ -48,12 +47,6 @@ export type Platform = {
 
   /** Storage mechanism, defaults to localStorage */
   storage?: (name?: string) => SyncStorage | AsyncStorage
-
-  /** Check for a downloadable desktop update */
-  checkUpdate?(): Promise<UpdateInfo>
-
-  /** Install the downloaded update using the platform restart flow */
-  updateAndRestart?(): Promise<void>
 
   /** Fetch override */
   fetch?: typeof fetch
