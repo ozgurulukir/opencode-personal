@@ -181,6 +181,10 @@ const table = sqliteTable("session", {
 - `packages/web` requires `--skipLibCheck` due to pre-existing astro/starlight lib errors
 - **LSP diagnostics may show false positives for `@/` path aliases.** The language server often cannot resolve tsconfig path mappings, producing "Cannot find module" errors that `bun typecheck` (which uses `tsgo`) passes cleanly. Always trust `bun typecheck` over LSP diagnostics for `@/` imports.
 
+## Linting
+
+- `bun run lint` (oxlint) reports `no-unused-vars` (leftover imports/locals/params) as **warnings, not errors** — the repo carries ~268 pre-existing `no-unused-vars` warnings, and lint still passes. A passing lint run does NOT prove there are no leftover imports. To verify a removal/cleanup, grep the output for `no-unused-vars` (and for `: error `).
+
 ## Technologies
 
 - HTTP server is Effect `HttpApi` (`effect/unstable/httpapi`) + Effect `Schema` for request/response typing at the API boundary (51 unique files use `effect/unstable/httpapi`; Hono appears only in a node SSE shim at `server/httpapi-server.node.ts`, one session handler, and a command template). zod 4.1.8 (catalog) is used for config/skill frontmatter/SDK-client boundaries, not the HTTP API.
