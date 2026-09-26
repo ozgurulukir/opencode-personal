@@ -356,88 +356,6 @@
         ]
       }
     },
-    "/global/upgrade": {
-      "post": {
-        "tags": ["global"],
-        "operationId": "global.upgrade",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "Upgrade result",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "anyOf": [
-                    {
-                      "type": "object",
-                      "properties": {
-                        "success": {
-                          "type": "boolean",
-                          "enum": [true]
-                        },
-                        "version": {
-                          "type": "string"
-                        }
-                      },
-                      "required": ["success", "version"],
-                      "additionalProperties": false
-                    },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "success": {
-                          "type": "boolean",
-                          "enum": [false]
-                        },
-                        "error": {
-                          "type": "string"
-                        }
-                      },
-                      "required": ["success", "error"],
-                      "additionalProperties": false
-                    }
-                  ],
-                  "description": "Upgrade result"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad request",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/BadRequestError"
-                }
-              }
-            }
-          }
-        },
-        "description": "Upgrade opencode to the specified version or latest if not specified.",
-        "summary": "Upgrade opencode",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "target": {
-                    "type": "string"
-                  }
-                },
-                "additionalProperties": false
-              }
-            }
-          }
-        },
-        "x-codeSamples": [
-          {
-            "lang": "js",
-            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk/v2/client\n\nconst client = createOpencodeClient()\nawait client.global.upgrade({\n  ...\n})"
-          }
-        ]
-      }
-    },
     "/event": {
       "get": {
         "tags": ["event"],
@@ -11117,12 +11035,6 @@
             "$ref": "#/components/schemas/EventSessionError"
           },
           {
-            "$ref": "#/components/schemas/EventInstallationUpdated"
-          },
-          {
-            "$ref": "#/components/schemas/EventInstallationUpdate-available"
-          },
-          {
             "$ref": "#/components/schemas/EventSkillLoaded"
           },
           {
@@ -13388,12 +13300,6 @@
                 "$ref": "#/components/schemas/EventSessionError"
               },
               {
-                "$ref": "#/components/schemas/EventInstallationUpdated"
-              },
-              {
-                "$ref": "#/components/schemas/EventInstallationUpdate-available"
-              },
-              {
                 "$ref": "#/components/schemas/EventSkillLoaded"
               },
               {
@@ -14485,18 +14391,6 @@
           },
           "autoshare": {
             "type": "boolean"
-          },
-          "autoupdate": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "string",
-                "enum": ["notify"]
-              }
-            ],
-            "description": "Automatically update to the latest version. Set to true to auto-update, false to disable, or 'notify' to show update notifications"
           },
           "disabled_providers": {
             "type": "array",
@@ -16545,6 +16439,10 @@
                 },
                 "required": ["id", "providerID", "variant"],
                 "additionalProperties": false
+              },
+              "legacyMessageID": {
+                "type": "string",
+                "pattern": "^msg"
               }
             },
             "required": ["timestamp", "sessionID", "prompt", "agent", "model"],
@@ -16738,6 +16636,10 @@
               },
               "snapshot": {
                 "type": "string"
+              },
+              "legacyMessageID": {
+                "type": "string",
+                "pattern": "^msg"
               }
             },
             "required": ["timestamp", "sessionID", "agent", "model"],
@@ -19082,54 +18984,6 @@
         "required": ["id", "type", "properties"],
         "additionalProperties": false
       },
-      "EventInstallationUpdated": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "type": {
-            "type": "string",
-            "enum": ["installation.updated"]
-          },
-          "properties": {
-            "type": "object",
-            "properties": {
-              "version": {
-                "type": "string"
-              }
-            },
-            "required": ["version"],
-            "additionalProperties": false
-          }
-        },
-        "required": ["id", "type", "properties"],
-        "additionalProperties": false
-      },
-      "EventInstallationUpdate-available": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "type": {
-            "type": "string",
-            "enum": ["installation.update-available"]
-          },
-          "properties": {
-            "type": "object",
-            "properties": {
-              "version": {
-                "type": "string"
-              }
-            },
-            "required": ["version"],
-            "additionalProperties": false
-          }
-        },
-        "required": ["id", "type", "properties"],
-        "additionalProperties": false
-      },
       "EventSkillLoaded": {
         "type": "object",
         "properties": {
@@ -19956,6 +19810,10 @@
                 },
                 "required": ["id", "providerID", "variant"],
                 "additionalProperties": false
+              },
+              "legacyMessageID": {
+                "type": "string",
+                "pattern": "^msg"
               }
             },
             "required": ["timestamp", "sessionID", "prompt", "agent", "model"],
@@ -20105,6 +19963,10 @@
               },
               "snapshot": {
                 "type": "string"
+              },
+              "legacyMessageID": {
+                "type": "string",
+                "pattern": "^msg"
               }
             },
             "required": ["timestamp", "sessionID", "agent", "model"],

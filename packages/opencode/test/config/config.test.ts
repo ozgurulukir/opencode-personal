@@ -1466,7 +1466,6 @@ test("managed settings override project settings", async () => {
     init: async (dir) => {
       await writeConfig(dir, {
         $schema: "https://opencode.ai/config.json",
-        autoupdate: true,
         disabled_providers: [],
       })
     },
@@ -1474,7 +1473,6 @@ test("managed settings override project settings", async () => {
 
   await writeManagedSettings({
     $schema: "https://opencode.ai/config.json",
-    autoupdate: false,
     disabled_providers: ["openai"],
   })
 
@@ -1482,7 +1480,6 @@ test("managed settings override project settings", async () => {
     directory: tmp.path,
     fn: async () => {
       const config = await load()
-      expect(config.autoupdate).toBe(false)
       expect(config.disabled_providers).toEqual(["openai"])
     },
   })
@@ -2495,7 +2492,6 @@ test("parseManagedPlist parses server settings", async () => {
         JSON.stringify({
           $schema: "https://opencode.ai/config.json",
           server: { hostname: "127.0.0.1", mdns: false },
-          autoupdate: true,
         }),
       ),
       "test:mobileconfig",
@@ -2504,7 +2500,6 @@ test("parseManagedPlist parses server settings", async () => {
   )
   expect(config.server?.hostname).toBe("127.0.0.1")
   expect(config.server?.mdns).toBe(false)
-  expect(config.autoupdate).toBe(true)
 })
 
 test("parseManagedPlist parses permission rules", async () => {
