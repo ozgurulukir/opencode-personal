@@ -1,12 +1,19 @@
 import { afterEach, describe, expect, mock, spyOn, test } from "bun:test"
-import { Context, Effect } from "effect"
+import { Context, Effect, DateTime } from "effect"
 import { Flag } from "@opencode-ai/core/flag/flag"
-import { Instance } from "../../src/project/instance"
 import { WithInstance } from "../../src/project/with-instance"
 import { Server } from "../../src/server/server"
 import { SyncPaths } from "../../src/server/routes/instance/httpapi/groups/sync"
 import { ExperimentalHttpApiServer } from "../../src/server/routes/instance/httpapi/server"
 import { Session } from "@/session/session"
+import { SyncEvent } from "@/sync"
+import { EventID } from "@/sync/schema"
+import { EventSequenceTable } from "@/sync/event.sql"
+import { SessionEvent } from "@/v2/session-event"
+import { Modelv2 } from "@/v2/model"
+import { SessionMessageTable } from "@/session/session.sql"
+import type { SessionID } from "@/session/schema"
+import { Database, eq } from "@/storage/db"
 import * as Log from "@opencode-ai/core/util/log"
 import { resetDatabase } from "../fixture/db"
 import { disposeAllInstances, tmpdir } from "../fixture/fixture"
@@ -22,6 +29,46 @@ function app() {
 
 function runSession<A, E>(fx: Effect.Effect<A, E, Session.Service>) {
   return Effect.runPromise(fx.pipe(Effect.provide(Session.defaultLayer)))
+}
+
+function runSync<A, E>(fx: Effect.Effect<A, E, SyncEvent.Service>) {
+  return Effect.runPromise(fx.pipe(Effect.provide(SyncEvent.defaultLayer)))
+}
+
+/** Next seq for an aggregate, bypassing `EventTable`'s primary-key collision. */
+function nextSeq(aggregateID: string) {
+  const row = Database.use((db) =>
+    db
+      .select({ seq: EventSequenceTable.seq })
+      .from(EventSequenceTable)
+      .where(eq(EventSequenceTable.aggregate_id, aggregateID))
+      .get(),
+  )
+  return (row?.seq ?? -1) + 1
+}
+
+function sessionMessages(sessionID: SessionID) {
+  return Database.use((db) =>
+    db.select().from(SessionMessageTable).where(eq(SessionMessageTable.session_id, sessionID)).all(),
+  )
+}
+
+function replay(
+  directory: string,
+  headers: Record<string, string>,
+  event: { id: string; aggregateID: string; seq: number; type: string; data: Record<string, unknown> },
+) {
+  return app().request(SyncPaths.replay, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ directory, events: [event] }),
+  })
+}
+
+const testModel = {
+  id: Modelv2.ID.make("test-model"),
+  providerID: Modelv2.ProviderID.make("test-provider"),
+  variant: Modelv2.VariantID.make("default"),
 }
 
 afterEach(async () => {
@@ -138,5 +185,183 @@ describe("sync HttpApi", () => {
     const body = (await response.json()) as Record<string, unknown>
     expect(body.success).toBe(false)
     expect(Array.isArray(body.error) || Array.isArray(body.errors)).toBe(true)
+  })
+})
+
+// V2 datetime round-trip: emitters pass `DateTime` instances, but `EventTable`
+// stores the JSON form. Replay must feed projectors a rebuilt `DateTime.Utc`
+// instead of the ISO string, or the projector constructor throws and the replay
+// transaction rolls back (workspace-sync reconnect loop).
+describe("sync HttpApi V2 datetime round-trip", () => {
+  const ISO = "2024-01-02T03:04:05.000Z"
+  const MILLIS = Date.parse(ISO)
+
+  async function createSession(directory: string) {
+    return WithInstance.provide({
+      directory,
+      fn: async () => runSession(Session.Service.use((svc) => svc.create({ title: "datetime" }))),
+    })
+  }
+
+  async function emitStepStarted(directory: string, sessionID: SessionID, millis: number) {
+    await WithInstance.provide({
+      directory,
+      fn: async () =>
+        runSync(
+          SyncEvent.Service.use((sync) =>
+            sync.run(SessionEvent.Step.Started.Sync, {
+              sessionID,
+              timestamp: DateTime.makeUnsafe(millis),
+              agent: "build",
+              model: testModel,
+            }),
+          ),
+        ),
+    })
+  }
+
+  const stepEndedPayload = (sessionID: SessionID, timestamp: string) => ({
+    sessionID,
+    timestamp,
+    finish: "stop",
+    cost: 0.25,
+    tokens: { input: 10, output: 20, reasoning: 0, cache: { read: 0, write: 0 } },
+  })
+
+  function storedTime(row: { data: unknown }): Record<string, unknown> {
+    return (row.data as unknown as { time?: Record<string, unknown> }).time ?? {}
+  }
+
+  test("stores V2 event timestamps in encoded form", async () => {
+    Flag.OPENCODE_EXPERIMENTAL_WORKSPACES = true
+    await using tmp = await tmpdir({ git: true, config: { formatter: false, lsp: false } })
+    const headers = { "x-opencode-directory": tmp.path, "content-type": "application/json" }
+    const session = await createSession(tmp.path)
+
+    await WithInstance.provide({
+      directory: tmp.path,
+      fn: async () =>
+        runSync(
+          SyncEvent.Service.use((sync) =>
+            sync.run(SessionEvent.Synthetic.Sync, {
+              sessionID: session.id,
+              timestamp: DateTime.makeUnsafe(MILLIS),
+              text: "encoded",
+            }),
+          ),
+        ),
+    })
+
+    const history = await app().request(SyncPaths.history, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({}),
+    })
+    expect(history.status).toBe(200)
+    const rows = (await history.json()) as Array<{
+      aggregate_id: string
+      type: string
+      data: Record<string, unknown>
+    }>
+    const row = rows.find((item) => item.aggregate_id === session.id && item.type === "session.next.synthetic.1")
+    expect(row).toBeDefined()
+    expect(typeof row!.data.timestamp).toBe("number")
+    expect(row!.data.timestamp).toBe(MILLIS)
+  })
+
+  test("replays a crafted ISO-timestamp V2 event", async () => {
+    Flag.OPENCODE_EXPERIMENTAL_WORKSPACES = true
+    await using tmp = await tmpdir({ git: true, config: { formatter: false, lsp: false } })
+    const headers = { "x-opencode-directory": tmp.path, "content-type": "application/json" }
+    const session = await createSession(tmp.path)
+
+    const response = await replay(tmp.path, headers, {
+      id: EventID.ascending(),
+      aggregateID: session.id,
+      seq: nextSeq(session.id),
+      type: "session.next.synthetic.1",
+      data: { sessionID: session.id, timestamp: ISO, text: "replayed" },
+    })
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ sessionID: session.id })
+
+    const row = sessionMessages(session.id).find((item) => item.type === "synthetic")
+    expect(row).toBeDefined()
+    if (!row) return
+    expect(storedTime(row).created).toBe(MILLIS)
+  })
+
+  test("replayed update events persist millis (mixed live+replay)", async () => {
+    Flag.OPENCODE_EXPERIMENTAL_WORKSPACES = true
+    await using tmp = await tmpdir({ git: true, config: { formatter: false, lsp: false } })
+    const headers = { "x-opencode-directory": tmp.path, "content-type": "application/json" }
+    const session = await createSession(tmp.path)
+    const started = MILLIS
+    const ended = MILLIS + 1000
+
+    await emitStepStarted(tmp.path, session.id, started)
+
+    const response = await replay(tmp.path, headers, {
+      id: EventID.ascending(),
+      aggregateID: session.id,
+      seq: nextSeq(session.id),
+      type: "session.next.step.ended.1",
+      data: stepEndedPayload(session.id, new Date(ended).toISOString()),
+    })
+    expect(response.status).toBe(200)
+
+    const row = sessionMessages(session.id).find((item) => item.type === "assistant")
+    expect(row).toBeDefined()
+    if (!row) return
+    const time = storedTime(row)
+    expect(time.created).toBe(started)
+    expect(time.completed).toBe(ended)
+  })
+
+  test("tolerates a poisoned read-model row", async () => {
+    Flag.OPENCODE_EXPERIMENTAL_WORKSPACES = true
+    await using tmp = await tmpdir({ git: true, config: { formatter: false, lsp: false } })
+    const headers = { "x-opencode-directory": tmp.path, "content-type": "application/json" }
+    const session = await createSession(tmp.path)
+    const started = MILLIS
+    const ended = MILLIS + 1000
+
+    await emitStepStarted(tmp.path, session.id, started)
+
+    // Simulate the mixed live+replay corruption: an ISO string persisted into
+    // the read model's JSON column.
+    const current = sessionMessages(session.id).find((item) => item.type === "assistant")
+    expect(current).toBeDefined()
+    if (!current) return
+    Database.use((db) =>
+      db
+        .update(SessionMessageTable)
+        .set({
+          data: {
+            ...(current.data as unknown as Record<string, unknown>),
+            time: { ...storedTime(current), created: new Date(started).toISOString() },
+          } as unknown as (typeof SessionMessageTable.$inferInsert)["data"],
+        })
+        .where(eq(SessionMessageTable.id, current.id))
+        .run(),
+    )
+    const poisoned = sessionMessages(session.id).find((item) => item.type === "assistant")
+    expect(storedTime(poisoned!).created).toBe(new Date(started).toISOString())
+
+    const response = await replay(tmp.path, headers, {
+      id: EventID.ascending(),
+      aggregateID: session.id,
+      seq: nextSeq(session.id),
+      type: "session.next.step.ended.1",
+      data: stepEndedPayload(session.id, new Date(ended).toISOString()),
+    })
+    expect(response.status).toBe(200)
+
+    const healed = sessionMessages(session.id).find((item) => item.type === "assistant")
+    expect(healed).toBeDefined()
+    if (!healed) return
+    const time = storedTime(healed)
+    expect(time.created).toBe(started)
+    expect(time.completed).toBe(ended)
   })
 })
