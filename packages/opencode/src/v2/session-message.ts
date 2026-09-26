@@ -33,17 +33,52 @@ export function normalizeToolInput(value: unknown): Record<string, unknown> {
   return {}
 }
 
+const TIME_FIELDS = ["created", "completed", "ran", "pruned"] as const
+
 /**
- * Keeps reads tolerant of assistant messages persisted while a tool call was
- * still streaming. Pending input is intentionally a string; terminal/running
- * states require the parsed record shape used by the V2 message contract.
+ * Rewrites ISO-string timestamps to epoch millis so rows poisoned by a mixed
+ * live+replay write (a `DateTime` that JSON-serialized to a string) decode
+ * again. Only declared `time` fields are touched; unparseable strings are left
+ * as-is so the schema error stays precise instead of being masked by `NaN`.
+ */
+function reviveTime(value: Record<string, unknown>): Record<string, unknown> {
+  if (!isRecord(value.time)) return value
+  const time = value.time
+  let changed = false
+  const next: Record<string, unknown> = { ...time }
+  for (const field of TIME_FIELDS) {
+    const current = time[field]
+    if (typeof current !== "string") continue
+    const millis = Date.parse(current)
+    if (!Number.isFinite(millis)) continue
+    next[field] = millis
+    changed = true
+  }
+  return changed ? { ...value, time: next } : value
+}
+
+/**
+ * Keeps reads tolerant of persisted rows that predate or bypass the encoded
+ * store. Runs the timestamp revival first for ALL message types (top-level
+ * `time` plus `content[].time.*`), then keeps assistant messages readable while
+ * a tool call was still streaming. Pending input is intentionally a string;
+ * terminal/running states require the parsed record shape used by the V2
+ * message contract.
  */
 export function normalizeForDecode(value: unknown): unknown {
-  if (!isRecord(value) || value.type !== "assistant" || !Array.isArray(value.content)) return value
+  if (!isRecord(value)) return value
+  // Full time revival (top-level `time` and `content[].time.*`) runs before the
+  // assistant-only gate below so it applies to every message type.
+  const revived = reviveTime(value)
+  const content = Array.isArray(revived.content)
+    ? revived.content.map((item) => (isRecord(item) ? reviveTime(item) : item))
+    : revived.content
+  const message = content === revived.content ? revived : { ...revived, content }
+  if (message.type !== "assistant" || !Array.isArray(message.content)) return message
 
   return {
-    ...value,
-    content: value.content.map((item) => {
+    ...message,
+    content: message.content.map((item) => {
       if (!isRecord(item) || item.type !== "tool" || !isRecord(item.state)) return item
       if (!["running", "completed", "error"].includes(String(item.state.status))) return item
       return {

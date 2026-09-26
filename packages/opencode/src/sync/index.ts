@@ -31,6 +31,12 @@ export type Definition<
   // passed at definition time (see `session.updated`, whose projector
   // expands the persisted data to a `{ sessionID, info }` bus payload).
   properties: BusSchema
+  // Reconstructs the type form of persisted data before it reaches the
+  // projector. `EventTable` stores the encoded form, so replayed rows are fed
+  // back through this hook to restore things like `DateTime` instances that
+  // JSON serialization flattened. Live runs pass already-typed data, so the
+  // hook must be idempotent.
+  readonly revive?: (data: unknown) => unknown
 }
 
 export type Event<Def extends Definition = Definition> = {
@@ -238,6 +244,7 @@ export function define<
   aggregate: Agg
   schema: Schema
   busSchema?: BusSchema
+  revive?: (data: unknown) => unknown
 }): Definition<Type, Schema, BusSchema> {
   if (frozen) {
     throw new Error("Error defining sync event: sync system has been frozen")
@@ -249,6 +256,7 @@ export function define<
     aggregate: input.aggregate,
     schema: input.schema,
     properties: (input.busSchema ?? input.schema) as BusSchema,
+    revive: input.revive,
   }
 
   versions.set(def.type, Math.max(def.version, versions.get(def.type) || 0))
@@ -258,6 +266,12 @@ export function define<
   return def
 }
 
+/**
+ * Registers a projector for a sync event. Projectors MUST read the `data`
+ * argument — the revived, canonical-form payload `process()` passes — and not
+ * `event.data`, which is the raw pre-revival value on replay and would bypass
+ * `def.revive`. `projectors-next.ts` already complies.
+ */
 export function project<Def extends Definition>(
   def: Def,
   func: (db: Database.TxOrDb, data: Event<Def>["data"], event: Event<Def>) => void,
@@ -267,13 +281,15 @@ export function project<Def extends Definition>(
 
 /**
  * Recursively converts `DateTime` instances to epoch millis so event payloads
- * are JSON-safe on the wire. The declared V2 event schemas type timestamps as
- * `V2Schema.DateTimeUtcFromMillis` (millis on the wire), but `SyncEvent.run`
- * receives raw `DateTime` values — without this walk they would
- * JSON-serialize as ISO strings over SSE and break consumers doing time
- * arithmetic. Deliberately NOT a full schema encode: `encodeUnknownSync`
- * strips fields the schema doesn't declare, which would drop undeclared
- * payload fields V1 consumers read.
+ * are JSON-safe on the wire AND in storage. Used at two seams: the publish path
+ * (`process()`) so the SSE payload matches the declared schemas, and the
+ * `EventTable` insert so persisted rows round-trip exactly (raw `DateTime`
+ * `toJSON`s to an ISO string, which projectors cannot rebuild a `DateTime.Utc`
+ * from — `def.revive` handles replay). The declared V2 event schemas type
+ * timestamps as `V2Schema.DateTimeUtcFromMillis` (millis), but `SyncEvent.run`
+ * receives raw `DateTime` values. Deliberately NOT a full schema encode:
+ * `encodeUnknownSync` strips fields the schema doesn't declare, which would drop
+ * undeclared payload fields V1 consumers read.
  */
 export function encodeDateTimes(value: unknown): unknown {
   if (DateTime.isDateTime(value)) return DateTime.toEpochMillis(value)
@@ -298,8 +314,14 @@ function process<Def extends Definition>(
     throw new Error(`Projector not found for event: ${def.type}`)
   }
 
+  // Reconstruct the type form the projector expects. Live runs hand us typed
+  // data (the hook is a no-op); replayed rows carry the encoded form (e.g.
+  // ISO-reserialized `DateTime`s) and are revived here. Everything downstream
+  // — projector, storage, publish — derives from this one value.
+  const data = def.revive ? def.revive(event.data) : event.data
+
   Database.transaction((tx) => {
-    projector(tx, event.data, event)
+    projector(tx, data, event)
 
     if (Flag.OPENCODE_EXPERIMENTAL_WORKSPACES) {
       tx.insert(EventSequenceTable)
@@ -319,7 +341,7 @@ function process<Def extends Definition>(
           seq: event.seq,
           aggregate_id: event.aggregateID,
           type: versionedType(def.type, def.version),
-          data: event.data as Record<string, unknown>,
+          data: encodeDateTimes(data) as Record<string, unknown>,
         })
         .run()
     }
@@ -330,11 +352,10 @@ function process<Def extends Definition>(
           throw new Error("SyncEvent.process: publish requires instance context")
         }
 
-        const result = convertEvent(def.type, event.data)
-        // Encode at publish: DateTime instances become epoch millis so the
-        // wire matches the declared schemas. EventTable keeps the raw data —
-        // replay re-publishes raw, which encodes again (the walk is
-        // idempotent for millis).
+        const result = convertEvent(def.type, data)
+        // EventTable stores the encoded form (epoch millis). Raw `DateTime`
+        // instances do NOT round-trip (`toJSON` → ISO string); `def.revive`
+        // reconstructs the type form for projectors on replay.
         const publish = (data: unknown) => ProjectBus.publish(def, encodeDateTimes(data) as Properties<Def>, { id: event.id })
         if (result instanceof Promise) {
           void result.then(publish)
