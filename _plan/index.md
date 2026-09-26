@@ -50,6 +50,7 @@
 | [continue-dummy-sessionid](./continue-dummy-sessionid-2026-09-24.md) | 2026-09-24 | `opencode -c` fabricated "dummy" sessionID fix | ✅ EXECUTED | `bece62b` |
 | [continue-dummy-sessionid-regression-test](./continue-dummy-sessionid-regression-test-2026-09-24.md) | 2026-09-24 | Regression guard for `opencode -c` dummy sessionID fix | ✅ EXECUTED | `5e2bf46` |
 | [remove-unused-deps](./remove-unused-deps-2026-09-25.md) | 2026-09-25 | Unused-dependency removal across 6 manifests (7 batches) | ✅ EXECUTED | 7 manifests + bun.lock; zero source changes |
+| [ai-sdk-upgrades](./ai-sdk-upgrades-2026-09-26.md) | 2026-09-26 | AI SDK same-major upgrades (22 pins, 2 manifests) | ⬜ PENDING | Version-bumps-only; edits applied 2026-09-26, not committed |
 
 ## Series: v1-v2-synthesis
 
@@ -70,13 +71,14 @@ Order: 1+2 → 3 → 4 → 5. Phase 5 supersedes the temporary event-bridge and 
 - [v1-v2-synthesis-phase-5](./v1-v2-synthesis-phase-5-2026-09-07.md) — deferred 5f deletions (V1 compatibility facade; anchors re-verified 2026-09-23)
 - [filter-compacted-regression-lock](./filter-compacted-regression-lock-2026-09-15.md) — regression test + AGENTS.md correction (re-verified 2026-09-23, still absent)
 - [verify-chat-message-drop](./verify-chat-message-drop-2026-08-14.md) — both proof tests (re-verified 2026-09-23; Test B fixture needs V2-store re-scope)
+- [ai-sdk-upgrades](./ai-sdk-upgrades-2026-09-26.md) — 22 same-major AI SDK pins applied 2026-09-26, not committed
 - ACP: real Zed smoke test (external verification only)
 
 ### Executed (for reference)
 
 - [chat-ordering-step1](./chat-ordering-step1-2026-09-23.md) — executed Step 1 execution plan (id-only ordering, V1+V2; landed in `3ac0678`)
 
-The 26 executed non-finalized plans (29 ✅ rows in the table including the 3 finalized, 2 🟡 PARTIAL, 2 ⬜ PENDING) — see the table above; each plan file cites its own landing commits and current `file:line` anchors.
+The 26 executed non-finalized plans (29 ✅ rows in the table including the 3 finalized, 2 🟡 PARTIAL, 3 ⬜ PENDING) — see the table above; each plan file cites its own landing commits and current `file:line` anchors.
 
 ### Superseded / Unverified
 
