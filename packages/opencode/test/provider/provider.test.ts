@@ -2622,107 +2622,91 @@ test("opencode loader keeps paid models when auth exists", async () => {
 })
 
 test("rewriteMaxOutputTokens > rewrites max_output_tokens to max_completion_tokens in JSON body", async () => {
-  const originalFetch = globalThis.fetch
-  try {
-    globalThis.fetch = mock((url: RequestInfo | URL, init?: RequestInit) => {
-      return Promise.resolve(new Response("ok"))
-    }) as any
+  const mockFetch = mock((url: RequestInfo | URL, init?: RequestInit) => {
+    return Promise.resolve(new Response("ok"))
+  }) as any
 
-    const init = {
-      body: JSON.stringify({
-        model: "o1-preview",
-        max_output_tokens: 32000,
-        temperature: 0.7
-      })
-    }
-
-    await rewriteMaxOutputTokens("https://api.openai.com/v1/responses", init)
-
-    expect(globalThis.fetch).toHaveBeenCalled()
-    const callArgs = (globalThis.fetch as any).mock.calls[0]
-    const body = JSON.parse(callArgs[1].body)
-
-    expect(body.max_output_tokens).toBeUndefined()
-    expect(body.max_completion_tokens).toBe(32000)
-    expect(body.model).toBe("o1-preview")
-    expect(body.temperature).toBe(0.7)
-  } finally {
-    globalThis.fetch = originalFetch
+  const init = {
+    body: JSON.stringify({
+      model: "o1-preview",
+      max_output_tokens: 32000,
+      temperature: 0.7
+    })
   }
+
+  const fetchFn = rewriteMaxOutputTokens(mockFetch)
+  await fetchFn("https://api.openai.com/v1/responses", init)
+
+  expect(mockFetch).toHaveBeenCalled()
+  const callArgs = mockFetch.mock.calls[0]
+  const body = JSON.parse(callArgs[1].body)
+
+  expect(body.max_output_tokens).toBeUndefined()
+  expect(body.max_completion_tokens).toBe(32000)
+  expect(body.model).toBe("o1-preview")
+  expect(body.temperature).toBe(0.7)
 })
 
 test("rewriteMaxOutputTokens > rewrites max_output_tokens to max_completion_tokens in Uint8Array body", async () => {
-  const originalFetch = globalThis.fetch
-  try {
-    globalThis.fetch = mock((url: RequestInfo | URL, init?: RequestInit) => {
-      return Promise.resolve(new Response("ok"))
-    }) as any
+  const mockFetch = mock((url: RequestInfo | URL, init?: RequestInit) => {
+    return Promise.resolve(new Response("ok"))
+  }) as any
 
-    const init = {
-      body: new TextEncoder().encode(JSON.stringify({
-        model: "o1-preview",
-        max_output_tokens: 32000,
-        temperature: 0.7
-      }))
-    }
-
-    await rewriteMaxOutputTokens("https://api.openai.com/v1/responses", init)
-
-    expect(globalThis.fetch).toHaveBeenCalled()
-    const callArgs = (globalThis.fetch as any).mock.calls[0]
-    expect(callArgs[1].body).toBeInstanceOf(Uint8Array)
-    const body = JSON.parse(new TextDecoder().decode(callArgs[1].body))
-
-    expect(body.max_output_tokens).toBeUndefined()
-    expect(body.max_completion_tokens).toBe(32000)
-    expect(body.model).toBe("o1-preview")
-    expect(body.temperature).toBe(0.7)
-  } finally {
-    globalThis.fetch = originalFetch
+  const init = {
+    body: new TextEncoder().encode(JSON.stringify({
+      model: "o1-preview",
+      max_output_tokens: 32000,
+      temperature: 0.7
+    }))
   }
+
+  const fetchFn = rewriteMaxOutputTokens(mockFetch)
+  await fetchFn("https://api.openai.com/v1/responses", init)
+
+  expect(mockFetch).toHaveBeenCalled()
+  const callArgs = mockFetch.mock.calls[0]
+  expect(callArgs[1].body).toBeInstanceOf(Uint8Array)
+  const body = JSON.parse(new TextDecoder().decode(callArgs[1].body))
+
+  expect(body.max_output_tokens).toBeUndefined()
+  expect(body.max_completion_tokens).toBe(32000)
+  expect(body.model).toBe("o1-preview")
+  expect(body.temperature).toBe(0.7)
 })
 
 test("rewriteMaxOutputTokens > is a no-op if max_output_tokens is not present", async () => {
-  const originalFetch = globalThis.fetch
-  try {
-    globalThis.fetch = mock((url: RequestInfo | URL, init?: RequestInit) => {
-      return Promise.resolve(new Response("ok"))
-    }) as any
+  const mockFetch = mock((url: RequestInfo | URL, init?: RequestInit) => {
+    return Promise.resolve(new Response("ok"))
+  }) as any
 
-    const init = {
-      body: JSON.stringify({
-        model: "o1-preview",
-        max_completion_tokens: 32000,
-      })
-    }
-
-    await rewriteMaxOutputTokens("https://api.openai.com/v1/responses", init)
-
-    const callArgs = (globalThis.fetch as any).mock.calls[0]
-    expect(callArgs[1].body).toBe(init.body) // should not modify if not needed
-  } finally {
-    globalThis.fetch = originalFetch
+  const init = {
+    body: JSON.stringify({
+      model: "o1-preview",
+      max_completion_tokens: 32000,
+    })
   }
+
+  const fetchFn = rewriteMaxOutputTokens(mockFetch)
+  await fetchFn("https://api.openai.com/v1/responses", init)
+
+  const callArgs = mockFetch.mock.calls[0]
+  expect(callArgs[1].body).toBe(init.body) // should not modify if not needed
 })
 
 test("rewriteMaxOutputTokens > passthroughs non-JSON bodies silently", async () => {
-  const originalFetch = globalThis.fetch
-  try {
-    globalThis.fetch = mock((url: RequestInfo | URL, init?: RequestInit) => {
-      return Promise.resolve(new Response("ok"))
-    }) as any
+  const mockFetch = mock((url: RequestInfo | URL, init?: RequestInit) => {
+    return Promise.resolve(new Response("ok"))
+  }) as any
 
-    const init = {
-      body: "this is not json max_output_tokens=32000"
-    }
-
-    await rewriteMaxOutputTokens("https://api.openai.com/v1/responses", init)
-
-    const callArgs = (globalThis.fetch as any).mock.calls[0]
-    expect(callArgs[1].body).toBe(init.body)
-  } finally {
-    globalThis.fetch = originalFetch
+  const init = {
+    body: "this is not json max_output_tokens=32000"
   }
+
+  const fetchFn = rewriteMaxOutputTokens(mockFetch)
+  await fetchFn("https://api.openai.com/v1/responses", init)
+
+  const callArgs = mockFetch.mock.calls[0]
+  expect(callArgs[1].body).toBe(init.body)
 })
 
 test("rewriteMaxOutputTokens > end-to-end through @ai-sdk/openai responses model", async () => {
@@ -2762,7 +2746,7 @@ test("rewriteMaxOutputTokens > end-to-end through @ai-sdk/openai responses model
     const openai = createOpenAI({
       baseURL: `http://127.0.0.1:${server.port}/`,
       apiKey: "test-key",
-      fetch: rewriteMaxOutputTokens as typeof fetch,
+      fetch: rewriteMaxOutputTokens(fetch) as typeof fetch,
     })
     const { text } = await generateText({
       model: openai.responses("gpt-4o"),
@@ -2840,4 +2824,28 @@ test("toPublicInfo returns a safe provider when options contain a circular refer
     options: {},
     models: {},
   })
+})
+
+test("provider merge > preserves custom fetch in plugin auth loader (prevents 401)", async () => {
+  const mockAuthFetch = mock((url: RequestInfo | URL, init?: RequestInit) => {
+    return Promise.resolve(new Response("ok"))
+  }) as any
+
+  const composedFetch = rewriteMaxOutputTokens(mockAuthFetch)
+
+  const init = {
+    body: JSON.stringify({
+      model: "gpt-5",
+      max_output_tokens: 32000,
+    })
+  }
+
+  await composedFetch("https://api.githubcopilot.com/responses", init)
+
+  expect(mockAuthFetch).toHaveBeenCalled()
+  const callArgs = mockAuthFetch.mock.calls[0]
+  const body = JSON.parse(callArgs[1].body)
+
+  expect(body.max_output_tokens).toBeUndefined()
+  expect(body.max_completion_tokens).toBe(32000)
 })
