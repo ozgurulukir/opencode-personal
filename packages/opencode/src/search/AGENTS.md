@@ -12,7 +12,7 @@ The companion manifest for an index at `{indexPath}` always lives at `{indexPath
 
 ## Native errors are coded; status results are checked
 
-The raw binding throws `Error` objects carrying a `ZVEC_*` `code`. `zvec.ts` mirrors `@zvec/zvec`'s structural `isZVecError` locally — do NOT import the wrapper's helper, the wrapper is bypassed for Bun `--compile` (see the comment at the `zvec()` loader). Caveat: this binding version (0.6.0) throws `ZVEC_INVALID_ARGUMENT` with a `"path validate failed: ... exists"` message for a duplicate create, NOT `ZVEC_ALREADY_EXISTS` — `alreadyExists()` matches the code OR the message for that reason. All failures surface as `ZvecError` (an `Error` subclass with a `code`). `upsertSync`/`deleteSync` return per-doc `ZVecStatus {ok, code, message}`: `checkStatuses` fails fully-failed batches and treats `ZVEC_NOT_FOUND` deletes as benign (idempotent delete of absent ids).
+The raw binding throws `Error` objects carrying a `ZVEC_*` `code`. `zvec.ts` mirrors `@zvec/zvec`'s structural `isZVecError` locally — do NOT import the wrapper's helper, the wrapper is bypassed for Bun `--compile` (see the comment at the `zvec()` loader). Caveat: this binding version (0.7.1) throws `ZVEC_INVALID_ARGUMENT` with a `"path validate failed: ... exists"` message for a duplicate create, NOT `ZVEC_ALREADY_EXISTS` — `alreadyExists()` matches the code OR the message for that reason. All failures surface as `ZvecError` (an `Error` subclass with a `code`). `upsertSync`/`deleteSync` return per-doc `ZVecStatus {ok, code, message}`: `checkStatuses` fails fully-failed batches and treats `ZVEC_NOT_FOUND` deletes as benign (idempotent delete of absent ids).
 
 ## EmbeddingService config is lazy, not eager
 
