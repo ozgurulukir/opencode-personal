@@ -52,10 +52,14 @@
     "@parcel/watcher-linux-x64-musl": "2.6.0",
     "@parcel/watcher-win32-arm64": "2.6.0",
     "@parcel/watcher-win32-x64": "2.6.0",
-    "@zvec/bindings-darwin-arm64": "0.6.0",
-    "@zvec/bindings-linux-arm64": "0.6.0",
-    "@zvec/bindings-linux-x64": "0.6.0",
-    "@zvec/bindings-win32-x64": "0.6.0",
+    "@zvec/bindings-darwin-arm64": "0.7.1",
+    "@zvec/bindings-darwin-x64": "0.7.1",
+    "@zvec/bindings-linux-arm64": "0.7.1",
+    "@zvec/bindings-linux-arm64-musl": "0.7.1",
+    "@zvec/bindings-linux-x64": "0.7.1",
+    "@zvec/bindings-linux-x64-musl": "0.7.1",
+    "@zvec/bindings-win32-arm64": "0.7.1",
+    "@zvec/bindings-win32-x64": "0.7.1",
     "@tsconfig/bun": "catalog:",
     "@types/bun": "catalog:",
     "@types/cross-spawn": "catalog:",
@@ -163,7 +167,7 @@
     "zod": "catalog:"
   },
   "optionalDependencies": {
-    "@zvec/zvec": "0.6.0",
+    "@zvec/zvec": "0.7.1",
     "onnxruntime-web": "1.27.0"
   },
   "overrides": {

@@ -39,7 +39,7 @@ export class ZvecError extends Error {
   }
 }
 
-// Structural mirror of @zvec/zvec@0.6.0's isZVecError (src/index.js:41-49). The
+// Structural mirror of @zvec/zvec@0.7.1's isZVecError (src/index.js:44-52). The
 // official JS wrapper is intentionally bypassed (see zvec() below), but the raw
 // binding throws the same coded Error objects its wrapper re-exports.
 function isZVecError(e: unknown): e is Error & { code: string } {
