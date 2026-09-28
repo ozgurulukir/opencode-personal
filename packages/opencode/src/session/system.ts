@@ -87,31 +87,33 @@ export const layer = Layer.effect(
       ) {
         if (Permission.disabled(["skill"], agent.permission).has("skill")) return
 
-        // Auto-match mode: use semantic search to find relevant skills
+        // Single assembly site for the <skills> block so the header text cannot
+        // drift between the auto-match and fallback branches.
+        const renderSkills = (list: Skill.Info[]) =>
+          [
+            "<skills>",
+            "Skills provide specialized instructions and workflows for specific tasks.",
+            "Use the skill tool to load a skill when a task matches its description.",
+            Skill.fmt(list, { verbose: true }),
+            "</skills>",
+          ].join("\n")
+
+        // Auto-match mode: use semantic search to find relevant skills.
+        // Order is the relevance/score order from the zvec similarity search
+        // (capped at `count`), intentionally NOT alphabetical — contrast the
+        // fallback below, where Skill.available sorts by name.
         if (userMessage && autoMatchOpts?.autoMatch) {
           const matched = yield* skill.matchBySemantics(userMessage, agent, {
             count: autoMatchOpts.count,
             threshold: autoMatchOpts.threshold,
           })
           if (matched.length === 0) return
-          return [
-            "<skills>",
-            "Skills provide specialized instructions and workflows for specific tasks.",
-            "Use the skill tool to load a skill when a task matches its description.",
-            Skill.fmt(matched, { verbose: true }),
-            "</skills>",
-          ].join("\n")
+          return renderSkills(matched)
         }
 
-        // Fallback: list all available skills
+        // Fallback: list all available skills (alphabetical, from Skill.available)
         const list = yield* skill.available(agent)
-        return [
-          "<skills>",
-          "Skills provide specialized instructions and workflows for specific tasks.",
-          "Use the skill tool to load a skill when a task matches its description.",
-          Skill.fmt(list, { verbose: true }),
-          "</skills>",
-        ].join("\n")
+        return renderSkills(list)
       }),
     })
   }),

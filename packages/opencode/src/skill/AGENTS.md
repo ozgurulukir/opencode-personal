@@ -14,6 +14,19 @@ When `skills.autoMatch` is enabled in config, `matchBySemantics()` (`skill/index
 
 State init ordering and failure semantics: `zi.open()` runs BEFORE the manifest is read (a dimension migration inside open wipes the manifest), and every zvec/embed step degrades instead of dying — an open/embed/index/delete failure logs a warning and keeps the manifest unchanged so the next session retries it. Manifest entries are only written after the corresponding zvec write succeeded, and only removed after a successful delete; `Event.Unloaded` still fires regardless (it reports the registry, not the index). `matchBySemantics()` returns `[]` when embedding fails rather than killing the system-prompt build. The index dimension comes from `() => embedder.dimension` (a getter — see `search/AGENTS.md` for why), and the index is closed via an `Effect.addFinalizer` in the `zvecIndex` InstanceState closure.
 
+## `<skills>` block ordering differs by mode, intentionally
+
+The system-prompt `<skills>` catalog is rendered at one site (`session/system.ts`
+`renderSkills`), but the list order depends on the branch:
+
+- **Fallback** (`skill.available(agent)`) — alphabetical by name (`available()` sorts).
+- **Auto-match** (`skill.matchBySemantics(...)`) — relevance/score order from the zvec
+  similarity search, capped at `count` (`skill/index.ts:626` breaks at the top-N).
+
+The auto-match order is deliberately NOT re-sorted: it carries the ranking signal (best
+match first) that the semantic search produces. `Skill.fmt()` preserves input order in both
+cases; sorting lives only in `available()`.
+
 ## Loaded skills are excluded from auto-match
 
 `Skill.Service` tracks which skills have been loaded via the `skill` tool in a `loadedSkills` Set. `matchBySemantics()` filters these out so the same skill is not injected both by auto-match and explicit user request. The set is per-instance (in-memory only), so it resets on instance restart.

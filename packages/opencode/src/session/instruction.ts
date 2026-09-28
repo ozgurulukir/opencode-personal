@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto"
 import path from "path"
 import { Effect, Layer, Context, Option, Stream } from "effect"
 import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/unstable/http"
@@ -13,6 +14,19 @@ import type { MessageID } from "./schema"
 
 const log = Log.create({ service: "instruction" })
 const MAX_INSTRUCTION_BYTES = 64 * 1024
+const SHA256_FRAGMENT = "#sha256="
+
+/**
+ * Splits an optional `#sha256=<hex>` integrity fragment off a configured
+ * instruction entry. The fragment is a local verification hint only — it is
+ * never sent over the wire — so only the request URL and the declared hash (if
+ * present) are returned. Entries without the fragment pass through unchanged.
+ */
+function stripHashFragment(entry: string): { url: string; hash?: string } {
+  const index = entry.indexOf(SHA256_FRAGMENT)
+  if (index === -1) return { url: entry }
+  return { url: entry.slice(0, index), hash: entry.slice(index + SHA256_FRAGMENT.length) }
+}
 
 const FILES = [
   "AGENTS.md",
@@ -107,9 +121,14 @@ export const layer: Layer.Layer<
       return yield* fs.readFileString(filepath).pipe(Effect.catch(() => Effect.succeed("")))
     })
 
-    type CacheEntry = { mtime: number; content: string }
+    type CacheEntry = { mtime: number; content: string; at: number }
     const fileCache = new Map<string, CacheEntry>()
     const FILE_CACHE_MAX = 100
+    // Bound how long a cached local file may be trusted on mtime alone. Mirrors
+    // REMOTE_TTL_MS so instruction content is re-validated at most once a minute,
+    // closing the misleading-mtime hole (coarse granularity, same-mtime rewrites,
+    // network mounts) where a changed file would otherwise never be re-read.
+    const FILE_CACHE_MAX_AGE_MS = 60_000
 
     const evictLRU = () => {
       if (fileCache.size <= FILE_CACHE_MAX) return
@@ -147,7 +166,7 @@ export const layer: Layer.Layer<
         return yield* read(filepath)
       }
       const cached = fileCache.get(filepath)
-      if (cached && cached.mtime >= mtime) {
+      if (cached && cached.mtime >= mtime && Date.now() - cached.at < FILE_CACHE_MAX_AGE_MS) {
         // Move to end (most recently used) by re-inserting
         fileCache.delete(filepath)
         fileCache.set(filepath, cached)
@@ -155,7 +174,9 @@ export const layer: Layer.Layer<
       }
       const content = yield* read(filepath)
       if (content) {
-        fileCache.set(filepath, { mtime, content })
+        // Refresh both the mtime and the fill time so a re-read after expiry
+        // (or a same-mtime rewrite) restarts the max-age window.
+        fileCache.set(filepath, { mtime, content, at: Date.now() })
         evictLRU()
       } else fileCache.delete(filepath)
       return content
@@ -169,8 +190,12 @@ export const layer: Layer.Layer<
     const REMOTE_TTL_MS = 60_000
     const REMOTE_CACHE_MAX = 50
 
-    const fetch = Effect.fnUntraced(function* (url: string) {
+    const fetch = Effect.fnUntraced(function* (entry: string) {
       const s = yield* InstanceState.get(state)
+      // An optional `#sha256=<hex>` integrity fragment is verified locally and
+      // never sent over the wire. The stripped URL is also the cache key, so
+      // `url#sha256=…` and a bare `url` share one cache entry.
+      const { url, hash } = stripHashFragment(entry)
       const cached = s.remote.get(url)
       const now = Date.now()
       if (cached && now - cached.at < REMOTE_TTL_MS) {
@@ -230,6 +255,17 @@ export const layer: Layer.Layer<
       for (const chunk of body.chunks) {
         bytes.set(chunk, offset)
         offset += chunk.byteLength
+      }
+      // Fail closed on a declared hash mismatch: return before the cache write so
+      // a tampered body is neither injected nor served from cache within the TTL.
+      // An empty `#sha256=` is a declared-but-invalid hash and also fails closed.
+      if (hash !== undefined) {
+        const digest = createHash("sha256").update(bytes).digest("hex")
+        if (hash.length !== digest.length || hash !== digest) {
+          log.warn("remote instruction hash mismatch", { url })
+          s.remote.delete(url)
+          return ""
+        }
       }
       const content = new TextDecoder().decode(bytes)
       if (!content) {
@@ -298,20 +334,35 @@ export const layer: Layer.Layer<
     const system = Effect.fn("Instruction.system")(function* () {
       const config = yield* cfg.get()
       const paths = yield* systemPaths()
-      const urls = (config.instructions ?? []).filter(
-        (item) => item.startsWith("https://") || item.startsWith("http://"),
+      // De-dupe at the source too: config-layer merging collapses duplicates
+      // across layers (config.ts), but a URL repeated within one config file
+      // would otherwise be fetched and injected twice.
+      const urls = Array.from(
+        new Set(
+          (config.instructions ?? []).filter((item) => item.startsWith("https://") || item.startsWith("http://")),
+        ),
       )
 
       const files = yield* Effect.forEach(Array.from(paths), readCached, { concurrency: 8 })
       const remote = yield* Effect.forEach(urls, fetch, { concurrency: 4 })
 
+      // Content-level de-dupe: sources carrying byte-identical content (a URL
+      // mirrored locally, the same file reachable via two entries) inject once.
+      // First occurrence wins; local sources are emitted before remote ones.
+      const seen = new Set<string>()
       return [
-        ...Array.from(paths).flatMap((item, i) =>
-          files[i] ? [`<instructions source="${item}">\n${files[i]}\n</instructions>`] : [],
-        ),
-        ...urls.flatMap((item, i) =>
-          remote[i] ? [`<instructions source="${item}">\n${remote[i]}\n</instructions>`] : [],
-        ),
+        ...Array.from(paths).flatMap((item, i) => {
+          const content = files[i]
+          if (!content || seen.has(content)) return []
+          seen.add(content)
+          return [`<instructions source="${item}">\n${content}\n</instructions>`]
+        }),
+        ...urls.flatMap((item, i) => {
+          const content = remote[i]
+          if (!content || seen.has(content)) return []
+          seen.add(content)
+          return [`<instructions source="${item}">\n${content}\n</instructions>`]
+        }),
       ]
     })
 

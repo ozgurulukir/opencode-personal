@@ -8,7 +8,7 @@ This file covers package-specific conventions only.
 
 System prompt uses a **shared core + provider delta** structure:
 
-- `session/prompt/core.txt` — universal identity, tone, task workflow, conventions, code style, system tags, instruction priority (69 lines)
+- `session/prompt/core.txt` — universal identity, tone, task workflow, conventions, code style, system tags, instruction priority (81 lines)
 - `session/prompt/delta-*.txt` — provider-specific additions only (anthropic, beast, codex, default, deepseek, gemini, glm, gpt, kimi, qwen, trinity)
 - `session/system.ts:provider(model)` returns `[PROMPT_CORE, delta]`; `matchDelta(model)` selects the delta by model API ID
 
