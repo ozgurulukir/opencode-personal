@@ -8,15 +8,15 @@ This file covers package-specific conventions only.
 
 System prompt uses a **shared core + provider delta** structure:
 
-- `session/prompt/core.txt` — universal identity, tone, task workflow, conventions, code style, system tags, instruction priority (81 lines)
+- `session/prompt/core.txt` — universal identity, tone, task workflow, conventions, code style, system tags, instruction priority (82 lines)
 - `session/prompt/delta-*.txt` — provider-specific additions only (anthropic, beast, codex, default, deepseek, gemini, glm, gpt, kimi, qwen, trinity)
 - `session/system.ts:provider(model)` returns `[PROMPT_CORE, delta]`; `matchDelta(model)` selects the delta by model API ID
 
-**Assembly flow** (`session/llm.ts:118-149`):
+**Assembly flow** (`session/llm.ts:118-185`):
 
 1. `prefix` = core + delta (cacheable, stable across turns for same model; resolved at `llm.ts:123` from `agent.prompt ?? SystemPrompt.provider(model).prefix`)
 2. `suffix` = environment + skills + structured-output hint + user system (dynamic, session-specific; built in `run-loop.ts:310-321`)
-3. Plugin transform hook may mutate `{system}`; an emptied prefix is restored and a mutated prefix is warned (`llm.ts:133-144`)
+3. Plugin transform hook may mutate `{system}`; an emptied prefix is restored and a mutated prefix is warned (`llm.ts:133-140`)
 
 **Known limitations (documented, not bugs to fix here):**
 
