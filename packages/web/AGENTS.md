@@ -26,6 +26,6 @@ the shell and V2 branches for payloads produced by newer share producers.
 
 When constructing a synthetic bash tool part (e.g., from `fromShell()`), match this exact shape or `ContentBash` renders blank.
 
-## Translated docs share identical code blocks
+## Translated docs (English + Turkish only)
 
-`content/docs/<locale>/skills.mdx` mirrors (17 locales) keep code blocks byte-identical to the English source; only prose is translated. Bulk doc edits can string-replace the shared code line across all locales in one pass; prose changes must be translated per locale.
+Docs ship in English (root) and Turkish (`content/docs/tr/`); locale routing (`src/i18n/locales.ts`) declares only `root` + `tr`. `content/docs/tr/skills.mdx` keeps code blocks byte-identical to the English source; only prose is translated. When editing shared code lines, apply the identical change to the English page and its `tr/` mirror; prose changes must be translated.
