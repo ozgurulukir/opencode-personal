@@ -31,6 +31,8 @@ const skills: Skill.Info[] = [
     description: "Manual skill.",
     location: "/tmp/manual-skill/SKILL.md",
     content: "# manual-skill",
+    // Emulates an invalid skill: real available() hides skills carrying warnings.
+    warnings: ["missing description"],
   },
 ]
 
@@ -51,7 +53,15 @@ const it = testEffect(
           all: () => Effect.succeed(skills),
           allIncludingInvalid: () => Effect.succeed(skills),
           dirs: () => Effect.succeed([]),
-          available: () => Effect.succeed(skills),
+          // Emulates the real Skill.available() contract (skill/index.ts):
+          // hide invalid skills (warnings) and sort by name. fmt() preserves
+          // this order — the system prompt must not re-sort or re-filter.
+          available: () =>
+            Effect.succeed(
+              skills
+                .filter((skill) => !skill.warnings || skill.warnings.length === 0)
+                .toSorted((a, b) => a.name.localeCompare(b.name)),
+            ),
           markLoaded: () => Effect.void,
           matchBySemantics: () => Effect.succeed([]),
         }),

@@ -131,8 +131,16 @@ const live: Layer.Layer<
         { system },
       )
       // Ensure the plugin cannot silently drop the prefix; restore it if missing.
+      // Prefix mutation is a supported hook feature (locked by test/plugin/trigger.test.ts),
+      // so it is preserved — but it changes the cacheable prefix boundary, hence the warning.
       if (!system.prefix || system.prefix.trim().length === 0) {
         system = { prefix, suffix: system.suffix }
+      } else if (system.prefix !== prefix) {
+        l.warn("plugin mutated system prompt prefix", {
+          sessionID: input.sessionID,
+          providerID: input.model.providerID,
+          modelID: input.model.id,
+        })
       }
 
       const systemMessages = ProviderTransform.systemPromptMessages(
@@ -160,6 +168,8 @@ const live: Layer.Layer<
         variant,
         "variant",
       )
+      // Known limitation: for instructions-mode providers the cacheable prefix
+      // boundary is lost — prefix and suffix are joined into one string.
       if (delivery.type === "instructions") {
         options.instructions = [system.prefix, system.suffix].filter((x) => x).join("\n")
       }
@@ -256,6 +266,7 @@ const live: Layer.Layer<
           approvalHandler?: (approvalTools: { name: string; args: string }[]) => Promise<{ approved: boolean }>
         }
         workflowModel.sessionID = input.sessionID
+        // Known limitation: joins prefix+suffix, losing the cacheable prefix boundary.
         workflowModel.systemPrompt = [system.prefix, system.suffix].filter((x) => x).join("\n")
         workflowModel.toolExecutor = async (toolName, argsJson, _requestID) => {
           const t = sortedTools[toolName]
