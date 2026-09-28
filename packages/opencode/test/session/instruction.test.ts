@@ -1,4 +1,5 @@
 import { describe, expect } from "bun:test"
+import { createHash } from "node:crypto"
 import path from "path"
 import { Effect, FileSystem, Layer, Ref } from "effect"
 import { FetchHttpClient, HttpClient, HttpClientError, HttpClientResponse } from "effect/unstable/http"
@@ -36,13 +37,16 @@ const provideInstruction =
 
 // Variant of instructionLayer that swaps the real HttpClient for a fake that
 // counts remote "fetch()" calls (system() fetches config.instructions URLs).
-const makeFakeHttpLayer = (countRef: Ref.Ref<number>, body: string) =>
+// When a `urlsRef` is supplied it also records the URL each request carried, so
+// tests can assert what actually went over the wire (e.g. a stripped fragment).
+const makeFakeHttpLayer = (countRef: Ref.Ref<number>, body: string, urlsRef?: Ref.Ref<string[]>) =>
   Layer.effect(
     HttpClient.HttpClient,
     Effect.gen(function* () {
       return HttpClient.make((request) =>
         Effect.gen(function* () {
           yield* Ref.update(countRef, (n) => n + 1)
+          if (urlsRef) yield* Ref.update(urlsRef, (urls) => [...urls, request.url])
           return HttpClientResponse.fromWeb(request, new Response(body, { status: 200 }))
         }),
       )
@@ -292,6 +296,172 @@ describe("Instruction.system", () => {
         provideInstance(yield* tmpdirScoped()),
         provideInstructionWithHttp({}, layer, {
           get: () => Effect.succeed({ instructions: [url] }),
+        }),
+      )
+    }),
+  )
+
+  it.live("re-reads local file after max-age expires even when mtime is unchanged", () =>
+    withFiles({ "AGENTS.md": "# Version 1" }, (dir) =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem
+        const nodeFs = yield* Effect.promise(() => import("node:fs/promises"))
+        const svc = yield* Instruction.Service
+        const filepath = path.join(dir, "AGENTS.md")
+
+        const first = yield* svc.system()
+        expect(first).toEqual([`<instructions source="${filepath}">\n# Version 1\n</instructions>`])
+
+        // Rewrite with new content but restore the recorded mtime so the mtime
+        // check alone still considers the entry valid. I2a's bounded max-age
+        // must force a re-read once Date.now is backdated past
+        // FILE_CACHE_MAX_AGE_MS, so the NEW content is served.
+        const original = (yield* Effect.promise(() => nodeFs.stat(filepath))).mtime
+        yield* fs.writeFileString(filepath, "# Version 2")
+        yield* Effect.promise(() => nodeFs.utimes(filepath, original, original))
+
+        const fakeNow = Date.now() + 61_000
+        const now = Date.now
+        Date.now = () => fakeNow
+        const second = yield* svc.system().pipe(Effect.ensuring(Effect.sync(() => (Date.now = now))))
+
+        expect(second).toEqual([`<instructions source="${filepath}">\n# Version 2\n</instructions>`])
+      }),
+    ),
+  )
+
+  it.live("dedupes repeated remote URLs in config.instructions", () =>
+    Effect.gen(function* () {
+      const count = yield* Ref.make(0)
+      const url = "https://example.com/AGENTS.md"
+      const body = "# Remote Instructions"
+      const layer = makeFakeHttpLayer(count, body)
+
+      yield* Effect.gen(function* () {
+        const svc = yield* Instruction.Service
+        const rules = yield* svc.system()
+        // Config-level source dedupe (Set) collapses [url, url] to a single
+        // fetch. Without it, the concurrent forEach both miss the per-URL TTL
+        // cache and issue two requests — the Phase 0 characterization of this gap.
+        expect(yield* Ref.get(count)).toBe(1)
+        expect(rules).toEqual([`<instructions source="${url}">\n${body}\n</instructions>`])
+      }).pipe(
+        provideInstance(yield* tmpdirScoped()),
+        provideInstructionWithHttp({}, layer, {
+          get: () => Effect.succeed({ instructions: [url, url] }),
+        }),
+      )
+    }),
+  )
+
+  it.live("dedupes identical content across local and remote sources", () =>
+    provideTmpdirInstance((dir) =>
+      Effect.gen(function* () {
+        const count = yield* Ref.make(0)
+        const url = "https://example.com/AGENTS.md"
+        const body = "# Shared Instructions"
+        const layer = makeFakeHttpLayer(count, body)
+        yield* write(path.join(dir, "AGENTS.md"), body)
+
+        yield* Effect.gen(function* () {
+          const svc = yield* Instruction.Service
+          const rules = yield* svc.system()
+          // Local content is emitted first and wins; the remote source carrying
+          // the identical body is skipped by the content-level de-dupe.
+          expect(rules).toEqual([
+            `<instructions source="${path.join(dir, "AGENTS.md")}">\n${body}\n</instructions>`,
+          ])
+        }).pipe(
+          provideInstructionWithHttp({ home: dir, config: dir }, layer, {
+            get: () => Effect.succeed({ instructions: [url] }),
+          }),
+        )
+      }),
+    ),
+  )
+
+  it.live("injects a remote instruction whose content matches the declared hash", () =>
+    Effect.gen(function* () {
+      const count = yield* Ref.make(0)
+      const urls = yield* Ref.make<string[]>([])
+      const url = "https://example.com/AGENTS.md"
+      const body = "# Remote Instructions"
+      const entry = `${url}#sha256=${createHash("sha256").update(body).digest("hex")}`
+      const layer = makeFakeHttpLayer(count, body, urls)
+
+      yield* Effect.gen(function* () {
+        const svc = yield* Instruction.Service
+        const rules = yield* svc.system()
+        // The integrity fragment is a local hint: it must never reach the network.
+        expect(yield* Ref.get(urls)).toEqual([url])
+        // Provenance keeps the original configured entry (fragment included).
+        expect(rules).toEqual([`<instructions source="${entry}">\n${body}\n</instructions>`])
+      }).pipe(
+        provideInstance(yield* tmpdirScoped()),
+        provideInstructionWithHttp({}, layer, {
+          get: () => Effect.succeed({ instructions: [entry] }),
+        }),
+      )
+    }),
+  )
+
+  it.live("rejects a remote instruction whose content does not match the declared hash", () =>
+    Effect.gen(function* () {
+      const count = yield* Ref.make(0)
+      const url = "https://example.com/AGENTS.md"
+      const body = "# Remote Instructions"
+      // A syntactically valid (64-hex) hash that cannot match `body`.
+      const entry = `${url}#sha256=${"0".repeat(64)}`
+      const layer = makeFakeHttpLayer(count, body)
+
+      yield* Effect.gen(function* () {
+        const svc = yield* Instruction.Service
+        const first = yield* svc.system()
+        expect(first).toEqual([])
+        const second = yield* svc.system()
+        // Mismatched content must not be cached (fail-closed): the next call goes
+        // back to the network rather than re-serving the tampered body.
+        expect(yield* Ref.get(count)).toBe(2)
+        expect(second).toEqual([])
+      }).pipe(
+        provideInstance(yield* tmpdirScoped()),
+        provideInstructionWithHttp({}, layer, {
+          get: () => Effect.succeed({ instructions: [entry] }),
+        }),
+      )
+    }),
+  )
+
+  it.live("shares one cache entry across fragment and fragmentless forms of the same URL", () =>
+    Effect.gen(function* () {
+      const count = yield* Ref.make(0)
+      const urls = yield* Ref.make<string[]>([])
+      const url = "https://example.com/AGENTS.md"
+      const body = "# Remote Instructions"
+      const withHash = `${url}#sha256=${createHash("sha256").update(body).digest("hex")}`
+      const layer = makeFakeHttpLayer(count, body, urls)
+
+      yield* Effect.gen(function* () {
+        const svc = yield* Instruction.Service
+        const first = yield* svc.system()
+        const fetchedOnFirst = yield* Ref.get(count)
+        const second = yield* svc.system()
+        // Scheduler-independent cache-sharing assertion: a second system() call
+        // must not add fetches, because both configured entries resolved to the
+        // same stripped cache key. (The FIRST call may fetch twice — the
+        // concurrent forEach both miss before either writes — so a `== 1`
+        // assertion on the first call would be racy; this form is not.)
+        expect(yield* Ref.get(count)).toBe(fetchedOnFirst)
+        // Every request that did reach the network carried the stripped URL.
+        expect((yield* Ref.get(urls)).every((u) => u === url)).toBe(true)
+        // Identical content de-dupes to exactly one entry; provenance is the
+        // first configured string, fragment included.
+        expect(second).toEqual([`<instructions source="${withHash}">\n${body}\n</instructions>`])
+        expect(first).toEqual(second)
+      }).pipe(
+        provideInstance(yield* tmpdirScoped()),
+        provideInstructionWithHttp({}, layer, {
+          get: () => Effect.succeed({ instructions: [withHash, url] }),
         }),
       )
     }),

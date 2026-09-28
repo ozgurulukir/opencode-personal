@@ -669,11 +669,140 @@ describe("session.llm.stream", () => {
         expect(body.model).toBe(resolved.api.id)
         expect(body.stream).toBe(true)
         expect((body.reasoning as { effort?: string } | undefined)?.effort).toBe("high")
+        // API-key auth uses messages-mode: the system prompt is not sent as `instructions`.
+        expect(body.instructions).toBe(undefined)
 
         const maxTokens = body.max_output_tokens as number | undefined
         expect(maxTokens).toBe(undefined) // match codex cli behavior
       },
     })
+  })
+
+  test("sends the system prompt via instructions for OpenAI OAuth models", async () => {
+    const server = state.server
+    if (!server) {
+      throw new Error("Server not initialized")
+    }
+
+    const source = await loadFixture("openai", "gpt-5.2")
+    const model = source.model
+
+    const responseChunks = [
+      {
+        type: "response.created",
+        response: {
+          id: "resp-oauth-1",
+          created_at: Math.floor(Date.now() / 1000),
+          model: model.id,
+          service_tier: null,
+        },
+      },
+      {
+        type: "response.output_text.delta",
+        item_id: "item-oauth-1",
+        delta: "Hello",
+        logprobs: null,
+      },
+      {
+        type: "response.completed",
+        response: {
+          incomplete_details: null,
+          usage: {
+            input_tokens: 1,
+            input_tokens_details: null,
+            output_tokens: 1,
+            output_tokens_details: null,
+          },
+          service_tier: null,
+        },
+      },
+    ]
+    const request = waitRequest("/responses", createEventResponse(responseChunks, true))
+
+    await using tmp = await tmpdir({
+      init: async (dir) => {
+        await Bun.write(
+          path.join(dir, "opencode.json"),
+          JSON.stringify({
+            $schema: "https://opencode.ai/config.json",
+            enabled_providers: ["openai"],
+            provider: {
+              openai: {
+                name: "OpenAI",
+                env: ["OPENAI_API_KEY"],
+                npm: "@ai-sdk/openai",
+                api: "https://api.openai.com/v1",
+                models: {
+                  [model.id]: model,
+                },
+                options: {
+                  apiKey: "test-openai-key",
+                  baseURL: `${server.url.origin}/v1`,
+                },
+              },
+            },
+          }),
+        )
+      },
+    })
+
+    // OpenCode resolves OpenAI OAuth auth from this env override on every call
+    // (src/auth/index.ts), so no second Auth layer is needed. `expires` is a
+    // far-future timestamp per repo precedent to avoid tripping a refresh path.
+    const previous = process.env.OPENCODE_AUTH_CONTENT
+    process.env.OPENCODE_AUTH_CONTENT = JSON.stringify({
+      openai: { type: "oauth", refresh: "dummy", access: "dummy", expires: 9999999999999 },
+    })
+
+    try {
+      await WithInstance.provide({
+        directory: tmp.path,
+        fn: async () => {
+          const resolved = await getModel(ProviderID.openai, ModelID.make(model.id))
+          const sessionID = SessionID.make("session-test-oauth")
+          const agent = {
+            name: "test",
+            mode: "primary",
+            prompt: "PREFIX_SENTINEL",
+            options: {},
+            permission: [{ permission: "*", pattern: "*", action: "allow" }],
+          } satisfies Agent.Info
+
+          const user = {
+            id: MessageID.make("msg_user-oauth"),
+            sessionID,
+            role: "user",
+            time: { created: Date.now() },
+            agent: agent.name,
+            model: { providerID: ProviderID.make("openai"), modelID: resolved.id },
+          } satisfies MessageV2.User
+
+          await drain({
+            user,
+            sessionID,
+            model: resolved,
+            agent,
+            system: { prefix: "PREFIX_SENTINEL", suffix: "SUFFIX_SENTINEL" },
+            messages: [{ role: "user", content: "Hello" }],
+            tools: {},
+          })
+
+          const capture = await request
+          const body = capture.body
+
+          expect(capture.url.pathname.endsWith("/responses")).toBe(true)
+          // Instructions-mode (OpenAI OAuth) joins prefix+suffix into `instructions`
+          // instead of emitting a system-role message.
+          expect(body.instructions).toBe("PREFIX_SENTINEL\nSUFFIX_SENTINEL")
+
+          const input = body.input as Array<{ role?: string }> | undefined
+          expect(input?.some((item) => item.role === "system" || item.role === "developer")).not.toBe(true)
+        },
+      })
+    } finally {
+      if (previous === undefined) delete process.env.OPENCODE_AUTH_CONTENT
+      else process.env.OPENCODE_AUTH_CONTENT = previous
+    }
   })
 
   test("accepts user image attachments as data URLs for OpenAI models", async () => {

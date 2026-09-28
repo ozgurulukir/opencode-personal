@@ -96,4 +96,21 @@ describe("SystemPrompt.provider — matchDelta", () => {
     const result = SystemPrompt.provider(modelWith("gpt-4o-beast"))
     expect(result.prefix).toContain("Autonomous mode")
   })
+
+  // Git-safety rules moved to core.txt (I5), so the shared section must appear
+  // in every provider's prefix — including where the delta-local copy was removed.
+  test("unknown-model prefix includes Git safety from core", () => {
+    const result = SystemPrompt.provider(modelWith("unknown-model"))
+    expect(result.prefix).toContain("Git safety")
+  })
+
+  test("gpt prefix includes Git safety from core", () => {
+    const result = SystemPrompt.provider(modelWith("gpt-3.5-turbo"))
+    expect(result.prefix).toContain("Git safety")
+  })
+
+  test("codex prefix includes Git safety from core", () => {
+    const result = SystemPrompt.provider(modelWith("gpt-5.2-codex"))
+    expect(result.prefix).toContain("Git safety")
+  })
 })

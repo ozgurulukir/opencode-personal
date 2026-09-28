@@ -143,11 +143,6 @@ const live: Layer.Layer<
         })
       }
 
-      const systemMessages = ProviderTransform.systemPromptMessages(
-        input.model,
-        [system.prefix, system.suffix].filter((x) => x),
-      )
-
       const variant =
         !input.small && input.model.variants && input.user.model.variant
           ? input.model.variants[input.user.model.variant]
@@ -176,6 +171,14 @@ const live: Layer.Layer<
 
       const isWorkflow = language instanceof GitLabWorkflowLanguageModel
       const messages = input.messages
+
+      // Shape the system prompt into wire-format message contents. Only the
+      // messages-mode consumers below read this, so it is computed here instead
+      // of unconditionally; instructions-mode yields [] (never read downstream).
+      const systemMessages =
+        delivery.type === "messages"
+          ? ProviderTransform.systemPromptMessages(input.model, [system.prefix, system.suffix].filter((x) => x))
+          : []
 
       // Qwen3 chat templates require a single system message at index 0.
       // Inline it into messages when the SDK won't prepend it reliably.

@@ -6,12 +6,6 @@
 - Use Bash for terminal operations (git, builds, tests, running scripts).
 - Run tool calls in parallel when independent; otherwise sequential.
 
-# Git and workspace hygiene
-
-- You may be in a dirty git worktree. NEVER revert existing changes you did not make unless requested.
-- Do not amend commits unless explicitly requested.
-- NEVER use destructive commands like `git reset --hard` or `git checkout --` unless requested or approved.
-
 # Frontend tasks
 
 Avoid collapsing into bland, generic layouts. Aim for interfaces that feel intentional and deliberate.
