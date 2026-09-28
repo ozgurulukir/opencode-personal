@@ -106,3 +106,7 @@ A tool's `Parameters` schema ships to the LLM as a runtime JSON schema — it ne
 ## Task/skill tool descriptions are assembled from two sources
 
 The LLM-visible description = the tool's static description (`task.txt`/`skill.txt` via `Tool.define`) joined with the dynamic catalog built by `describeTask`/`describeSkill` (`tool/registry.ts:374-380`). Changing how a tool is invoked may require updating both the `.txt` file and the registry builder.
+
+## LLM shell tool order + exit semantics
+
+`tool/shell/execute.ts`: `parse(params.command)` runs unconditionally BEFORE the permission `ask` and the spawn (a parser/WASM failure kills every shell call), the spawn block is `.pipe(Effect.orDie)` (~`:396`) so `ENOENT`/bad `cwd` surface as defects rather than clean errors, and a NON-ZERO exit returns normally with the code in `metadata.exit` (empty output collapses to `"(no output)"`) — so a failing command can look like "shell did nothing".

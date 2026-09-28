@@ -101,3 +101,9 @@ Live child sessions are synchronized into `sync.data.session` as soon as the
 `session.created` event arrives. Keep those entries filtered by the active
 directory query and sorted by session id; otherwise a subagent can exist on the
 server but remain absent from Ctrl+X/session-tree navigation until a refresh.
+
+## V2 shell message rendering — silent gaps and failure modes
+
+- **Unhandled V2 message types render NOTHING.** The main session route's message `<Switch>` (`routes/session/index.tsx`, cases around `:1136-1268`) has no fall-through `<Match when={true}>`, so any `sync.data.messages` record lacking a matching case (`shell`, `synthetic`, `switch`) is silently skipped — the feature looks like it "does nothing", with no error. Adding a new V2 message type / `session.next.*` message record REQUIRES adding a renderer case. The source comment at `routes/session/index.tsx:178-182` documents this.
+- **The TUI `!` shell path is not fire-and-forget at the transport level.** Submit (`component/prompt/index.tsx`) → `sdk.client.v2.session.shell(...)` → POST `/api/session/:id/shell` is awaited server-side for the ENTIRE command duration (`SessionPrompt.shell` → `Runner.startShell` awaits the forked fiber). Output arrives as standalone `session.next.shell.started/ended` message records, NOT in the POST response; the client resolves failures via `res.error` and never rejects, so a bare `void` call loses both the output and the failure/busy signal.
+- Debugging: in the session SQLite DB, TUI `!` shell parts are identifiable by a ULID `callID` (e.g. `01M3KW…`) and an `input` WITHOUT `description`; LLM `bash` calls use `call_…` ids and carry `description`.
