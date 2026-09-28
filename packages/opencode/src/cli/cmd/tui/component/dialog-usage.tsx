@@ -206,7 +206,11 @@ export function DialogUsage() {
                                 <span style={{ fg: theme.textMuted }}>{resets}</span>
                               </Show>
                             </text>
-                            <text fg={statusColor}>{renderBar(fraction)}</text>
+                            <text fg={statusColor}>
+                              {limit.amount.unit === "usd" && fraction === undefined && limit.amount.remaining !== undefined
+                                ? `$${limit.amount.remaining.toFixed(2)} left`
+                                : renderBar(fraction)}
+                            </text>
                           </box>
                         )
                       }}

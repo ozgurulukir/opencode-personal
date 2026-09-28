@@ -3,21 +3,24 @@ import { Global } from "@opencode-ai/core/global"
 import type { UsageProvider, UsageReport, UsageCredential } from "./types"
 import { claudeUsageProvider } from "./claude"
 import { zaiUsageProvider } from "./zai"
+import { clineUsageProvider } from "./cline"
 
 export * as UsageTypes from "./types"
 export { claudeUsageProvider } from "./claude"
 export { zaiUsageProvider } from "./zai"
+export { clineUsageProvider } from "./cline"
 export { resolveUsedFraction } from "./types"
 export type { UsageReport, UsageLimit, UsageAmount, UsageWindow, UsageProvider, UsageCredential } from "./types"
 
 /** All registered usage providers. */
-const providers: UsageProvider[] = [claudeUsageProvider, zaiUsageProvider]
+const providers: UsageProvider[] = [claudeUsageProvider, zaiUsageProvider, clineUsageProvider]
 
 /** Maps opencode provider IDs to usage provider IDs. */
 const PROVIDER_ID_MAP: Record<string, string> = {
   anthropic: "anthropic",
   "zai-coding-plan": "zai",
   zai: "zai",
+  "cline-pass": "cline-pass",
 }
 
 /** Auth entry from auth.json. */
