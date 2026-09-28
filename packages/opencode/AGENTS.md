@@ -9,16 +9,21 @@ This file covers package-specific conventions only.
 System prompt uses a **shared core + provider delta** structure:
 
 - `session/prompt/core.txt` — universal identity, tone, task workflow, conventions, code style, system tags, instruction priority (69 lines)
-- `session/prompt/delta-*.txt` — provider-specific additions only (anthropic, beast, codex, default, gemini, gpt, kimi, trinity)
+- `session/prompt/delta-*.txt` — provider-specific additions only (anthropic, beast, codex, default, deepseek, gemini, glm, gpt, kimi, qwen, trinity)
 - `session/system.ts:provider(model)` returns `[PROMPT_CORE, delta]`; `matchDelta(model)` selects the delta by model API ID
 
-**Assembly flow** (`session/llm.ts:102-121`):
+**Assembly flow** (`session/llm.ts:118-149`):
 
-1. `system[0]` = core + delta (cacheable prefix, stable across turns for same model)
-2. `system[1]` = environment + skills (dynamic suffix, session-specific)
-3. Plugin transform hook may add entries; rejoin logic collapses back to 2-part structure if needed
+1. `prefix` = core + delta (cacheable, stable across turns for same model; resolved at `llm.ts:123` from `agent.prompt ?? SystemPrompt.provider(model).prefix`)
+2. `suffix` = environment + skills + structured-output hint + user system (dynamic, session-specific; built in `run-loop.ts:310-321`)
+3. Plugin transform hook may mutate `{system}`; an emptied prefix is restored and a mutated prefix is warned (`llm.ts:133-144`)
 
-**AGENTS.md injection** (`session/prompt.ts:1638-1644`):
+**Known limitations (documented, not bugs to fix here):**
+
+- For `{type:"instructions"}` providers (OpenAI OAuth), `LLM.run` joins prefix+suffix into a single `options.instructions` string (and `workflowModel.systemPrompt` for DWS workflow models), so the cacheable prefix boundary is lost on those paths.
+- `input.agent.prompt` (`llm.ts:123`) overrides the core+delta prefix entirely — it bypasses provider delta tuning and the cacheable prefix.
+
+**AGENTS.md injection** (`session/loop/run-loop.ts:303-334`):
 
 - `instruction.system()` resolves project/global AGENTS.md/CLAUDE.md and configured local paths on every `runLoop` iteration; local file contents use an mtime-based cache and configured remote URLs use a 60-second cache
 - Content is wrapped in `<instructions source="path">` tags and prepended as a **user message** (not system prompt)
@@ -377,7 +382,7 @@ behavior is under test.
 
 - `Plugin.defaultLayer` includes `Config.defaultLayer` (real filesystem config) and triggers `import("../server/server")` inside the layer init closure (`plugin/index.ts:123`). Tests using `Plugin.defaultLayer` directly (`trigger.test.ts`, `workspace-adapter.test.ts`) time out because the server import block is too heavy for test context. Fix: use `TestConfig.layer()` mock + `Plugin.layer` (not `defaultLayer`) in tests that need Plugin service — see `auth-override.test.ts` and `loader-shared.test.ts` for the working pattern.
 - Testing modules that read `Log.file()` (or any singleton with module-level state): do NOT mutate `Global.Path.log` + `Log.init({...})` per test. The module-level `logpath` and `createWriteStream` race across parallel tests and leave dangling stream handles pointing at cleaned-up tmp dirs. Use `mock.module("@opencode-ai/core/util/log", () => ({...Log, file: () => logFile}))` to override the specific function per test, paired with `mock.restore()` in `afterEach`. See `test/cli/cmd/tui/stderr-capture.test.ts` for the pattern.
-- `Skill.fmt()` sorting conflict: `skill.fmt` test expects stable input order without re-sorting (`test/skill/skill.test.ts`), but system prompt (`session/system.ts`) expects alphabetically sorted output. Reverting `toSorted()` removal preserves test behavior but creates inconsistency with system prompt expectations. Resolution pending: either update system prompt to not sort, or update test to expect sorted output.
+- `Skill.fmt()` sorting contract (resolved): `fmt()` preserves input order by design (locked by `test/skill/skill.test.ts` "preserves input order without re-sorting"); sorting lives in `Skill.available()` (`skill/index.ts:578`, `.toSorted` by name). `test/session/system.test.ts` stubs `available()` with the real contract (filter warnings + sort), so the system-prompt output is sorted without `fmt()` re-sorting. The old "resolution pending" conflict is closed.
 - `ModelsDev.Service.get()` check order: `OPENCODE_DISABLE_MODELS_FETCH` must be evaluated BEFORE `loadSnapshot` (`src/provider/models.ts`). The previous ordering loaded the snapshot first, causing unnecessary I/O and test failures when fetch was disabled.
  - Permission `reply("reject")` cancellation test race condition: The test `reply - reject cancels all pending for same session` (`test/permission/next.test.ts`) fails with "timed out waiting for 2 pending permission request(s)" because `waitForPending(2)` runs before the second permission request registers. The cancellation logic itself works correctly. Fix: insert `yield* Effect.yieldNow` before `waitForPending(2)` to allow the second `ask` to register.
  - `it.live` tests in `test/tool/skill.test.ts` flake at the 5s timeout in full-suite/parallel runs — the first test pays warm-up (registry init + ripgrep spawn). They pass in isolation (`bun test test/tool/skill.test.ts -t "<name>"`). Run test files in separate `bun test` invocations to reduce parallel load.

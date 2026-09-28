@@ -10,7 +10,7 @@ When removing `withStatics` from a `Schema.Struct` that still needs `.zod`, you 
 
 ## `system.ts:matchDelta` — order-dependent regex matching
 
-Delta selection uses anchored regex in a fixed order: `gpt-4`/`o1`/`o3` → beast, then `codex` → codex, then `gpt` → gpt, then `gemini-`, `claude`, `trinity`, `kimi`. Codex MUST be checked before generic gpt (otherwise "gpt-5.2-codex" matches gpt). The `(?:^|\/)` anchor lets "openai/gpt-4o" match. Tests in `test/session/match-delta.test.ts` lock this behavior.
+Delta selection uses anchored regex in a fixed order: `gpt-4`/`o1`/`o3` → beast, then `codex` → codex, then `gpt` → gpt, then `gemini-`, `claude`, `trinity`, `kimi`, `qwen`, `glm`, `deepseek` (default otherwise). Codex MUST be checked before generic gpt (otherwise "gpt-5.2-codex" matches gpt). The `(?:^|\/)` anchor lets "openai/gpt-4o" match. Tests in `test/session/match-delta.test.ts` lock this behavior.
 
 ## Two-phase system prompt prefix assembly
 
@@ -18,7 +18,7 @@ Delta selection uses anchored regex in a fixed order: `gpt-4`/`o1`/`o3` → beas
 
 ## `system.ts:skills()` — auto-match via semantic search
 
-`SystemPrompt.skills()` now accepts optional `userMessage` and `autoMatchOpts` parameters. When `skills.autoMatch` is enabled in config, `prompt.ts:runLoop` reads the config, extracts the last user message text, and passes both to `skills()`. The method then calls `skill.matchBySemantics()` instead of `skill.available()`, returning only the top-N matching skills. The config is read at the call site (`prompt.ts`), not inside `skills()`, to keep the `Interface` methods' Effect `R = never` (avoiding `Config.Service` requirement on the interface).
+`SystemPrompt.skills()` now accepts optional `userMessage` and `autoMatchOpts` parameters. When `skills.autoMatch` is enabled in config, `run-loop.ts:runLoop` reads the config, extracts the last user message text, and passes both to `skills()`. The method then calls `skill.matchBySemantics()` instead of `skill.available()`, returning only the top-N matching skills. The config is read at the call site (`run-loop.ts:293-301`), not inside `skills()`, to keep the `Interface` methods' Effect `R = never` (avoiding `Config.Service` requirement on the interface).
 
 ## `merge-options.ts` — hot LLM path, cast is intentional
 
@@ -145,7 +145,7 @@ When filtering parts with `p is CompactionPart | SubtaskPart`, both types must b
 
 ## Pre-existing flaky tests in this module
 
-- `session.system > skills output is sorted by name and stable across calls` — fails intermittently (Expected: >489, Received: 188)
+- `session.system > skills output is sorted by name and stable across calls` — was failing deterministically (Expected: > 495, Received: 188): the test stub returned an unsorted list including an invalid skill while asserting the real `available()` contract. Fixed in the test (stub now emulates `available()`: filter warnings + sort). Not order-dependent.
 - Permission tests have pre-existing `ScopedCache` state leakage between `withDir` tests — `disposeAllInstances()` invalidates async, so "always" replies leak into subsequent tests. 2 flaky tests remain.
 
 ## Subagent tool metadata and out-of-order sync events

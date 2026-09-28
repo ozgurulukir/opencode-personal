@@ -184,7 +184,10 @@ export const layer: Layer.Layer<
         Effect.timeout(5000),
         Effect.catch(() => Effect.succeed(null)),
       )
-      if (!res) return ""
+      if (!res) {
+        log.warn("remote instruction fetch failed", { url })
+        return ""
+      }
 
       class OversizedRemoteInstruction extends Error {
         constructor(readonly size: number) {
@@ -211,6 +214,8 @@ export const layer: Layer.Layer<
                 limit: MAX_INSTRUCTION_BYTES,
               })
             }
+          } else {
+            log.warn("remote instruction stream failed", { url, error: String(error) })
           }
           return Effect.succeed(null)
         }),
@@ -229,6 +234,7 @@ export const layer: Layer.Layer<
       const content = new TextDecoder().decode(bytes)
       if (!content) {
         s.remote.delete(url)
+        log.warn("remote instruction returned empty content", { url })
         return ""
       }
       s.remote.delete(url)
