@@ -30,6 +30,7 @@ import type {
   SessionMessageAssistant,
   SessionMessageAssistantTool,
   SessionMessageCompaction,
+  SessionMessageShell,
   SessionMessageUser,
   ToolPart,
   TextPart,
@@ -177,9 +178,9 @@ export function Session() {
   })
   // V2 message slice, reversed to oldest-first so the findLast/scan logic and
   // the rendering order keep their V1 semantics. The slice also holds
-  // shell/synthetic/compaction/switch records the V1 slice never had — the
-  // rendering loop skips them (compaction renders as a divider with its
-  // streaming summary).
+  // shell/synthetic/compaction/switch records the V1 slice never had; shell
+  // records render as a `# Shell` block and compaction renders as a divider
+  // with its streaming summary.
   const messages = createMemo(() => (sync.data.messages[route.sessionID] ?? []).toReversed())
   // Every session in the viewed session's subtree (itself + all descendants through
   // the parentID chain, any depth). Powers recursive aggregation of pending asks.
@@ -1241,6 +1242,9 @@ export function Session() {
                           )
                         })()}
                       </Match>
+                      <Match when={message.type === "shell"}>
+                        <ShellMessage message={message as SessionMessageShell} />
+                      </Match>
                       <Match when={message.type === "user"}>
                         <UserMessage
                           index={index()}
@@ -1867,6 +1871,35 @@ function BlockTool(props: {
         <text fg={theme.error}>{error()}</text>
       </Show>
     </box>
+  )
+}
+
+function ShellMessage(props: { message: SessionMessageShell }) {
+  const { theme } = useTheme()
+  const output = createMemo(() => stripAnsi(props.message.output.trim()))
+  const [expanded, setExpanded] = createSignal(false)
+  const lines = createMemo(() => output().split("\n"))
+  const overflow = createMemo(() => lines().length > 10)
+  const limited = createMemo(() => {
+    if (expanded() || !overflow()) return output()
+    return [...lines().slice(0, 10), "…"].join("\n")
+  })
+  return (
+    <BlockTool
+      title="# Shell"
+      spinner={!props.message.time.completed}
+      onClick={overflow() ? () => setExpanded((prev) => !prev) : undefined}
+    >
+      <box gap={1}>
+        <text fg={theme.text}>$ {props.message.command}</text>
+        <Show when={output()}>
+          <text fg={theme.text}>{limited()}</text>
+        </Show>
+        <Show when={overflow()}>
+          <text fg={theme.textMuted}>{expanded() ? "Click to collapse" : "Click to expand"}</text>
+        </Show>
+      </box>
+    </BlockTool>
   )
 }
 

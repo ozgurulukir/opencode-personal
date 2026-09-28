@@ -12,6 +12,7 @@ import type { CommandContext } from "@opentui/keymap"
 import { createEffect, createMemo, onMount, createSignal, onCleanup, on, Show, Switch, Match } from "solid-js"
 import path from "path"
 import { fileURLToPath } from "url"
+import { errorMessage } from "@/util/error"
 import { Filesystem } from "@/util/filesystem"
 import { useLocal } from "@tui/context/local"
 import { tint, useTheme } from "@tui/context/theme"
@@ -1248,15 +1249,25 @@ export function Prompt(props: PromptProps) {
         : []
 
     if (store.mode === "shell") {
-      void sdk.client.v2.session.shell({
-        sessionID,
-        agent: agent.name,
-        model: {
-          providerID: selectedModel.providerID,
-          modelID: selectedModel.modelID,
-        },
-        command: inputText,
-      })
+      void sdk.client.v2.session
+        .shell({
+          sessionID,
+          agent: agent.name,
+          model: {
+            providerID: selectedModel.providerID,
+            modelID: selectedModel.modelID,
+          },
+          command: inputText,
+        })
+        .then((res) => {
+          if (!res.error) return
+          Log.Default.error("Shell command failed:", { error: res.error })
+          toast.show({
+            title: "Shell command failed",
+            message: errorMessage(res.error),
+            variant: "error",
+          })
+        })
       setStore("mode", "normal")
     } else if (
       inputText.startsWith("/") &&
