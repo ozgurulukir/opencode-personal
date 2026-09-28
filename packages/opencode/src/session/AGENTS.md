@@ -164,3 +164,8 @@ When filtering parts with `p is CompactionPart | SubtaskPart`, both types must b
   pending progress makes the subagent appear non-navigable and loses metadata.
 - Thread the shared `sync` service through `SessionPrompt` → `runLoop` → tool
   resolution/subtask execution so V1 and V2 emit the same lifecycle events.
+
+## shellImpl is uninterruptible before the spawn, and is forked via the runner
+
+- `session/loop/shell.ts` (`shellImpl`) wraps its whole body in `Effect.uninterruptibleMask`; only the `restore(...)` execution block (~`:174`) is interruptible. `SessionEvent.Shell.Started.Sync` is emitted at ~`:134` AFTER `plugin.trigger("shell.env")` (~`:119`) and `createClientTerminal` (~`:124`) — so a block/failure there yields NO `shell.started` event, NO output, and NO visible error, and cannot be aborted. `Plugin.trigger` awaits hooks with no timeout (`plugin/index.ts`), so a hanging `shell.env` hook hangs every shell uninterruptibly.
+- `SessionPrompt.shell` → `SessionRunState.startShell` → `Runner.startShell` (`effect/runner.ts:140-174`): when the runner is not `Idle` it throws `Session.BusyError` (rejected, not queued); otherwise the work is forked via `Effect.forkChild` and the caller awaits the fiber, so the HTTP shell request stays open for the whole command.

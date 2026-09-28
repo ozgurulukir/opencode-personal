@@ -364,4 +364,8 @@ This project is indexed by GitNexus as **opencode-personal** (60209 symbols, 168
 | Tools, resources, schema reference | `.claude/skills/gitnexus-guide/SKILL.md` |
 | Index, status, clean, wiki CLI commands | `.claude/skills/gitnexus-cli/SKILL.md` |
 
+## Notes
+
+- ripgrep's `-r` flag is `--replace`, NOT "recursive": `rg -rn "<pattern>" <path>` silently rewrites every match in the OUTPUT to the replacement (`n`) while lines/line-numbers still print — the output looks like corrupted file content and is easy to misread as what the file says. Use `rg -n` for line numbers; ripgrep already searches recursively.
+
 <!-- gitnexus:end -->
