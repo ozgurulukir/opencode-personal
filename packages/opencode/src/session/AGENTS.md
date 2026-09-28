@@ -61,7 +61,7 @@ Normal tools merge `agent.permission + session.permission`. But subagent task's 
 
 ## `instruction.ts` fileCache uses bounded LRU eviction
 
-`session/instruction.ts:108-160` — the `fileCache` Map caches AGENTS.md/CLAUDE.md file contents by path. It evicts the least recently used entry after 100 entries and re-inserts cache hits to maintain recency ordering. The cache is per-instance, not per-session, so it survives across session switches within the same project.
+`session/instruction.ts:124-183` — the `fileCache` Map caches AGENTS.md/CLAUDE.md file contents by path. It evicts the least recently used entry after 100 entries and re-inserts cache hits to maintain recency ordering; a cached entry also expires after `FILE_CACHE_MAX_AGE_MS` (60 s, declared at `:131`) even when mtime is unchanged (`readCached` check at `:169`). The cache is per-instance, not per-session, so it survives across session switches within the same project.
 
 ## Remote instruction integrity (`#sha256=` fragment)
 
@@ -99,7 +99,7 @@ When filtering parts with `p is CompactionPart | SubtaskPart`, both types must b
 
 ### `compaction_continue` metadata guard scope
 
-`session/loop/run-loop.ts:171-182` — the double-compaction guard scopes only to the active user turn (`isCurrentTurnContinue`), checking if `lastUser` contains `compaction_continue` metadata rather than searching all messages in history. This prevents immediate re-compaction loops after an auto-compaction continue turn while ensuring future auto-compactions in the same session are not blocked once new user interactions occur.
+`session/loop/run-loop.ts:187-207` — the double-compaction guard scopes only to the active user turn (`isCurrentTurnContinue`), checking if `lastUser` contains `compaction_continue` metadata rather than searching all messages in history. This prevents immediate re-compaction loops after an auto-compaction continue turn while ensuring future auto-compactions in the same session are not blocked once new user interactions occur.
 
 ### `processCompaction` history computation is order-dependent
 

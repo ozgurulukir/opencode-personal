@@ -136,11 +136,7 @@ const live: Layer.Layer<
       if (!system.prefix || system.prefix.trim().length === 0) {
         system = { prefix, suffix: system.suffix }
       } else if (system.prefix !== prefix) {
-        l.warn("plugin mutated system prompt prefix", {
-          sessionID: input.sessionID,
-          providerID: input.model.providerID,
-          modelID: input.model.id,
-        })
+        l.warn("plugin mutated system prompt prefix")
       }
 
       const variant =

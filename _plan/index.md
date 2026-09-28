@@ -51,6 +51,9 @@
 | [continue-dummy-sessionid-regression-test](./continue-dummy-sessionid-regression-test-2026-09-24.md) | 2026-09-24 | Regression guard for `opencode -c` dummy sessionID fix | ✅ EXECUTED | `5e2bf46` |
 | [remove-unused-deps](./remove-unused-deps-2026-09-25.md) | 2026-09-25 | Unused-dependency removal across 6 manifests (7 batches) | ✅ EXECUTED | 7 manifests + bun.lock; zero source changes |
 | [ai-sdk-upgrades](./ai-sdk-upgrades-2026-09-26.md) | 2026-09-26 | AI SDK same-major upgrades (22 pins, 2 manifests) | ⬜ PENDING | Version-bumps-only; edits applied 2026-09-26, not committed |
+| [prompt-audit-remaining](./prompt-audit-remaining-2026-09-28.md) | 2026-09-28 | Prompt-audit remaining items (doc drift + Group B decision) | ⬜ PENDING | Group A doc/whitespace fixes; Group B (I4 config-object variant) deferred |
+| [prompt-system-fixes](./prompt-system-fixes-2026-09-28.md) | 2026-09-28 | Prompt-system defect/doc-drift fixes | ✅ EXECUTED | `f15bac7` |
+| [prompt-pipeline-improvements](./prompt-pipeline-improvements-2026-09-28.md) | 2026-09-28 | Prompt pipeline improvements I1–I5 | ✅ EXECUTED | `3465e43` |
 
 ## Series: v1-v2-synthesis
 
@@ -78,7 +81,7 @@ Order: 1+2 → 3 → 4 → 5. Phase 5 supersedes the temporary event-bridge and 
 
 - [chat-ordering-step1](./chat-ordering-step1-2026-09-23.md) — executed Step 1 execution plan (id-only ordering, V1+V2; landed in `3ac0678`)
 
-The 26 executed non-finalized plans (29 ✅ rows in the table including the 3 finalized, 2 🟡 PARTIAL, 3 ⬜ PENDING) — see the table above; each plan file cites its own landing commits and current `file:line` anchors.
+The 29 executed non-finalized plans (32 ✅ rows in the table including the 3 finalized, 2 🟡 PARTIAL, 4 ⬜ PENDING) — see the table above; each plan file cites its own landing commits and current `file:line` anchors.
 
 ### Superseded / Unverified
 
