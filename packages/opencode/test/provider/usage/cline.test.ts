@@ -48,6 +48,20 @@ describe("parseCurrentUser", () => {
     expect(parseCurrentUser({ id: "user_1", name: "User" })).toEqual({ id: "user_1" })
   })
 
+  test("unwraps the live { data, success } envelope captured from api.cline.bot", () => {
+    expect(
+      parseCurrentUser({
+        data: {
+          id: "usr-01KBDY3A27G7J6AN85Y1ZVHE51",
+          email: "user@example.com",
+          displayName: "Ozgur",
+          organizations: [],
+        },
+        success: true,
+      }),
+    ).toEqual({ id: "usr-01KBDY3A27G7J6AN85Y1ZVHE51", email: "user@example.com" })
+  })
+
   test("returns null when the id is missing", () => {
     expect(parseCurrentUser({ email: "user@example.com", active_account_id: "acct_1" })).toBeNull()
   })
@@ -108,6 +122,51 @@ describe("clineUsageProvider.fetchUsage degradation", () => {
 
   test("returns null when the balance payload is not an object", async () => {
     stubFetch((url) => (url.endsWith("/api/v1/users/me") ? jsonResponse({ id: "user_1" }) : jsonResponse(null)))
+    expect(await clineUsageProvider.fetchUsage(apiKeyCredential)).toBeNull()
+  })
+})
+
+describe("clineUsageProvider.fetchUsage with captured live shapes", () => {
+  // Fixtures pinned to real 200 responses captured from api.cline.bot on
+  // 2026-09-28 (both wrapped in a { data, success } envelope the docs omit).
+  test("maps the captured balance envelope to a USD limit with email metadata", async () => {
+    stubFetch((url) =>
+      url.endsWith("/api/v1/users/me")
+        ? jsonResponse({
+            data: { id: "usr-01KBDY3A27G7J6AN85Y1ZVHE51", email: "user@example.com", organizations: [] },
+            success: true,
+          })
+        : jsonResponse({ data: { userId: "usr-01KBDY3A27G7J6AN85Y1ZVHE51", balance: 8442 }, success: true }),
+    )
+
+    const report = await clineUsageProvider.fetchUsage(apiKeyCredential)
+
+    expect(report).not.toBeNull()
+    expect(report!.provider).toBe("cline-pass")
+    expect(report!.limits).toHaveLength(1)
+    expect(report!.limits[0].id).toBe("cline-pass:balance")
+    expect(report!.limits[0].label).toBe("ClinePass Balance")
+    expect(report!.limits[0].amount.unit).toBe("usd")
+    expect(report!.limits[0].amount.remaining).toBe(84.42)
+    expect(report!.limits[0].amount.usedFraction).toBeUndefined()
+    expect(report!.metadata?.email).toBe("user@example.com")
+  })
+
+  test("returns null when the balance envelope is missing the data wrapper", async () => {
+    stubFetch((url) =>
+      url.endsWith("/api/v1/users/me")
+        ? jsonResponse({ data: { id: "user_1" }, success: true })
+        : jsonResponse({ balance: 8442, success: true }),
+    )
+    expect(await clineUsageProvider.fetchUsage(apiKeyCredential)).toBeNull()
+  })
+
+  test("returns null when the balance value is not a finite number", async () => {
+    stubFetch((url) =>
+      url.endsWith("/api/v1/users/me")
+        ? jsonResponse({ data: { id: "user_1" }, success: true })
+        : jsonResponse({ data: { userId: "user_1", balance: "8442" }, success: true }),
+    )
     expect(await clineUsageProvider.fetchUsage(apiKeyCredential)).toBeNull()
   })
 })
