@@ -14,49 +14,56 @@ interface CurrentUser {
 }
 
 /**
- * Parses the documented `GET /api/v1/users/me` payload
- * (`{ id, email?, name?, active_account_id? }`). Returns `null` for
- * non-object payloads or a missing/empty `id`, since the id is required to
- * address the subsequent balance call.
+ * Parses the `GET /api/v1/users/me` payload. The live API wraps the profile in
+ * an envelope (`{ data: { id, email, ... }, success: true }`, captured
+ * 2026-09-28) even though the published docs show a flat
+ * `{ id, email, name, active_account_id }` — both shapes are accepted. Returns
+ * `null` for non-object payloads or a missing/empty `id`, since the id is
+ * required to address the subsequent balance call.
  */
 export function parseCurrentUser(raw: unknown): CurrentUser | null {
   if (!raw || typeof raw !== "object") return null
   const record = raw as Record<string, unknown>
-  const id = typeof record.id === "string" ? record.id : undefined
+  const profile = record.data && typeof record.data === "object" ? (record.data as Record<string, unknown>) : record
+  const id = typeof profile.id === "string" ? profile.id : undefined
   if (!id) return null
   return {
     id,
-    ...(typeof record.email === "string" ? { email: record.email } : {}),
-    ...(typeof record.active_account_id === "string" ? { accountId: record.active_account_id } : {}),
+    ...(typeof profile.email === "string" ? { email: profile.email } : {}),
+    ...(typeof profile.active_account_id === "string" ? { accountId: profile.active_account_id } : {}),
   }
 }
 
 /**
- * Maps the `/api/v1/users/{id}/balance` payload to a `UsageLimit`.
- *
- * The Cline docs do not publish a response schema for this endpoint, so this
- * stub accepts `null`/non-object payloads and returns `null` rather than
- * inventing field names. Once a real 200 response is captured, map it to
- * `{ id: "cline-pass:balance", label: "ClinePass Balance",
- *    scope: { provider: "cline-pass" }, amount: { remaining, unit: "usd" } }`
- * — a prepaid balance has no denominator or reset window, so `usedFraction`
- * stays `undefined`.
+ * Maps the captured `GET /api/v1/users/{id}/balance` payload
+ * (`{ data: { userId, balance }, success: true }`, observed 2026-09-28) to a
+ * `UsageLimit`. `balance` is an integer credit count; Cline credits price at
+ * $0.01 (inferred — the docs publish no unit), so it renders as
+ * `$<balance>/100 left`. A prepaid balance has no denominator or reset
+ * window, so `usedFraction` stays `undefined`.
  */
 function parseBalanceLimit(payload: unknown): UsageLimit | null {
   if (!payload || typeof payload !== "object") return null
-  return null
+  const record = payload as Record<string, unknown>
+  if (!record.data || typeof record.data !== "object") return null
+  const balance = (record.data as Record<string, unknown>).balance
+  if (typeof balance !== "number" || !Number.isFinite(balance)) return null
+  return {
+    id: "cline-pass:balance",
+    label: "ClinePass Balance",
+    scope: { provider: "cline-pass" },
+    amount: { remaining: balance / 100, unit: "usd" },
+  }
 }
 
 /**
  * Fetches the ClinePass credit balance as a two-call chain: resolve the user
- * id via `GET /users/me` (documented), then read `GET /users/{id}/balance`.
- *
- * The balance→`UsageLimit` mapping is intentionally gated: the endpoint's
- * response shape is undocumented, so `parseBalanceLimit` is inert until a real
- * response is captured. With no mapped limit the `limits` array is empty and
- * the whole call returns `null`, so the `/usage` dialog simply omits the
- * ClinePass section (graceful degradation). The documented `users/me`
- * resolution ships fully implemented and unit-tested via `parseCurrentUser`.
+ * id via `GET /users/me`, then read `GET /users/{id}/balance`. The live API
+ * wraps both payloads in a `{ data, success }` envelope the docs omit; the
+ * `users/me` parser also accepts the documented flat profile shape. Returns
+ * `null` on any failure (non-OK response, unparseable payload, empty limits)
+ * so the `/usage` dialog simply omits the ClinePass section — graceful
+ * degradation, never a broken dialog.
  */
 async function fetchClineUsage(credential: UsageCredential): Promise<UsageReport | null> {
   if (!credential.apiKey) return null
