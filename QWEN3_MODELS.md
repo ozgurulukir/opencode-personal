@@ -310,7 +310,7 @@ From the user's perspective, dense and MoE Qwen3 models have the **same API requ
    - Model ID
    - Provider ID
    - API ID
-2. Check that `allowSystemInMessages: true` is set (this is in `llm.ts:414`)
+2. Check that `allowSystemInMessages: true` is set (this is in `llm.ts:427`)
 
 ### Q: Context is lost after reasoning turns
 
