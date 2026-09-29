@@ -277,6 +277,18 @@ Unshare current session. [Learn more](/docs/share#un-sharing).
 
 ---
 
+### usage
+
+Show provider usage and quota information alongside a breakdown of the current session's cost, tokens, models, and tool calls.
+
+Provider limits are shown for Anthropic (Claude), ZAI, and ClinePass accounts when credentials are configured — for example Claude's 5-hour and 7-day windows, ZAI's token and request quotas, or ClinePass's 5-hour/weekly/monthly limits and pay-as-you-go credit balance.
+
+```bash frame="none"
+/usage
+```
+
+---
+
 ## Editor setup
 
 Both the `/editor` and `/export` commands use the editor specified in your `EDITOR` environment variable.
