@@ -1,0 +1,111 @@
+name: release-binaries
+
+on:
+  push:
+    tags:
+      # Fork-version convention only (-p.N suffix). Mirrored upstream tags
+      # (plain semver, e.g. v1.14.48) do NOT match this pattern, so a tag
+      # sync from upstream can never mint a fork release.
+      - "v*-p.*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release, e.g. 1.14.48-p.1 (fork convention: semver + -p.N suffix; tag v<version> is created if missing)"
+        required: true
+        type: string
+
+concurrency:
+  group: release-binaries-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  isolation-test:
+    # Hermetic non-interference checks for the fork installers (no network, no build).
+    if: github.repository == 'ozgurulukir/opencode-personal'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Bash installer syntax check
+        run: bash -n install.sh
+      - name: Bash installer non-interference test
+        run: bash script/verify-isolation.sh
+
+  isolation-test-windows:
+    if: github.repository == 'ozgurulukir/opencode-personal'
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: PowerShell installer non-interference test
+        shell: pwsh
+        run: ./script/verify-isolation.ps1
+
+  release:
+    if: github.repository == 'ozgurulukir/opencode-personal'
+    needs: [isolation-test, isolation-test-windows]
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      GH_REPO: ${{ github.repository }}
+      OPENCODE_CHANNEL: personal
+      OPENCODE_RELEASE: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-bun
+
+      - name: Setup Rust (wasm32 target for diff-wasm)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Install wasm-pack
+        run: curl -sSf https://rustwasm.github.io/wasm-pack/installer/init.sh | sh
+
+      - name: "Resolve version (fork convention: semver + required -p.N suffix)"
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            v="${{ inputs.version }}"
+          else
+            v="${GITHUB_REF_NAME#v}"
+          fi
+          v="${v#v}"
+          # Second line of defense against mirrored upstream tags: even if a
+          # plain-semver tag ever reached this workflow, it fails here before
+          # any release is created.
+          if ! grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+-p\.[0-9]+$' <<<"$v"; then
+            echo "::error::Invalid version '$v' - fork releases must be semver with a -p.N suffix (e.g. 1.14.48-p.1)"
+            exit 1
+          fi
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+
+      - name: Create draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="v${{ steps.version.outputs.version }}"
+          if gh release view "$tag" --repo "$GH_REPO" >/dev/null 2>&1; then
+            echo "Release $tag already exists - reusing it (assets upload with --clobber)"
+          else
+            gh release create "$tag" --draft --target "$GITHUB_SHA" \
+              --title "$tag" \
+              --notes "Prebuilt binaries for the opencode-personal fork ($tag). Installs as the command opencode-personal - safe alongside an existing upstream opencode. See the README for install instructions." \
+              --repo "$GH_REPO"
+          fi
+
+      - name: Build all targets and upload release assets
+        working-directory: packages/opencode
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OPENCODE_VERSION: ${{ steps.version.outputs.version }}
+        run: bun run build
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release edit "v${{ steps.version.outputs.version }}" --draft=false --latest --repo "$GH_REPO"
