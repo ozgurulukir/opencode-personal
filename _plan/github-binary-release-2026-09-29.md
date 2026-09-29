@@ -3,6 +3,8 @@
 Date: 2026-09-29 (rev 2 — in-place revision after review rejection; same-day)
 Scope: user-approved option **A** — release workflow + installer scripts + README/docs update. No upstream workflow changes. **No app source-code change** (installer-only isolation).
 
+> **Superseded 2026-09-29:** the fork version scheme is now CalVer `YYYY.M.D` (tag `v<version>`), not semver + `-p.N`. See `_plan/calver-versioning-2026-09-29.md`. The `-p.N` convention below (D1, examples, verification steps) is historical.
+
 ## Revision summary
 
 **Rev 1 (coexistence rework):** channel `latest` → `personal`; command `opencode` → `opencode-personal` in `~/.opencode-personal/bin`; asset names keep upstream `opencode-<target>.*` (installer-side rename); non-interference installers; hermetic isolation tests; README/docs updates.
