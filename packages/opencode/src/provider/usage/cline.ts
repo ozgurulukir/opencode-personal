@@ -19,16 +19,13 @@ const LIMIT_TYPE_META: Record<string, { label: string; order: number }> = {
 }
 
 // The live `balance` value is stored in micro-USD (1 unit = $0.000001 — Cline's own
-// client calls the unit "microcredits"). Two readings of the same integer are possible,
-// and they differ by 10,000x:
-//   - cents:      balance / 100       → 8442 / 100       = $84.42       (previously shipped)
-//   - micro-USD:  balance / 1_000_000 → 8442 / 1_000_000 = $0.008442    (three client sources)
-// Client-source evidence for micro-USD:
+// client calls the unit "microcredits"): balance / 1_000_000 → 8442 = $0.008442.
+// RESOLVED against app.cline.bot's dashboard "Credits Balance" card (≈$0.01), so the
+// micro-USD reading is verified and the competing `balance / 100` (cents → $84.42)
+// hypothesis is FALSIFIED. Client-source evidence for micro-USD:
 //   - apps/cline-hub/src/webview/src/components/views/settings/account-view.tsx:341-346 (`value / 1_000_000`)
 //   - apps/vscode/webview-ui/src/utils/format.ts:39-41 (`microcredits / 10000` → credits; 1 credit = $0.01)
 //   - apps/vscode/webview-ui/src/components/chat/CreditLimitError.tsx:52 ("stored in microcredits")
-// The app.cline.bot dashboard "Credits Balance" card is the ground truth and the arbiter;
-// flipping this single constant is the entire correction.
 const BALANCE_UNITS_PER_USD = 1_000_000
 
 const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
@@ -137,7 +134,7 @@ export function parsePlanUsageLimits(raw: unknown): PlanUsageLimit[] {
     .flatMap((item: unknown): PlanUsageLimit[] => {
       if (!isRecord(item)) return []
       const type = typeof item.type === "string" ? item.type : undefined
-      if (!type || !(type in LIMIT_TYPE_META)) return []
+      if (!type || !Object.hasOwn(LIMIT_TYPE_META, type)) return []
       const percentUsed =
         typeof item.percentUsed === "number" && Number.isFinite(item.percentUsed)
           ? Math.min(100, Math.max(0, item.percentUsed))
