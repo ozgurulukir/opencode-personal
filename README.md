@@ -15,6 +15,24 @@ This fork keeps the core OpenCode experience while carrying changes maintained i
 
 See the [fork documentation](https://ozgurulukir.github.io/opencode-personal/) for usage, configuration, providers, and integrations. The generated [config schema](https://ozgurulukir.github.io/opencode-personal/config.json) and [TUI config schema](https://ozgurulukir.github.io/opencode-personal/tui.json) are also published there.
 
+## What this fork adds
+
+This fork is built on top of the OpenCode 1.14.48 source release. Notable changes maintained in this repository:
+
+- Provider usage & quotas in `/usage` — Anthropic (Claude), ZAI, and ClinePass (5-hour/weekly/monthly limits, credit balance, and plan info).
+- Unified V1/V2 session architecture with a single V2 SDK surface.
+- Local semantic workspace search (zvec) with automatic skill matching.
+- A Rust/WASM diff engine (`packages/diff-wasm`).
+- ACP (Agent Client Protocol) terminal backend support (e.g. Zed).
+- TUI enhancements: ghost-text next-prompt suggestions, shell `!` output rendering, and a unified spinner.
+- Permission system hardening: MCP tool keys, deny-first evaluation, persisted "always allow", and subagent parity.
+- Security hardening: SSRF protection in the webfetch tool, strict CORS origin validation, command-injection and path-traversal fixes, read-tool symlink-escape prevention, TUI log-leak prevention, and cryptographically strong dialog IDs.
+- Prompt/session engine refactors: decomposed `prompt.ts` (2146 → 374 lines) and split provider message transforms.
+- Auto-compaction improvements: `context_limit` config, summary budget, and metadata preservation.
+- Performance work: event-loop starvation fixes, O(1) session summarize, batched DB writes, and embedded-UI caching.
+- Monorepo pruning & build/CI hardening: removed unused packages, a personal-fork typecheck workflow, and a hardened dependency-update checker.
+- Tooling: multi-skill loading, strict skill validation, and hunk-diff integration with todo autoclose.
+
 ## Get started from source
 
 This personal fork does not publish its own prebuilt release packages. To run it from source, install [Bun](https://bun.sh/) (the repository targets Bun 1.3.14), then clone and install the workspace:
