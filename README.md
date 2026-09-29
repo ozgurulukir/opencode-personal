@@ -33,9 +33,35 @@ This fork is built on top of the OpenCode 1.14.48 source release. Notable change
 - Monorepo pruning & build/CI hardening: removed unused packages, a personal-fork typecheck workflow, and a hardened dependency-update checker.
 - Tooling: multi-skill loading, strict skill validation, and hunk-diff integration with todo autoclose.
 
-## Get started from source
+## Install
 
-This personal fork does not publish its own prebuilt release packages. To run it from source, install [Bun](https://bun.sh/) (the repository targets Bun 1.3.14), then clone and install the workspace:
+Prebuilt binaries are published on this fork's [GitHub Releases](https://github.com/ozgurulukir/opencode-personal/releases) for Linux (x64/arm64, glibc and musl), macOS (x64/arm64), and Windows (x64/arm64).
+
+macOS / Linux:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/ozgurulukir/opencode-personal/main/install.sh | bash
+```
+
+Windows (PowerShell):
+
+```powershell
+irm https://raw.githubusercontent.com/ozgurulukir/opencode-personal/main/install.ps1 | iex
+```
+
+Both install the command **`opencode-personal`** and append only their own directory to your PATH: `~/.opencode-personal/bin` on macOS/Linux, `%USERPROFILE%\.opencode-personal\bin` on Windows. The fork is designed to coexist with an existing upstream `opencode` install: it never touches `~/.opencode`, `~/.local/bin/opencode`, or any existing PATH entry, and it stores sessions in its own database (`opencode-personal.db`) via the build-time channel `personal`. Configuration (`opencode.json`, auth) is shared with upstream by design. Caveat: if you export `OPENCODE_DISABLE_CHANNEL_DB` or `OPENCODE_DB`, DB separation is yours to manage.
+
+Pass `--version <v>` (bash) or `-Version <v>` (PowerShell) to pin a release (fork versions carry a `-p.N` suffix, e.g. `1.14.48-p.1`), `--binary <path>` / `-Binary <path>` to install a local build (also copy the bundled `libopentui.*` / `opentui.dll` next to the binary in that case), and `--no-modify-path` (bash) to skip the PATH edit. Note: `install.ps1` has **no PATH-skip flag** — it always appends the install directory to your user PATH; remove it manually if unwanted. Windows binaries are unsigned, so SmartScreen may warn — choose "More info" → "Run anyway".
+
+Uninstall: delete `~/.opencode-personal` (Windows: `%USERPROFILE%\.opencode-personal`) and remove the `# opencode-personal` PATH line from your shell rc file (Windows: remove the directory from your user PATH).
+
+### Manual download
+
+Download an archive from the [releases page](https://github.com/ozgurulukir/opencode-personal/releases), extract it, rename the binary `opencode` to `opencode-personal` (keep the bundled native library `libopentui.*` / `opentui.dll` in the same directory), and put that directory on your PATH.
+
+### Run from source
+
+Install [Bun](https://bun.sh/) (the repository targets Bun 1.3.14), then clone and install the workspace:
 
 ```bash
 git clone https://github.com/ozgurulukir/opencode-personal.git
