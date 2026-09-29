@@ -205,11 +205,16 @@ export function DialogUsage() {
                               <Show when={resets}>
                                 <span style={{ fg: theme.textMuted }}>{resets}</span>
                               </Show>
+                              <Show when={limit.notes?.length}>
+                                <span style={{ fg: theme.textMuted }}>{"\n" + limit.notes!.join("\n")}</span>
+                              </Show>
                             </text>
                             <text fg={statusColor}>
                               {limit.amount.unit === "usd" && fraction === undefined && limit.amount.remaining !== undefined
                                 ? `$${limit.amount.remaining.toFixed(2)} left`
-                                : renderBar(fraction)}
+                                : fraction === undefined && limit.amount.unit !== "usd"
+                                  ? ""
+                                  : renderBar(fraction)}
                             </text>
                           </box>
                         )

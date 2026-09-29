@@ -1,5 +1,5 @@
-import { afterEach, describe, expect, test } from "bun:test"
-import { clineUsageProvider, parseCurrentUser } from "../../../src/provider/usage/cline"
+import { afterEach, describe, expect, spyOn, test } from "bun:test"
+import { clineUsageProvider, parseCurrentUser, parseUserPlan } from "../../../src/provider/usage/cline"
 import type { UsageCredential } from "../../../src/provider/usage/types"
 
 const realFetch = globalThis.fetch
@@ -126,10 +126,69 @@ describe("clineUsageProvider.fetchUsage degradation", () => {
   })
 })
 
+describe("parseUserPlan", () => {
+  test("extracts plan metadata from the captured /users/me/plan envelope", () => {
+    expect(
+      parseUserPlan({
+        data: {
+          plan: {
+            name: "Cline Pass (Monthly)[Internal]",
+            displayName: "Cline Pass (Monthly)",
+            type: "individual",
+            interval: "Monthly",
+            isActive: true,
+          },
+          currentPeriodStart: "2026-09-12T20:07:47Z",
+          currentPeriodEnd: "2026-10-12T20:07:47Z",
+          cancelAt: "2026-10-12T20:07:47Z",
+          canceledAt: "2026-09-14T10:10:39Z",
+        },
+        success: true,
+      }),
+    ).toEqual({
+      displayName: "Cline Pass (Monthly)",
+      interval: "Monthly",
+      periodEnd: Date.parse("2026-10-12T20:07:47Z"),
+      canceled: true,
+    })
+  })
+
+  test("reports canceled as false when canceledAt is absent", () => {
+    expect(
+      parseUserPlan({
+        data: {
+          plan: { displayName: "Cline Pass (Monthly)", interval: "Monthly" },
+          currentPeriodEnd: "2026-10-12T20:07:47Z",
+        },
+        success: true,
+      }),
+    ).toEqual({
+      displayName: "Cline Pass (Monthly)",
+      interval: "Monthly",
+      periodEnd: Date.parse("2026-10-12T20:07:47Z"),
+      canceled: false,
+    })
+  })
+
+  test("returns null when the data envelope is missing", () => {
+    expect(parseUserPlan({ plan: { displayName: "Cline Pass (Monthly)" }, success: true })).toBeNull()
+  })
+
+  test("returns null when the payload carries no plan name, interval or period end", () => {
+    expect(parseUserPlan({ data: { subscriptionId: "sub_1" }, success: true })).toBeNull()
+  })
+
+  test("returns null for non-object input", () => {
+    expect(parseUserPlan("not-an-object")).toBeNull()
+    expect(parseUserPlan(null)).toBeNull()
+    expect(parseUserPlan(42)).toBeNull()
+  })
+})
+
 describe("clineUsageProvider.fetchUsage with captured live shapes", () => {
   // Fixtures pinned to real 200 responses captured from api.cline.bot on
-  // 2026-09-28 (both wrapped in a { data, success } envelope the docs omit).
-  test("maps the captured balance envelope to a USD limit with email metadata", async () => {
+  // 2026-09-29 (both wrapped in a { data, success } envelope the docs omit).
+  test("maps the captured balance envelope to a micro-USD limit with email metadata and a dashboard note", async () => {
     stubFetch((url) =>
       url.endsWith("/api/v1/users/me")
         ? jsonResponse({
@@ -144,11 +203,14 @@ describe("clineUsageProvider.fetchUsage with captured live shapes", () => {
     expect(report).not.toBeNull()
     expect(report!.provider).toBe("cline-pass")
     expect(report!.limits).toHaveLength(1)
-    expect(report!.limits[0].id).toBe("cline-pass:balance")
-    expect(report!.limits[0].label).toBe("ClinePass Balance")
+    expect(report!.limits[0].id).toBe("cline-pass:credits")
+    expect(report!.limits[0].label).toBe("ClinePass Credits (pay-as-you-go)")
     expect(report!.limits[0].amount.unit).toBe("usd")
-    expect(report!.limits[0].amount.remaining).toBe(84.42)
+    expect(report!.limits[0].amount.remaining).toBe(0.008442)
     expect(report!.limits[0].amount.usedFraction).toBeUndefined()
+    expect(report!.limits[0].notes).toEqual([
+      "Subscription windows (5h/weekly/monthly) are not exposed by the Cline API — check app.cline.bot/dashboard/subscription",
+    ])
     expect(report!.metadata?.email).toBe("user@example.com")
   })
 
@@ -168,5 +230,77 @@ describe("clineUsageProvider.fetchUsage with captured live shapes", () => {
         : jsonResponse({ data: { userId: "user_1", balance: "8442" }, success: true }),
     )
     expect(await clineUsageProvider.fetchUsage(apiKeyCredential)).toBeNull()
+  })
+
+  test("appends the plan limit after the balance limit when /users/me/plan is available", async () => {
+    const calls: string[] = []
+    stubFetch((url) => {
+      calls.push(url)
+      if (url.endsWith("/api/v1/users/me")) return jsonResponse({ data: { id: "user_1" }, success: true })
+      if (url.endsWith("/api/v1/users/me/plan"))
+        return jsonResponse({
+          data: {
+            plan: { displayName: "Cline Pass (Monthly)", interval: "Monthly", isActive: true },
+            currentPeriodEnd: "2026-10-12T20:07:47Z",
+            canceledAt: "2026-09-14T10:10:39Z",
+          },
+          success: true,
+        })
+      return jsonResponse({ data: { userId: "user_1", balance: 8442 }, success: true })
+    })
+
+    const report = await clineUsageProvider.fetchUsage(apiKeyCredential)
+
+    expect(calls).toEqual([
+      "https://api.cline.bot/api/v1/users/me",
+      "https://api.cline.bot/api/v1/users/user_1/balance",
+      "https://api.cline.bot/api/v1/users/me/plan",
+    ])
+    expect(report).not.toBeNull()
+    expect(report!.limits).toHaveLength(2)
+    expect(report!.limits[0].id).toBe("cline-pass:credits")
+    expect(report!.limits[1].id).toBe("cline-pass:plan")
+    expect(report!.limits[1].label).toBe("Cline Pass (Monthly) — canceled")
+    expect(report!.limits[1].scope.tier).toBeUndefined()
+    expect(report!.limits[1].window?.id).toBe("period")
+    expect(report!.limits[1].window?.label).toBe("until Oct 12")
+    expect(report!.limits[1].amount.unit).toBe("unknown")
+    expect(report!.limits[1].amount.usedFraction).toBeUndefined()
+  })
+
+  test("keeps the balance row when /users/me/plan is rejected", async () => {
+    stubFetch((url) => {
+      if (url.endsWith("/api/v1/users/me")) return jsonResponse({ data: { id: "user_1" }, success: true })
+      if (url.endsWith("/api/v1/users/me/plan")) return new Response(null, { status: 500 })
+      return jsonResponse({ data: { userId: "user_1", balance: 8442 }, success: true })
+    })
+
+    const report = await clineUsageProvider.fetchUsage(apiKeyCredential)
+
+    expect(report).not.toBeNull()
+    expect(report!.limits).toHaveLength(1)
+    expect(report!.limits[0].id).toBe("cline-pass:credits")
+    expect(report!.limits[0].amount.remaining).toBe(0.008442)
+  })
+
+  test("keeps the balance row and logs the failure when the /users/me/plan request throws", async () => {
+    const errorSpy = spyOn(console, "error").mockImplementation(() => {})
+    try {
+      stubFetch((url) => {
+        if (url.endsWith("/api/v1/users/me")) return jsonResponse({ data: { id: "user_1" }, success: true })
+        if (url.endsWith("/api/v1/users/me/plan")) throw new Error("network down")
+        return jsonResponse({ data: { userId: "user_1", balance: 8442 }, success: true })
+      })
+
+      const report = await clineUsageProvider.fetchUsage(apiKeyCredential)
+
+      expect(report).not.toBeNull()
+      expect(report!.limits).toHaveLength(1)
+      expect(report!.limits[0].id).toBe("cline-pass:credits")
+      expect(report!.limits[0].amount.remaining).toBe(0.008442)
+      expect(errorSpy).toHaveBeenCalledTimes(1)
+    } finally {
+      errorSpy.mockRestore()
+    }
   })
 })
