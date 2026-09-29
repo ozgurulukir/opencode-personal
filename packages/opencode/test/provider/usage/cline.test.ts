@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, spyOn, test } from "bun:test"
-import { clineUsageProvider, parseCurrentUser, parseUserPlan } from "../../../src/provider/usage/cline"
+import {
+  clineUsageProvider,
+  parseCurrentUser,
+  parseUserPlan,
+  parsePlanUsageLimits,
+} from "../../../src/provider/usage/cline"
 import type { UsageCredential } from "../../../src/provider/usage/types"
 
 const realFetch = globalThis.fetch
@@ -185,10 +190,88 @@ describe("parseUserPlan", () => {
   })
 })
 
+describe("parsePlanUsageLimits", () => {
+  const capturedEnvelope = {
+    data: {
+      limits: [
+        { type: "five_hour", percentUsed: 7, resetsAt: "2026-09-29T09:09:00.361942941Z" },
+        { type: "weekly", percentUsed: 86, resetsAt: "2026-09-29T08:53:18.363835999Z" },
+        { type: "monthly", percentUsed: 91, resetsAt: "2026-10-13T07:24:39.36560156Z" },
+      ],
+    },
+    success: true,
+  }
+
+  test("extracts the three known windows in dashboard order with epoch resets", () => {
+    expect(parsePlanUsageLimits(capturedEnvelope)).toEqual([
+      { type: "five_hour", percentUsed: 7, resetsAt: Date.parse("2026-09-29T09:09:00.361942941Z") },
+      { type: "weekly", percentUsed: 86, resetsAt: Date.parse("2026-09-29T08:53:18.363835999Z") },
+      { type: "monthly", percentUsed: 91, resetsAt: Date.parse("2026-10-13T07:24:39.36560156Z") },
+    ])
+  })
+
+  test("sorts the windows into dashboard order regardless of input order", () => {
+    expect(
+      parsePlanUsageLimits({
+        data: {
+          limits: [
+            { type: "monthly", percentUsed: 1 },
+            { type: "five_hour", percentUsed: 2 },
+            { type: "weekly", percentUsed: 3 },
+          ],
+        },
+      }).map((limit) => limit.type),
+    ).toEqual(["five_hour", "weekly", "monthly"])
+  })
+
+  test("drops unknown window types", () => {
+    expect(
+      parsePlanUsageLimits({
+        data: {
+          limits: [
+            { type: "daily", percentUsed: 50, resetsAt: "2026-09-29T09:09:00Z" },
+            { type: "weekly", percentUsed: 10 },
+          ],
+        },
+      }),
+    ).toEqual([{ type: "weekly", percentUsed: 10 }])
+  })
+
+  test("clamps percentUsed to 0..100 and defaults missing or non-numeric values to 0", () => {
+    expect(
+      parsePlanUsageLimits({
+        data: {
+          limits: [
+            { type: "five_hour", percentUsed: 150 },
+            { type: "weekly", percentUsed: -5 },
+            { type: "monthly", percentUsed: "91" },
+          ],
+        },
+      }).map((limit) => limit.percentUsed),
+    ).toEqual([100, 0, 0])
+  })
+
+  test("omits resetsAt when it is missing or not a parseable date", () => {
+    expect(
+      parsePlanUsageLimits({
+        data: { limits: [{ type: "five_hour", percentUsed: 10, resetsAt: "not-a-date" }] },
+      }),
+    ).toEqual([{ type: "five_hour", percentUsed: 10 }])
+  })
+
+  test("returns [] for a missing envelope or non-object input", () => {
+    expect(parsePlanUsageLimits({ limits: [{ type: "weekly", percentUsed: 1 }] })).toEqual([])
+    expect(parsePlanUsageLimits({ data: {} })).toEqual([])
+    expect(parsePlanUsageLimits("not-an-object")).toEqual([])
+    expect(parsePlanUsageLimits(null)).toEqual([])
+    expect(parsePlanUsageLimits(42)).toEqual([])
+  })
+})
+
 describe("clineUsageProvider.fetchUsage with captured live shapes", () => {
   // Fixtures pinned to real 200 responses captured from api.cline.bot on
   // 2026-09-29 (both wrapped in a { data, success } envelope the docs omit).
-  test("maps the captured balance envelope to a micro-USD limit with email metadata and a dashboard note", async () => {
+  test("maps the captured balance envelope to a micro-USD limit with email metadata", async () => {
     stubFetch((url) =>
       url.endsWith("/api/v1/users/me")
         ? jsonResponse({
@@ -208,9 +291,7 @@ describe("clineUsageProvider.fetchUsage with captured live shapes", () => {
     expect(report!.limits[0].amount.unit).toBe("usd")
     expect(report!.limits[0].amount.remaining).toBe(0.008442)
     expect(report!.limits[0].amount.usedFraction).toBeUndefined()
-    expect(report!.limits[0].notes).toEqual([
-      "Subscription windows (5h/weekly/monthly) are not exposed by the Cline API — check app.cline.bot/dashboard/subscription",
-    ])
+    expect(report!.limits[0].notes).toBeUndefined()
     expect(report!.metadata?.email).toBe("user@example.com")
   })
 
@@ -254,6 +335,7 @@ describe("clineUsageProvider.fetchUsage with captured live shapes", () => {
     expect(calls).toEqual([
       "https://api.cline.bot/api/v1/users/me",
       "https://api.cline.bot/api/v1/users/user_1/balance",
+      "https://api.cline.bot/api/v1/users/me/plan/usage-limits",
       "https://api.cline.bot/api/v1/users/me/plan",
     ])
     expect(report).not.toBeNull()
@@ -302,5 +384,138 @@ describe("clineUsageProvider.fetchUsage with captured live shapes", () => {
     } finally {
       errorSpy.mockRestore()
     }
+  })
+})
+
+describe("clineUsageProvider.fetchUsage with the quota endpoint", () => {
+  // Fixtures pinned to the redacted live captures in the plan (2026-09-29).
+  const windowLimitsPayload = {
+    data: {
+      limits: [
+        { type: "weekly", percentUsed: 86, resetsAt: "2026-09-29T08:53:18.363835999Z" },
+        { type: "five_hour", percentUsed: 7, resetsAt: "2026-09-29T09:09:00.361942941Z" },
+        { type: "monthly", percentUsed: 91, resetsAt: "2026-10-13T07:24:39.36560156Z" },
+      ],
+    },
+    success: true,
+  }
+
+  const planPayload = {
+    data: {
+      plan: { displayName: "Cline Pass (Monthly)", interval: "Monthly", isActive: true },
+      currentPeriodEnd: "2026-10-12T20:07:47Z",
+    },
+    success: true,
+  }
+
+  test("queries users/me, balance, plan/usage-limits then plan, ordering the window rows between credits and plan", async () => {
+    const calls: string[] = []
+    stubFetch((url) => {
+      calls.push(url)
+      if (url.endsWith("/api/v1/users/me")) return jsonResponse({ data: { id: "user_1" }, success: true })
+      if (url.endsWith("/api/v1/users/me/plan/usage-limits")) return jsonResponse(windowLimitsPayload)
+      if (url.endsWith("/api/v1/users/me/plan")) return jsonResponse(planPayload)
+      return jsonResponse({ data: { userId: "user_1", balance: 8442 }, success: true })
+    })
+
+    const report = await clineUsageProvider.fetchUsage(apiKeyCredential)
+
+    expect(calls).toEqual([
+      "https://api.cline.bot/api/v1/users/me",
+      "https://api.cline.bot/api/v1/users/user_1/balance",
+      "https://api.cline.bot/api/v1/users/me/plan/usage-limits",
+      "https://api.cline.bot/api/v1/users/me/plan",
+    ])
+    expect(report!.limits.map((limit) => limit.id)).toEqual([
+      "cline-pass:credits",
+      "cline-pass:limit:five_hour",
+      "cline-pass:limit:weekly",
+      "cline-pass:limit:monthly",
+      "cline-pass:plan",
+    ])
+  })
+
+  test("maps a window row to a percent amount, an empty-label reset window and a status", async () => {
+    stubFetch((url) => {
+      if (url.endsWith("/api/v1/users/me")) return jsonResponse({ data: { id: "user_1" }, success: true })
+      if (url.endsWith("/api/v1/users/me/plan/usage-limits")) return jsonResponse(windowLimitsPayload)
+      return jsonResponse({ data: { userId: "user_1", balance: 8442 }, success: true })
+    })
+
+    const report = await clineUsageProvider.fetchUsage(apiKeyCredential)
+    const fiveHour = report!.limits.find((limit) => limit.id === "cline-pass:limit:five_hour")!
+
+    expect(fiveHour.label).toBe("5-Hour Limit")
+    expect(fiveHour.scope).toEqual({ provider: "cline-pass", windowId: "five_hour" })
+    expect(fiveHour.window).toEqual({
+      id: "five_hour",
+      label: "",
+      resetsAt: Date.parse("2026-09-29T09:09:00.361942941Z"),
+    })
+    expect(fiveHour.amount).toEqual({ used: 7, unit: "percent" })
+    expect(fiveHour.amount.usedFraction).toBeUndefined()
+    expect(fiveHour.status).toBe("ok")
+
+    const monthly = report!.limits.find((limit) => limit.id === "cline-pass:limit:monthly")!
+    expect(monthly.amount).toEqual({ used: 91, unit: "percent" })
+    expect(monthly.status).toBe("warning")
+  })
+
+  test("keeps the credits and plan rows when the quota endpoint returns an error status", async () => {
+    stubFetch((url) => {
+      if (url.endsWith("/api/v1/users/me")) return jsonResponse({ data: { id: "user_1" }, success: true })
+      if (url.endsWith("/api/v1/users/me/plan/usage-limits")) return new Response(null, { status: 500 })
+      if (url.endsWith("/api/v1/users/me/plan")) return jsonResponse(planPayload)
+      return jsonResponse({ data: { userId: "user_1", balance: 8442 }, success: true })
+    })
+
+    const report = await clineUsageProvider.fetchUsage(apiKeyCredential)
+
+    expect(report!.limits.map((limit) => limit.id)).toEqual(["cline-pass:credits", "cline-pass:plan"])
+  })
+
+  test("keeps the credits and plan rows when the quota endpoint returns 404", async () => {
+    stubFetch((url) => {
+      if (url.endsWith("/api/v1/users/me")) return jsonResponse({ data: { id: "user_1" }, success: true })
+      if (url.endsWith("/api/v1/users/me/plan/usage-limits")) return new Response(null, { status: 404 })
+      if (url.endsWith("/api/v1/users/me/plan")) return jsonResponse(planPayload)
+      return jsonResponse({ data: { userId: "user_1", balance: 8442 }, success: true })
+    })
+
+    const report = await clineUsageProvider.fetchUsage(apiKeyCredential)
+
+    expect(report!.limits.map((limit) => limit.id)).toEqual(["cline-pass:credits", "cline-pass:plan"])
+  })
+
+  test("keeps the credits and plan rows and logs when the quota request throws", async () => {
+    const errorSpy = spyOn(console, "error").mockImplementation(() => {})
+    try {
+      stubFetch((url) => {
+        if (url.endsWith("/api/v1/users/me")) return jsonResponse({ data: { id: "user_1" }, success: true })
+        if (url.endsWith("/api/v1/users/me/plan/usage-limits")) throw new Error("network down")
+        if (url.endsWith("/api/v1/users/me/plan")) return jsonResponse(planPayload)
+        return jsonResponse({ data: { userId: "user_1", balance: 8442 }, success: true })
+      })
+
+      const report = await clineUsageProvider.fetchUsage(apiKeyCredential)
+
+      expect(report!.limits.map((limit) => limit.id)).toEqual(["cline-pass:credits", "cline-pass:plan"])
+      expect(errorSpy).toHaveBeenCalledTimes(1)
+    } finally {
+      errorSpy.mockRestore()
+    }
+  })
+
+  test("adds no window rows when the quota endpoint returns an empty limits array", async () => {
+    stubFetch((url) => {
+      if (url.endsWith("/api/v1/users/me")) return jsonResponse({ data: { id: "user_1" }, success: true })
+      if (url.endsWith("/api/v1/users/me/plan/usage-limits"))
+        return jsonResponse({ data: { limits: [] }, success: true })
+      return jsonResponse({ data: { userId: "user_1", balance: 8442 }, success: true })
+    })
+
+    const report = await clineUsageProvider.fetchUsage(apiKeyCredential)
+
+    expect(report!.limits.map((limit) => limit.id)).toEqual(["cline-pass:credits"])
   })
 })
