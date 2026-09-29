@@ -237,6 +237,28 @@ describe("parsePlanUsageLimits", () => {
     ).toEqual([{ type: "weekly", percentUsed: 10 }])
   })
 
+  test("drops prototype-chain type keys that are not own keys of the limit-type map", () => {
+    expect(
+      parsePlanUsageLimits({
+        data: {
+          limits: [
+            { type: "toString", percentUsed: 50 },
+            { type: "__proto__", percentUsed: 60 },
+            { type: "constructor", percentUsed: 70 },
+            { type: "five_hour", percentUsed: 7 },
+            { type: "weekly", percentUsed: 86 },
+            { type: "monthly", percentUsed: 91 },
+          ],
+        },
+        success: true,
+      }),
+    ).toEqual([
+      { type: "five_hour", percentUsed: 7 },
+      { type: "weekly", percentUsed: 86 },
+      { type: "monthly", percentUsed: 91 },
+    ])
+  })
+
   test("clamps percentUsed to 0..100 and defaults missing or non-numeric values to 0", () => {
     expect(
       parsePlanUsageLimits({
