@@ -1,12 +1,22 @@
 import * as Log from "@opencode-ai/core/util/log"
 import { safeCatch } from "@/util/error"
 import { isRecord } from "@/util/record"
+import { buildUsageStatus } from "./types"
 import type { UsageProvider, UsageReport, UsageLimit, UsageCredential } from "./types"
 
 const CLINE_BASE_URL = "https://api.cline.bot"
 const USER_ME_PATH = "/api/v1/users/me"
 const USER_PLAN_PATH = "/api/v1/users/me/plan"
 const USER_BALANCE_PATH = "/api/v1/users"
+const USER_USAGE_LIMITS_PATH = "/api/v1/users/me/plan/usage-limits"
+
+// Subscription windows the quota endpoint serves, mirroring the dashboard's own
+// label map (`app.cline.bot/dashboard/subscription`). Key order drives row order.
+const LIMIT_TYPE_META: Record<string, { label: string; order: number }> = {
+  five_hour: { label: "5-Hour Limit", order: 0 },
+  weekly: { label: "Weekly Limit", order: 1 },
+  monthly: { label: "Monthly Limit", order: 2 },
+}
 
 // The live `balance` value is stored in micro-USD (1 unit = $0.000001 — Cline's own
 // client calls the unit "microcredits"). Two readings of the same integer are possible,
@@ -90,8 +100,7 @@ export function parseUserPlan(raw: unknown): UserPlan | null {
  * `UsageLimit`. `balance` is an integer count of micro-USD (1 unit = $0.000001), so it
  * converts to dollars via `BALANCE_UNITS_PER_USD` (8442 → $0.008442); three Cline-client
  * sources agree on that unit (see the constant above). The balance is a pay-as-you-go
- * credit pool with no denominator or reset window, so `usedFraction` stays `undefined`,
- * and `notes` points the user at the dashboard for the subscription windows the API omits.
+ * credit pool with no denominator or reset window, so `usedFraction` stays `undefined`.
  */
 function parseBalanceLimit(payload: unknown): UsageLimit | null {
   if (!payload || typeof payload !== "object") return null
@@ -104,21 +113,52 @@ function parseBalanceLimit(payload: unknown): UsageLimit | null {
     label: "ClinePass Credits (pay-as-you-go)",
     scope: { provider: "cline-pass" },
     amount: { remaining: balance / BALANCE_UNITS_PER_USD, unit: "usd" },
-    notes: [
-      "Subscription windows (5h/weekly/monthly) are not exposed by the Cline API — check app.cline.bot/dashboard/subscription",
-    ],
   }
 }
 
+/** One windowed quota reading from `GET /api/v1/users/me/plan/usage-limits`. */
+export interface PlanUsageLimit {
+  type: string
+  percentUsed: number
+  resetsAt?: number
+}
+
 /**
- * Fetches the ClinePass credit balance as a two-call chain: resolve the user id via
- * `GET /users/me`, then read `GET /users/{id}/balance`. A best-effort third call
- * (`GET /users/me/plan`) appends subscription metadata when the API returns it. The live
- * API wraps every payload in a `{ data, success }` envelope the docs omit; the `users/me`
- * parser also accepts the documented flat profile shape. Returns `null` on any balance
- * failure (non-OK response, unparseable payload) so the `/usage` dialog simply omits the
- * ClinePass section — graceful degradation, never a broken dialog. A plan-call failure is
- * logged and swallowed so it can never take the balance row down with it.
+ * Parses the `GET /api/v1/users/me/plan/usage-limits` payload
+ * (`{ data: { limits: [{ type, percentUsed, resetsAt }, ...] }, success: true }`,
+ * captured live 2026-09-29). Unknown `type` values are dropped (dashboard parity),
+ * `percentUsed` is clamped to 0..100 (defaulting to 0 when missing or non-numeric), and
+ * `resetsAt` is parsed to epoch milliseconds when parseable. Non-object or envelope-less
+ * input yields `[]`. Results are ordered five_hour → weekly → monthly.
+ */
+export function parsePlanUsageLimits(raw: unknown): PlanUsageLimit[] {
+  if (!isRecord(raw) || !isRecord(raw.data) || !Array.isArray(raw.data.limits)) return []
+  return raw.data.limits
+    .flatMap((item: unknown): PlanUsageLimit[] => {
+      if (!isRecord(item)) return []
+      const type = typeof item.type === "string" ? item.type : undefined
+      if (!type || !(type in LIMIT_TYPE_META)) return []
+      const percentUsed =
+        typeof item.percentUsed === "number" && Number.isFinite(item.percentUsed)
+          ? Math.min(100, Math.max(0, item.percentUsed))
+          : 0
+      const resetsAt = typeof item.resetsAt === "string" ? Date.parse(item.resetsAt) : Number.NaN
+      return [{ type, percentUsed, ...(Number.isFinite(resetsAt) ? { resetsAt } : {}) }]
+    })
+    .sort((a, b) => LIMIT_TYPE_META[a.type].order - LIMIT_TYPE_META[b.type].order)
+}
+
+/**
+ * Fetches the ClinePass credit balance and subscription windows as a best-effort call
+ * chain: resolve the user id via `GET /users/me`, read the credit balance via
+ * `GET /users/{id}/balance`, then read the subscription windows via
+ * `GET /users/me/plan/usage-limits` and the plan metadata via `GET /users/me/plan`. The
+ * live API wraps every payload in a `{ data, success }` envelope the docs omit; the
+ * `users/me` parser also accepts the documented flat profile shape. Returns `null` on any
+ * balance failure (non-OK response, unparseable payload) so the `/usage` dialog simply
+ * omits the ClinePass section — graceful degradation, never a broken dialog. A failure in
+ * either best-effort call is logged and swallowed so it can never take the balance row
+ * down with it.
  */
 async function fetchClineUsage(credential: UsageCredential): Promise<UsageReport | null> {
   if (!credential.apiKey) return null
@@ -144,6 +184,35 @@ async function fetchClineUsage(credential: UsageCredential): Promise<UsageReport
   if (!balance) return null
 
   const limits: UsageLimit[] = [balance]
+
+  try {
+    const usageLimitsResponse = await fetch(`${CLINE_BASE_URL}${USER_USAGE_LIMITS_PATH}`, { headers })
+    if (usageLimitsResponse.ok) {
+      limits.push(
+        ...parsePlanUsageLimits(await usageLimitsResponse.json()).map(
+          (item): UsageLimit => ({
+            id: `cline-pass:limit:${item.type}`,
+            label: LIMIT_TYPE_META[item.type].label,
+            scope: { provider: "cline-pass", windowId: item.type },
+            window: {
+              id: item.type,
+              label: "",
+              ...(item.resetsAt !== undefined ? { resetsAt: item.resetsAt } : {}),
+            },
+            amount: { used: item.percentUsed, unit: "percent" },
+            status: buildUsageStatus(item.percentUsed / 100),
+          }),
+        ),
+      )
+    } else {
+      log.warn("cline usage: /users/me/plan/usage-limits request was rejected", {
+        status: usageLimitsResponse.status,
+      })
+    }
+  } catch (error) {
+    safeCatch("cline usage: /users/me/plan/usage-limits request failed", error)
+  }
+
   try {
     const planResponse = await fetch(`${CLINE_BASE_URL}${USER_PLAN_PATH}`, { headers })
     if (planResponse.ok) {
