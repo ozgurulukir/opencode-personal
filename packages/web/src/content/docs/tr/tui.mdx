@@ -283,6 +283,18 @@ Mevcut oturumun paylaşımını kaldırır. [Daha fazla bilgi](/docs/share#un-sh
 
 ---
 
+### usage
+
+Sağlayıcı kullanım ve kota bilgilerini, mevcut oturumun maliyet, token, model ve araç çağrısı dökümüyle birlikte gösterir.
+
+Sağlayıcı limitleri, kimlik bilgileri yapılandırılmışsa Anthropic (Claude), ZAI ve ClinePass hesapları için gösterilir — örneğin Claude'un 5 saatlik ve 7 günlük pencereleri, ZAI'nin token ve istek kotaları veya ClinePass'in 5 saatlik/haftalık/aylık limitleri ve kullandıkça öde kredi bakiyesi.
+
+```bash frame="none"
+/usage
+```
+
+---
+
 ## Editör kurulumu
 
 Hem `/editor` hem de `/export` komutları, `EDITOR` ortam değişkeninde belirtilen editörü kullanır.
