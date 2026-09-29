@@ -87,7 +87,7 @@ The generated API client embedded in the bundles exposes the full surface. Quota
 
 ### 3.2 The generated client method (chunk `4081-5846c56218676d3c.js`)
 
-Minified but greppable (citations = chunk filename + unique code anchors; bundles are minified, so no stable line numbers — U6):
+Minified but greppable (citations = chunk filename + unique code anchors; bundles are minified, so no stable line numbers — U5):
 
 ```js
 async getCurrentUserPlanUsageLimitsRaw(e){let t={};
