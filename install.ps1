@@ -75,13 +75,38 @@ try {
     Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue
 }
 
-# --- user PATH (append-only; never removes or reorders existing entries) ---
-$userPath = [Environment]::GetEnvironmentVariable("Path", "User")
-if (($userPath -split ";") -notcontains $InstallDir) {
-    $newPath = if ($userPath) { "$userPath;$InstallDir" } else { $InstallDir }
-    [Environment]::SetEnvironmentVariable("Path", $newPath, "User")
-    $env:Path = "$env:Path;$InstallDir"
-    Write-Host "Added $InstallDir to your user PATH. Restart your terminal for it to take effect."
+# --- user PATH (append-only; never removes, reorders, or rewrites existing entries) ---
+# Round-trip the RAW registry value instead of [Environment]::Get/SetEnvironmentVariable:
+# GetEnvironmentVariable("Path","User") expands REG_EXPAND_SZ %vars% using THIS process's
+# environment (wrong whenever USERPROFILE is redirected, e.g. under verify-isolation.ps1),
+# and SetEnvironmentVariable rewrites the whole value as REG_SZ - degrading the value kind
+# and freezing %-entries to this machine's literal paths. Reading raw and writing back
+# with the original kind keeps every existing entry byte-identical.
+$envKey = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey("Environment", $true)
+try {
+    $rawPath = $envKey.GetValue("Path", $null, [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames)
+    $kind = if ($null -ne $rawPath) { $envKey.GetValueKind("Path") } else { [Microsoft.Win32.RegistryValueKind]::String }
+    $appendable = $kind -eq [Microsoft.Win32.RegistryValueKind]::String -or $kind -eq [Microsoft.Win32.RegistryValueKind]::ExpandString
+    if (-not $appendable) {
+        # Never risk mangling an exotic value kind - install succeeds, PATH stays manual.
+        Write-Warning "User PATH registry value has unexpected kind '$kind'; add '$InstallDir' to your PATH manually."
+    } elseif (($rawPath -split ";") -notcontains $InstallDir) {
+        $newPath = if ($rawPath) { "$rawPath;$InstallDir" } else { $InstallDir }
+        $envKey.SetValue("Path", $newPath, $kind)
+        $env:Path = "$env:Path;$InstallDir"
+        Write-Host "Added $InstallDir to your user PATH. Restart your terminal for it to take effect."
+        # SetEnvironmentVariable broadcast WM_SETTINGCHANGE for us; keep that behavior.
+        try {
+            $sig = '[DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)] public static extern IntPtr SendMessageTimeout(IntPtr hWnd, uint Msg, UIntPtr wParam, string lParam, uint fuFlags, uint uTimeout, out UIntPtr lpdwResult);'
+            $user32 = Add-Type -MemberDefinition $sig -Name User32PathBroadcastPersonal -Namespace Win32 -PassThru
+            [UIntPtr]$res = [UIntPtr]::Zero
+            $user32::SendMessageTimeout([IntPtr]0xFFFF, 0x001A, [UIntPtr]::Zero, "Environment", 2, 5000, [ref]$res) | Out-Null
+        } catch {
+            # best-effort: a failed WM_SETTINGCHANGE broadcast must not fail the install
+        }
+    }
+} finally {
+    $envKey.Close()
 }
 
 Write-Host ""
