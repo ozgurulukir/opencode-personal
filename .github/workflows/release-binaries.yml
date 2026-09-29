@@ -3,14 +3,17 @@ name: release-binaries
 on:
   push:
     tags:
-      # Fork-version convention only (-p.N suffix). Mirrored upstream tags
-      # (plain semver, e.g. v1.14.48) do NOT match this pattern, so a tag
-      # sync from upstream can never mint a fork release.
-      - "v*-p.*"
+      # Fork-version convention only (CalVer YYYY.M.D, no leading zeros).
+      # Mirrored upstream tags (plain semver, e.g. v1.14.48) do NOT match
+      # this pattern, so a tag sync from upstream can never mint a fork
+      # release. A glob cannot express "1-2 digits" or "no leading zeros",
+      # so malformed CalVer shapes (v2026.09.29, v2026.9, v2026.9.29-rc.1)
+      # also match here and are rejected by the Resolve version step below.
+      - "v[0-9][0-9][0-9][0-9].[0-9]*"
   workflow_dispatch:
     inputs:
       version:
-        description: "Version to release, e.g. 1.14.48-p.1 (fork convention: semver + -p.N suffix; tag v<version> is created if missing)"
+        description: "Version to release, e.g. 2026.9.29 (fork convention: CalVer YYYY.M.D, no leading zeros; tag v<version> is created if missing)"
         required: true
         type: string
 
@@ -66,24 +69,42 @@ jobs:
       - name: Install wasm-pack
         run: curl -sSf https://rustwasm.github.io/wasm-pack/installer/init.sh | sh
 
-      - name: "Resolve version (fork convention: semver + required -p.N suffix)"
+      - name: "Resolve version (fork convention: CalVer YYYY.M.D)"
         id: version
+        env:
+          RAW: ${{ inputs.version }}
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            v="${{ inputs.version }}"
+            v="$RAW"
           else
             v="${GITHUB_REF_NAME#v}"
           fi
           v="${v#v}"
           # Second line of defense against mirrored upstream tags: even if a
-          # plain-semver tag ever reached this workflow, it fails here before
-          # any release is created.
-          if ! grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+-p\.[0-9]+$' <<<"$v"; then
-            echo "::error::Invalid version '$v' - fork releases must be semver with a -p.N suffix (e.g. 1.14.48-p.1)"
+          # plain-semver tag (e.g. v1.14.48) ever reached this workflow, it
+          # fails here before any release is created.
+          if ! grep -Eq '^[0-9]{4}\.[0-9]{1,2}\.[0-9]{1,2}$' <<<"$v"; then
+            echo "::error::Invalid version '$v' - fork releases must be CalVer YYYY.M.D without a suffix (e.g. 2026.9.29); mirrored upstream semver tags (e.g. 1.14.48) are not fork releases"
+            exit 1
+          fi
+          if [ "${v%%.*}" -lt 2000 ]; then
+            echo "::error::Invalid version '$v' - year must be >= 2000 (e.g. 2026.9.29)"
+            exit 1
+          fi
+          # Valid semver (no leading zeros): 2026.09.29 is NOT valid semver.
+          # The shape check bounds month/day to 1-2 digits, so a leading zero
+          # can only appear as .0X (pure bash, no runtime dependency).
+          if grep -Eq '\.0[0-9]' <<<"$v"; then
+            echo "::error::Invalid version '$v' - not valid semver (no leading zeros; use 2026.9.9, not 2026.09.09)"
             exit 1
           fi
           echo "version=$v" >> "$GITHUB_OUTPUT"
 
+      # Same-day re-release: same version = same tag. This step reuses an
+      # existing release, and the build re-uploads assets with --clobber
+      # (packages/opencode/script/build.ts), so the tag keeps pointing at its
+      # original commit. A second cut on the same day overwrites assets rather
+      # than minting a new version/tag.
       - name: Create draft release
         env:
           GH_TOKEN: ${{ github.token }}
