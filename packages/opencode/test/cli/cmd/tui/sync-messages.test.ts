@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test"
 import type { SessionMessage } from "@opencode-ai/sdk/v2"
 import { reduceMessageEvent, type MessageSyncEvent } from "@/cli/cmd/tui/context/sync-messages.shared"
+import { dropRevertedRange } from "@/cli/cmd/tui/routes/session/revert-boundary.shared"
 
 /**
  * Characterization tests for the TUI message-state reducer, extracted verbatim
@@ -425,5 +426,57 @@ describe("reduceMessageEvent", () => {
     if (shell.type !== "shell") throw new Error("expected shell")
     expect(shell.output).toBe("files")
     expect(shell.time.completed).toBe(now + 1)
+  })
+
+  // Server-side revert cleanup deletes rows (V1 `msg_*` ids) before clearing
+  // the marker, but the live store never consumes `message.removed` — its
+  // `evt_*` rows can't match. The reducer must ignore removals and rely on
+  // sync.tsx's boundary drop at revert-clear, so stale rows survive intact
+  // here and the later `session.next.prompted` (newest unshift) plus the
+  // store drop produce exactly one replacement.
+  it("ignores message.removed and keeps stale rows for the revert-clear drop", () => {
+    const messages: SessionMessage[] = []
+    const prompted = (id: string, text: string, offset: number) =>
+      ev(id, "session.next.prompted", {
+        sessionID: "ses_1",
+        timestamp: now + offset,
+        prompt: { text, files: [], agents: [] },
+        agent: "build",
+        model: { id: "m", providerID: "p", variant: "default" },
+      })
+    reduceMessageEvent(messages, prompted("evt_1", "first", 0))
+    reduceMessageEvent(messages, ev("evt_2", "session.next.step.started", {
+      sessionID: "ses_1",
+      timestamp: now + 1,
+      agent: "build",
+      model: { id: "m", providerID: "p", variant: "default" },
+    }))
+    reduceMessageEvent(messages, prompted("evt_3", "second", 2))
+    reduceMessageEvent(messages, ev("evt_4", "session.next.step.started", {
+      sessionID: "ses_1",
+      timestamp: now + 3,
+      agent: "build",
+      model: { id: "m", providerID: "p", variant: "default" },
+    }))
+    // undo targets evt_3; cleanup emits canonical removals the store can't match
+    reduceMessageEvent(messages, ev("evt_x", "message.removed", { sessionID: "ses_1", messageID: "msg_srv" }) as never)
+    reduceMessageEvent(
+      messages,
+      ev("evt_y", "message.part.removed", {
+        sessionID: "ses_1",
+        messageID: "msg_srv",
+        partID: "prt_srv",
+      }) as never,
+    )
+    expect(messages.map((m) => m.id)).toEqual(["evt_4", "evt_3", "evt_2", "evt_1"])
+
+    // sync.tsx drops id >= "evt_3" at revert-clear; replacement prompts after
+    const dropped = dropRevertedRange(messages, "evt_3")
+    expect(dropped.map((m) => m.id)).toEqual(["evt_2", "evt_1"])
+    reduceMessageEvent(dropped, prompted("evt_5", "second edited", 4))
+    const users = dropped.filter((m) => m.type === "user")
+    expect(users.map((m) => m.id)).toEqual(["evt_5", "evt_1"])
+    if (users[0]?.type !== "user") throw new Error("expected user")
+    expect(users[0].text).toBe("second edited")
   })
 })

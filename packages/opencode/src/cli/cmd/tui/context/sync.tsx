@@ -34,6 +34,14 @@ import { useKV } from "./kv"
 import { aggregateFailures } from "./aggregate-failures"
 import type { SyncStore } from "./sync-schema"
 import { reduceMessageEvent } from "./sync-messages.shared"
+import { dropRevertedRange, revertClearDropBoundary } from "@tui/routes/session/revert-boundary.shared"
+
+// SessionIDs with an unconsumed full `message.removed`. Arms only on
+// SessionRevert.cleanup's per-message removals (which precede the
+// revert-clear); `unrevert` clears the marker without deleting rows and must
+// leave hidden rows in place for redo. `message.part.removed` is ignored
+// deliberately — the TUI never initiates part-level revert.
+const revertCleanupSeen = new Set<string>()
 
 export const { use: useSync, provider: SyncProvider } = createSimpleContext({
   name: "Sync",
@@ -121,6 +129,20 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
     }
 
     function patchSession(sessionID: string, info: Partial<Session>) {
+      // Revert-clear after server-side cleanup deleted rows: the live message
+      // store never consumed `message.removed` (V1 `msg_*` ids vs projected
+      // `evt_*` rows), so replay the renderer's boundary comparison here
+      // before the stale rows become visible again. `clearRevert` without a
+      // preceding removal is the unrevert path — rows must stay for redo.
+      const match = Binary.search(store.session, sessionID, (session) => session.id)
+      const prevBoundary = match.found ? store.session[match.index]?.revert?.messageID : undefined
+      const cleared = "revert" in info && info.revert == null
+      const boundary = revertClearDropBoundary(prevBoundary, cleared, revertCleanupSeen.has(sessionID))
+      revertCleanupSeen.delete(sessionID)
+      if (boundary) {
+        const messages = store.messages[sessionID]
+        if (messages) setStore("messages", sessionID, dropRevertedRange(messages, boundary))
+      }
       setStore(
         "session",
         produce((draft) => {
@@ -148,6 +170,7 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
           break
         case "session.deleted": {
           const sessionID = event.properties.sessionID ?? event.properties.info.id
+          revertCleanupSeen.delete(sessionID)
           setStore(
             "session",
             produce((draft) => {
@@ -155,6 +178,14 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
               if (match.found) draft.splice(match.index, 1)
             }),
           )
+          break
+        }
+        case "message.removed": {
+          // Server-side cleanup deleted rows keyed by V1 `msg_*` ids, which
+          // never match the projected `evt_*` rows in the live store. Record
+          // the session so the following revert-clear drops the stale range
+          // by boundary comparison instead.
+          revertCleanupSeen.add(event.properties.sessionID)
           break
         }
         case "session.next.permission.replied": {
