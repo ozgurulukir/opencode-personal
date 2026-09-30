@@ -42,6 +42,19 @@ export function dropRevertedRange(messages: SessionMessage[], boundary: string) 
 }
 
 /**
+ * Captures the projected rows hidden by an active revert marker. Keep the
+ * concrete IDs instead of reapplying the boundary later: a replacement turn
+ * can be inserted before cleanup events reach the client and must survive.
+ */
+export function revertedMessageIDs(messages: SessionMessage[], boundary: string) {
+  return messages.filter((x) => x.id >= boundary).map((x) => x.id)
+}
+
+export function dropRevertedMessages(messages: SessionMessage[], ids: ReadonlySet<string>) {
+  return messages.filter((x) => !ids.has(x.id))
+}
+
+/**
  * Decides whether a revert-clear patch should drop the pre-clear range from
  * the live store, and if so which boundary to drop at. `cleared` must mean
  * the patch explicitly nulls the marker (`"revert" in info && info.revert ==

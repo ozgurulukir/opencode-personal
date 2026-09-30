@@ -34,14 +34,11 @@ import { useKV } from "./kv"
 import { aggregateFailures } from "./aggregate-failures"
 import type { SyncStore } from "./sync-schema"
 import { reduceMessageEvent } from "./sync-messages.shared"
-import { dropRevertedRange, revertClearDropBoundary } from "@tui/routes/session/revert-boundary.shared"
-
-// SessionIDs with an unconsumed full `message.removed`. Arms only on
-// SessionRevert.cleanup's per-message removals (which precede the
-// revert-clear); `unrevert` clears the marker without deleting rows and must
-// leave hidden rows in place for redo. `message.part.removed` is ignored
-// deliberately — the TUI never initiates part-level revert.
-const revertCleanupSeen = new Set<string>()
+import {
+  dropRevertedMessages,
+  revertedMessageIDs,
+  revertClearDropBoundary,
+} from "@tui/routes/session/revert-boundary.shared"
 
 export const { use: useSync, provider: SyncProvider } = createSimpleContext({
   name: "Sync",
@@ -89,7 +86,16 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
     }
 
     const fullSyncedSessions = new Set<string>()
+    const revertCleanupSeen = new Set<string>()
+    const revertedProjectedIDs = new Map<string, Set<string>>()
     let syncedWorkspace = project.workspace.current()
+
+    function rememberRevertedMessages(sessionID: string, boundary: string | undefined) {
+      if (!boundary?.startsWith("evt_")) return
+      const messages = store.messages[sessionID]
+      if (!messages) return
+      revertedProjectedIDs.set(sessionID, new Set(revertedMessageIDs(messages, boundary)))
+    }
 
     function sessionListQuery(): { scope?: "project"; path?: string } {
       if (!kv.get("session_directory_filter_enabled", true)) return { scope: "project" }
@@ -138,10 +144,13 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
       const prevBoundary = match.found ? store.session[match.index]?.revert?.messageID : undefined
       const cleared = "revert" in info && info.revert == null
       const boundary = revertClearDropBoundary(prevBoundary, cleared, revertCleanupSeen.has(sessionID))
+      rememberRevertedMessages(sessionID, info.revert?.messageID)
       revertCleanupSeen.delete(sessionID)
       if (boundary) {
         const messages = store.messages[sessionID]
-        if (messages) setStore("messages", sessionID, dropRevertedRange(messages, boundary))
+        const projectedIDs = revertedProjectedIDs.get(sessionID)
+        if (messages && projectedIDs) setStore("messages", sessionID, dropRevertedMessages(messages, projectedIDs))
+        revertedProjectedIDs.delete(sessionID)
       }
       setStore(
         "session",
@@ -171,6 +180,7 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
         case "session.deleted": {
           const sessionID = event.properties.sessionID ?? event.properties.info.id
           revertCleanupSeen.delete(sessionID)
+          revertedProjectedIDs.delete(sessionID)
           setStore(
             "session",
             produce((draft) => {
@@ -181,11 +191,17 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
           break
         }
         case "message.removed": {
-          // Server-side cleanup deleted rows keyed by V1 `msg_*` ids, which
-          // never match the projected `evt_*` rows in the live store. Record
-          // the session so the following revert-clear drops the stale range
-          // by boundary comparison instead.
-          revertCleanupSeen.add(event.properties.sessionID)
+          // Server-side cleanup deletes canonical V1 rows, while this store
+          // contains projected V2 rows. The exact projected IDs were
+          // snapshotted when the revert marker was set, so this remains safe
+          // if the replacement prompt arrives before this event or clear.
+          const sessionID = event.properties.sessionID
+          revertCleanupSeen.add(sessionID)
+          const projectedIDs = revertedProjectedIDs.get(sessionID)
+          const messages = store.messages[sessionID]
+          if (projectedIDs && messages) {
+            setStore("messages", sessionID, dropRevertedMessages(messages, projectedIDs))
+          }
           break
         }
         case "session.next.permission.replied": {
@@ -535,12 +551,14 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
               draft.messages[sessionID] = v2messages.data?.items ?? []
             }),
           )
+          rememberRevertedMessages(sessionID, result.session.get(sessionID)?.revert?.messageID)
           fullSyncedSessions.add(sessionID)
         },
         message: {
           async sync(sessionID: string) {
             const response = await sdk.client.v2.session.messages({ sessionID })
             setStore("messages", sessionID, reconcile(response.data?.items ?? []))
+            rememberRevertedMessages(sessionID, result.session.get(sessionID)?.revert?.messageID)
           },
           fromSession(sessionID: string) {
             const messages = store.messages[sessionID]
