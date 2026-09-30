@@ -289,7 +289,13 @@ function insertPart(input: MessageHandlerInput, part: Part) {
 }
 
 function latestUser(messages: Message[] | undefined): UserMessage | undefined {
-  return messages?.findLast((message): message is UserMessage => message.role === "user")
+  if (!messages) return undefined
+  // ⚡ Bolt Optimization: Using backward loop instead of .findLast() to avoid GC pressure and O(N) traversal overhead
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const message = messages[i]
+    if (message.role === "user") return message
+  }
+  return undefined
 }
 
 // V1 user messages store the model as {providerID, modelID}; the adapter's

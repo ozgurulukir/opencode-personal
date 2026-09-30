@@ -122,3 +122,7 @@
 ## 2026-09-02 - GC Pressure from `JSON.stringify` in Hot Paths
 **Learning:** Using `JSON.stringify` as a fallback for generating uniqueness keys in hot paths (like LSP diagnostic deduplication processing thousands of items) creates significant Garbage Collection (GC) pressure and serialization overhead. The memory allocations during `stringify` add up quickly in high-frequency loops.
 **Action:** When deriving deterministic string keys from objects in high-throughput areas, replace `JSON.stringify` with lightweight, recursive string concatenation of the primitive properties.
+
+## 2026-09-30 - Extension of Backward Loops and Single Chain Iteration in Reactive Contexts
+**Learning:** Expanding on previous optimizations (see 2026-08-04), using `.findLast()`, `.findLastIndex()`, or chaining multiple array traversals (like `.flatMap().map().findLast()`) within high-frequency paths or `createMemo` hooks continues to generate measurable GC pressure via closure allocation and redundant intermediate array creation.
+**Action:** Consistently replace these methods and chains with single, imperative backward `for` loops across both backend session loops and frontend reactive graph hot paths. This guarantees minimal allocation overhead, O(N) single-pass execution, and reduces garbage collection pauses.
