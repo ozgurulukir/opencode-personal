@@ -13,7 +13,7 @@ import { Spinner } from "@opencode-ai/ui/spinner"
 import { SessionTurn } from "@opencode-ai/ui/session-turn"
 import { ScrollView } from "@opencode-ai/ui/scroll-view"
 import { TextField } from "@opencode-ai/ui/text-field"
-import type { AssistantMessage, Message as MessageType, Part, TextPart, UserMessage } from "@opencode-ai/sdk/v2"
+import type { Message as MessageType, Part, TextPart, UserMessage } from "@opencode-ai/sdk/v2"
 import { showToast } from "@opencode-ai/ui/toast"
 import { Binary } from "@opencode-ai/core/util/binary"
 import { getFilename } from "@opencode-ai/core/util/path"
@@ -91,11 +91,17 @@ export function MessageTimeline(props: {
     if (!id) return emptyMessages
     return sync.data.message[id] ?? emptyMessages
   })
-  const pending = createMemo(() =>
-    sessionMessages().findLast(
-      (item): item is AssistantMessage => item.role === "assistant" && typeof item.time.completed !== "number",
-    ),
-  )
+  const pending = createMemo(() => {
+    const msgs = sessionMessages()
+    // ⚡ Bolt Optimization: Using backward loop instead of .findLast() to avoid GC pressure and O(N) traversal overhead
+    for (let i = msgs.length - 1; i >= 0; i--) {
+      const item = msgs[i]
+      if (item.role === "assistant" && typeof item.time.completed !== "number") {
+        return item
+      }
+    }
+    return undefined
+  })
   const sessionStatus = createMemo(() => {
     const id = sessionID()
     if (!id) return idle
@@ -162,10 +168,19 @@ export function MessageTimeline(props: {
   const childTaskDescription = createMemo(() => {
     const id = sessionID()
     if (!id) return
-    return parentMessages()
-      .flatMap((message) => sync.data.part[message.id] ?? [])
-      .map((part) => taskDescription(part, id))
-      .findLast((value): value is string => !!value)
+    const msgs = parentMessages()
+    // ⚡ Bolt Optimization: Using single backward loop instead of chained .flatMap().map().findLast()
+    // to avoid intermediate array allocations and closure overhead on reactive path
+    for (let i = msgs.length - 1; i >= 0; i--) {
+      const message = msgs[i]
+      const parts = sync.data.part[message.id]
+      if (!parts) continue
+      for (let j = parts.length - 1; j >= 0; j--) {
+        const desc = taskDescription(parts[j], id)
+        if (desc) return desc
+      }
+    }
+    return
   })
   const childTitle = createMemo(() => {
     if (!parentID()) return titleLabel() ?? ""

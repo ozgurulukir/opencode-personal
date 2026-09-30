@@ -40,7 +40,14 @@ export const predict = Effect.fn("SessionPrompt.predict")(function* (
   const history = yield* deps.sessions.messages({ sessionID: input.sessionID })
   const real = (m: MessageV2.WithParts) =>
     m.info.role === "user" && !m.parts.every((p) => "synthetic" in p && p.synthetic)
-  const userIdx = history.findLastIndex(real)
+  let userIdx = -1
+  // ⚡ Bolt Optimization: Using backward loop instead of .findLastIndex() to avoid GC pressure and O(N) traversal overhead
+  for (let i = history.length - 1; i >= 0; i--) {
+    if (real(history[i])) {
+      userIdx = i
+      break
+    }
+  }
   if (userIdx === -1) return ""
   const lastUser = history[userIdx]
   if (lastUser.info.role !== "user") return ""
