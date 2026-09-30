@@ -33,9 +33,9 @@ function parse(input: string) {
 export function exactLocale(input: string) {
   const value = parse(input)
   if (!value) return null
-  if (value in localeAlias) {
-    return localeAlias[value as keyof typeof localeAlias]
-  }
+
+  const alias = Object.entries(localeAlias).find(([key]) => key === value)?.[1]
+  if (alias) return alias
 
   return null
 }
@@ -44,9 +44,8 @@ export function matchLocale(input: string) {
   const value = parse(input)
   if (!value) return null
 
-  if (value in localeAlias) {
-    return localeAlias[value as keyof typeof localeAlias]
-  }
+  const alias = Object.entries(localeAlias).find(([key]) => key === value)?.[1]
+  if (alias) return alias
 
   return starts.find((item) => value.startsWith(item[0]))?.[1] ?? null
 }

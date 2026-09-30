@@ -242,6 +242,7 @@ function createOpencode() {
 }
 
 function assertPayloadKeyword() {
+  // oxlint-disable-next-line
   const payload = useContext().payload as IssueCommentEvent | PullRequestReviewCommentEvent
   const body = payload.comment.body.trim()
   if (!body.match(/(?:^|\s)(?:\/opencode|\/oc)(?=$|\s)/)) {
@@ -255,6 +256,7 @@ function getReviewCommentContext() {
     return null
   }
 
+  // oxlint-disable-next-line
   const payload = context.payload as PullRequestReviewCommentEvent
   return {
     file: payload.comment.path,
@@ -350,15 +352,18 @@ function isMock() {
 
 function isPullRequest() {
   const context = useContext()
+  // oxlint-disable-next-line
   const payload = context.payload as IssueCommentEvent
   return Boolean(payload.issue.pull_request)
 }
 
 function useContext() {
+  // oxlint-disable-next-line
   return isMock() ? (JSON.parse(useEnvMock().mockEvent!) as GitHubContext) : github.context
 }
 
 function useIssueId() {
+  // oxlint-disable-next-line
   const payload = useContext().payload as IssueCommentEvent
   return payload.issue.number
 }
@@ -393,10 +398,12 @@ async function getAccessToken() {
   }
 
   if (!response.ok) {
+    // oxlint-disable-next-line
     const responseJson = (await response.json()) as { error?: string }
     throw new Error(`App token exchange failed: ${response.status} ${response.statusText} - ${responseJson.error}`)
   }
 
+  // oxlint-disable-next-line
   const responseJson = (await response.json()) as { token: string }
   return responseJson.token
 }
@@ -414,6 +421,7 @@ async function createComment() {
 
 async function getUserPrompt() {
   const context = useContext()
+  // oxlint-disable-next-line
   const payload = context.payload as IssueCommentEvent | PullRequestReviewCommentEvent
   const reviewContext = getReviewCommentContext()
 
@@ -581,6 +589,7 @@ async function summarize(response: string) {
     if (isScheduleEvent()) {
       return "Scheduled task changes"
     }
+    // oxlint-disable-next-line
     const payload = useContext().payload as IssueCommentEvent
     return `Fix issue: ${payload.issue.title}`
   }
@@ -876,6 +885,7 @@ query($owner: String!, $repo: String!, $number: Int!) {
 }
 
 function buildPromptDataForIssue(issue: GitHubIssue) {
+  // oxlint-disable-next-line
   const payload = useContext().payload as IssueCommentEvent
 
   const comments = (issue.comments?.nodes || [])
@@ -998,6 +1008,7 @@ query($owner: String!, $repo: String!, $number: Int!) {
 }
 
 function buildPromptDataForPR(pr: GitHubPullRequest) {
+  // oxlint-disable-next-line
   const payload = useContext().payload as IssueCommentEvent
 
   const comments = (pr.comments?.nodes || [])
