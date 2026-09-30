@@ -11,6 +11,7 @@
         "typescript": "catalog:",
       },
       "devDependencies": {
+        "@octokit/webhooks-types": "7.6.1",
         "@opentui/core": "catalog:",
         "@opentui/keymap": "catalog:",
         "@opentui/solid": "catalog:",
