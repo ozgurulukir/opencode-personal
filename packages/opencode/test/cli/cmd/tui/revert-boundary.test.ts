@@ -1,8 +1,10 @@
 import { describe, expect, it } from "bun:test"
 import type { SessionMessage, SessionMessageAssistant, SessionMessageUser } from "@opencode-ai/sdk/v2"
 import {
+  dropRevertedRange,
   firstUserAfterBoundary,
   lastUserBeforeBoundary,
+  revertClearDropBoundary,
   usersFromBoundary,
 } from "@/cli/cmd/tui/routes/session/revert-boundary.shared"
 
@@ -67,5 +69,25 @@ describe("revert boundary helpers", () => {
     expect(usersFromBoundary(slice, "evt_4").map((m) => m.id)).toEqual(["evt_5"])
     expect(usersFromBoundary(slice, "evt_5").map((m) => m.id)).toEqual(["evt_5"])
     expect(usersFromBoundary(slice, "evt_6")).toEqual([])
+  })
+
+  it("dropRevertedRange keeps only messages below the boundary", () => {
+    expect(dropRevertedRange(slice, "evt_5").map((m) => m.id)).toEqual(["evt_1", "evt_2", "evt_3", "evt_4"])
+    expect(dropRevertedRange(slice, "evt_1")).toEqual([])
+    expect(dropRevertedRange(slice, "evt_9").map((m) => m.id)).toEqual(slice.map((m) => m.id))
+  })
+
+  it("dropRevertedRange is ordering-agnostic (newest-first store slice)", () => {
+    const newestFirst = [...slice].reverse()
+    expect(dropRevertedRange(newestFirst, "evt_5").map((m) => m.id)).toEqual(["evt_4", "evt_3", "evt_2", "evt_1"])
+  })
+
+  it("revertClearDropBoundary returns the boundary only for armed cleanup clears", () => {
+    expect(revertClearDropBoundary("evt_5", true, true)).toBe("evt_5")
+    // unrevert: marker clears without a preceding removal — rows must stay
+    expect(revertClearDropBoundary("evt_5", true, false)).toBeUndefined()
+    // patch that merely omits revert is not a clear
+    expect(revertClearDropBoundary("evt_5", false, true)).toBeUndefined()
+    expect(revertClearDropBoundary(undefined, true, true)).toBeUndefined()
   })
 })
