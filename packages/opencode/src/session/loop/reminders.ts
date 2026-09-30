@@ -29,7 +29,14 @@ export const insertReminders = Effect.fn("SessionPrompt.insertReminders")(functi
     session: Session.Info
   },
 ) {
-  const userIndex = input.messages.findLastIndex((msg) => msg.info.role === "user")
+  let userIndex = -1
+  // ⚡ Bolt Optimization: Using backward loop instead of .findLastIndex() to avoid GC pressure and O(N) traversal overhead
+  for (let i = input.messages.length - 1; i >= 0; i--) {
+    if (input.messages[i].info.role === "user") {
+      userIndex = i
+      break
+    }
+  }
   if (userIndex === -1) return input.messages
   const userMessage = input.messages[userIndex]
 
