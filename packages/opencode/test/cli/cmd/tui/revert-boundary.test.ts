@@ -1,9 +1,11 @@
 import { describe, expect, it } from "bun:test"
 import type { SessionMessage, SessionMessageAssistant, SessionMessageUser } from "@opencode-ai/sdk/v2"
 import {
+  dropRevertedMessages,
   dropRevertedRange,
   firstUserAfterBoundary,
   lastUserBeforeBoundary,
+  revertedMessageIDs,
   revertClearDropBoundary,
   usersFromBoundary,
 } from "@/cli/cmd/tui/routes/session/revert-boundary.shared"
@@ -80,6 +82,14 @@ describe("revert boundary helpers", () => {
   it("dropRevertedRange is ordering-agnostic (newest-first store slice)", () => {
     const newestFirst = [...slice].reverse()
     expect(dropRevertedRange(newestFirst, "evt_5").map((m) => m.id)).toEqual(["evt_4", "evt_3", "evt_2", "evt_1"])
+  })
+
+  it("drops only the snapshotted rows when a replacement arrives first", () => {
+    const hidden = revertedMessageIDs(slice, "evt_3")
+    const replacement = user("evt_7")
+    const withReplacement = [replacement, ...slice]
+
+    expect(dropRevertedMessages(withReplacement, new Set(hidden)).map((m) => m.id)).toEqual(["evt_7", "evt_1", "evt_2"])
   })
 
   it("revertClearDropBoundary returns the boundary only for armed cleanup clears", () => {
