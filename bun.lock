@@ -310,7 +310,7 @@
         "@storybook/addon-a11y": "^10.2.13",
         "@storybook/addon-docs": "^10.2.13",
         "@storybook/addon-links": "^10.2.13",
-        "@storybook/addon-onboarding": "^10.2.13",
+        "@storybook/addon-onboarding": "^10.6.0",
         "@storybook/addon-vitest": "^10.2.13",
         "@tailwindcss/vite": "catalog:",
         "@tsconfig/node22": "catalog:",
@@ -1552,7 +1552,7 @@
 
     "@storybook/addon-links": ["@storybook/addon-links@10.5.7", "", { "dependencies": { "@storybook/global": "^5.0.0" }, "peerDependencies": { "@types/react": "^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0", "react": "^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0", "storybook": "^10.5.7" }, "optionalPeers": ["@types/react", "react"] }, "sha512-17PxEOocLhAEaPeQ4q+8yul/LF9YEIePS1arknCAS7U1pQXTe0uj+R0pB6uPLVflM5gECQMiP4WzIj4tEiL6+A=="],
 
-    "@storybook/addon-onboarding": ["@storybook/addon-onboarding@10.5.7", "", { "peerDependencies": { "storybook": "^10.5.7" } }, "sha512-GDssSoWmmGnz6OnUvAofMcrUuTMD53Y2rnbshjXvhtPnjKw4dufXFjo6C7yZQ6vyoNzTS9HyQwCHlxlhyCKJjQ=="],
+    "@storybook/addon-onboarding": ["@storybook/addon-onboarding@10.6.0", "", { "peerDependencies": { "storybook": "^10.6.0" } }, "sha512-zwe9lgCsq4ko/37CVgM9mZvaVV6WSO0k1IDTURof9B1CgHWzQ2Xn+5CYRVhbHie3mQ9bO1pcLI+ASdpdnOtSiQ=="],
 
     "@storybook/addon-vitest": ["@storybook/addon-vitest@10.5.7", "", { "dependencies": { "@storybook/global": "^5.0.0", "@storybook/icons": "^2.0.2" }, "peerDependencies": { "@vitest/browser": "^3.0.0 || ^4.0.0", "@vitest/browser-playwright": "^4.0.0", "@vitest/runner": "^3.0.0 || ^4.0.0", "storybook": "^10.5.7", "vitest": "^3.0.0 || ^4.0.0" }, "optionalPeers": ["@vitest/browser", "@vitest/browser-playwright", "@vitest/runner", "vitest"] }, "sha512-7NK7Kzazc2vb2h8nGlH15QlUn5J6/LV0xF70VziAK0bxu3r1JupLCoBvckX39vHzFXiAZljXZtt1Wq/OidBxow=="],
 
