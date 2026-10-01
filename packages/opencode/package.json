@@ -168,7 +168,7 @@
   },
   "optionalDependencies": {
     "@zvec/zvec": "0.7.1",
-    "onnxruntime-web": "1.27.0"
+    "onnxruntime-web": "1.30.0"
   },
   "overrides": {
     "drizzle-orm": "catalog:"
