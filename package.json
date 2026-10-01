@@ -87,7 +87,7 @@
     "@types/mime-types": "3.0.1",
     "@typescript/native-preview": "catalog:",
     "husky": "9.1.7",
-    "oxlint": "1.85.0",
+    "oxlint": "1.86.0",
     "oxlint-tsgolint": "0.25.0",
     "prettier": "3.9.9",
     "sst": "3.19.3",
