@@ -51,6 +51,7 @@ function formatDuration(ms: number): string {
 }
 
 function formatProviderName(provider: string): string {
+  if (provider === "openai") return "ChatGPT"
   return provider
     .split(/[-_]/g)
     .map((part) => (part ? part[0].toUpperCase() + part.slice(1) : ""))
@@ -180,6 +181,14 @@ export function DialogUsage() {
                       <Show when={report.metadata?.email}>
                         <text fg={theme.textMuted}>{String(report.metadata!.email)}</text>
                       </Show>
+                      <Show when={report.metadata?.planType || report.metadata?.resetCredits !== undefined}>
+                        <text fg={theme.textMuted}>
+                          {report.metadata?.planType ? `${String(report.metadata.planType)} plan` : ""}
+                          {report.metadata?.resetCredits !== undefined
+                            ? `${report.metadata?.planType ? " · " : ""}${String(report.metadata.resetCredits)} reset credits`
+                            : ""}
+                        </text>
+                      </Show>
                     </box>
                     <For each={report.limits}>
                       {(limit: UsageLimit) => {
@@ -210,7 +219,9 @@ export function DialogUsage() {
                               </Show>
                             </text>
                             <text fg={statusColor}>
-                              {limit.amount.unit === "usd" && fraction === undefined && limit.amount.remaining !== undefined
+                              {limit.amount.unit === "usd" &&
+                              fraction === undefined &&
+                              limit.amount.remaining !== undefined
                                 ? `$${limit.amount.remaining.toFixed(2)} left`
                                 : fraction === undefined && limit.amount.unit !== "usd"
                                   ? ""

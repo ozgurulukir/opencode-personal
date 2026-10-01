@@ -4,16 +4,18 @@ import type { UsageProvider, UsageReport, UsageCredential } from "./types"
 import { claudeUsageProvider } from "./claude"
 import { zaiUsageProvider } from "./zai"
 import { clineUsageProvider } from "./cline"
+import { openaiUsageProvider } from "./openai"
 
 export * as UsageTypes from "./types"
 export { claudeUsageProvider } from "./claude"
 export { zaiUsageProvider } from "./zai"
 export { clineUsageProvider } from "./cline"
+export { openaiUsageProvider } from "./openai"
 export { resolveUsedFraction } from "./types"
 export type { UsageReport, UsageLimit, UsageAmount, UsageWindow, UsageProvider, UsageCredential } from "./types"
 
 /** All registered usage providers. */
-const providers: UsageProvider[] = [claudeUsageProvider, zaiUsageProvider, clineUsageProvider]
+const providers: UsageProvider[] = [claudeUsageProvider, zaiUsageProvider, clineUsageProvider, openaiUsageProvider]
 
 /** Maps opencode provider IDs to usage provider IDs. */
 const PROVIDER_ID_MAP: Record<string, string> = {

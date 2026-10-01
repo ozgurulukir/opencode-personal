@@ -19,7 +19,7 @@ See the [fork documentation](https://ozgurulukir.github.io/opencode-personal/) f
 
 This fork is built on top of the OpenCode 1.14.48 source release. Notable changes maintained in this repository:
 
-- Provider usage & quotas in `/usage` — Anthropic (Claude), ZAI, and ClinePass (5-hour/weekly/monthly limits, credit balance, and plan info).
+- Provider usage & quotas in `/usage` — Anthropic (Claude), ChatGPT subscriptions, ZAI, and ClinePass (5-hour/weekly/monthly limits, credit balance, and plan info).
 - Unified V1/V2 session architecture with a single V2 SDK surface.
 - Local semantic workspace search (zvec) with automatic skill matching.
 - A Rust/WASM diff engine (`packages/diff-wasm`).
