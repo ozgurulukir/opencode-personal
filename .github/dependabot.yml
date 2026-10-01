@@ -1,0 +1,26 @@
+version: 2
+updates:
+  - package-ecosystem: "bun"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+  - package-ecosystem: "bun"
+    directory: "/github"
+    schedule:
+      interval: "weekly"
+  - package-ecosystem: "cargo"
+    directory: "/packages/diff-wasm"
+    schedule:
+      interval: "weekly"
+  - package-ecosystem: "pip"
+    directory: "/.nova"
+    schedule:
+      interval: "weekly"
+  - package-ecosystem: "pip"
+    directory: "/packages/opencode/.nova"
+    schedule:
+      interval: "weekly"
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
