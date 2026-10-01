@@ -53,3 +53,9 @@ packages/opencode/dist.old/opencode-windows-x64/bin/opencode.exe.old
 
 # Generated artifacts (untracked)
 .ua/
+
+# Local planning notes (never shared; history removal needs opt-in rewrite)
+_plan/
+_proposal/
+_review/
+specs/
