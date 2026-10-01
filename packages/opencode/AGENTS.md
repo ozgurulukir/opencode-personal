@@ -1,6 +1,6 @@
 # opencode package guide
 
-This package follows the root [AGENTS.md](../AGENTS.md) for general repo rules (style, testing, typecheck, technologies).
+This package follows the root [AGENTS.md](../../AGENTS.md) for general repo rules (style, testing, typecheck, technologies).
 
 This file covers package-specific conventions only.
 
@@ -156,7 +156,7 @@ test("flushInterrupted marks all in-flight parts as interrupted", () => {
 
  ### Order-dependent failures
 
- Many tests pass in isolation but fail in the full suite due to shared state or global mock leakage. This is documented in the root [AGENTS.md](../AGENTS.md#testing). Always run the full test suite after changes.
+ Many tests pass in isolation but fail in the full suite due to shared state or global mock leakage. This is documented in the root [AGENTS.md](../../AGENTS.md#testing). Always run the full test suite after changes.
 
  ### Effect race conditions in tests
 

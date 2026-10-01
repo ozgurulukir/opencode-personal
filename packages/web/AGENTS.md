@@ -1,6 +1,6 @@
 # Web package guide
 
-This package follows the root [AGENTS.md](../AGENTS.md) for general repo rules.
+This package follows the root [AGENTS.md](../../AGENTS.md) for general repo rules.
 
 ## Share page — WebSocket message conversion gate
 

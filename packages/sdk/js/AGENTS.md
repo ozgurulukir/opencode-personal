@@ -1,6 +1,6 @@
 # SDK package guide
 
-This package follows the root [AGENTS.md](../AGENTS.md) for general repo rules (style, testing, typecheck, technologies).
+This package follows the root [AGENTS.md](../../../AGENTS.md) for general repo rules (style, testing, typecheck, technologies).
 
 ## Generated client structure
 
