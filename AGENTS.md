@@ -188,7 +188,7 @@ const table = sqliteTable("session", {
 ## Technologies
 
 - HTTP server is Effect `HttpApi` (`effect/unstable/httpapi`) + Effect `Schema` for request/response typing at the API boundary (51 unique files use `effect/unstable/httpapi`; Hono appears only in a node SSE shim at `server/httpapi-server.node.ts`, one session handler, and a command template). zod 4.1.8 (catalog) is used for config/skill frontmatter/SDK-client boundaries, not the HTTP API.
-- Bun 1.3.14 with workspace support, catalog versions, and patches
+- Bun 1.4.2 (pinned via `packageManager`; hook + `packages/script` read it dynamically) with workspace support, catalog versions, and patches. `overrides` pins `@effect/platform-node-shared` to `4.0.0-beta.107` — its upstream range `^4.0.0-beta.65` semver-matches stable 4.0.0, whose dist imports `effect/ByteSize` etc. and breaks the compiled build against core `effect@4.0.0-beta.65`.
 - Drizzle ORM (beta) with snake_case field convention
 - Effect 4.0.0-beta.65
 - SolidJS + Astro/Starlight (web), OpenTUI (TUI)
