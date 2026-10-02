@@ -32,6 +32,8 @@ import {
 import { toolFiletype } from "./tool"
 import { transparent, type RunBlockTheme, type RunFooterTheme } from "./theme"
 import type { PermissionReply, RunDiffStyle } from "./types"
+import * as Log from "@opencode-ai/core/util/log"
+import { errorMessage } from "@/util/error"
 
 function buttons(
   list: PermissionOption[],
@@ -141,6 +143,7 @@ export function RunPermissionBody(props: {
 }) {
   const dims = useTerminalDimensions()
   const [state, setState] = createSignal(createPermissionBodyState(props.request.id))
+  const [replyError, setReplyError] = createSignal<string | undefined>(undefined)
   const info = createMemo(() => permissionInfo(props.request))
   const ft = createMemo(() => toolFiletype(info().file))
   const narrow = createMemo(() => dims().width < 80)
@@ -164,6 +167,7 @@ export function RunPermissionBody(props: {
       return
     }
 
+    setReplyError(undefined)
     setState(createPermissionBodyState(id))
   })
 
@@ -172,6 +176,7 @@ export function RunPermissionBody(props: {
   }
 
   const submit = async (next: PermissionReply) => {
+    setReplyError(undefined)
     setState((prev) => ({
       ...prev,
       submitting: true,
@@ -179,7 +184,9 @@ export function RunPermissionBody(props: {
 
     try {
       await props.onReply(next)
-    } catch {
+    } catch (error) {
+      Log.Default.error("[run] permission reply failed", { err: error })
+      setReplyError(`Reply failed: ${errorMessage(error)} — press the button again to retry`)
       setState((prev) => ({
         ...prev,
         submitting: false,
@@ -292,6 +299,13 @@ export function RunPermissionBody(props: {
             </box>
           </Match>
         </Switch>
+        <Show when={replyError()}>
+          <box paddingLeft={2}>
+            <text fg={props.theme.error} wrapMode="word">
+              {replyError()}
+            </text>
+          </box>
+        </Show>
       </box>
 
       <Show

@@ -42,6 +42,8 @@ import {
 } from "./question.shared"
 import type { RunFooterTheme } from "./theme"
 import type { QuestionReject, QuestionReply } from "./types"
+import * as Log from "@opencode-ai/core/util/log"
+import { errorMessage } from "@/util/error"
 
 export function RunQuestionBody(props: {
   request: QuestionRequest
@@ -51,6 +53,7 @@ export function RunQuestionBody(props: {
 }) {
   const dims = useTerminalDimensions()
   const [state, setState] = createSignal(createQuestionBodyState(props.request.id))
+  const [replyError, setReplyError] = createSignal<string | undefined>(undefined)
   const single = createMemo(() => questionSingle(props.request))
   const confirm = createMemo(() => questionConfirm(props.request, state()))
   const info = createMemo(() => questionInfo(props.request, state()))
@@ -77,6 +80,7 @@ export function RunQuestionBody(props: {
   let area: TextareaRenderable | undefined
 
   createEffect(() => {
+    setReplyError(undefined)
     setState((prev) => questionSync(prev, props.request.id))
   })
 
@@ -89,21 +93,27 @@ export function RunQuestionBody(props: {
   }
 
   const beginReply = async (input: QuestionReply) => {
+    setReplyError(undefined)
     setState((prev) => questionSetSubmitting(prev, true))
 
     try {
       await props.onReply(input)
-    } catch {
+    } catch (error) {
+      Log.Default.error("[run] question reply failed", { err: error })
+      setReplyError(`Reply failed: ${errorMessage(error)} — try again`)
       setState((prev) => questionSetSubmitting(prev, false))
     }
   }
 
   const beginReject = async (input: QuestionReject) => {
+    setReplyError(undefined)
     setState((prev) => questionSetSubmitting(prev, true))
 
     try {
       await props.onReject(input)
-    } catch {
+    } catch (error) {
+      Log.Default.error("[run] question reject failed", { err: error })
+      setReplyError(`Reject failed: ${errorMessage(error)} — try again`)
       setState((prev) => questionSetSubmitting(prev, false))
     }
   }
@@ -283,6 +293,13 @@ export function RunQuestionBody(props: {
         flexShrink={1}
         backgroundColor={props.theme.surface}
       >
+        <Show when={replyError()}>
+          <box paddingLeft={1} flexShrink={0}>
+            <text fg={props.theme.error} wrapMode="word">
+              {replyError()}
+            </text>
+          </box>
+        </Show>
         <Show when={!single()}>
           <box id="run-direct-footer-question-tabs" flexDirection="row" gap={1} paddingLeft={1} flexShrink={0}>
             <For each={props.request.questions}>
