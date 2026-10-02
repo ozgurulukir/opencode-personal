@@ -125,7 +125,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: opencode-cli-windows
           path: packages/opencode/dist
@@ -239,22 +239,22 @@ jobs:
           node-version: "24"
           registry-url: "https://registry.npmjs.org"
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: opencode-cli
           path: packages/opencode/dist
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: opencode-cli-windows
           path: packages/opencode/dist
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: opencode-cli-signed-windows
           path: packages/opencode/dist
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         if: needs.version.outputs.release
         with:
       - name: Setup git committer
