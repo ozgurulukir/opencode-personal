@@ -163,7 +163,7 @@
     "web-tree-sitter": "0.26.12",
     "which": "6.0.1",
     "xdg-basedir": "5.1.0",
-    "yargs": "18.1.0",
+    "yargs": "18.2.0",
     "zod": "catalog:"
   },
   "optionalDependencies": {
