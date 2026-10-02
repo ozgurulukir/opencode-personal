@@ -13,7 +13,9 @@ export const log = {
 
 const optional = <Value>(result: Value | symbol) => {
   if (prompts.isCancel(result)) return Option.none<Value>()
-  return Option.some(result)
+  // isCancel() guards only the concrete CANCEL_SYMBOL, which TypeScript cannot subtract
+  // from the wide `symbol` union member — cast to recover Value at this boundary.
+  return Option.some(result as Value)
 }
 
 export const select = <Value>(opts: Parameters<typeof prompts.select<Value>>[0]) =>
