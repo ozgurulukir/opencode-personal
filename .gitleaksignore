@@ -134,3 +134,12 @@ ca3f0e2c1cac7d5cc8d4246760e85b9d84fc14a9:packages/opencode/test/config/search.te
 6a827bc658a2cc8b67aee8ff9503ceda10c6dcb6:packages/opencode/test/config/search.test.ts:generic-api-key:28
 f03df718a6d337bc9eaf427f28ec5e5123936057:packages/opencode/test/config/search.test.ts:generic-api-key:28
 f5a639d462eeb77143b03294814c4ac549f0ff7d:packages/opencode/test/config/search.test.ts:generic-api-key:28
+
+# Keyboard-binding strings ("shift+alt+arrow…") — the word "keybind" trips
+# generic-api-key; not credentials (commit c801127e3, app command palette).
+c801127e3f147bdc79c054d13814cfb55c124a0f:packages/app/src/pages/layout.tsx:generic-api-key:1080
+c801127e3f147bdc79c054d13814cfb55c124a0f:packages/app/src/pages/layout.tsx:generic-api-key:1087
+
+# Docs teaching page placeholder ("Authorization: Bearer YOUR_API_KEY") —
+# canonical dummy, never a real credential.
+c801127e3f147bdc79c054d13814cfb55c124a0f:packages/docs/ai-tools/cursor.mdx:curl-auth-header:127
