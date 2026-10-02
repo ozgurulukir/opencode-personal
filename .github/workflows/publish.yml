@@ -125,7 +125,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: opencode-cli-windows
           path: packages/opencode/dist
@@ -144,7 +144,7 @@ jobs:
           tenant-id: ${{ env.AZURE_TENANT_ID }}
           subscription-id: ${{ env.AZURE_SUBSCRIPTION_ID }}
 
-      - uses: azure/artifact-signing-action@v1
+      - uses: azure/artifact-signing-action@v2
         with:
           endpoint: ${{ env.AZURE_TRUSTED_SIGNING_ENDPOINT }}
           signing-account-name: ${{ env.AZURE_TRUSTED_SIGNING_ACCOUNT_NAME }}
@@ -232,29 +232,29 @@ jobs:
         uses: docker/setup-qemu-action@v3
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       - uses: actions/setup-node@v7
         with:
           node-version: "24"
           registry-url: "https://registry.npmjs.org"
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: opencode-cli
           path: packages/opencode/dist
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: opencode-cli-windows
           path: packages/opencode/dist
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: opencode-cli-signed-windows
           path: packages/opencode/dist
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         if: needs.version.outputs.release
         with:
       - name: Setup git committer
