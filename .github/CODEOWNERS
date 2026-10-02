@@ -1,5 +1,3 @@
-# web + desktop packages
-packages/app/      @adamdotdevin
-packages/tauri/    @adamdotdevin
-packages/desktop/src-tauri/  @brendonovich
-packages/desktop/  @adamdotdevin
+# Fork maintained by its owner; upstream paths (packages/tauri, packages/desktop)
+# were deleted here. Advisory only — no required reviews on this fork.
+*                   @ozgurulukir
