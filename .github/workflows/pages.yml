@@ -44,7 +44,7 @@ jobs:
           XDG_CACHE_HOME: ${{ runner.temp }}/opencode-cache
           XDG_STATE_HOME: ${{ runner.temp }}/opencode-state
       - run: bun run --cwd packages/web build
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: packages/web/dist
 
