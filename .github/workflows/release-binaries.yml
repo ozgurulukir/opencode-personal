@@ -31,7 +31,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Bash installer syntax check
         run: bash -n install.sh
       - name: Bash installer non-interference test
@@ -42,7 +42,7 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: PowerShell installer non-interference test
         shell: pwsh
         run: ./script/verify-isolation.ps1
@@ -57,7 +57,7 @@ jobs:
       OPENCODE_CHANNEL: personal
       OPENCODE_RELEASE: "1"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: ./.github/actions/setup-bun
 
