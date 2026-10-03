@@ -8,11 +8,13 @@ import { EventSequenceTable, EventTable } from "./event.sql"
 import type { WorkspaceID } from "@/control-plane/schema"
 import { EventID } from "./schema"
 import { Flag } from "@opencode-ai/core/flag/flag"
+import * as Log from "@opencode-ai/core/util/log"
 import { Context, DateTime, Effect, Layer, Schema as EffectSchema } from "effect"
 import type { DeepMutable } from "@opencode-ai/core/schema"
 import { makeRuntime } from "@/effect/run-service"
 import { serviceUse } from "@/effect/service-use"
 import { InstanceState } from "@/effect/instance-state"
+import { errorData } from "@/util/error"
 
 // Keep `Event["data"]` mutable because projectors mutate the persisted shape
 // when writing to the database. Bus payloads (`Properties`) stay readonly —
@@ -37,6 +39,12 @@ export type Definition<
   // JSON serialization flattened. Live runs pass already-typed data, so the
   // hook must be idempotent.
   readonly revive?: (data: unknown) => unknown
+  // When false the event is broadcast live (projection + bus/SSE) but never
+  // written to `EventTable`/`EventSequenceTable` — it vanishes on replay.
+  // For high-frequency delta events where a durable End/success event carries
+  // the full result anyway; recording one row per streamed token would grow
+  // the log without bound.
+  readonly persist?: boolean
 }
 
 export type Event<Def extends Definition = Definition> = {
@@ -81,28 +89,6 @@ export const layer = Layer.effect(Service)(
         throw new Error(`Unknown event type: ${event.type}`)
       }
 
-      const row = Database.use((db) =>
-        db
-          .select({ seq: EventSequenceTable.seq, ownerID: EventSequenceTable.owner_id })
-          .from(EventSequenceTable)
-          .where(eq(EventSequenceTable.aggregate_id, event.aggregateID))
-          .get(),
-      )
-
-      const latest = row?.seq ?? -1
-      if (event.seq <= latest) return
-
-      if (row?.ownerID && row.ownerID !== options?.ownerID) {
-        return
-      }
-
-      const expected = latest + 1
-      if (event.seq !== expected) {
-        throw new Error(
-          `Sequence mismatch for aggregate "${event.aggregateID}": expected ${expected}, got ${event.seq}`,
-        )
-      }
-
       const publish = !!options?.publish
       const context = publish
         ? {
@@ -110,7 +96,39 @@ export const layer = Layer.effect(Service)(
             workspace: yield* InstanceState.workspaceID,
           }
         : undefined
-      process(def, event, { publish, context, ownerID: options?.ownerID })
+
+      // Like `run()` below, the seq read and the apply must share one
+      // "immediate" transaction. Concurrent replay sources (SSE loop, HTTP
+      // /sync/replay, reconnect history) could otherwise both pass the gap
+      // check and drop or double-apply events for the same aggregate.
+      Database.transaction(
+        (tx) => {
+          const row = tx
+            .select({ seq: EventSequenceTable.seq, ownerID: EventSequenceTable.owner_id })
+            .from(EventSequenceTable)
+            .where(eq(EventSequenceTable.aggregate_id, event.aggregateID))
+            .get()
+
+          const latest = row?.seq ?? -1
+          if (event.seq <= latest) return
+
+          if (row?.ownerID && row.ownerID !== options?.ownerID) {
+            return
+          }
+
+          const expected = latest + 1
+          if (event.seq !== expected) {
+            throw new Error(
+              `Sequence mismatch for aggregate "${event.aggregateID}": expected ${expected}, got ${event.seq}`,
+            )
+          }
+
+          process(def, event, { publish, context, ownerID: options?.ownerID })
+        },
+        {
+          behavior: "immediate",
+        },
+      )
     })
 
     const replayAll: Interface["replayAll"] = Effect.fn("SyncEvent.replayAll")(function* (events, options) {
@@ -201,6 +219,7 @@ let projectors: Map<Definition, ProjectorFunc> | undefined
 const versions = new Map<string, number>()
 let frozen = false
 let convertEvent: ConvertEvent
+const log = Log.create({ service: "sync" })
 
 export function reset() {
   frozen = false
@@ -245,6 +264,7 @@ export function define<
   schema: Schema
   busSchema?: BusSchema
   revive?: (data: unknown) => unknown
+  persist?: boolean
 }): Definition<Type, Schema, BusSchema> {
   if (frozen) {
     throw new Error("Error defining sync event: sync system has been frozen")
@@ -257,6 +277,7 @@ export function define<
     schema: input.schema,
     properties: (input.busSchema ?? input.schema) as BusSchema,
     revive: input.revive,
+    persist: input.persist ?? true,
   }
 
   versions.set(def.type, Math.max(def.version, versions.get(def.type) || 0))
@@ -323,7 +344,7 @@ function process<Def extends Definition>(
   Database.transaction((tx) => {
     projector(tx, data, event)
 
-    if (Flag.OPENCODE_EXPERIMENTAL_WORKSPACES) {
+    if (Flag.OPENCODE_EXPERIMENTAL_WORKSPACES && def.persist !== false) {
       tx.insert(EventSequenceTable)
         .values({
           aggregate_id: event.aggregateID,
@@ -346,8 +367,14 @@ function process<Def extends Definition>(
         .run()
     }
 
+    // Publishes are post-commit best-effort: the event is already recorded,
+    // so a throwing bus/GlobalBus listener must not fail `run` (the caller may
+    // be mid-LLM-step) nor skip subsequent work. Isolation lives here — not
+    // only in Database.runEffects — because a defect thrown inside the bus
+    // runtime's fiber can resurface asynchronously past the caller's try/catch.
     Database.effect(() => {
-      if (options?.publish) {
+      if (!options?.publish) return
+      try {
         if (!options.context?.instance) {
           throw new Error("SyncEvent.process: publish requires instance context")
         }
@@ -357,11 +384,11 @@ function process<Def extends Definition>(
         // instances do NOT round-trip (`toJSON` → ISO string); `def.revive`
         // reconstructs the type form for projectors on replay.
         const publish = (data: unknown) => ProjectBus.publish(def, encodeDateTimes(data) as Properties<Def>, { id: event.id })
-        if (result instanceof Promise) {
-          void result.then(publish)
-        } else {
-          void publish(result)
-        }
+        // ProjectBus.publish is a runPromise wrapper: it always returns a
+        // promise, so both branches need the rejection guard (an async
+        // convertEvent adds a stage before publish).
+        const published = result instanceof Promise ? result.then(publish) : Promise.resolve(publish(result))
+        published.catch((error) => log.error("event publish failed", { type: def.type, id: event.id, error: errorData(error) }))
 
         GlobalBus.emit("event", {
           directory: options.context.instance.directory,
@@ -375,6 +402,8 @@ function process<Def extends Definition>(
             },
           },
         })
+      } catch (error) {
+        log.error("event publish failed", { type: def.type, id: event.id, error: errorData(error) })
       }
     })
   })

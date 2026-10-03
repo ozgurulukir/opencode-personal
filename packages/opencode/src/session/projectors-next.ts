@@ -8,85 +8,122 @@ import { SyncEvent } from "@/sync"
 import { SessionMessageTable, SessionTable } from "./session.sql"
 import type { SessionID } from "./schema"
 import { Schema } from "effect"
+import * as Log from "@opencode-ai/core/util/log"
+import { errorData } from "@/util/error"
+
+const log = Log.create({ service: "session.projectors" })
 
 const decodeMessage = (data: unknown) =>
   Schema.decodeUnknownSync(SessionMessage.Message)(SessionMessage.normalizeForDecode(data))
 type SessionMessageData = NonNullable<(typeof SessionMessageTable.$inferInsert)["data"]>
+type MessageRow = typeof SessionMessageTable.$inferSelect
 
 function encodeMessageData(value: unknown): SessionMessageData {
   return SyncEvent.encodeDateTimes(value) as SessionMessageData
 }
 
-function sqlite(db: Database.TxOrDb, sessionID: SessionID): SessionMessageUpdater.Adapter<void> {
+// A single undecodable row (legacy shape, corruption) must not poison every
+// later projector call for the session: skip it with a warning and let the
+// update paths heal it.
+function decodeRow(row: MessageRow) {
+  try {
+    return decodeMessage({ ...row.data, id: row.id, type: row.type })
+  } catch (error) {
+    log.warn("skipping undecodable session message row", { id: row.id, type: row.type, error: errorData(error) })
+    return undefined
+  }
+}
+
+// SQLite read-model adapter for the SessionMessageUpdater. Exported for tests
+// that exercise the zero-changes warning path directly.
+export function sqlite(db: Database.TxOrDb, sessionID: SessionID): SessionMessageUpdater.Adapter<void> {
+  const updateRow = (message: SessionMessage.Message) => {
+    const { id, type, ...data } = message
+    const result = db
+      .update(SessionMessageTable)
+      .set({ data: encodeMessageData(data) })
+      .where(
+        and(
+          eq(SessionMessageTable.id, id),
+          eq(SessionMessageTable.session_id, sessionID),
+          eq(SessionMessageTable.type, type),
+        ),
+      )
+      .run()
+    // drizzle types the update builder's `.run()` as void, but the bun-sqlite
+    // session actually returns the statement's `Changes` result.
+    const { changes } = result as unknown as { changes: number }
+    if (changes === 0) {
+      // A zero-row update means the append event never landed (dropped by a
+      // failed replay, or the row was pruned) — recording the update event
+      // without the read-model write would silently diverge the read model.
+      log.warn("session message update matched no rows", { id, sessionID, type })
+    }
+  }
+
   return {
     getCurrentAssistant() {
-      return db
-        .select()
-        .from(SessionMessageTable)
-        .where(and(eq(SessionMessageTable.session_id, sessionID), eq(SessionMessageTable.type, "assistant")))
-        .orderBy(desc(SessionMessageTable.id))
-        .all()
-        .map((row) => decodeMessage({ ...row.data, id: row.id, type: row.type }))
-        .find((message): message is SessionMessage.Assistant => message.type === "assistant" && !message.time.completed)
+      const rows = () =>
+        db
+          .select()
+          .from(SessionMessageTable)
+          .where(and(eq(SessionMessageTable.session_id, sessionID), eq(SessionMessageTable.type, "assistant")))
+          .orderBy(desc(SessionMessageTable.id))
+      const isCurrent = (message: ReturnType<typeof decodeMessage>): message is SessionMessage.Assistant =>
+        message.type === "assistant" && !message.time.completed
+
+      // Streaming events fire many times per turn and the in-flight assistant
+      // is always the newest row, so decoding just that one keeps the hot path
+      // O(1) instead of decoding the full history on every event.
+      const latest = rows().limit(1).get()
+      if (latest) {
+        const message = decodeRow(latest)
+        if (message && isCurrent(message)) return message
+      }
+
+      // The newest assistant is already completed (or undecodable): fall back
+      // to a full newest-first scan to preserve the "latest uncompleted"
+      // semantics.
+      for (const row of rows().all()) {
+        const message = decodeRow(row)
+        if (message && isCurrent(message)) return message
+      }
+      return undefined
     },
     getCurrentCompaction() {
-      return db
+      const rows = db
         .select()
         .from(SessionMessageTable)
         .where(and(eq(SessionMessageTable.session_id, sessionID), eq(SessionMessageTable.type, "compaction")))
         .orderBy(desc(SessionMessageTable.id))
         .all()
-        .map((row) => decodeMessage({ ...row.data, id: row.id, type: row.type }))
-        .find((message): message is SessionMessage.Compaction => message.type === "compaction")
+      for (const row of rows) {
+        const message = decodeRow(row)
+        if (message?.type === "compaction") return message
+      }
+      return undefined
     },
     getCurrentShell(callID) {
-      return db
+      const rows = db
         .select()
         .from(SessionMessageTable)
         .where(and(eq(SessionMessageTable.session_id, sessionID), eq(SessionMessageTable.type, "shell")))
         .orderBy(desc(SessionMessageTable.id))
         .all()
-        .map((row) => decodeMessage({ ...row.data, id: row.id, type: row.type }))
-        .find((message): message is SessionMessage.Shell => message.type === "shell" && message.callID === callID)
+      for (const row of rows) {
+        const message = decodeRow(row)
+        if (message?.type === "shell" && message.callID === callID) return message
+      }
+      return undefined
     },
     updateAssistant(assistant) {
-      const { id, type, ...data } = assistant
-      db.update(SessionMessageTable)
-        .set({ data: encodeMessageData(data) })
-        .where(
-          and(
-            eq(SessionMessageTable.id, id),
-            eq(SessionMessageTable.session_id, sessionID),
-            eq(SessionMessageTable.type, type),
-          ),
-        )
-        .run()
+      updateRow(assistant)
     },
     updateCompaction(compaction) {
-      const { id, type, ...data } = compaction
-      db.update(SessionMessageTable)
-        .set({ data: encodeMessageData(data) })
-        .where(
-          and(
-            eq(SessionMessageTable.id, id),
-            eq(SessionMessageTable.session_id, sessionID),
-            eq(SessionMessageTable.type, type),
-          ),
-        )
-        .run()
+      updateRow(compaction)
     },
     updateShell(shell) {
-      const { id, type, ...data } = shell
-      db.update(SessionMessageTable)
-        .set({ data: encodeMessageData(data) })
-        .where(
-          and(
-            eq(SessionMessageTable.id, id),
-            eq(SessionMessageTable.session_id, sessionID),
-            eq(SessionMessageTable.type, type),
-          ),
-        )
-        .run()
+      updateRow(shell)
     },
     appendMessage(message) {
       const { id, type, ...data } = message

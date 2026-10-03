@@ -12,3 +12,25 @@ describe("Database.Path", () => {
     expect(Database.getChannelPath()).toBe(expected)
   })
 })
+
+describe("Database post-commit effects", () => {
+  test("a throwing effect does not fail the transaction nor skip later effects", () => {
+    const ran: string[] = []
+    const result = Database.transaction(() => {
+      Database.effect(() => {
+        ran.push("first")
+      })
+      Database.effect(() => {
+        throw new Error("post-commit boom")
+      })
+      Database.effect(() => {
+        ran.push("third")
+      })
+      return "committed"
+    })
+    // The transaction has already committed when effects run: a throwing
+    // effect must be isolated (caller succeeds) and must not skip the rest.
+    expect(result).toBe("committed")
+    expect(ran).toEqual(["first", "third"])
+  })
+})

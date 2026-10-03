@@ -641,12 +641,21 @@ export const layer: Layer.Layer<Service, never, Bus.Service | Storage.Service | 
 
     const patch = (sessionID: SessionID, info: Patch) =>
       Effect.gen(function* () {
-        yield* sync.run(Event.Updated, { sessionID, info })
-        // Native V2 lifecycle emission is published alongside the V1 event
-        yield* sync.run(SessionEvent.Updated.Sync, {
-          sessionID,
-          timestamp: DateTime.makeUnsafe(Date.now()),
-          info,
+        // Both emissions must land in one SQLite transaction: SyncEvent.run
+        // joins the ambient transaction context, so a crash between them can
+        // no longer leave the V1 event recorded while the V2 event is missing.
+        // The effects run on the current fiber with the captured environment
+        // because a sync transaction callback cannot yield.
+        const env = yield* Effect.context<never>()
+        Database.transaction(() => {
+          Effect.runSync(sync.run(Event.Updated, { sessionID, info }).pipe(Effect.provide(env)))
+          Effect.runSync(
+            sync.run(SessionEvent.Updated.Sync, {
+              sessionID,
+              timestamp: DateTime.makeUnsafe(Date.now()),
+              info,
+            }).pipe(Effect.provide(env)),
+          )
         })
       })
 

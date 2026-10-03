@@ -6,6 +6,7 @@ import { GlobalBus } from "./global"
 import { InstanceState } from "@/effect/instance-state"
 import { makeRuntime } from "@/effect/run-service"
 import { Identifier } from "@/id/id"
+import { errorData } from "@/util/error"
 
 const log = Log.create({ service: "bus" })
 
@@ -98,12 +99,20 @@ export const layer = Layer.effect(
         const context = yield* InstanceState.context
         const workspace = yield* InstanceState.workspaceID
 
-        GlobalBus.emit("event", {
-          directory: dir,
-          project: context.project.id,
-          workspace,
-          payload,
-        })
+        // GlobalBus is a plain EventEmitter: a throwing listener propagates to
+        // the emitter. This runs in a deferred fiber continuation after the
+        // PubSub yields, so a raw throw here escapes the caller's try/catch as
+        // an unhandled error — guard it at the emission point instead.
+        try {
+          GlobalBus.emit("event", {
+            directory: dir,
+            project: context.project.id,
+            workspace,
+            payload,
+          })
+        } catch (error) {
+          log.error("global bus listener failed", { type: def.type, error: errorData(error) })
+        }
       })
     }
 

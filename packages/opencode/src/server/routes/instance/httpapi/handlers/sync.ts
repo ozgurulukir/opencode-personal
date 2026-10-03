@@ -15,6 +15,7 @@ import { HttpApiBuilder } from "effect/unstable/httpapi"
 import { InstanceHttpApi } from "../api"
 import { HistoryPayload, ReplayPayload, SessionPayload } from "../groups/sync"
 import * as Log from "@opencode-ai/core/util/log"
+import { errorData } from "@/util/error"
 
 const log = Log.create({ service: "server.sync" })
 
@@ -27,7 +28,12 @@ export const syncHandlers = HttpApiBuilder.group(InstanceHttpApi, "sync", (handl
     const start = Effect.fn("SyncHttpApi.start")(function* () {
       yield* workspace
         .startWorkspaceSyncing((yield* InstanceState.context).project.id)
-        .pipe(Effect.ignore, Effect.forkIn(scope))
+        .pipe(
+          Effect.tapError((error) =>
+            Effect.sync(() => log.error("failed to start workspace syncing", { error: errorData(error) })),
+          ),
+          Effect.forkIn(scope),
+        )
       return true
     })
 

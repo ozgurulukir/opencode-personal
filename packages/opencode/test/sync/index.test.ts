@@ -3,6 +3,7 @@ import { provideTmpdirInstance } from "../fixture/fixture"
 import { Effect, Layer, Schema } from "effect"
 import { CrossSpawnSpawner } from "@opencode-ai/core/cross-spawn-spawner"
 import { Bus } from "../../src/bus"
+import { GlobalBus } from "../../src/bus/global"
 import { SyncEvent } from "../../src/sync"
 import { Database } from "@/storage/db"
 import { EventSequenceTable, EventTable } from "../../src/sync/event.sql"
@@ -40,12 +41,23 @@ describe("SyncEvent", () => {
       aggregate: "item_id",
       schema: Schema.Struct({ item_id: Schema.String, to: Schema.String }),
     })
-
-    SyncEvent.init({
-      projectors: [SyncEvent.project(Created, () => {}), SyncEvent.project(Sent, () => {})],
+    const Tick = SyncEvent.define({
+      type: "item.tick",
+      version: 1,
+      aggregate: "item_id",
+      persist: false,
+      schema: Schema.Struct({ item_id: Schema.String }),
     })
 
-    return { Created, Sent }
+    SyncEvent.init({
+      projectors: [
+        SyncEvent.project(Created, () => {}),
+        SyncEvent.project(Sent, () => {}),
+        SyncEvent.project(Tick, () => {}),
+      ],
+    })
+
+    return { Created, Sent, Tick }
   }
 
   function expectDefect<A, E, R>(effect: Effect.Effect<A, E, R>, pattern: RegExp) {
@@ -134,6 +146,65 @@ describe("SyncEvent", () => {
           } finally {
             dispose()
           }
+        }),
+      ),
+    )
+
+    it.live(
+      "a throwing global-bus listener does not fail run",
+      provideTmpdirInstance(() =>
+        Effect.gen(function* () {
+          const { Created } = setup()
+          // GlobalBus is a plain EventEmitter: a listener throw propagates to
+          // the emitter inside the post-commit publish effect. The event is
+          // already committed at that point, so `run` must still succeed.
+          const listener = () => {
+            throw new Error("global bus boom")
+          }
+          GlobalBus.on("event", listener)
+          try {
+            yield* SyncEvent.use.run(Created, { id: "evt_1", name: "isolated" })
+          } finally {
+            GlobalBus.off("event", listener)
+          }
+
+          const rows = Database.use((db) => db.select().from(EventTable).all())
+          expect(rows).toHaveLength(1)
+          expect(rows[0].aggregate_id).toBe("evt_1")
+        }),
+      ),
+    )
+
+    it.live(
+      "emits but does not persist ephemeral (persist: false) events",
+      provideTmpdirInstance(() =>
+        Effect.gen(function* () {
+          const { Created, Tick } = setup()
+
+          const events: string[] = []
+          let resolve = () => {}
+          const received = new Promise<void>((done) => {
+            resolve = done
+          })
+          const dispose = Bus.subscribeAll((event) => {
+            events.push(event.type)
+            if (events.length === 3) resolve()
+          })
+          try {
+            yield* SyncEvent.use.run(Created, { id: "evt_1", name: "durable" })
+            yield* SyncEvent.use.run(Tick, { item_id: "evt_1" })
+            yield* SyncEvent.use.run(Tick, { item_id: "evt_1" })
+            yield* Effect.promise(() => received)
+          } finally {
+            dispose()
+          }
+
+          // Ephemeral events reach subscribers but leave no trace in the log.
+          expect(events).toEqual(["item.created", "item.tick", "item.tick"])
+          const rows = Database.use((db) => db.select().from(EventTable).all())
+          expect(rows.map((row) => row.type)).toEqual(["item.created.1"])
+          const sequence = Database.use((db) => db.select().from(EventSequenceTable).all())
+          expect(sequence).toHaveLength(1)
         }),
       ),
     )
@@ -249,6 +320,34 @@ describe("SyncEvent", () => {
 
           const rows = Database.use((db) => db.select().from(EventTable).all())
           expect(rows.map((row) => row.seq)).toEqual([0, 1, 2, 3])
+        }),
+      ),
+    )
+
+    it.live(
+      "applies concurrent duplicate replays exactly once",
+      provideTmpdirInstance(() =>
+        Effect.gen(function* () {
+          const { Created } = setup()
+          const id = MessageID.ascending()
+          const event = (seq: number) => ({
+            id: `evt_${seq}`,
+            type: SyncEvent.versionedType(Created.type, Created.version),
+            seq,
+            aggregateID: id,
+            data: { id, name: "duplicated" },
+          })
+
+          // Two concurrent sources replaying the same event (e.g. SSE
+          // redelivery racing a reconnect history fetch). The seq check and
+          // apply are atomic, so the loser sees the event as already applied
+          // and skips it instead of double-applying.
+          yield* Effect.all([SyncEvent.use.replay(event(0)), SyncEvent.use.replay(event(0))], {
+            discard: true,
+          })
+
+          const rows = Database.use((db) => db.select().from(EventTable).all())
+          expect(rows.map((row) => row.seq)).toEqual([0])
         }),
       ),
     )

@@ -3,6 +3,7 @@ import { migrate } from "drizzle-orm/bun-sqlite/migrator"
 import { type SQLiteTransaction } from "drizzle-orm/sqlite-core"
 export * from "drizzle-orm"
 import { LocalContext } from "@/util/local-context"
+import { errorData } from "@/util/error"
 import { lazy } from "../util/lazy"
 import { Global } from "@opencode-ai/core/global"
 import * as Log from "@opencode-ai/core/util/log"
@@ -134,6 +135,23 @@ const ctx = LocalContext.create<{
   effects: (() => void | Promise<void>)[]
 }>("database")
 
+// Post-commit effects (bus publishes) run after the transaction has committed.
+// A throwing subscriber must not fail the caller of `transaction()`/`use()`
+// — the data is already committed at that point — nor skip the remaining
+// effects, so each one is isolated and failures are logged.
+function runEffects(effects: (() => void | Promise<void>)[]) {
+  for (const effect of effects) {
+    try {
+      const result = effect()
+      if (result instanceof Promise) {
+        result.catch((error) => log.error("post-commit effect failed", { error: errorData(error) }))
+      }
+    } catch (error) {
+      log.error("post-commit effect failed", { error: errorData(error) })
+    }
+  }
+}
+
 export function use<T>(callback: (trx: TxOrDb) => NotPromise<T>): NotPromise<T> {
   try {
     return callback(ctx.use().tx)
@@ -141,7 +159,7 @@ export function use<T>(callback: (trx: TxOrDb) => NotPromise<T>): NotPromise<T> 
     if (err instanceof LocalContext.NotFound) {
       const effects: (() => void | Promise<void>)[] = []
       const result = ctx.provide({ effects, tx: Client() }, () => callback(Client()))
-      for (const effect of effects) effect()
+      runEffects(effects)
       return result
     }
     throw err
@@ -172,7 +190,7 @@ export function transaction<T>(
       const effects: (() => void | Promise<void>)[] = []
       const txCallback = InstanceState.bind((tx: TxOrDb) => ctx.provide({ tx, effects }, () => callback(tx)))
       const result = Client().transaction(txCallback, { behavior: options?.behavior })
-      for (const effect of effects) effect()
+      runEffects(effects)
       return result as NotPromise<T>
     }
     throw err

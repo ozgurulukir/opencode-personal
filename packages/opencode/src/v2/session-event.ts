@@ -171,6 +171,9 @@ export namespace Text {
   export const Delta = EventV2.define({
     type: "session.next.text.delta",
     aggregate: "sessionID",
+    // Streaming deltas are live-only: Text.Ended carries the full text, so
+    // recording one event per token would grow the event log without bound.
+    persist: false,
     schema: {
       ...Base,
       delta: Schema.String,
@@ -203,6 +206,8 @@ export namespace Reasoning {
   export const Delta = EventV2.define({
     type: "session.next.reasoning.delta",
     aggregate: "sessionID",
+    // Live-only: Reasoning.Ended carries the full text.
+    persist: false,
     schema: {
       ...Base,
       reasoningID: Schema.String,
@@ -239,6 +244,8 @@ export namespace Tool {
     export const Delta = EventV2.define({
       type: "session.next.tool.input.delta",
       aggregate: "sessionID",
+      // Live-only: Tool.Called carries the full parsed input.
+      persist: false,
       schema: {
         ...Base,
         callID: Schema.String,
@@ -278,6 +285,8 @@ export namespace Tool {
   export const Progress = EventV2.define({
     type: "session.next.tool.progress",
     aggregate: "sessionID",
+    // Live-only progress metadata: Tool.Success/Failed carry the final state.
+    persist: false,
     schema: {
       ...Base,
       callID: Schema.String,
@@ -356,6 +365,8 @@ export namespace Compaction {
   export const Delta = EventV2.define({
     type: "session.next.compaction.delta",
     aggregate: "sessionID",
+    // Live-only: Compaction.Ended carries the full summary text.
+    persist: false,
     schema: {
       ...Base,
       text: Schema.String,

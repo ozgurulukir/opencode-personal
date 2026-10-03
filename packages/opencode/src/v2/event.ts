@@ -30,6 +30,7 @@ export function define<const Type extends string, Fields extends Schema.Struct.F
   schema: Fields
   aggregate: string
   version?: number
+  persist?: boolean
 }) {
   const Payload = Schema.Struct({
     id: ID,
@@ -46,6 +47,7 @@ export function define<const Type extends string, Fields extends Schema.Struct.F
     aggregate: input.aggregate,
     schema: Payload.fields.data,
     revive: reviveEventTimestamp,
+    persist: input.persist,
   })
 
   return Object.assign(Payload, {
