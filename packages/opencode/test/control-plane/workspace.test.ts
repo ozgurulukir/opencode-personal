@@ -974,6 +974,62 @@ describe("workspace CRUD", () => {
       )
     })
   })
+
+  it.live("sessionWarp deletes the partial target session when a batch fails", () => {
+    const calls: FetchCall[] = []
+    return Effect.gen(function* () {
+      yield* HttpServer.serveEffect()(
+        Effect.gen(function* () {
+          const req = yield* HttpServerRequest.HttpServerRequest
+          const bodyText = yield* req.text
+          const call = {
+            url: new URL(req.url, "http://localhost"),
+            method: req.method,
+            headers: new Headers(req.headers),
+            bodyText,
+            json: bodyText ? JSON.parse(bodyText) : undefined,
+          }
+          calls.push(call)
+          if (call.url.pathname === "/warp-fail-source/sync/history") return yield* HttpServerResponse.json([])
+          if (call.url.pathname === "/warp-fail-target/sync/replay")
+            return HttpServerResponse.text("replay exploded", { status: 500 })
+          return HttpServerResponse.text("unexpected", { status: 500 })
+        }),
+      )
+      const url = yield* serverUrl()
+      yield* provideTmpdirInstance(
+        () =>
+          Effect.gen(function* () {
+            const workspace = yield* Workspace.Service
+            const sessionSvc = yield* SessionNs.Service
+            const previousType = unique("warp-fail-source")
+            const targetType = unique("warp-fail-target")
+            const previous = workspaceInfo(Instance.project.id, previousType)
+            const target = workspaceInfo(Instance.project.id, targetType, { directory: "remote-target-dir" })
+            insertWorkspace(previous)
+            insertWorkspace(target)
+            registerAdapter(Instance.project.id, previousType, remoteAdapter(`${url}/warp-fail-source`).adapter)
+            registerAdapter(Instance.project.id, targetType, remoteAdapter(`${url}/warp-fail-target`).adapter)
+            const session = yield* sessionSvc.create({})
+            attachSessionToWorkspace(session.id, previous.id)
+
+            const exit = yield* Effect.exit(
+              workspace.sessionWarp({ workspaceID: target.id, sessionID: session.id }),
+            )
+            expect(exit._tag).toBe("Failure")
+
+            // The failed batch must trigger a best-effort cleanup of the
+            // ownerless partial session on the target (and never steal).
+            expect(calls.map((call) => `${call.method} ${call.url.pathname}`)).toEqual([
+              "POST /warp-fail-source/sync/history",
+              "POST /warp-fail-target/sync/replay",
+              `DELETE /warp-fail-target/session/${session.id}`,
+            ])
+          }),
+        { git: true },
+      )
+    })
+  })
 })
 
 describe("workspace sync state", () => {

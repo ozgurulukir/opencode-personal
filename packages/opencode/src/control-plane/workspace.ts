@@ -215,6 +215,7 @@ export const layer = Layer.effect(
     const parseSSE = Effect.fn("Workspace.parseSSE")(function* (
       stream: Stream.Stream<Uint8Array, unknown>,
       onEvent: (event: unknown) => Effect.Effect<void>,
+      onRetry?: (ms: number) => void,
     ) {
       yield* stream.pipe(
         Stream.decodeText(),
@@ -235,6 +236,7 @@ export const layer = Layer.effect(
             if (field === "id") return [{ ...state, id: value }, []]
             if (field === "retry") {
               const retry = Number.parseInt(value, 10)
+              if (!Number.isNaN(retry)) onRetry?.(retry)
               return [Number.isNaN(retry) ? state : { ...state, retry }, []]
             }
             return [state, []]
@@ -405,6 +407,9 @@ export const layer = Layer.effect(
       if (target.type === "local") return
 
       let attempt = 0
+      // Server-advised SSE reconnect floor ("retry:" field), kept across
+      // reconnects until a newer advice arrives.
+      let serverRetry = 0
 
       while (true) {
         log.info("connecting to global sync", { workspace: space.name })
@@ -430,43 +435,48 @@ export const layer = Layer.effect(
           log.info("global sync connected", { workspace: space.name })
           setStatus(space.id, "connected")
 
-          yield* parseSSE(stream, (evt) =>
-            Effect.gen(function* () {
-              if (!evt || typeof evt !== "object" || !("payload" in evt)) return
-              const payload = evt.payload as { type?: string; syncEvent?: SyncEvent.SerializedEvent }
-              if (payload.type === "server.heartbeat") return
+          yield* parseSSE(
+            stream,
+            (evt) =>
+              Effect.gen(function* () {
+                if (!evt || typeof evt !== "object" || !("payload" in evt)) return
+                const payload = evt.payload as { type?: string; syncEvent?: SyncEvent.SerializedEvent }
+                if (payload.type === "server.heartbeat") return
 
-              if (payload.type === "sync" && payload.syncEvent) {
-                const failed = yield* sync.replay(payload.syncEvent).pipe(
-                  Effect.as(false),
-                  Effect.catchCause((error) =>
-                    Effect.sync(() => {
-                      log.info("failed to replay global event", {
-                        workspaceID: space.id,
-                        error,
-                      })
-                      return true
-                    }),
-                  ),
-                )
-                if (failed) return
-              }
+                if (payload.type === "sync" && payload.syncEvent) {
+                  const failed = yield* sync.replay(payload.syncEvent).pipe(
+                    Effect.as(false),
+                    Effect.catchCause((error) =>
+                      Effect.sync(() => {
+                        log.info("failed to replay global event", {
+                          workspaceID: space.id,
+                          error,
+                        })
+                        return true
+                      }),
+                    ),
+                  )
+                  if (failed) return
+                }
 
-              try {
-                const event = evt as { directory?: string; project?: string; payload: unknown }
-                GlobalBus.emit("event", {
-                  directory: event.directory,
-                  project: event.project,
-                  workspace: space.id,
-                  payload: event.payload,
-                })
-              } catch (error) {
-                log.info("failed to replay global event", {
-                  workspaceID: space.id,
-                  error,
-                })
-              }
-            }),
+                try {
+                  const event = evt as { directory?: string; project?: string; payload: unknown }
+                  GlobalBus.emit("event", {
+                    directory: event.directory,
+                    project: event.project,
+                    workspace: space.id,
+                    payload: event.payload,
+                  })
+                } catch (error) {
+                  log.info("failed to replay global event", {
+                    workspaceID: space.id,
+                    error,
+                  })
+                }
+              }),
+            (ms) => {
+              serverRetry = ms
+            },
           )
 
           log.info("disconnected from global sync: " + space.id)
@@ -474,8 +484,8 @@ export const layer = Layer.effect(
         }
 
         // Back off reconnect attempts up to 2 minutes while the workspace
-        // stays unavailable.
-        yield* Effect.sleep(`${Math.min(120_000, 1_000 * 2 ** attempt)} millis`)
+        // stays unavailable. The server-advised SSE retry sets a floor.
+        yield* Effect.sleep(`${Math.max(serverRetry, Math.min(120_000, 1_000 * 2 ** attempt))} millis`)
         attempt += 1
       }
     })
@@ -794,6 +804,38 @@ export const layer = Layer.effect(
               })
             }),
           { discard: true },
+        ).pipe(
+          Effect.catchCause((cause) =>
+            Effect.gen(function* () {
+              // A failed batch leaves the previously-posted batches on the
+              // target as an ownerless partial session. Best-effort delete it
+              // (the target's session remove also drops its recorded events)
+              // so the warp stays retryable instead of stranding an orphan,
+              // then rethrow the original failure.
+              const response = yield* http
+                .execute(
+                  HttpClientRequest.make("DELETE")(route(target.url, `/session/${input.sessionID}`), {
+                    headers: new Headers(target.headers),
+                  }),
+                )
+                .pipe(Effect.option)
+              if (response._tag === "Some") {
+                const body = yield* response.value.text.pipe(Effect.catch(() => Effect.succeed("")))
+                log.warn("session warp partial cleanup", {
+                  workspaceID: input.workspaceID,
+                  sessionID: input.sessionID,
+                  status: response.value.status,
+                  body,
+                })
+              } else {
+                log.warn("session warp partial cleanup failed to reach target", {
+                  workspaceID: input.workspaceID,
+                  sessionID: input.sessionID,
+                })
+              }
+              return yield* Effect.failCause(cause)
+            }),
+          ),
         )
 
         const response = yield* http.execute(
