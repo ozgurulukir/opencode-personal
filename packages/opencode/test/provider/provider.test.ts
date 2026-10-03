@@ -12,6 +12,7 @@ import { Plugin } from "../../src/plugin/index"
 import { ModelsDev } from "@/provider/models"
 import { Provider } from "@/provider/provider"
 import { rewriteMaxOutputTokens, __exportTestFetchFn } from "@/provider/provider"
+import { Auth } from "../../src/auth"
 import { ProviderID, ModelID } from "../../src/provider/schema"
 import { Filesystem } from "@/util/filesystem"
 import { Env } from "../../src/env"
@@ -2826,7 +2827,7 @@ test("toPublicInfo returns a safe provider when options contain a circular refer
   })
 })
 
-test("provider merge > preserves custom fetch in plugin auth loader (prevents 401)", async () => {
+test("rewriteMaxOutputTokens > composes over an existing auth fetch wrapper", async () => {
   const mockAuthFetch = mock((url: RequestInfo | URL, init?: RequestInit) => {
     return Promise.resolve(new Response("ok"))
   }) as any
@@ -2848,4 +2849,83 @@ test("provider merge > preserves custom fetch in plugin auth loader (prevents 40
 
   expect(body.max_output_tokens).toBeUndefined()
   expect(body.max_completion_tokens).toBe(32000)
+})
+
+test("provider merge > openai custom rewrite composes over plugin OAuth fetch (codex 401 regression)", async () => {
+  await using tmp = await tmpdir({
+    init: async (dir) => {
+      await Bun.write(
+        path.join(dir, "opencode.json"),
+        JSON.stringify({
+          $schema: "https://opencode.ai/config.json",
+        }),
+      )
+    },
+  })
+  await WithInstance.provide({
+    directory: tmp.path,
+    fn: async () => {
+      // Seed the OAuth entry BEFORE the first provider state build so the codex
+      // plugin auth loader installs its fetch wrapper.
+      await AppRuntime.runPromise(
+        Effect.gen(function* () {
+          const auth = yield* Auth.Service
+          yield* auth.set("openai", {
+            type: "oauth",
+            refresh: "test-refresh",
+            access: "test-access-token",
+            expires: Date.now() + 3_600_000,
+          })
+        }),
+      )
+      try {
+        const providers = await list()
+        const openai = providers[ProviderID.make("openai")]
+        expect(openai).toBeDefined()
+        const fetchFn = openai.options["fetch"]
+        expect(typeof fetchFn).toBe("function")
+
+        const captured = { url: "", headers: undefined as HeadersInit | undefined, body: "" }
+        const originalFetch = global.fetch
+        // Bun's Mock type omits the preconnect member of Bun's own global fetch type.
+        // @ts-expect-error
+        global.fetch = mock((url: RequestInfo | URL, init?: RequestInit) => {
+          captured.url = typeof url === "string" ? url : url instanceof URL ? url.href : url.url
+          captured.headers = init?.headers
+          if (typeof init?.body === "string") captured.body = init.body
+          return Promise.resolve(new Response("ok"))
+        })
+        try {
+          await fetchFn("https://api.openai.com/v1/responses", {
+            method: "POST",
+            headers: {
+              authorization: "Bearer opencode-oauth-dummy-key",
+              "content-type": "application/json",
+            },
+            body: JSON.stringify({ model: "gpt-5.6", max_output_tokens: 32000, input: [] }),
+          })
+        } finally {
+          global.fetch = originalFetch
+        }
+
+        // The codex OAuth wrapper ran: dummy key swapped for the real token and
+        // the URL rewritten to the ChatGPT backend.
+        expect(captured.url).toBe("https://chatgpt.com/backend-api/codex/responses")
+        const headers = new Headers(captured.headers)
+        expect(headers.get("authorization")).toBe("Bearer test-access-token")
+        // The #136 rewrite ran on top of the auth wrapper, not instead of it.
+        const body = JSON.parse(captured.body)
+        expect(body.max_output_tokens).toBeUndefined()
+        expect(body.max_completion_tokens).toBe(32000)
+      } finally {
+        // Keep other tests in this file from seeing the seeded openai auth.
+        await AppRuntime.runPromise(
+          Effect.gen(function* () {
+            const auth = yield* Auth.Service
+            yield* auth.remove("openai")
+          }),
+        )
+      }
+    },
+  })
 })

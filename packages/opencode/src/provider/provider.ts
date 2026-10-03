@@ -155,6 +155,10 @@ type CustomLoader = (provider: Info) => Effect.Effect<{
   vars?: CustomVarsLoader
   options?: Record<string, any>
   discoverModels?: CustomDiscoverModels
+  // Wrap the provider's final fetch (plugin OAuth wrapper or global) with
+  // rewriteMaxOutputTokens in the merge step instead of providing options.fetch,
+  // which would clobber a plugin auth loader's fetch.
+  rewriteFetch?: boolean
 }>
 
 type CustomDep = {
@@ -310,7 +314,7 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
         async getModel(sdk: any, modelID: string, _options?: Record<string, any>) {
           return sdk.responses(modelID)
         },
-        options: { fetch: rewriteMaxOutputTokens(fetch) },
+        rewriteFetch: true,
       }),
     xai: () =>
       Effect.succeed({
@@ -318,7 +322,7 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
         async getModel(sdk: any, modelID: string, _options?: Record<string, any>) {
           return sdk.responses(modelID)
         },
-        options: { fetch: rewriteMaxOutputTokens(fetch) },
+        rewriteFetch: true,
       }),
     "github-copilot": () =>
       Effect.succeed({
@@ -1412,6 +1416,16 @@ const layer: Layer.Layer<
             if (result.vars) varsLoaders[providerID] = result.vars
             if (result.discoverModels) discoveryLoaders[providerID] = result.discoverModels
             const opts = result.options ?? {}
+            // A plugin auth loader may have installed an OAuth fetch wrapper (codex/xAI:
+            // swap the dummy key for the real token and rewrite the URL to their backend).
+            // mergeDeep would clobber it with options.fetch - compose the
+            // max_output_tokens rewrite over the auth wrapper so both survive.
+            if (result.rewriteFetch) {
+              // The options bag is untyped (models.dev schema); guard before wiring.
+              const isFetch = (value: unknown): value is typeof fetch => typeof value === "function"
+              const existing: unknown = providers[providerID]?.options?.["fetch"]
+              opts.fetch = rewriteMaxOutputTokens(isFetch(existing) ? existing : fetch)
+            }
             const patch: Partial<Info> = providers[providerID] ? { options: opts } : { source: "custom", options: opts }
             mergeProvider(providerID, patch)
           }
