@@ -20,6 +20,15 @@ $Repo       = "ozgurulukir/opencode-personal"
 $Command    = "opencode-personal"
 $InstallDir = Join-Path $HOME ".opencode-personal\bin"
 
+# --- optional auth (GH_TOKEN / GITHUB_TOKEN, same names gh CLI uses) ---
+# Required while the repo is private (anonymous API calls get 404); harmless
+# and rate-limit-friendly once public. Never forwarded to the redirect target -
+# Invoke-WebRequest drops the Authorization header on cross-host redirects.
+$token = $env:GH_TOKEN
+if (-not $token) { $token = $env:GITHUB_TOKEN }
+$authHeaders = @{}
+if ($token) { $authHeaders["Authorization"] = "Bearer $token" }
+
 # --- arch ---
 $arch = if ("$env:PROCESSOR_ARCHITECTURE" -eq "ARM64") { "arm64" } else { "x64" }
 
@@ -41,7 +50,7 @@ if ($Binary) {
     $Version = "local"
 } else {
     if (-not $Version) {
-        $rel = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/latest"
+        $rel = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/latest" -Headers $authHeaders
         $Version = $rel.tag_name.TrimStart("v")
     }
     $Version = $Version.TrimStart("v")
@@ -60,9 +69,18 @@ try {
         Copy-Item -LiteralPath $Binary -Destination (Join-Path $InstallDir "$Command.exe") -Force
     } else {
         $asset = "opencode-$target.zip"   # asset names keep the upstream 'opencode' prefix
-        $url   = "https://github.com/$Repo/releases/download/v$Version/$asset"
         $zip   = Join-Path $tmp $asset
-        Invoke-WebRequest -Uri $url -OutFile $zip -UseBasicParsing
+        if ($token) {
+            # github.com/.../releases/download ignores API tokens on private repos (404):
+            # pull the asset through the octet-stream asset API instead.
+            $rel = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/tags/v$Version" -Headers $authHeaders
+            $assetId = $rel.assets | Where-Object name -eq $asset | Select-Object -First 1 -ExpandProperty id
+            if (-not $assetId) { throw "Asset '$asset' not found in release v$Version of $Repo" }
+            Invoke-WebRequest -Uri "https://api.github.com/repos/$Repo/releases/assets/$assetId" -OutFile $zip -UseBasicParsing -Headers ($authHeaders + @{ Accept = "application/octet-stream" })
+        } else {
+            $url = "https://github.com/$Repo/releases/download/v$Version/$asset"
+            Invoke-WebRequest -Uri $url -OutFile $zip -UseBasicParsing
+        }
         $x = Join-Path $tmp "x"
         Expand-Archive -Path $zip -DestinationPath $x -Force
         # Rename the compiled binary to the fork command name, then copy ALL archive
