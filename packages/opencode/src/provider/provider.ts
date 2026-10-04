@@ -1693,6 +1693,17 @@ const layer: Layer.Layer<
         return yield* getModel(parsed.providerID, parsed.modelID)
       }
 
+      // ChatGPT/Codex OAuth entitlements are invisible to the catalog: an
+      // oauth account can reject models the catalog lists (gpt-5.4-mini,
+      // gpt-5.3-codex) while accepting others (gpt-5.6-luna), so a heuristic
+      // pick fails with a 400 at call time and silently kills title/predict.
+      // Skip the guess; callers fall back to the session's own model, which
+      // is entitled by construction.
+      if (providerID === ProviderID.openai) {
+        const info = yield* auth.get(providerID).pipe(Effect.orDie)
+        if (info?.type === "oauth") return undefined
+      }
+
       const s = yield* InstanceState.get(state)
       const provider = s.providers[providerID]
       if (!provider) return undefined
@@ -1704,6 +1715,7 @@ const layer: Layer.Layer<
         "3.5-haiku",
         "gemini-3-flash",
         "gemini-2.5-flash",
+        "gpt-5.4-mini",
         "gpt-5-nano",
       ]
       if (providerID.startsWith("opencode")) {

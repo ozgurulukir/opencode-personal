@@ -1053,6 +1053,90 @@ test("getSmallModel respects config small_model override", async () => {
   })
 })
 
+test("getSmallModel picks a catalog mini model for openai api-key auth", async () => {
+  await using tmp = await tmpdir({
+    init: async (dir) => {
+      await Bun.write(
+        path.join(dir, "opencode.json"),
+        JSON.stringify({
+          $schema: "https://opencode.ai/config.json",
+        }),
+      )
+    },
+  })
+  const authPath = path.join(Global.Path.data, "auth.json")
+  let prev: string | undefined
+  try {
+    prev = await Filesystem.readText(authPath)
+  } catch {}
+  try {
+    await Filesystem.write(authPath, JSON.stringify({}))
+    await WithInstance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        set("OPENAI_API_KEY", "test-api-key")
+        const model = await getSmallModel(ProviderID.openai)
+        expect(model).toBeDefined()
+        expect(model?.id).toContain("mini")
+      },
+    })
+  } finally {
+    if (prev !== undefined) {
+      await Filesystem.write(authPath, prev)
+    }
+    if (prev === undefined) {
+      try {
+        await unlink(authPath)
+      } catch {}
+    }
+  }
+})
+
+test("getSmallModel skips the catalog guess for openai oauth auth", async () => {
+  await using tmp = await tmpdir({
+    init: async (dir) => {
+      await Bun.write(
+        path.join(dir, "opencode.json"),
+        JSON.stringify({
+          $schema: "https://opencode.ai/config.json",
+        }),
+      )
+    },
+  })
+  const authPath = path.join(Global.Path.data, "auth.json")
+  let prev: string | undefined
+  try {
+    prev = await Filesystem.readText(authPath)
+  } catch {}
+  try {
+    await Filesystem.write(
+      authPath,
+      JSON.stringify({
+        openai: { type: "oauth", refresh: "refresh", access: "access", expires: Date.now() + 3_600_000 },
+      }),
+    )
+    await WithInstance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        // The API key env keeps the openai provider (and its catalog) visible,
+        // so only the oauth guard can produce undefined here.
+        set("OPENAI_API_KEY", "test-api-key")
+        const model = await getSmallModel(ProviderID.openai)
+        expect(model).toBeUndefined()
+      },
+    })
+  } finally {
+    if (prev !== undefined) {
+      await Filesystem.write(authPath, prev)
+    }
+    if (prev === undefined) {
+      try {
+        await unlink(authPath)
+      } catch {}
+    }
+  }
+})
+
 test("provider.sort prioritizes preferred models", () => {
   const models = [
     { id: "random-model", name: "Random" },
