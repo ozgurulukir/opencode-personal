@@ -5,7 +5,6 @@ import os from "os"
 import path from "path"
 import * as Log from "@opencode-ai/core/util/log"
 import { Process } from "@/util/process"
-import { warn } from "console"
 
 const log = Log.create({ service: "config" })
 
@@ -44,19 +43,31 @@ export function parseManagedPlist(json: string): string {
   return JSON.stringify(raw)
 }
 
-export async function readManagedPreferences() {
-  if (process.platform !== "darwin") return
+export async function readManagedPreferences(): Promise<{ source: string; text: string } | undefined> {
+  if (process.platform !== "darwin") return undefined
 
   const user = os.userInfo().username
-  const paths = [
+  const candidatePaths = [
     path.join("/Library/Managed Preferences", user, `${MANAGED_PLIST_DOMAIN}.plist`),
     path.join("/Library/Managed Preferences", `${MANAGED_PLIST_DOMAIN}.plist`),
   ]
 
-  for (const plist of paths) {
-    if (!existsSync(plist)) continue
+  const existingPaths = candidatePaths.filter((plist) => existsSync(plist))
+  if (existingPaths.length === 0) return undefined
+
+  for (const plist of existingPaths) {
     log.info("reading macOS managed preferences", { path: plist })
-    const result = await Process.run(["plutil", "-convert", "json", "-o", "-", plist], { nothrow: true })
+  }
+
+  const results = await Promise.all(
+    existingPaths.map((plist) =>
+      Process.run(["plutil", "-convert", "json", "-o", "-", plist], { nothrow: true })
+    )
+  )
+
+  for (let i = 0; i < existingPaths.length; i++) {
+    const plist = existingPaths[i]
+    const result = results[i]
     if (result.code !== 0) {
       log.warn("failed to convert managed preferences plist", { path: plist })
       continue
@@ -67,5 +78,5 @@ export async function readManagedPreferences() {
     }
   }
 
-  return
+  return undefined
 }

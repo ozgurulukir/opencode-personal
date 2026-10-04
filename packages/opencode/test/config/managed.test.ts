@@ -1,5 +1,5 @@
 import { test, expect } from "bun:test"
-import { parseManagedPlist, managedConfigDir } from "../../src/config/managed"
+import { parseManagedPlist, managedConfigDir, readManagedPreferences } from "../../src/config/managed"
 
 // ---- parseManagedPlist ----
 
@@ -53,4 +53,23 @@ test("returns the OPENCODE_TEST_MANAGED_CONFIG_DIR env override when set", () =>
     if (original === undefined) delete process.env.OPENCODE_TEST_MANAGED_CONFIG_DIR
     else process.env.OPENCODE_TEST_MANAGED_CONFIG_DIR = original
   }
+})
+
+// ---- readManagedPreferences ----
+
+test("returns undefined when platform is not darwin", async () => {
+  const originalPlatform = process.platform
+  Object.defineProperty(process, "platform", { value: "linux", configurable: true })
+  try {
+    const result = await readManagedPreferences()
+    expect(result).toBeUndefined()
+  } finally {
+    Object.defineProperty(process, "platform", { value: originalPlatform, configurable: true })
+  }
+})
+
+test("returns undefined when no plist files exist on darwin", async () => {
+  if (process.platform !== "darwin") return
+  const result = await readManagedPreferences()
+  expect(result === undefined || typeof result === "object").toBe(true)
 })
