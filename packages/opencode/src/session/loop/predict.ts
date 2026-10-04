@@ -132,9 +132,16 @@ export const predict = Effect.fn("SessionPrompt.predict")(function* (
       allowSystemInMessages: true,
       system: qwen3 ? undefined : PREDICT_SYSTEM,
       messages: predictMessages,
-      maxOutputTokens: ProviderTransform.supportsMaxOutputTokens(model)
-        ? ProviderTransform.maxOutputTokens(model)
-        : undefined,
+      maxOutputTokens:
+        // Mirrors the codex plugin's chat.params rule, which strips
+        // maxOutputTokens for openai models ("Match codex cli") because the
+        // ChatGPT backend rejects the parameter. predict bypasses plugin
+        // hooks by design, so the rule has to be duplicated here — sending
+        // max_output_tokens to an openai OAuth session fails the request and
+        // silently kills the ghost-text suggestion.
+        model.providerID !== "openai" && ProviderTransform.supportsMaxOutputTokens(model)
+          ? ProviderTransform.maxOutputTokens(model)
+          : undefined,
       temperature: model.capabilities.temperature ? 0.7 : undefined,
       providerOptions: ProviderTransform.providerOptions(model, ProviderTransform.smallOptions(model)),
       headers: {
