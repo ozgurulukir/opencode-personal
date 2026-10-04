@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { parsePluginSpecifier } from "../../src/plugin/shared"
+import { isDeprecatedPlugin, parsePluginSpecifier } from "../../src/plugin/shared"
 
 describe("parsePluginSpecifier", () => {
   test("parses standard npm package without version", () => {
@@ -84,5 +84,29 @@ describe("parsePluginSpecifier", () => {
       pkg: "@opencode/acme",
       version: "latest",
     })
+  })
+})
+
+describe("isDeprecatedPlugin", () => {
+  test("returns true for deprecated plugin packages", () => {
+    expect(isDeprecatedPlugin("opencode-openai-codex-auth")).toBe(true)
+    expect(isDeprecatedPlugin("opencode-copilot-auth")).toBe(true)
+  })
+
+  test("returns true for deprecated plugin packages with version or path specs", () => {
+    expect(isDeprecatedPlugin("opencode-openai-codex-auth@1.0.0")).toBe(true)
+    expect(isDeprecatedPlugin("@scope/opencode-copilot-auth@latest")).toBe(true)
+    expect(isDeprecatedPlugin("/path/to/node_modules/opencode-openai-codex-auth/index.js")).toBe(true)
+  })
+
+  test("returns false for non-deprecated plugin packages", () => {
+    expect(isDeprecatedPlugin("opencode-anthropic-auth")).toBe(false)
+    expect(isDeprecatedPlugin("@opencode/plugin-copilot")).toBe(false)
+    expect(isDeprecatedPlugin("some-other-plugin")).toBe(false)
+  })
+
+  test("returns false for empty string or unrelated specifiers", () => {
+    expect(isDeprecatedPlugin("")).toBe(false)
+    expect(isDeprecatedPlugin("opencode")).toBe(false)
   })
 })
