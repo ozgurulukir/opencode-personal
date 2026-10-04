@@ -70,11 +70,16 @@ export const prettier: Info = {
   ],
   async enabled(context) {
     const items = await Filesystem.findUp("package.json", context.directory, context.worktree)
-    for (const item of items) {
-      const json = await Filesystem.readJson<{
-        dependencies?: Record<string, string>
-        devDependencies?: Record<string, string>
-      }>(item)
+    const jsons = await Promise.all(
+      items.map(async (item) => {
+        const json = await Filesystem.readJson<{
+          dependencies?: Record<string, string>
+          devDependencies?: Record<string, string>
+        }>(item)
+        return { item, json }
+      }),
+    )
+    for (const { item, json } of jsons) {
       if (json.dependencies?.prettier || json.devDependencies?.prettier) {
         // Prefer the repo's own prettier binary: it matches the project's
         // pinned version and config. Falling back to the opencode global cache
@@ -99,11 +104,16 @@ export const oxfmt: Info = {
   async enabled(context) {
     if (!Flag.OPENCODE_EXPERIMENTAL_OXFMT) return false
     const items = await Filesystem.findUp("package.json", context.directory, context.worktree)
-    for (const item of items) {
-      const json = await Filesystem.readJson<{
-        dependencies?: Record<string, string>
-        devDependencies?: Record<string, string>
-      }>(item)
+    const jsons = await Promise.all(
+      items.map(async (item) => {
+        const json = await Filesystem.readJson<{
+          dependencies?: Record<string, string>
+          devDependencies?: Record<string, string>
+        }>(item)
+        return { item, json }
+      }),
+    )
+    for (const { item, json } of jsons) {
       if (json.dependencies?.oxfmt || json.devDependencies?.oxfmt) {
         // Prefer the repo's own oxfmt binary (matches pinned version); fall back
         // to the opencode global cache only if not installed locally.
@@ -373,11 +383,16 @@ export const pint: Info = {
   extensions: [".php"],
   async enabled(context) {
     const items = await Filesystem.findUp("composer.json", context.directory, context.worktree)
-    for (const item of items) {
-      const json = await Filesystem.readJson<{
-        require?: Record<string, string>
-        "require-dev"?: Record<string, string>
-      }>(item)
+    const jsons = await Promise.all(
+      items.map(async (item) => {
+        const json = await Filesystem.readJson<{
+          require?: Record<string, string>
+          "require-dev"?: Record<string, string>
+        }>(item)
+        return { item, json }
+      }),
+    )
+    for (const { item, json } of jsons) {
       if (json.require?.["laravel/pint"] || json["require-dev"]?.["laravel/pint"]) return ["./vendor/bin/pint", "$FILE"]
     }
     return false
