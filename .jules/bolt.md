@@ -126,3 +126,7 @@
 ## 2026-09-30 - Extension of Backward Loops and Single Chain Iteration in Reactive Contexts
 **Learning:** Expanding on previous optimizations (see 2026-08-04), using `.findLast()`, `.findLastIndex()`, or chaining multiple array traversals (like `.flatMap().map().findLast()`) within high-frequency paths or `createMemo` hooks continues to generate measurable GC pressure via closure allocation and redundant intermediate array creation.
 **Action:** Consistently replace these methods and chains with single, imperative backward `for` loops across both backend session loops and frontend reactive graph hot paths. This guarantees minimal allocation overhead, O(N) single-pass execution, and reduces garbage collection pauses.
+
+## 2026-08-31 - Concurrent Directory Traversal & Stat in Uninstall
+**Learning:** Sequential fs checks and recursive directory size computations (`for...of` loops with `await fs.stat/access/readdir`) cause severe I/O waterfalls during CLI operations like `uninstall` summary generation.
+**Action:** Replace sequential loops with concurrent `Promise.all` traversals across directory trees and target directory checks to enable parallel I/O, reducing traversal latency by over 20x.

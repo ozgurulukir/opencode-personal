@@ -104,14 +104,22 @@ async function collectRemovalTargets(args: UninstallArgs, method: Installation.M
 async function showRemovalSummary(targets: RemovalTargets, method: Installation.Method) {
   prompts.log.message("The following will be removed:")
 
-  for (const dir of targets.directories) {
-    const exists = await fs
-      .access(dir.path)
-      .then(() => true)
-      .catch(() => false)
-    if (!exists) continue
+  const directorySummaries = await Promise.all(
+    targets.directories.map(async (dir) => {
+      const exists = await fs
+        .access(dir.path)
+        .then(() => true)
+        .catch(() => false)
+      if (!exists) return null
 
-    const size = await getDirectorySize(dir.path)
+      const size = await getDirectorySize(dir.path)
+      return { dir, size }
+    }),
+  )
+
+  for (const item of directorySummaries) {
+    if (!item) continue
+    const { dir, size } = item
     const sizeStr = formatSize(size)
     const status = dir.keep ? UI.Style.TEXT_DIM + "(keeping)" : ""
     const prefix = dir.keep ? "○" : "✓"
@@ -315,26 +323,23 @@ async function cleanShellConfig(file: string) {
 }
 
 async function getDirectorySize(dir: string): Promise<number> {
-  let total = 0
+  const entries = await fs.readdir(dir, { withFileTypes: true }).catch(() => [])
 
-  const walk = async (current: string) => {
-    const entries = await fs.readdir(current, { withFileTypes: true }).catch(() => [])
-
-    for (const entry of entries) {
-      const full = path.join(current, entry.name)
+  const sizes = await Promise.all(
+    entries.map(async (entry) => {
+      const full = path.join(dir, entry.name)
       if (entry.isDirectory()) {
-        await walk(full)
-        continue
+        return getDirectorySize(full)
       }
       if (entry.isFile()) {
         const stat = await fs.stat(full).catch(() => null)
-        if (stat) total += stat.size
+        return stat ? stat.size : 0
       }
-    }
-  }
+      return 0
+    }),
+  )
 
-  await walk(dir)
-  return total
+  return sizes.reduce((acc, s) => acc + s, 0)
 }
 
 function formatSize(bytes: number): string {
