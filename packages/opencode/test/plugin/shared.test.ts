@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { parsePluginSpecifier } from "../../src/plugin/shared"
+import { isDeprecatedPlugin, isPathPluginSpec, parsePluginSpecifier } from "../../src/plugin/shared"
 
 describe("parsePluginSpecifier", () => {
   test("parses standard npm package without version", () => {
@@ -84,5 +84,62 @@ describe("parsePluginSpecifier", () => {
       pkg: "@opencode/acme",
       version: "latest",
     })
+  })
+})
+
+describe("isDeprecatedPlugin", () => {
+  test("returns true for exact deprecated package names", () => {
+    expect(isDeprecatedPlugin("opencode-openai-codex-auth")).toBe(true)
+    expect(isDeprecatedPlugin("opencode-copilot-auth")).toBe(true)
+  })
+
+  test("returns true for versioned or prefixed/suffixed deprecated specs", () => {
+    expect(isDeprecatedPlugin("opencode-openai-codex-auth@1.0.0")).toBe(true)
+    expect(isDeprecatedPlugin("@scope/opencode-copilot-auth")).toBe(true)
+    expect(isDeprecatedPlugin("file:///path/to/opencode-openai-codex-auth")).toBe(true)
+  })
+
+  test("returns false for non-deprecated plugin specs", () => {
+    expect(isDeprecatedPlugin("opencode-anthropic-auth")).toBe(false)
+    expect(isDeprecatedPlugin("my-custom-plugin")).toBe(false)
+    expect(isDeprecatedPlugin("")).toBe(false)
+  })
+
+  test("returns false for partial substring non-matches", () => {
+    expect(isDeprecatedPlugin("opencode-openai")).toBe(false)
+    expect(isDeprecatedPlugin("copilot-auth")).toBe(false)
+  })
+})
+
+describe("isPathPluginSpec", () => {
+  test("returns true for relative paths starting with .", () => {
+    expect(isPathPluginSpec(".")).toBe(true)
+    expect(isPathPluginSpec("./plugin")).toBe(true)
+    expect(isPathPluginSpec("../plugin")).toBe(true)
+    expect(isPathPluginSpec("./path/to/plugin.ts")).toBe(true)
+  })
+
+  test("returns true for file:// URLs", () => {
+    expect(isPathPluginSpec("file:///path/to/plugin")).toBe(true)
+    expect(isPathPluginSpec("file://./plugin")).toBe(true)
+    expect(isPathPluginSpec("file://C:/path/to/plugin")).toBe(true)
+  })
+
+  test("returns true for POSIX absolute paths", () => {
+    expect(isPathPluginSpec("/path/to/plugin")).toBe(true)
+    expect(isPathPluginSpec("/usr/local/lib/plugin")).toBe(true)
+  })
+
+  test("returns true for Windows absolute paths", () => {
+    expect(isPathPluginSpec("C:\\path\\to\\plugin")).toBe(true)
+    expect(isPathPluginSpec("D:/path/to/plugin")).toBe(true)
+    expect(isPathPluginSpec("z:\\plugin")).toBe(true)
+  })
+
+  test("returns false for non-path npm plugin specifiers", () => {
+    expect(isPathPluginSpec("my-plugin")).toBe(false)
+    expect(isPathPluginSpec("@scope/my-plugin")).toBe(false)
+    expect(isPathPluginSpec("opencode-plugin-test")).toBe(false)
+    expect(isPathPluginSpec("my-plugin@1.0.0")).toBe(false)
   })
 })

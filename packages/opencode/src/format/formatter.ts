@@ -70,11 +70,18 @@ export const prettier: Info = {
   ],
   async enabled(context) {
     const items = await Filesystem.findUp("package.json", context.directory, context.worktree)
-    for (const item of items) {
-      const json = await Filesystem.readJson<{
-        dependencies?: Record<string, string>
-        devDependencies?: Record<string, string>
-      }>(item)
+    const jsons = await Promise.allSettled(
+      items.map(async (item) => {
+        const json = await Filesystem.readJson<{
+          dependencies?: Record<string, string>
+          devDependencies?: Record<string, string>
+        }>(item)
+        return { item, json }
+      }),
+    )
+    for (const result of jsons) {
+      if (result.status === "rejected") throw result.reason
+      const { item, json } = result.value
       if (json.dependencies?.prettier || json.devDependencies?.prettier) {
         // Prefer the repo's own prettier binary: it matches the project's
         // pinned version and config. Falling back to the opencode global cache
@@ -99,11 +106,18 @@ export const oxfmt: Info = {
   async enabled(context) {
     if (!Flag.OPENCODE_EXPERIMENTAL_OXFMT) return false
     const items = await Filesystem.findUp("package.json", context.directory, context.worktree)
-    for (const item of items) {
-      const json = await Filesystem.readJson<{
-        dependencies?: Record<string, string>
-        devDependencies?: Record<string, string>
-      }>(item)
+    const jsons = await Promise.allSettled(
+      items.map(async (item) => {
+        const json = await Filesystem.readJson<{
+          dependencies?: Record<string, string>
+          devDependencies?: Record<string, string>
+        }>(item)
+        return { item, json }
+      }),
+    )
+    for (const result of jsons) {
+      if (result.status === "rejected") throw result.reason
+      const { item, json } = result.value
       if (json.dependencies?.oxfmt || json.devDependencies?.oxfmt) {
         // Prefer the repo's own oxfmt binary (matches pinned version); fall back
         // to the opencode global cache only if not installed locally.
@@ -203,8 +217,12 @@ export const python: Info = {
   async enabled(context) {
     if (which("ruff")) {
       const configs = ["pyproject.toml", "ruff.toml", ".ruff.toml"]
-      for (const config of configs) {
-        const found = await Filesystem.findUp(config, context.directory, context.worktree)
+      const configResults = await Promise.all(
+        configs.map((config) => Filesystem.findUp(config, context.directory, context.worktree)),
+      )
+      for (let i = 0; i < configs.length; i++) {
+        const config = configs[i]
+        const found = configResults[i]
         if (found.length > 0) {
           if (config === "pyproject.toml") {
             const content = await Filesystem.readText(found[0])
@@ -214,9 +232,13 @@ export const python: Info = {
           }
         }
       }
+
       const deps = ["requirements.txt", "pyproject.toml", "Pipfile"]
-      for (const dep of deps) {
-        const found = await Filesystem.findUp(dep, context.directory, context.worktree)
+      const depResults = await Promise.all(
+        deps.map((dep) => Filesystem.findUp(dep, context.directory, context.worktree)),
+      )
+      for (let i = 0; i < deps.length; i++) {
+        const found = depResults[i]
         if (found.length > 0) {
           const content = await Filesystem.readText(found[0])
           if (content.includes("ruff")) return ["ruff", "format", "$FILE"]
@@ -373,11 +395,18 @@ export const pint: Info = {
   extensions: [".php"],
   async enabled(context) {
     const items = await Filesystem.findUp("composer.json", context.directory, context.worktree)
-    for (const item of items) {
-      const json = await Filesystem.readJson<{
-        require?: Record<string, string>
-        "require-dev"?: Record<string, string>
-      }>(item)
+    const jsons = await Promise.allSettled(
+      items.map(async (item) => {
+        const json = await Filesystem.readJson<{
+          require?: Record<string, string>
+          "require-dev"?: Record<string, string>
+        }>(item)
+        return { item, json }
+      }),
+    )
+    for (const result of jsons) {
+      if (result.status === "rejected") throw result.reason
+      const { item, json } = result.value
       if (json.require?.["laravel/pint"] || json["require-dev"]?.["laravel/pint"]) return ["./vendor/bin/pint", "$FILE"]
     }
     return false
