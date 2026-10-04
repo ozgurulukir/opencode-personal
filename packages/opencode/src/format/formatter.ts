@@ -215,13 +215,17 @@ export const python: Info = {
         }
       }
       const deps = ["requirements.txt", "pyproject.toml", "Pipfile"]
-      for (const dep of deps) {
-        const found = await Filesystem.findUp(dep, context.directory, context.worktree)
-        if (found.length > 0) {
-          const content = await Filesystem.readText(found[0])
-          if (content.includes("ruff")) return ["ruff", "format", "$FILE"]
-        }
-      }
+      const depResults = await Promise.all(
+        deps.map(async (dep) => {
+          const found = await Filesystem.findUp(dep, context.directory, context.worktree)
+          if (found.length > 0) {
+            const content = await Filesystem.readText(found[0])
+            if (content.includes("ruff")) return true
+          }
+          return false
+        }),
+      )
+      if (depResults.some(Boolean)) return ["ruff", "format", "$FILE"]
     }
     const uv = which("uv")
     if (uv != null) {
