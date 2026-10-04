@@ -205,11 +205,7 @@ export const GithubInstallCommand = effectCmd({
         const app = await getAppInfo()
         await installGitHubApp()
 
-        const providers = await Effect.runPromise(modelsDev.get()).then((p) => {
-          // TODO: add guide for copilot, for now just hide it
-          delete p["github-copilot"]
-          return p
-        })
+        const providers = await Effect.runPromise(modelsDev.get())
 
         const provider = await promptProvider()
         const model = await promptModel()
@@ -223,6 +219,14 @@ export const GithubInstallCommand = effectCmd({
           if (provider === "amazon-bedrock") {
             step2 =
               "Configure OIDC in AWS - https://docs.github.com/en/actions/how-tos/security-for-github-actions/security-hardening-your-deployments/configuring-openid-connect-in-amazon-web-services"
+          } else if (provider === "github-copilot") {
+            step2 = [
+              `    2. Add the following secrets in org or repo (${app.owner}/${app.repo}) settings`,
+              "",
+              ...providers[provider].env.map((e) => `       - ${e}`),
+              "",
+              "       Read setup guide - https://opencode.ai/docs/providers/#github-copilot",
+            ].join("\n")
           } else {
             step2 = [
               `    2. Add the following secrets in org or repo (${app.owner}/${app.repo}) settings`,
@@ -269,7 +273,8 @@ export const GithubInstallCommand = effectCmd({
             opencode: 0,
             anthropic: 1,
             openai: 2,
-            google: 3,
+            "github-copilot": 3,
+            google: 4,
           }
           let provider = await prompts.select({
             message: "Select provider",
