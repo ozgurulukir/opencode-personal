@@ -203,8 +203,12 @@ export const python: Info = {
   async enabled(context) {
     if (which("ruff")) {
       const configs = ["pyproject.toml", "ruff.toml", ".ruff.toml"]
-      for (const config of configs) {
-        const found = await Filesystem.findUp(config, context.directory, context.worktree)
+      const configResults = await Promise.all(
+        configs.map((config) => Filesystem.findUp(config, context.directory, context.worktree)),
+      )
+      for (let i = 0; i < configs.length; i++) {
+        const config = configs[i]
+        const found = configResults[i]
         if (found.length > 0) {
           if (config === "pyproject.toml") {
             const content = await Filesystem.readText(found[0])
@@ -214,9 +218,13 @@ export const python: Info = {
           }
         }
       }
+
       const deps = ["requirements.txt", "pyproject.toml", "Pipfile"]
-      for (const dep of deps) {
-        const found = await Filesystem.findUp(dep, context.directory, context.worktree)
+      const depResults = await Promise.all(
+        deps.map((dep) => Filesystem.findUp(dep, context.directory, context.worktree)),
+      )
+      for (let i = 0; i < deps.length; i++) {
+        const found = depResults[i]
         if (found.length > 0) {
           const content = await Filesystem.readText(found[0])
           if (content.includes("ruff")) return ["ruff", "format", "$FILE"]

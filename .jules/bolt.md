@@ -126,3 +126,8 @@
 ## 2026-09-30 - Extension of Backward Loops and Single Chain Iteration in Reactive Contexts
 **Learning:** Expanding on previous optimizations (see 2026-08-04), using `.findLast()`, `.findLastIndex()`, or chaining multiple array traversals (like `.flatMap().map().findLast()`) within high-frequency paths or `createMemo` hooks continues to generate measurable GC pressure via closure allocation and redundant intermediate array creation.
 **Action:** Consistently replace these methods and chains with single, imperative backward `for` loops across both backend session loops and frontend reactive graph hot paths. This guarantees minimal allocation overhead, O(N) single-pass execution, and reduces garbage collection pauses.
+
+## 2025-03-08 - Parallelize findUp config and dependency checks for Python formatter
+
+**Learning:** When looking up multiple configuration/dependency files across ancestor directory hierarchies (such as `pyproject.toml`, `ruff.toml`, `.ruff.toml`), sequential `findUp` searches multiply file I/O latency across directory traversal steps.
+**Action:** Use `Promise.all` to query all potential config/dependency target files concurrently with `Filesystem.findUp`, while maintaining the original array order in the subsequent loop to preserve search precedence rules.
