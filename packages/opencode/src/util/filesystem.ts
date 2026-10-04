@@ -198,7 +198,7 @@ export async function findUp(
   for (const dir of options?.rootFirst ? dirs.toReversed() : dirs) {
     for (const item of targets) {
       const search = join(dir, item)
-      if (await exists(search)) result.push(search)
+      if (existsSync(search)) result.push(search)
     }
   }
   return result
@@ -210,7 +210,7 @@ export async function* up(options: { targets: string[]; start: string; stop?: st
   while (true) {
     for (const target of targets) {
       const search = join(current, target)
-      if (await exists(search)) yield search
+      if (existsSync(search)) yield search
     }
     if (stop === current) break
     const parent = dirname(current)
