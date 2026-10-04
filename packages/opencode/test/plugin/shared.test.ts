@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { parsePluginSpecifier } from "../../src/plugin/shared"
+import { isPathPluginSpec, parsePluginSpecifier } from "../../src/plugin/shared"
 
 describe("parsePluginSpecifier", () => {
   test("parses standard npm package without version", () => {
@@ -84,5 +84,38 @@ describe("parsePluginSpecifier", () => {
       pkg: "@opencode/acme",
       version: "latest",
     })
+  })
+})
+
+describe("isPathPluginSpec", () => {
+  test("returns true for relative paths starting with .", () => {
+    expect(isPathPluginSpec(".")).toBe(true)
+    expect(isPathPluginSpec("./plugin")).toBe(true)
+    expect(isPathPluginSpec("../plugin")).toBe(true)
+    expect(isPathPluginSpec("./path/to/plugin.ts")).toBe(true)
+  })
+
+  test("returns true for file:// URLs", () => {
+    expect(isPathPluginSpec("file:///path/to/plugin")).toBe(true)
+    expect(isPathPluginSpec("file://./plugin")).toBe(true)
+    expect(isPathPluginSpec("file://C:/path/to/plugin")).toBe(true)
+  })
+
+  test("returns true for POSIX absolute paths", () => {
+    expect(isPathPluginSpec("/path/to/plugin")).toBe(true)
+    expect(isPathPluginSpec("/usr/local/lib/plugin")).toBe(true)
+  })
+
+  test("returns true for Windows absolute paths", () => {
+    expect(isPathPluginSpec("C:\\path\\to\\plugin")).toBe(true)
+    expect(isPathPluginSpec("D:/path/to/plugin")).toBe(true)
+    expect(isPathPluginSpec("z:\\plugin")).toBe(true)
+  })
+
+  test("returns false for non-path npm plugin specifiers", () => {
+    expect(isPathPluginSpec("my-plugin")).toBe(false)
+    expect(isPathPluginSpec("@scope/my-plugin")).toBe(false)
+    expect(isPathPluginSpec("opencode-plugin-test")).toBe(false)
+    expect(isPathPluginSpec("my-plugin@1.0.0")).toBe(false)
   })
 })
