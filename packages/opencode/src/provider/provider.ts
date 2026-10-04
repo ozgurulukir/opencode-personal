@@ -1690,7 +1690,19 @@ const layer: Layer.Layer<
 
       if (cfg.small_model) {
         const parsed = parseModel(cfg.small_model)
-        return yield* getModel(parsed.providerID, parsed.modelID)
+        // A stale small_model pin (model removed from the catalog, provider
+        // typo) falls through to the heuristic below instead of throwing —
+        // callers (title, predict) treat undefined as "use the next
+        // fallback", whereas an error silently kills title generation
+        // (run-loop forks it with Effect.ignore). getModel surfaces the
+        // missing-model error as a defect (no E channel), so this needs the
+        // defect-aware catch, not Effect.catch.
+        const pinned = yield* getModel(parsed.providerID, parsed.modelID).pipe(
+          Effect.catchDefect((defect) =>
+            ModelNotFoundError.isInstance(defect) ? Effect.succeed(undefined) : Effect.die(defect),
+          ),
+        )
+        if (pinned) return pinned
       }
 
       // ChatGPT/Codex OAuth entitlements are invisible to the catalog: an

@@ -1053,6 +1053,31 @@ test("getSmallModel respects config small_model override", async () => {
   })
 })
 
+test("getSmallModel degrades to the heuristic when small_model points at a missing model", async () => {
+  await using tmp = await tmpdir({
+    init: async (dir) => {
+      await Bun.write(
+        path.join(dir, "opencode.json"),
+        JSON.stringify({
+          $schema: "https://opencode.ai/config.json",
+          small_model: "anthropic/nonexistent-model",
+        }),
+      )
+    },
+  })
+  await WithInstance.provide({
+    directory: tmp.path,
+    fn: async () => {
+      set("ANTHROPIC_API_KEY", "test-api-key")
+      // Before the fall-through this threw ModelNotFoundError, which killed
+      // title generation outright (run-loop forks it with Effect.ignore).
+      const model = await getSmallModel(ProviderID.anthropic)
+      expect(model).toBeDefined()
+      expect(model?.id).toContain("haiku")
+    },
+  })
+})
+
 test("getSmallModel picks a catalog mini model for openai api-key auth", async () => {
   await using tmp = await tmpdir({
     init: async (dir) => {

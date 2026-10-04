@@ -71,15 +71,16 @@ export const predict = Effect.fn("SessionPrompt.predict")(function* (
 
   // Prefer the small ("title") model for cost; fall back to the assistant's
   // own model, and finally to getSmallModel for the assistant's provider.
-  // Each step is wrapped in Effect.catch -> succeed(undefined) so a
-  // missing provider/model just leaves us with the next fallback rather
-  // than failing the whole prediction.
+  // Each step is wrapped in catchDefect so a missing provider/model just
+  // leaves us with the next fallback rather than dying the whole prediction
+  // — getModel surfaces the missing-model error as a defect (no E channel),
+  // so Effect.catch would never fire here.
   const titleAg = yield* deps.agents.get("title")
   const mdl = yield* Effect.gen(function* () {
     if (titleAg?.model) {
       return yield* deps.provider
         .getModel(titleAg.model.providerID, titleAg.model.modelID)
-        .pipe(Effect.catch(() => Effect.succeed(undefined)))
+        .pipe(Effect.catchDefect(() => Effect.succeed(undefined)))
     }
     return undefined
   })
@@ -88,10 +89,10 @@ export const predict = Effect.fn("SessionPrompt.predict")(function* (
     return yield* deps.provider
       .getModel(lastAssistant.info.providerID, lastAssistant.info.modelID)
       .pipe(
-        Effect.catch(() =>
+        Effect.catchDefect(() =>
           deps.provider
             .getSmallModel(lastAssistant.info.providerID)
-            .pipe(Effect.catch(() => Effect.succeed(undefined))),
+            .pipe(Effect.catchDefect(() => Effect.succeed(undefined))),
         ),
       )
   })

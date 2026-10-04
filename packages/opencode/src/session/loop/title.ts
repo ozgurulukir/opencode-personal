@@ -48,10 +48,28 @@ export const title = Effect.fn("SessionPrompt.ensureTitle")(function* (
 
   const ag = yield* deps.agents.get("title")
   if (!ag) return
-  const mdl = ag.model
-    ? yield* deps.provider.getModel(ag.model.providerID, ag.model.modelID)
-    : ((yield* deps.provider.getSmallModel(input.providerID)) ??
-      (yield* deps.provider.getModel(input.providerID, input.modelID)))
+  // Resolution must be total: a stale agent.title.model pin or a broken
+  // small_model config must fall through to the turn's model instead of
+  // failing this effect — run-loop forks title with Effect.ignore, so an
+  // error here silently disables title generation. getModel surfaces the
+  // missing-model error as a defect, hence catchDefect (the idiom used for
+  // this call in create-user-message.ts), not Effect.catch.
+  const mdl = yield* Effect.gen(function* () {
+    if (ag.model) {
+      const pinned = yield* deps.provider
+        .getModel(ag.model.providerID, ag.model.modelID)
+        .pipe(Effect.catchDefect(() => Effect.succeed(undefined)))
+      if (pinned) return pinned
+    }
+    const small = yield* deps.provider
+      .getSmallModel(input.providerID)
+      .pipe(Effect.catchDefect(() => Effect.succeed(undefined)))
+    if (small) return small
+    return yield* deps.provider
+      .getModel(input.providerID, input.modelID)
+      .pipe(Effect.catchDefect(() => Effect.succeed(undefined)))
+  })
+  if (!mdl) return
   const msgs = onlySubtasks
     ? [{ role: "user" as const, content: subtasks.map((p) => p.prompt).join("\n") }]
     : yield* MessageV2.toModelMessagesEffect(context, mdl)
