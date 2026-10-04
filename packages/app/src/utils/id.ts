@@ -74,10 +74,15 @@ function bytesToHex(bytes: Uint8Array): string {
 
 function randomBase62(length: number): string {
   const chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
-  const bytes = getRandomBytes(length)
   let result = ""
-  for (let i = 0; i < length; i += 1) {
-    result += chars[bytes[i] % 62]
+  while (result.length < length) {
+    const bytes = getRandomBytes(length - result.length)
+    for (let i = 0; i < bytes.length; i += 1) {
+      if (bytes[i] < 248) {
+        result += chars[bytes[i] % 62]
+        if (result.length === length) break
+      }
+    }
   }
   return result
 }
@@ -91,9 +96,5 @@ function getRandomBytes(length: number): Uint8Array {
     return bytes
   }
 
-  for (let i = 0; i < length; i += 1) {
-    bytes[i] = Math.floor(Math.random() * 256)
-  }
-
-  return bytes
+  throw new Error("Cryptographically secure random number generator is not available")
 }
