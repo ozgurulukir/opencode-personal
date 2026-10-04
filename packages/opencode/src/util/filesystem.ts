@@ -196,9 +196,14 @@ export async function findUp(
   const targets = Array.isArray(target) ? target : [target]
   const result = []
   for (const dir of options?.rootFirst ? dirs.toReversed() : dirs) {
-    for (const item of targets) {
-      const search = join(dir, item)
-      if (await exists(search)) result.push(search)
+    const matches = await Promise.all(
+      targets.map(async (item) => {
+        const search = join(dir, item)
+        return (await exists(search)) ? search : null
+      }),
+    )
+    for (const match of matches) {
+      if (match !== null) result.push(match)
     }
   }
   return result

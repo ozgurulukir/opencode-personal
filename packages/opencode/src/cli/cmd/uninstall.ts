@@ -104,14 +104,22 @@ async function collectRemovalTargets(args: UninstallArgs, method: Installation.M
 async function showRemovalSummary(targets: RemovalTargets, method: Installation.Method) {
   prompts.log.message("The following will be removed:")
 
-  for (const dir of targets.directories) {
-    const exists = await fs
-      .access(dir.path)
-      .then(() => true)
-      .catch(() => false)
-    if (!exists) continue
+  const directorySummaries = await Promise.all(
+    targets.directories.map(async (dir) => {
+      const exists = await fs
+        .access(dir.path)
+        .then(() => true)
+        .catch(() => false)
+      if (!exists) return null
 
-    const size = await getDirectorySize(dir.path)
+      const size = await getDirectorySize(dir.path)
+      return { dir, size }
+    }),
+  )
+
+  for (const item of directorySummaries) {
+    if (!item) continue
+    const { dir, size } = item
     const sizeStr = formatSize(size)
     const status = dir.keep ? UI.Style.TEXT_DIM + "(keeping)" : ""
     const prefix = dir.keep ? "○" : "✓"
