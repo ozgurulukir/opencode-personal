@@ -74,20 +74,27 @@ export async function run(db: SQLiteBunDatabase<any, any> | NodeSQLiteDatabase<a
     return Glob.scan(pattern, { cwd: storageDir, absolute: true })
   }
 
-  async function read(files: string[], start: number, end: number) {
+  async function read<T>(
+    files: string[],
+    start: number,
+    end: number,
+    map: (data: any, index: number) => T | undefined,
+  ): Promise<T[]> {
     const count = end - start
     // oxlint-disable-next-line unicorn/no-new-array -- pre-allocated for index-based batch fill
     const tasks = new Array(count)
     for (let i = 0; i < count; i++) {
-      tasks[i] = Filesystem.readJson(files[start + i])
+      const fileIdx = start + i
+      tasks[i] = Filesystem.readJson(files[fileIdx]).then((data) => map(data, fileIdx))
     }
     const results = await Promise.allSettled(tasks)
-    // oxlint-disable-next-line unicorn/no-new-array -- pre-allocated for index-based batch fill
-    const items = new Array(count)
+    const items: T[] = []
     for (let i = 0; i < results.length; i++) {
       const result = results[i]
       if (result.status === "fulfilled") {
-        items[i] = result.value
+        if (result.value !== undefined) {
+          items.push(result.value)
+        }
         continue
       }
       errs.push(`failed to read ${files[start + i]}: ${result.reason}`)
@@ -101,7 +108,8 @@ export async function run(db: SQLiteBunDatabase<any, any> | NodeSQLiteDatabase<a
       db.insert(table).values(values).onConflictDoNothing().run()
       return values.length
     } catch (e) {
-      errs.push(`failed to migrate ${label} batch: ${e}`)
+      const msg = e instanceof Error ? e.message : String(e)
+      errs.push(`failed to migrate ${label} batch: ${msg}`)
       return 0
     }
   }
@@ -152,17 +160,13 @@ export async function run(db: SQLiteBunDatabase<any, any> | NodeSQLiteDatabase<a
   // Migrate projects first (no FK deps)
   // Derive all IDs from file paths, not JSON content
   const projectIds = new Set<string>()
-  const projectValues: unknown[] = []
   for (let i = 0; i < projectFiles.length; i += batchSize) {
     const end = Math.min(i + batchSize, projectFiles.length)
-    const batch = await read(projectFiles, i, end)
-    projectValues.length = 0
-    for (let j = 0; j < batch.length; j++) {
-      const data = batch[j]
-      if (!data) continue
-      const id = path.basename(projectFiles[i + j], ".json")
+    const values = await read(projectFiles, i, end, (data, idx) => {
+      if (!data) return undefined
+      const id = path.basename(projectFiles[idx], ".json")
       projectIds.add(id)
-      projectValues.push({
+      return {
         id,
         worktree: data.worktree ?? "/",
         vcs: data.vcs,
@@ -175,9 +179,9 @@ export async function run(db: SQLiteBunDatabase<any, any> | NodeSQLiteDatabase<a
         time_initialized: data.time?.initialized,
         sandboxes: data.sandboxes ?? [],
         commands: data.commands,
-      })
-    }
-    stats.projects += insert(projectValues, ProjectTable, "project")
+      }
+    })
+    stats.projects += insert(values, ProjectTable, "project")
     step("projects", end - i)
   }
   log.info("migrated projects", { count: stats.projects, duration: Math.round(performance.now() - start) })
@@ -187,22 +191,19 @@ export async function run(db: SQLiteBunDatabase<any, any> | NodeSQLiteDatabase<a
   // migrations may have moved sessions to new directories without updating the JSON
   const sessionProjects = sessionFiles.map((file) => path.basename(path.dirname(file)))
   const sessionIds = new Set<string>()
-  const sessionValues: unknown[] = []
   for (let i = 0; i < sessionFiles.length; i += batchSize) {
     const end = Math.min(i + batchSize, sessionFiles.length)
-    const batch = await read(sessionFiles, i, end)
-    sessionValues.length = 0
-    for (let j = 0; j < batch.length; j++) {
-      const data = batch[j]
-      if (!data) continue
-      const id = path.basename(sessionFiles[i + j], ".json")
-      const projectID = sessionProjects[i + j]
+    let sessionOrphans = 0
+    const values = await read(sessionFiles, i, end, (data, idx) => {
+      if (!data) return undefined
+      const id = path.basename(sessionFiles[idx], ".json")
+      const projectID = sessionProjects[idx]
       if (!projectIds.has(projectID)) {
-        orphans.sessions++
-        continue
+        sessionOrphans++
+        return undefined
       }
       sessionIds.add(id)
-      sessionValues.push({
+      return {
         id,
         project_id: projectID,
         parent_id: data.parentID ?? null,
@@ -222,9 +223,10 @@ export async function run(db: SQLiteBunDatabase<any, any> | NodeSQLiteDatabase<a
         time_updated: data.time?.updated ?? now,
         time_compacting: data.time?.compacting ?? null,
         time_archived: data.time?.archived ?? null,
-      })
-    }
-    stats.sessions += insert(sessionValues, SessionTable, "session")
+      }
+    })
+    orphans.sessions += sessionOrphans
+    stats.sessions += insert(values, SessionTable, "session")
     step("sessions", end - i)
   }
   log.info("migrated sessions", { count: stats.sessions })
@@ -245,29 +247,23 @@ export async function run(db: SQLiteBunDatabase<any, any> | NodeSQLiteDatabase<a
 
   for (let i = 0; i < allMessageFiles.length; i += batchSize) {
     const end = Math.min(i + batchSize, allMessageFiles.length)
-    const batch = await read(allMessageFiles, i, end)
-    // oxlint-disable-next-line unicorn/no-new-array -- pre-allocated for index-based batch fill
-    const values = new Array(batch.length)
-    let count = 0
-    for (let j = 0; j < batch.length; j++) {
-      const data = batch[j]
-      if (!data) continue
-      const file = allMessageFiles[i + j]
+    const values = await read(allMessageFiles, i, end, (data, idx) => {
+      if (!data) return undefined
+      const file = allMessageFiles[idx]
       const id = path.basename(file, ".json")
-      const sessionID = allMessageSessions[i + j]
+      const sessionID = allMessageSessions[idx]
       messageSessions.set(id, sessionID)
       const rest = data
       delete rest.id
       delete rest.sessionID
-      values[count++] = {
+      return {
         id,
         session_id: sessionID,
         time_created: data.time?.created ?? now,
         time_updated: data.time?.updated ?? now,
         data: rest,
       }
-    }
-    values.length = count
+    })
     stats.messages += insert(values, MessageTable, "message")
     step("messages", end - i)
   }
@@ -276,27 +272,23 @@ export async function run(db: SQLiteBunDatabase<any, any> | NodeSQLiteDatabase<a
   // Migrate parts using pre-scanned file map
   for (let i = 0; i < partFiles.length; i += batchSize) {
     const end = Math.min(i + batchSize, partFiles.length)
-    const batch = await read(partFiles, i, end)
-    // oxlint-disable-next-line unicorn/no-new-array -- pre-allocated for index-based batch fill
-    const values = new Array(batch.length)
-    let count = 0
-    for (let j = 0; j < batch.length; j++) {
-      const data = batch[j]
-      if (!data) continue
-      const file = partFiles[i + j]
+    const partErrs = [] as string[]
+    const values = await read(partFiles, i, end, (data, idx) => {
+      if (!data) return undefined
+      const file = partFiles[idx]
       const id = path.basename(file, ".json")
       const messageID = path.basename(path.dirname(file))
       const sessionID = messageSessions.get(messageID)
       if (!sessionID) {
-        errs.push(`part missing message session: ${file}`)
-        continue
+        partErrs.push(`part missing message session: ${file}`)
+        return undefined
       }
-      if (!sessionIds.has(sessionID)) continue
+      if (!sessionIds.has(sessionID)) return undefined
       const rest = data
       delete rest.id
       delete rest.messageID
       delete rest.sessionID
-      values[count++] = {
+      return {
         id,
         message_id: messageID,
         session_id: sessionID,
@@ -304,8 +296,8 @@ export async function run(db: SQLiteBunDatabase<any, any> | NodeSQLiteDatabase<a
         time_updated: data.time?.updated ?? now,
         data: rest,
       }
-    }
-    values.length = count
+    })
+    errs.push(...partErrs)
     stats.parts += insert(values, PartTable, "part")
     step("parts", end - i)
   }
@@ -315,24 +307,24 @@ export async function run(db: SQLiteBunDatabase<any, any> | NodeSQLiteDatabase<a
   const todoSessions = todoFiles.map((file) => path.basename(file, ".json"))
   for (let i = 0; i < todoFiles.length; i += batchSize) {
     const end = Math.min(i + batchSize, todoFiles.length)
-    const batch = await read(todoFiles, i, end)
-    const values: unknown[] = []
-    for (let j = 0; j < batch.length; j++) {
-      const data = batch[j]
-      if (!data) continue
-      const sessionID = todoSessions[i + j]
+    let todoOrphans = 0
+    const todoErrs = [] as string[]
+    const batchValues = await read(todoFiles, i, end, (data, idx) => {
+      if (!data) return undefined
+      const sessionID = todoSessions[idx]
       if (!sessionIds.has(sessionID)) {
-        orphans.todos++
-        continue
+        todoOrphans++
+        return undefined
       }
       if (!Array.isArray(data)) {
-        errs.push(`todo not an array: ${todoFiles[i + j]}`)
-        continue
+        todoErrs.push(`todo not an array: ${todoFiles[idx]}`)
+        return undefined
       }
+      const list = []
       for (let position = 0; position < data.length; position++) {
         const todo = data[position]
         if (!todo?.content || !todo?.status || !todo?.priority) continue
-        values.push({
+        list.push({
           session_id: sessionID,
           content: todo.content,
           status: todo.status,
@@ -342,7 +334,11 @@ export async function run(db: SQLiteBunDatabase<any, any> | NodeSQLiteDatabase<a
           time_updated: now,
         })
       }
-    }
+      return list
+    })
+    orphans.todos += todoOrphans
+    errs.push(...todoErrs)
+    const values = batchValues.flat()
     stats.todos += insert(values, TodoTable, "todo")
     step("todos", end - i)
   }
@@ -353,22 +349,20 @@ export async function run(db: SQLiteBunDatabase<any, any> | NodeSQLiteDatabase<a
 
   // Migrate permissions
   const permProjects = permFiles.map((file) => path.basename(file, ".json"))
-  const permValues: unknown[] = []
   for (let i = 0; i < permFiles.length; i += batchSize) {
     const end = Math.min(i + batchSize, permFiles.length)
-    const batch = await read(permFiles, i, end)
-    permValues.length = 0
-    for (let j = 0; j < batch.length; j++) {
-      const data = batch[j]
-      if (!data) continue
-      const projectID = permProjects[i + j]
+    let permOrphans = 0
+    const values = await read(permFiles, i, end, (data, idx) => {
+      if (!data) return undefined
+      const projectID = permProjects[idx]
       if (!projectIds.has(projectID)) {
-        orphans.permissions++
-        continue
+        permOrphans++
+        return undefined
       }
-      permValues.push({ project_id: projectID, data })
-    }
-    stats.permissions += insert(permValues, PermissionTable, "permission")
+      return { project_id: projectID, data }
+    })
+    orphans.permissions += permOrphans
+    stats.permissions += insert(values, PermissionTable, "permission")
     step("permissions", end - i)
   }
   log.info("migrated permissions", { count: stats.permissions })
@@ -378,26 +372,26 @@ export async function run(db: SQLiteBunDatabase<any, any> | NodeSQLiteDatabase<a
 
   // Migrate session shares
   const shareSessions = shareFiles.map((file) => path.basename(file, ".json"))
-  const shareValues: unknown[] = []
   for (let i = 0; i < shareFiles.length; i += batchSize) {
     const end = Math.min(i + batchSize, shareFiles.length)
-    const batch = await read(shareFiles, i, end)
-    shareValues.length = 0
-    for (let j = 0; j < batch.length; j++) {
-      const data = batch[j]
-      if (!data) continue
-      const sessionID = shareSessions[i + j]
+    let shareOrphans = 0
+    const shareErrs = [] as string[]
+    const values = await read(shareFiles, i, end, (data, idx) => {
+      if (!data) return undefined
+      const sessionID = shareSessions[idx]
       if (!sessionIds.has(sessionID)) {
-        orphans.shares++
-        continue
+        shareOrphans++
+        return undefined
       }
       if (!data?.id || !data?.secret || !data?.url) {
-        errs.push(`session_share missing id/secret/url: ${shareFiles[i + j]}`)
-        continue
+        shareErrs.push(`session_share missing id/secret/url: ${shareFiles[idx]}`)
+        return undefined
       }
-      shareValues.push({ session_id: sessionID, id: data.id, secret: data.secret, url: data.url })
-    }
-    stats.shares += insert(shareValues, SessionShareTable, "session_share")
+      return { session_id: sessionID, id: data.id, secret: data.secret, url: data.url }
+    })
+    orphans.shares += shareOrphans
+    errs.push(...shareErrs)
+    stats.shares += insert(values, SessionShareTable, "session_share")
     step("shares", end - i)
   }
   log.info("migrated session shares", { count: stats.shares })
