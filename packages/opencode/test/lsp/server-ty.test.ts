@@ -1,6 +1,5 @@
 // oxlint-disable typescript/no-unsafe-type-assertion
 import { afterAll, describe, expect, spyOn, test } from "bun:test"
-import type { ChildProcessWithoutNullStreams } from "node:child_process"
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
@@ -70,35 +69,40 @@ describe("Ty LSP Info", () => {
 
   describe("spawn", () => {
     test("returns undefined if OPENCODE_EXPERIMENTAL_LSP_TY is disabled", async () => {
-      const flagSpy = spyOn(Flag, "OPENCODE_EXPERIMENTAL_LSP_TY", "get").mockReturnValue(false)
+      const prev = Flag.OPENCODE_EXPERIMENTAL_LSP_TY
+      ;(Flag as any).OPENCODE_EXPERIMENTAL_LSP_TY = false
+
       try {
         const root = makeTempDir()
         const ctx = mockInstanceContext(root)
         const handle = await Ty.spawn(root, ctx)
         expect(handle).toBeUndefined()
       } finally {
-        flagSpy.mockRestore()
+        ;(Flag as any).OPENCODE_EXPERIMENTAL_LSP_TY = prev
       }
     })
 
     test("returns undefined if ty binary is not found anywhere", async () => {
-      const flagSpy = spyOn(Flag, "OPENCODE_EXPERIMENTAL_LSP_TY", "get").mockReturnValue(true)
-      const whichSpy = spyOn(Which, "which").mockReturnValue(undefined)
+      const prev = Flag.OPENCODE_EXPERIMENTAL_LSP_TY
+      ;(Flag as any).OPENCODE_EXPERIMENTAL_LSP_TY = true
+      const whichSpy = spyOn(Which, "which").mockReturnValue(null)
+
       try {
         const root = makeTempDir()
         const ctx = mockInstanceContext(root)
         const handle = await Ty.spawn(root, ctx)
         expect(handle).toBeUndefined()
       } finally {
-        flagSpy.mockRestore()
+        ;(Flag as any).OPENCODE_EXPERIMENTAL_LSP_TY = prev
         whichSpy.mockRestore()
       }
     })
 
     test("spawns ty from PATH when available and passes initialization with pythonPath if venv present", async () => {
-      const flagSpy = spyOn(Flag, "OPENCODE_EXPERIMENTAL_LSP_TY", "get").mockReturnValue(true)
+      const prev = Flag.OPENCODE_EXPERIMENTAL_LSP_TY
+      ;(Flag as any).OPENCODE_EXPERIMENTAL_LSP_TY = true
       const whichSpy = spyOn(Which, "which").mockReturnValue("/usr/local/bin/ty")
-      const mockProc = { id: "mock-process" } as unknown as ChildProcessWithoutNullStreams
+      const mockProc = { id: "mock-process", exited: Promise.resolve(0) } as unknown as ReturnType<typeof Launch.spawn>
       const spawnSpy = spyOn(Launch, "spawn").mockReturnValue(mockProc)
 
       try {
@@ -115,16 +119,17 @@ describe("Ty LSP Info", () => {
         expect(handle?.process).toBe(mockProc)
         expect(handle?.initialization).toEqual({ pythonPath: pythonBin })
       } finally {
-        flagSpy.mockRestore()
+        ;(Flag as any).OPENCODE_EXPERIMENTAL_LSP_TY = prev
         whichSpy.mockRestore()
         spawnSpy.mockRestore()
       }
     })
 
     test("spawns ty from project venv when not in PATH", async () => {
-      const flagSpy = spyOn(Flag, "OPENCODE_EXPERIMENTAL_LSP_TY", "get").mockReturnValue(true)
-      const whichSpy = spyOn(Which, "which").mockReturnValue(undefined)
-      const mockProc = { id: "mock-process" } as unknown as ChildProcessWithoutNullStreams
+      const prev = Flag.OPENCODE_EXPERIMENTAL_LSP_TY
+      ;(Flag as any).OPENCODE_EXPERIMENTAL_LSP_TY = true
+      const whichSpy = spyOn(Which, "which").mockReturnValue(null)
+      const mockProc = { id: "mock-process", exited: Promise.resolve(0) } as unknown as ReturnType<typeof Launch.spawn>
       const spawnSpy = spyOn(Launch, "spawn").mockReturnValue(mockProc)
 
       try {
@@ -143,7 +148,7 @@ describe("Ty LSP Info", () => {
         expect(handle).toBeDefined()
         expect(handle?.process).toBe(mockProc)
       } finally {
-        flagSpy.mockRestore()
+        ;(Flag as any).OPENCODE_EXPERIMENTAL_LSP_TY = prev
         whichSpy.mockRestore()
         spawnSpy.mockRestore()
       }
