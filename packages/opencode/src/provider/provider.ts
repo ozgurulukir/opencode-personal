@@ -1354,17 +1354,29 @@ const layer: Layer.Layer<
 
         // load env
         const envs = yield* env.all()
-        const knownIDs = new Set([...Object.keys(modelsDev), ...Object.keys(databaseCache)])
+        const knownIDs = new Set<string>()
+        for (const id of Object.keys(modelsDev)) knownIDs.add(id)
+        for (const id of Object.keys(databaseCache)) knownIDs.add(id)
         for (const id of knownIDs) {
           const providerID = ProviderID.make(id)
           if (!isProviderAllowed(providerID)) continue
           const dbEntry = databaseCache[id]
           const envList = dbEntry ? dbEntry.env : (modelsDev[id]?.env ?? [])
-          const apiKey = envList.find((item) => envs[item])
+          let apiKey: string | undefined
+          let apiKeyValue: string | undefined
+          for (let i = 0; i < envList.length; i++) {
+            const item = envList[i]
+            const val = envs[item]
+            if (val) {
+              apiKey = item
+              apiKeyValue = val
+              break
+            }
+          }
           if (!apiKey) continue
           mergeProvider(providerID, {
             source: "env",
-            key: envList.length === 1 ? envs[apiKey] : undefined,
+            key: envList.length === 1 ? apiKeyValue : undefined,
           })
         }
 
