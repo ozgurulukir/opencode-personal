@@ -3761,25 +3761,25 @@ describe("ProviderTransform.providerOptions - ai-gateway-provider", () => {
   })
 })
 
-describe("ProviderTransform.shouldUseInstructions", () => {
-  test("returns true for openai with oauth auth", () => {
-    expect(ProviderTransform.shouldUseInstructions("openai", { type: "oauth" } as any)).toBe(true)
+describe("ProviderTransform.systemPromptDelivery", () => {
+  test("returns instructions for openai with oauth auth", () => {
+    expect(ProviderTransform.systemPromptDelivery("openai", { type: "oauth" } as any)).toEqual({ type: "instructions" })
   })
 
-  test("returns false for openai with api auth", () => {
-    expect(ProviderTransform.shouldUseInstructions("openai", { type: "api" } as any)).toBe(false)
+  test("returns messages for openai with api auth", () => {
+    expect(ProviderTransform.systemPromptDelivery("openai", { type: "api" } as any)).toEqual({ type: "messages" })
   })
 
-  test("returns false for openai with no auth info", () => {
-    expect(ProviderTransform.shouldUseInstructions("openai", undefined)).toBe(false)
+  test("returns messages for openai with no auth info", () => {
+    expect(ProviderTransform.systemPromptDelivery("openai", undefined)).toEqual({ type: "messages" })
   })
 
-  test("returns false for non-openai provider with oauth", () => {
-    expect(ProviderTransform.shouldUseInstructions("anthropic", { type: "oauth" } as any)).toBe(false)
+  test("returns messages for non-openai provider with oauth", () => {
+    expect(ProviderTransform.systemPromptDelivery("anthropic", { type: "oauth" } as any)).toEqual({ type: "messages" })
   })
 
-  test("returns false for non-openai provider with no auth", () => {
-    expect(ProviderTransform.shouldUseInstructions("anthropic", undefined)).toBe(false)
+  test("returns messages for non-openai provider with no auth", () => {
+    expect(ProviderTransform.systemPromptDelivery("anthropic", undefined)).toEqual({ type: "messages" })
   })
 })
 
