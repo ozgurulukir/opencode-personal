@@ -75,6 +75,9 @@ describe("cli/effect/prompt", () => {
         stop: (_msg?: string) => {},
         error: (_msg?: string) => {},
         message: (_msg?: string) => {},
+        cancel: (_msg?: string) => {},
+        clear: () => {},
+        isCancelled: false,
       }
       const spinnerSpy = spyOn(prompts, "spinner").mockReturnValue(mockSpinner)
 
@@ -101,6 +104,9 @@ describe("cli/effect/prompt", () => {
         stop: (_msg?: string) => {},
         error: (_msg?: string) => {},
         message: (_msg?: string) => {},
+        cancel: (_msg?: string) => {},
+        clear: () => {},
+        isCancelled: false,
       }
       const spinnerSpy = spyOn(prompts, "spinner").mockReturnValue(mockSpinner)
 
@@ -128,9 +134,8 @@ describe("cli/effect/prompt", () => {
           expect(res1.value).toBe("opt1")
         }
 
-        const cancelSymbol = Symbol("cancel")
         const isCancelSpy = spyOn(prompts, "isCancel").mockReturnValue(true)
-        selectSpy.mockResolvedValue(cancelSymbol)
+        selectSpy.mockResolvedValue(prompts.CANCEL_SYMBOL)
 
         const res2 = await Effect.runPromise(select({ message: "Pick one", options: [] }))
         expect(Option.isNone(res2)).toBe(true)
@@ -144,17 +149,16 @@ describe("cli/effect/prompt", () => {
     test("autocomplete returns Option.some when value provided and Option.none on cancel", async () => {
       const autoSpy = spyOn(prompts, "autocomplete").mockResolvedValue("selected-item")
       try {
-        const res1 = await Effect.runPromise(autocomplete({ message: "Search", options: async () => [] }))
+        const res1 = await Effect.runPromise(autocomplete({ message: "Search", options: () => [] }))
         expect(Option.isSome(res1)).toBe(true)
         if (Option.isSome(res1)) {
           expect(res1.value).toBe("selected-item")
         }
 
-        const cancelSymbol = Symbol("cancel")
         const isCancelSpy = spyOn(prompts, "isCancel").mockReturnValue(true)
-        autoSpy.mockResolvedValue(cancelSymbol)
+        autoSpy.mockResolvedValue(prompts.CANCEL_SYMBOL)
 
-        const res2 = await Effect.runPromise(autocomplete({ message: "Search", options: async () => [] }))
+        const res2 = await Effect.runPromise(autocomplete({ message: "Search", options: () => [] }))
         expect(Option.isNone(res2)).toBe(true)
 
         isCancelSpy.mockRestore()
@@ -172,9 +176,8 @@ describe("cli/effect/prompt", () => {
           expect(res1.value).toBe("hello")
         }
 
-        const cancelSymbol = Symbol("cancel")
         const isCancelSpy = spyOn(prompts, "isCancel").mockReturnValue(true)
-        textSpy.mockResolvedValue(cancelSymbol)
+        textSpy.mockResolvedValue(prompts.CANCEL_SYMBOL)
 
         const res2 = await Effect.runPromise(text({ message: "Enter text" }))
         expect(Option.isNone(res2)).toBe(true)
@@ -194,9 +197,8 @@ describe("cli/effect/prompt", () => {
           expect(res1.value).toBe("secret")
         }
 
-        const cancelSymbol = Symbol("cancel")
         const isCancelSpy = spyOn(prompts, "isCancel").mockReturnValue(true)
-        passSpy.mockResolvedValue(cancelSymbol)
+        passSpy.mockResolvedValue(prompts.CANCEL_SYMBOL)
 
         const res2 = await Effect.runPromise(password({ message: "Enter password" }))
         expect(Option.isNone(res2)).toBe(true)
