@@ -340,7 +340,7 @@ export const layer = Layer.effect(
               sessionID: SessionMessageTable.session_id,
               legacyID: sql<string>`json_extract(
                 ${SessionMessageTable.data},
-                ${sql.raw(`'$.metadata.${LEGACY_MESSAGE_ID}'`)}
+                ${"$.metadata." + LEGACY_MESSAGE_ID}
               )`,
             })
             .from(SessionMessageTable)
@@ -353,7 +353,7 @@ export const layer = Layer.effect(
                 inArray(
                   sql`json_extract(
                     ${SessionMessageTable.data},
-                    ${sql.raw(`'$.metadata.${LEGACY_MESSAGE_ID}'`)}
+                    ${"$.metadata." + LEGACY_MESSAGE_ID}
                   )`,
                   batch.map(({ messageID }) => messageID),
                 ),

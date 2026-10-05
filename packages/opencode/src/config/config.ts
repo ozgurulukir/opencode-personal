@@ -105,11 +105,8 @@ async function substituteWellKnownRemoteConfig(input: { value: unknown; dir: str
 
 async function resolveLoadedPlugins<T extends { plugin?: ConfigPlugin.Spec[] }>(config: T, filepath: string) {
   if (!config.plugin) return config
-  for (let i = 0; i < config.plugin.length; i++) {
-    // Normalize path-like plugin specs while we still know which config file declared them.
-    // This prevents `./plugin.ts` from being reinterpreted relative to some later merge location.
-    config.plugin[i] = await ConfigPlugin.resolvePluginSpec(config.plugin[i], filepath)
-  }
+  // Keep declaration order and resolve paths against the declaring config before merging.
+  config.plugin = await Promise.all(config.plugin.map((plugin) => ConfigPlugin.resolvePluginSpec(plugin, filepath)))
   return config
 }
 

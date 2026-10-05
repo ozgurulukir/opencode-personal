@@ -125,7 +125,7 @@ export default [
       .where(
         and(
           eq(SessionMessageTable.session_id, data.sessionID),
-          sql`json_extract(${SessionMessageTable.data}, ${sql.raw(`'$."metadata"."${LEGACY_MESSAGE_ID}"'`)}) = ${data.messageID}`,
+          sql`json_extract(${SessionMessageTable.data}, ${"$.metadata." + LEGACY_MESSAGE_ID}) = ${data.messageID}`,
         ),
       )
       .run()
