@@ -143,3 +143,9 @@ c801127e3f147bdc79c054d13814cfb55c124a0f:packages/app/src/pages/layout.tsx:gener
 # Docs teaching page placeholder ("Authorization: Bearer YOUR_API_KEY") —
 # canonical dummy, never a real credential.
 c801127e3f147bdc79c054d13814cfb55c124a0f:packages/docs/ai-tools/cursor.mdx:curl-auth-header:127
+
+# Historical Daytona API key in upstream/dev; owner confirmed revoked on 2026-10-05.
+0bedea52b19515c69057866ec958769004147f66:daytona.ts:generic-api-key:15
+
+# Historical Cerebras API key in upstream/dev; owner confirmed revoked on 2026-10-05.
+71cd84dbbb59c3655ef9647e9cb1280eb16e73cb:opencode.json:generic-api-key:6
