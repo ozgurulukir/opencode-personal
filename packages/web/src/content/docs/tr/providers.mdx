@@ -4,7 +4,7 @@ description: opencode'da herhangi bir LLM sağlayıcısını kullanma.
 ---
 
 
-opencode, **75'ten fazla LLM sağlayıcısını** desteklemek için [AI SDK](https://ai-sdk.dev/) ve [Models.dev](https://models.dev) kullanır ve yerel modellerin çalıştırılmasını destekler.
+opencode, birçok LLM sağlayıcısını desteklemek için [AI SDK](https://ai-sdk.dev/) ve [Models.dev](https://models.dev) kullanır ve yerel modellerin çalıştırılmasını destekler.
 
 Bir sağlayıcı eklemek için şunları yapmanız gerekir:
 
@@ -103,13 +103,13 @@ Amazon Bedrock'u opencode ile kullanmak için:
 
    ```bash
    # Option 1: Using AWS access keys
-   AWS_ACCESS_KEY_ID=XXX AWS_SECRET_ACCESS_KEY=YYY opencode
+   AWS_ACCESS_KEY_ID=XXX AWS_SECRET_ACCESS_KEY=YYY opencode-personal
 
    # Option 2: Using named AWS profile
-   AWS_PROFILE=my-profile opencode
+   AWS_PROFILE=my-profile opencode-personal
 
    # Option 3: Using Bedrock bearer token
-   AWS_BEARER_TOKEN_BEDROCK=XXX opencode
+   AWS_BEARER_TOKEN_BEDROCK=XXX opencode-personal
    ```
 
    Veya bunları bash profilinize ekleyin:
@@ -326,7 +326,7 @@ Araç çağrıları iyi çalışmıyorsa, tool calling desteği güçlü olan y�
 5. Kaynak adınızı ortam değişkeni olarak ayarlayın:
 
    ```bash
-   AZURE_RESOURCE_NAME=XXX opencode
+   AZURE_RESOURCE_NAME=XXX opencode-personal
    ```
 
    Veya bash profilinize ekleyin:
@@ -373,7 +373,7 @@ Araç çağrıları iyi çalışmıyorsa, tool calling desteği güçlü olan y�
 5. Kaynak adınızı ortam değişkeni olarak ayarlayın:
 
    ```bash
-   AZURE_COGNITIVE_SERVICES_RESOURCE_NAME=XXX opencode
+   AZURE_COGNITIVE_SERVICES_RESOURCE_NAME=XXX opencode-personal
    ```
 
    Veya bash profilinize ekleyin:
@@ -839,7 +839,7 @@ Google Vertex AI'yi opencode ile kullanmak için:
    Bunları opencode çalıştırılırken ayarlayın.
 
    ```bash
-   GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json GOOGLE_CLOUD_PROJECT=your-project-id opencode
+   GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json GOOGLE_CLOUD_PROJECT=your-project-id opencode-personal
    ```
 
    Veya bunları bash profilinize ekleyin.
@@ -968,8 +968,8 @@ Helicone'un opencode aracılığıyla otomatik olarak yapılandırılmayan bir �
           // Model ID (from Helicone's model directory page)
           "name": "GPT-4o", // Your own custom name for the model
         },
-        "claude-sonnet-4-20250514": {
-          "name": "Claude Sonnet 4",
+        "claude-sonnet-4-5-20250929": {
+          "name": "Claude Sonnet 4.5",
         },
       },
     },
@@ -1421,7 +1421,7 @@ SAP AI Core, birleşik bir platform aracılığıyla OpenAI, Anthropic, Google, 
    Veya `AICORE_SERVICE_KEY` ortam değişkenini ayarlayın:
 
    ```bash
-   AICORE_SERVICE_KEY='{"clientid":"...","clientsecret":"...","url":"...","serviceurls":{"AI_API_URL":"..."}}' opencode
+   AICORE_SERVICE_KEY='{"clientid":"...","clientsecret":"...","url":"...","serviceurls":{"AI_API_URL":"..."}}' opencode-personal
    ```
 
    Veya bash profilinize ekleyin:
@@ -1433,7 +1433,7 @@ SAP AI Core, birleşik bir platform aracılığıyla OpenAI, Anthropic, Google, 
 4. İsteğe bağlı olarak dağıtım kimliğini ve kaynak grubunu ayarlayın:
 
    ```bash
-   AICORE_DEPLOYMENT_ID=your-deployment-id AICORE_RESOURCE_GROUP=your-resource-group opencode
+   AICORE_DEPLOYMENT_ID=your-deployment-id AICORE_RESOURCE_GROUP=your-resource-group opencode-personal
    ```
 
    :::note
@@ -1866,7 +1866,7 @@ Burada `apiKey`, `headers` ve model `limit` seçeneklerini ayarlayan bir örnek 
 
 Yapılandırma ayrıntıları:
 
-- **apiKey**: `env` değişken söz dizimini kullanarak ayarlayın, [daha fazla bilgi](/docs/config#env-vars).
+- **apiKey**: `env` değişken söz dizimini kullanarak ayarlayın, [daha fazla bilgi](../config/#ortam-değişkenleri).
 - **headers**: Her istekle birlikte gönderilen özel başlıklar.
 - **limit.context**: Modelin kabul ettiği maksimum giriş tokenları.
 - **limit.output**: Modelin üretebileceği maksimum token sayısı.
@@ -1879,7 +1879,7 @@ Yapılandırma ayrıntıları:
 
 Sağlayıcıyı yapılandırma konusunda sorun yaşıyorsanız aşağıdakileri kontrol edin:
 
-1. **Kimlik doğrulama kurulumunu kontrol edin**: Kimlik bilgilerinin geçerli olup olmadığını görmek için `opencode auth list` komutunu çalıştırın.
+1. **Kimlik doğrulama kurulumunu kontrol edin**: Kimlik bilgilerinin geçerli olup olmadığını görmek için `opencode-personal auth list` komutunu çalıştırın.
    sağlayıcı için yapılandırmanıza eklenir.
 
    Bu, kimlik doğrulaması için ortam değişkenlerine güvenen Amazon Bedrock gibi sağlayıcılar için geçerli değildir.

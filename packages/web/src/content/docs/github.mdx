@@ -3,7 +3,7 @@ title: GitHub
 description: Use OpenCode in GitHub issues and pull-requests.
 ---
 
-OpenCode integrates with your GitHub workflow. Mention `/opencode` or `/oc` in your comment, and OpenCode will execute tasks within your GitHub Actions runner.
+OpenCode integrates with your GitHub workflow. Mention `/opencode` or `/oc` in your comment, and OpenCode will execute tasks within your GitHub Actions runner. The fork's GitHub integration remains compatible with the upstream OpenCode GitHub App and action.
 
 ---
 
@@ -20,10 +20,10 @@ OpenCode integrates with your GitHub workflow. Mention `/opencode` or `/oc` in y
 Run the following command in a project that is in a GitHub repo:
 
 ```bash
-opencode github install
+opencode-personal github install
 ```
 
-This will walk you through installing the GitHub app, creating the workflow, and setting up secrets.
+This walks you through installing the upstream GitHub App, creating the workflow, and setting up secrets. The generated workflow currently uses `anomalyco/opencode/github@latest` and the upstream installer; it does not install the `opencode-personal` binary.
 
 ---
 
@@ -57,20 +57,20 @@ Or you can set it up manually.
        permissions:
          id-token: write
        steps:
-          - name: Checkout repository
-            uses: actions/checkout@v6
-            with:
-              fetch-depth: 1
-              persist-credentials: false
+       - name: Checkout repository
+         uses: actions/checkout@v6
+         with:
+           fetch-depth: 1
+           persist-credentials: false
 
-          - name: Run OpenCode
-           uses: ozgurulukir/opencode-personal/github@main
-           env:
-             ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-           with:
-             model: anthropic/claude-sonnet-4-20250514
-             # share: true
-             # github_token: xxxx
+       - name: Run OpenCode
+         uses: anomalyco/opencode/github@latest
+         env:
+           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+         with:
+           model: anthropic/claude-sonnet-4-5-20250929
+           # share: true
+           # use_github_token: true
    ```
 
 3. **Store the API keys in secrets**
@@ -85,7 +85,12 @@ Or you can set it up manually.
 - `agent`: The agent to use. Must be a primary agent. Falls back to `default_agent` from config or `"build"` if not found.
 - `share`: Whether to share the OpenCode session. Defaults to **true** for public repositories.
 - `prompt`: Optional custom prompt to override the default behavior. Use this to customize how OpenCode processes requests.
-- `token`: Optional GitHub access token for performing operations such as creating comments, committing changes, and opening pull requests. By default, OpenCode uses the installation access token from the OpenCode GitHub App, so commits, comments, and pull requests appear as coming from the app.
+- `use_github_token`: Set this to `true` to use the workflow's `GITHUB_TOKEN` instead of exchanging an OpenCode App token. Grant the token the permissions required by your workflow.
+- `mentions`: Comma-separated trigger phrases. Defaults to `/opencode,/oc`.
+- `variant`: Provider-specific model variant, such as `high`, `max`, or `minimal`.
+- `oidc_base_url`: Override the OIDC token exchange endpoint when using a custom GitHub App installation.
+
+  By default, OpenCode uses the installation access token from the OpenCode GitHub App, so commits, comments, and pull requests appear as coming from the app.
 
   Alternatively, you can use the GitHub Action runner's [built-in `GITHUB_TOKEN`](https://docs.github.com/en/actions/tutorials/authenticate-with-github_token) without installing the OpenCode GitHub App. Just make sure to grant the required permissions in your workflow:
 
@@ -140,11 +145,11 @@ jobs:
           persist-credentials: false
 
       - name: Run OpenCode
-        uses: ozgurulukir/opencode-personal/github@main
+        uses: anomalyco/opencode/github@latest
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         with:
-          model: anthropic/claude-sonnet-4-20250514
+          model: anthropic/claude-sonnet-4-5-20250929
           prompt: |
             Review the codebase for any TODO comments and create a summary.
             If you find issues worth addressing, open an issue to track them.
@@ -177,12 +182,12 @@ jobs:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
-      - uses: ozgurulukir/opencode-personal/github@main
+      - uses: anomalyco/opencode/github@latest
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          model: anthropic/claude-sonnet-4-20250514
+          model: anthropic/claude-sonnet-4-5-20250929
           use_github_token: true
           prompt: |
             Review this pull request:
@@ -233,12 +238,12 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: ozgurulukir/opencode-personal/github@main
+      - uses: anomalyco/opencode/github@latest
         if: steps.check.outputs.result == 'true'
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         with:
-          model: anthropic/claude-sonnet-4-20250514
+          model: anthropic/claude-sonnet-4-5-20250929
           prompt: |
             Review this issue. If there's a clear fix or relevant docs:
             - Provide documentation links
@@ -255,7 +260,7 @@ For `issues` events, the `prompt` input is **required** since there's no comment
 Override the default prompt to customize OpenCode's behavior for your workflow.
 
 ```yaml title=".github/workflows/opencode.yml"
-- uses: ozgurulukir/opencode-personal/github@main
+- uses: anomalyco/opencode/github@latest
   with:
     model: anthropic/claude-sonnet-4-5
     prompt: |

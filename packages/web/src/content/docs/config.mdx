@@ -127,7 +127,7 @@ Specify a custom config file path using the `OPENCODE_CONFIG` environment variab
 
 ```bash
 export OPENCODE_CONFIG=/path/to/my/custom-config.json
-opencode run "Hello world"
+opencode-personal run "Hello world"
 ```
 
 Custom config is loaded between global and project configs in the precedence order.
@@ -143,7 +143,7 @@ follow the same structure.
 
 ```bash
 export OPENCODE_CONFIG_DIR=/path/to/my/config-directory
-opencode run "Hello world"
+opencode-personal run "Hello world"
 ```
 
 The custom directory is loaded after the global config and `.opencode` directories, so it **can override** their settings.
@@ -243,7 +243,7 @@ Generate unique UUIDs with `uuidgen`. Customize the settings to match your organ
 Double-click the `.mobileconfig` to install locally for testing (shows in System Settings > Privacy & Security > Profiles), then run:
 
 ```bash
-opencode debug config
+opencode-personal debug config
 ```
 
 All managed preference keys appear in the resolved config and cannot be overridden by user or project configuration.
@@ -284,7 +284,7 @@ Legacy `theme`, `keybinds`, and `tui` keys in `opencode.json` are deprecated and
 
 ### Server
 
-You can configure server settings for the `opencode serve` and `opencode web` commands through the `server` option.
+You can configure server settings for the `opencode-personal serve` and `opencode-personal web` commands through the `server` option.
 
 ```json title="opencode.json"
 {
@@ -307,7 +307,7 @@ Available options:
 - `mdnsDomain` - Custom domain name for mDNS service. Defaults to `opencode.local`. Useful for running multiple instances on the same network.
 - `cors` - Additional origins to allow for CORS when using the HTTP server from a browser-based client. Values must be full origins (scheme + host + optional port), eg `https://app.example.com`.
 
-[Learn more about the server here](/docs/server).
+[Learn more about the server here](../server/).
 
 ---
 
@@ -340,7 +340,7 @@ You can manage the tools an LLM can use through the `tools` option.
 }
 ```
 
-[Learn more about tools here](/docs/tools).
+[Learn more about tools here](../tools/).
 
 ---
 
@@ -380,7 +380,7 @@ Provider options can include `timeout`, `chunkTimeout`, and `setCacheKey`:
 - `chunkTimeout` - Timeout in milliseconds between streamed response chunks. If no chunk arrives in time, the request is aborted.
 - `setCacheKey` - Ensure a cache key is always set for designated provider.
 
-You can also configure [local models](/docs/models#local). [Learn more](/docs/models).
+You can also configure [local models](../models/). [Learn more](../models/).
 
 ---
 
@@ -412,10 +412,10 @@ Amazon Bedrock supports AWS-specific configuration:
 - `endpoint` - Custom endpoint URL for VPC endpoints. This is an alias for the generic `baseURL` option using AWS-specific terminology. If both are specified, `endpoint` takes precedence.
 
 :::note
-Bearer tokens (`AWS_BEARER_TOKEN_BEDROCK` or `/connect`) take precedence over profile-based authentication. See [authentication precedence](/docs/providers#authentication-precedence) for details.
+Bearer tokens (`AWS_BEARER_TOKEN_BEDROCK` or `/connect`) take precedence over profile-based authentication. See [authentication precedence](../providers/#authentication-precedence) for details.
 :::
 
-[Learn more about Amazon Bedrock configuration](/docs/providers#amazon-bedrock).
+[Learn more about Amazon Bedrock configuration](../providers/#amazon-bedrock).
 
 ---
 
@@ -430,7 +430,7 @@ Set your UI theme in `tui.json`.
 }
 ```
 
-[Learn more here](/docs/themes).
+[Learn more here](../themes/).
 
 ---
 
@@ -456,7 +456,7 @@ You can configure specialized agents for specific tasks through the `agent` opti
 }
 ```
 
-You can also define agents using markdown files in `~/.config/opencode/agents/` or `.opencode/agents/`. [Learn more here](/docs/agents).
+You can also define agents using markdown files in `~/.config/opencode/agents/` or `.opencode/agents/`. [Learn more here](../agents/).
 
 ---
 
@@ -471,15 +471,15 @@ You can set the default agent using the `default_agent` option. This determines 
 }
 ```
 
-The default agent must be a primary agent (not a subagent). This can be a built-in agent like `"build"` or `"plan"`, or a [custom agent](/docs/agents) you've defined. If the specified agent doesn't exist or is a subagent, OpenCode will fall back to `"build"` with a warning.
+The default agent must be a primary agent (not a subagent). This can be a built-in agent like `"build"` or `"plan"`, or a [custom agent](../agents/) you've defined. If the specified agent doesn't exist or is a subagent, OpenCode will fall back to `"build"` with a warning.
 
-This setting applies across all interfaces: TUI, CLI (`opencode run`), desktop app, and GitHub Action.
+This setting applies across the fork's interfaces: TUI, CLI (`opencode-personal run`), web app, HTTP server, and the upstream-compatible GitHub Action.
 
 ---
 
 ### Sharing
 
-You can configure the [share](/docs/share) feature through the `share` option.
+You can configure the [share](../share/) feature through the `share` option.
 
 ```json title="opencode.json"
 {
@@ -520,7 +520,7 @@ You can configure custom commands for repetitive tasks through the `command` opt
 }
 ```
 
-You can also define commands using markdown files in `~/.config/opencode/commands/` or `.opencode/commands/`. [Learn more here](/docs/commands).
+You can also define commands using markdown files in `~/.config/opencode/commands/` or `.opencode/commands/`. [Learn more here](../commands/).
 
 ---
 
@@ -539,7 +539,7 @@ Customize TUI keyboard shortcuts in `tui.json` with `keybinds`.
 
 `keybinds` is merged with built-in defaults, so you only need to configure the shortcuts you want to change.
 
-[Learn more here](/docs/keybinds).
+[Learn more here](../keybinds/).
 
 ---
 
@@ -591,7 +591,7 @@ Use an object to keep built-ins enabled while configuring overrides or custom fo
 }
 ```
 
-[Learn more about formatters here](/docs/formatters).
+[Learn more about formatters here](../formatters/).
 
 ---
 
@@ -619,7 +619,7 @@ Use an object to keep built-ins enabled while configuring overrides or custom LS
 }
 ```
 
-[Learn more about LSP servers here](/docs/lsp).
+[Learn more about LSP servers here](../lsp/).
 
 ---
 
@@ -639,7 +639,7 @@ For example, to ensure that the `edit` and `bash` tools require user approval:
 }
 ```
 
-[Learn more about permissions here](/docs/permissions).
+[Learn more about permissions here](../permissions/).
 
 ---
 
@@ -711,7 +711,7 @@ You can configure MCP servers you want to use through the `mcp` option.
 }
 ```
 
-[Learn more here](/docs/mcp-servers).
+[Learn more here](../mcp-servers/).
 
 ---
 
@@ -740,7 +740,7 @@ Configure skill discovery and auto-matching through the `skills` option.
 | `autoMatchCount` | `number` | `3` | Number of top-matching skills to inject when `autoMatch` is enabled |
 | `autoMatchThreshold` | `number` | `0.25` | Minimum cosine similarity score (0–1) for auto-match. Skills below this threshold are not injected |
 
-[Learn more about skills](/docs/skills).
+[Learn more about skills](../skills/).
 
 ---
 
@@ -769,13 +769,13 @@ Configure the embedding provider used by workspace semantic search through `sear
 | `dimension` | `number` | `384` local, `1536` OpenAI | Embedding vector size. It must match the selected model's output. |
 | `openaiApiKey` | `string` | `OPENAI_API_KEY` | OpenAI API key. The config value is used when the environment variable is not set. |
 
-See [Tools](/docs/tools#index_workspace) for indexing a workspace and [semantic search](/docs/tools#semantic_search) for searching it.
+See [Tools](../tools/#index_workspace) for indexing a workspace and [semantic search](../tools/#semantic_search) for searching it.
 
 ---
 
 ### Plugins
 
-[Plugins](/docs/plugins) extend OpenCode with custom tools, hooks, and integrations.
+[Plugins](../plugins/) extend OpenCode with custom tools, hooks, and integrations.
 
 Place plugin files in `.opencode/plugins/` or `~/.config/opencode/plugins/`. You can also load plugins from npm through the `plugin` option.
 
@@ -786,7 +786,7 @@ Place plugin files in `.opencode/plugins/` or `~/.config/opencode/plugins/`. You
 }
 ```
 
-[Learn more here](/docs/plugins).
+[Learn more here](../plugins/).
 
 ---
 
@@ -802,7 +802,7 @@ You can configure the instructions for the model you're using through the `instr
 ```
 
 This takes an array of paths and glob patterns to instruction files. [Learn more
-about rules here](/docs/rules).
+about rules here](../rules/).
 
 ---
 

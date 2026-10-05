@@ -3,7 +3,7 @@ title: Intro
 description: Get started with this personal OpenCode fork.
 ---
 
-[**OpenCode**](/) is an open source AI coding agent. This personal fork documents the terminal interface and integrations maintained in this repository.
+[**OpenCode**](./) is an open source AI coding agent. This personal fork documents the terminal interface and integrations maintained in this repository.
 
 Use a provider's own API key with `/connect`, or configure a compatible provider in `opencode.json`.
 
@@ -29,7 +29,38 @@ To use OpenCode in your terminal, you'll need:
 
 ## Install
 
-This fork publishes prebuilt binaries on its [GitHub Releases](https://github.com/ozgurulukir/opencode-personal/releases). The installers install the command `opencode-personal` into `~/.opencode-personal/bin` — safe alongside an existing upstream `opencode` install (separate session database via the `personal` channel). See the fork's README for one-liners and manual download.
+This is an independently maintained fork, not an official OpenCode release. Prebuilt binaries are available for Linux, macOS, and Windows on this fork's [GitHub Releases](https://github.com/ozgurulukir/opencode-personal/releases).
+
+macOS / Linux:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/ozgurulukir/opencode-personal/main/install.sh | bash
+```
+
+Windows (PowerShell):
+
+```powershell
+irm https://raw.githubusercontent.com/ozgurulukir/opencode-personal/main/install.ps1 | iex
+```
+
+The installers create the `opencode-personal` command in `~/.opencode-personal/bin` (Windows: `%USERPROFILE%\.opencode-personal\bin`). They preserve an existing upstream `opencode` installation. Release binaries store sessions in `opencode-personal.db`; configuration and provider credentials are shared with upstream. `OPENCODE_DB` or `OPENCODE_DISABLE_CHANNEL_DB` can override that database separation.
+
+Use `--version <v>` / `-Version <v>` to select a calendar-versioned release, or `--binary <path>` / `-Binary <path>` for a local build. Keep bundled `libopentui.*` / `opentui.dll` files next to the executable. The bash installer supports `--no-modify-path`; the PowerShell installer always adds its directory to the user PATH.
+
+To uninstall the fork, remove its installation directory and its PATH entry. Keep the shared config and data directories if you still use upstream OpenCode.
+
+### Run from source
+
+The workspace uses Bun 1.4.2, as pinned in the root `package.json`:
+
+```bash
+git clone https://github.com/ozgurulukir/opencode-personal.git
+cd opencode-personal
+bun install
+bun dev
+```
+
+Source builds use their build channel to choose a database. Run `bun dev db path` to inspect the path. The command examples below use the installed release command, `opencode-personal`.
 
 ---
 
@@ -52,7 +83,7 @@ With OpenCode you can use any LLM provider by configuring their API keys.
    └ enter
    ```
 
-Alternatively, you can select one of the other providers. [Learn more](/docs/providers#directory).
+Alternatively, you can select one of the other providers. [Learn more](./providers/#directory).
 
 ---
 
@@ -68,7 +99,7 @@ cd /path/to/project
 And run OpenCode.
 
 ```bash
-opencode
+opencode-personal
 ```
 
 Next, initialize OpenCode for the project by running the following command.
@@ -233,7 +264,7 @@ Or you **can redo** the changes using the `/redo` command.
 
 ## Share
 
-OpenCode conversations can be [shared](/docs/share) using a public link.
+OpenCode conversations can be [shared](./share/) using a public link.
 
 ```bash frame="none"
 /share
@@ -251,4 +282,4 @@ Conversations are not shared by default.
 
 And that's it! You are now a pro at using OpenCode.
 
-To make it your own, we recommend [picking a theme](/docs/themes), [customizing the keybinds](/docs/keybinds), [configuring code formatters](/docs/formatters), [creating custom commands](/docs/commands), or playing around with the [OpenCode config](/docs/config).
+To make it your own, we recommend [picking a theme](./themes/), [customizing the keybinds](./keybinds/), [configuring code formatters](./formatters/), [creating custom commands](./commands/), or playing around with the [OpenCode config](./config/).

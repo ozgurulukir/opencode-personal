@@ -15,7 +15,7 @@ ACP, kod editörleri ile AI kodlama ajanları arasındaki iletişimi standartla�
 
 ## Yapılandırma
 
-opencode'u ACP aracılığıyla kullanmak için düzenleyicinizi `opencode acp` komutunu çalıştıracak şekilde yapılandırın.
+opencode'u ACP aracılığıyla kullanmak için düzenleyicinizi `opencode-personal acp` komutunu çalıştıracak şekilde yapılandırın.
 
 Komut, opencode'u, editörünüzle stdio aracılığıyla JSON-RPC üzerinden iletişim kuran ACP uyumlu bir alt süreç olarak başlatır.
 
@@ -31,7 +31,7 @@ Aşağıda ACP'yi destekleyen popüler düzenleyicilere ilişkin örnekler veril
 {
   "agent_servers": {
     "OpenCode": {
-      "command": "opencode",
+      "command": "opencode-personal",
       "args": ["acp"]
     }
   }
@@ -53,7 +53,7 @@ Açmak için **Komut Paleti**'ndeki `agent: new thread` eylemini kullanın.
             "custom": {
               "name": "OpenCode",
               "command": {
-                "command": "opencode",
+                "command": "opencode-personal",
                 "args": ["acp"]
               }
             }
@@ -75,7 +75,7 @@ Açmak için **Komut Paleti**'ndeki `agent: new thread` eylemini kullanın.
 {
   "agent_servers": {
     "OpenCode": {
-      "command": "/absolute/path/bin/opencode",
+      "command": "/absolute/path/bin/opencode-personal",
       "args": ["acp"]
     }
   }
@@ -94,7 +94,7 @@ Açmak için AI Chat agent seçicisindeki yeni 'OpenCode' ajanını kullanın.
 {
   acp_providers = {
     ["opencode"] = {
-      command = "opencode",
+      command = "opencode-personal",
       args = { "acp" }
     }
   }
@@ -107,10 +107,10 @@ Ortam değişkenlerini iletmeniz gerekiyor:
 {
   acp_providers = {
     ["opencode"] = {
-      command = "opencode",
+      command = "opencode-personal",
       args = { "acp" },
       env = {
-        OPENCODE_API_KEY = os.getenv("OPENCODE_API_KEY")
+        ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
       }
     }
   }
@@ -129,7 +129,7 @@ require("codecompanion").setup({
     chat = {
       adapter = {
         name = "opencode",
-        model = "claude-sonnet-4",
+        model = "claude-sonnet-4-5",
       },
     },
   },
@@ -138,7 +138,7 @@ require("codecompanion").setup({
 
 Bu yapılandırma, CodeCompanion'ı opencode'u sohbet için ACP ajanı olarak kullanacak şekilde ayarlar.
 
-Ortam değişkenlerini (`OPENCODE_API_KEY` gibi) iletmeniz gerekiyorsa, tüm ayrıntılar için CodeCompanion.nvim belgelerindeki [Configuring Adapters: Environment Variables](https://codecompanion.olimorris.dev/getting-started#setting-an-api-key)'ye bakın.
+Ortam değişkenlerini (`ANTHROPIC_API_KEY` gibi) iletmeniz gerekiyorsa, tüm ayrıntılar için CodeCompanion.nvim belgelerindeki [Configuring Adapters: Environment Variables](https://codecompanion.olimorris.dev/getting-started#setting-an-api-key)'ye bakın.
 
 ## Oturum seçenekleri
 
@@ -157,7 +157,7 @@ istemcinin oluşturduğu terminalde çalıştırır. Aksi durumda yerel kabuk ku
 zaman yerel kabuk kullanır):
 
 ```bash
-OPENCODE_ACP_TERMINAL_BACKEND=client opencode acp
+OPENCODE_ACP_TERMINAL_BACKEND=client opencode-personal acp
 ```
 
 İstemci terminali başlatılamazsa aynı komutu yerel kabukta ikinci kez çalıştırmak
@@ -169,7 +169,7 @@ Her ACP istemcisi etkileşimli soru istemlerini desteklemediği için `question`
 aracı varsayılan olarak devre dışıdır. Yalnızca uyumlu bir istemciyle etkinleştirin:
 
 ```bash
-OPENCODE_ENABLE_QUESTION_TOOL=1 opencode acp
+OPENCODE_ENABLE_QUESTION_TOOL=1 opencode-personal acp
 ```
 
 ## Destek
@@ -177,5 +177,5 @@ OPENCODE_ENABLE_QUESTION_TOOL=1 opencode acp
 ACP, opencode oturumlarını protokol üzerinden sunar; istemci desteği değişebilir.
 Yerleşik ve özel araçlar, MCP sunucuları, proje talimatları, biçimlendiriciler,
 agent'lar ve izinler istemcinin yeteneklerine bağlı olarak kullanılabilir.
-ACP `authenticate` isteği uygulanmamıştır; önce `opencode auth login` ile giriş
+ACP `authenticate` isteği uygulanmamıştır; önce `opencode-personal auth login` ile giriş
 yapın. `/undo` ve `/redo` gibi slash komutları ACP üzerinden kullanılamaz.

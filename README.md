@@ -62,7 +62,7 @@ Download an archive from the [releases page](https://github.com/ozgurulukir/open
 
 ### Run from source
 
-Install [Bun](https://bun.sh/) (the repository targets Bun 1.3.14), then clone and install the workspace:
+Install [Bun](https://bun.sh/) (the repository targets Bun 1.4.2), then clone and install the workspace:
 
 ```bash
 git clone https://github.com/ozgurulukir/opencode-personal.git

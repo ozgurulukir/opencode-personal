@@ -3,9 +3,9 @@ title: Araçlar
 description: LLM'in kullanabileceği araçları yönetin.
 ---
 
-Araçlar, LLM'in kod tabanınızda eylem gerçekleştirmesini sağlar. opencode yerleşik bir araç setiyle gelir, ancak bunu [özel araçlarla](/docs/custom-tools) veya [MCP sunucularıyla](/docs/mcp-servers) genişletebilirsiniz.
+Araçlar, LLM'in kod tabanınızda eylem gerçekleştirmesini sağlar. opencode yerleşik bir araç setiyle gelir, ancak bunu [özel araçlarla](../custom-tools/) veya [MCP sunucularıyla](../mcp-servers/) genişletebilirsiniz.
 
-Varsayılan olarak tüm araçlar **etkindir** ve çalışmak için izin istemez. Araç davranışını [izinler](/docs/permissions) üzerinden kontrol edebilirsiniz.
+Varsayılan olarak tüm araçlar **etkindir** ve çalışmak için izin istemez. Araç davranışını [izinler](../permissions/) üzerinden kontrol edebilirsiniz.
 
 ---
 
@@ -35,7 +35,7 @@ Birden fazla aracı aynı anda kontrol etmek için joker karakterler de kullanab
 }
 ```
 
-İzin yapılandırması için [daha fazla bilgi alın](/docs/permissions).
+İzin yapılandırması için [daha fazla bilgi alın](../permissions/).
 
 MCP izin anahtarları `mcp_<sunucu>_<araç>` biçimindedir. Tüm MCP araçları için `mcp_*`, tek bir sunucunun araçları için `mcp_<sunucu>_*` kullanın. Sunucu ve araç adlarında harf, rakam, `_` ve `-` dışındaki karakterler `_` ile değiştirilir.
 
@@ -206,11 +206,11 @@ Bu araç yalnızca `OPENCODE_EXPERIMENTAL_LSP_TOOL=true` (veya `OPENCODE_EXPERIM
 
 Desteklenen işlemler: `goToDefinition`, `findReferences`, `hover`, `documentSymbol`, `workspaceSymbol`, `goToImplementation`, `prepareCallHierarchy`, `incomingCalls`, `outgoingCalls`.
 
-Projeniz için kullanılabilir LSP sunucularını ayarlamak için [LSP Sunucuları](/docs/lsp) sayfasına bakın.
+Projeniz için kullanılabilir LSP sunucularını ayarlamak için [LSP Sunucuları](../lsp/) sayfasına bakın.
 
 ---
 
-### patch
+### apply_patch
 
 Dosyalara patch uygular.
 
@@ -233,7 +233,7 @@ Bu araç patch dosyalarını kod tabanınıza uygular. Farklı kaynaklardan gele
 
 ### skill
 
-Bir [skill](/docs/skills) (`SKILL.md` dosyası) yükler ve içeriğini konuşmaya döndürür.
+Bir [skill](../skills/) (`SKILL.md` dosyası) yükler ve içeriğini konuşmaya döndürür.
 
 ```json title="opencode.json" {4}
 {
@@ -262,7 +262,7 @@ Kodlama oturumlarında yapılacaklar listesini yönetir.
 Karmaşık işlemlerde ilerlemeyi takip etmek için görev listeleri oluşturur ve günceller. LLM bunu çok adımlı görevleri düzenlemek için kullanır.
 
 :::note
-Bu araç alt agent'lar için varsayılan olarak devre dışıdır, ama manuel etkinleştirebilirsiniz. [Daha fazla bilgi](/docs/agents/#permissions)
+Bu araç alt agent'lar için varsayılan olarak devre dışıdır, ama manuel etkinleştirebilirsiniz. [Daha fazla bilgi](../agents/)
 :::
 
 ---
@@ -294,7 +294,7 @@ Bu araç yalnızca opencode provider kullanılırken veya `OPENCODE_ENABLE_EXA` 
 opencode başlatırken etkinleştirmek için:
 
 ```bash
-OPENCODE_ENABLE_EXA=1 opencode
+OPENCODE_ENABLE_EXA=1 opencode-personal
 ```
 
 :::
@@ -342,11 +342,23 @@ Her soru bir başlık, soru metni ve seçenek listesi içerir. Kullanıcılar se
 
 ---
 
+### task
+
+Uzmanlaşmış alt ajanları başlatır. `task` izni ajan türünü eşleştirir. [Ajanlar](../agents/) sayfasına bakın.
+
+### Scout araçları (deneysel)
+
+`OPENCODE_EXPERIMENTAL_SCOUT=1` veya `OPENCODE_EXPERIMENTAL=1` ile `codesearch`, `repo_clone` ve `repo_overview` araçları eklenir. Dış depoları ve bağımlılıkları araştırmak için kullanılırlar.
+
+### plan_exit (deneysel)
+
+CLI istemcisinde `OPENCODE_EXPERIMENTAL_PLAN_MODE=1` veya `OPENCODE_EXPERIMENTAL=1` ile plan modundan çıkmayı teklif eden araç kullanılabilir.
+
 ## Özel araçlar
 
 Özel araçlar, LLM'in çağırabileceği kendi fonksiyonlarınızı tanımlamanızı sağlar. Bunlar config dosyanızda tanımlanır ve keyfi kod çalıştırabilir.
 
-Özel araç oluşturma için [daha fazla bilgi alın](/docs/custom-tools).
+Özel araç oluşturma için [daha fazla bilgi alın](../custom-tools/).
 
 ---
 
@@ -354,7 +366,7 @@ Her soru bir başlık, soru metni ve seçenek listesi içerir. Kullanıcılar se
 
 MCP (Model Context Protocol) sunucuları, harici araçları ve servisleri entegre etmenizi sağlar. Buna veritabanı erişimi, API entegrasyonları ve üçüncü taraf servisler dahildir.
 
-MCP sunucularını yapılandırma için [daha fazla bilgi alın](/docs/mcp-servers).
+MCP sunucularını yapılandırma için [daha fazla bilgi alın](../mcp-servers/).
 
 ---
 

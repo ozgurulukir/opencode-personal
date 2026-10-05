@@ -3,7 +3,7 @@ title: IDE
 description: VS Code, Cursor ve diğer IDE'ler için opencode uzantısı
 ---
 
-opencode, VS Code, Cursor veya bir terminali destekleyen herhangi bir IDE ile entegre olur. Başlamak için terminalde `opencode` komutunu çalıştırmanız yeterli.
+opencode, VS Code, Cursor veya bir terminali destekleyen herhangi bir IDE ile entegre olur. Bu fork CLI ve ACP entegrasyonunu sağlar; `sst-dev.opencode` IDE eklentisi ayrı bir yukarı akış marketplace paketidir. Fork'u kullanmak için tümleşik terminalde `opencode-personal` komutunu çalıştırın.
 
 ---
 
@@ -18,13 +18,13 @@ opencode, VS Code, Cursor veya bir terminali destekleyen herhangi bir IDE ile en
 
 ## Kurulum
 
-opencode'u VS Code'a ve Cursor, Windsurf, VSCodium gibi popüler çatallara yüklemek için:
+Ayrı yukarı akış eklentisini VS Code ve Cursor, Windsurf veya VSCodium gibi popüler çatallara yüklemek için:
 
 1. VS Code'u Aç
 2. Entegre terminali açın
-3. `opencode` komutunu çalıştırın - uzantı otomatik olarak yüklenir
+3. Extension Marketplace'te `sst-dev.opencode` aratıp kurun. Eklenti yapılandırıldığı `opencode` komutunu başlatır; özellikle `opencode-personal` kullanmanız gerektiğinde fork'un terminal veya ACP entegrasyonunu kullanın.
 
-TUI içinden `/editor` veya `/export` komutlarını çalıştırdığınızda kendi IDE'nizi kullanmak istiyorsanız `export EDITOR="code --wait"` ayarlayın. [Daha fazla bilgi](/docs/tui/#editor-setup).
+TUI içinden `/editor` veya `/export` komutlarını çalıştırdığınızda kendi IDE'nizi kullanmak istiyorsanız `export EDITOR="code --wait"` ayarlayın. [Daha fazla bilgi](../tui/#editör-kurulumu).
 
 ---
 
@@ -36,9 +36,9 @@ Extension Marketplace'te **opencode**'u arayın ve **Yükle**'ye tıklayın.
 
 ### Sorun giderme
 
-Uzantı otomatik olarak yüklenemezse:
+Eklenti yüklenemez veya başlatılamazsa:
 
-- Entegre terminalde `opencode` çalıştırdığınızdan emin olun.
+- Entegre terminalde `opencode-personal` çalıştırdığınızdan emin olun.
 - IDE cihazınız için CLI'nin kurulu olduğunu doğrulayın:
   - VS Code için: `code` komutu
   - Cursor için: `cursor` komutu

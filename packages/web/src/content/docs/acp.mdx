@@ -15,7 +15,7 @@ ACP is an open protocol that standardizes communication between code editors and
 
 ## Configure
 
-To use OpenCode via ACP, configure your editor to run the `opencode acp` command.
+To use OpenCode via ACP, configure your editor to run the `opencode-personal acp` command.
 
 The command starts OpenCode as an ACP-compatible subprocess that communicates with your editor over JSON-RPC via stdio.
 
@@ -31,7 +31,7 @@ Add to your [Zed](https://zed.dev) configuration (`~/.config/zed/settings.json`)
 {
   "agent_servers": {
     "OpenCode": {
-      "command": "opencode",
+      "command": "opencode-personal",
       "args": ["acp"]
     }
   }
@@ -53,7 +53,7 @@ You can also bind a keyboard shortcut by editing your `keymap.json`:
             "custom": {
               "name": "OpenCode",
               "command": {
-                "command": "opencode",
+                "command": "opencode-personal",
                 "args": ["acp"]
               }
             }
@@ -75,7 +75,7 @@ Add to your [JetBrains IDE](https://www.jetbrains.com/) acp.json according to th
 {
   "agent_servers": {
     "OpenCode": {
-      "command": "/absolute/path/bin/opencode",
+      "command": "/absolute/path/bin/opencode-personal",
       "args": ["acp"]
     }
   }
@@ -94,7 +94,7 @@ Add to your [Avante.nvim](https://github.com/yetone/avante.nvim) configuration:
 {
   acp_providers = {
     ["opencode"] = {
-      command = "opencode",
+      command = "opencode-personal",
       args = { "acp" }
     }
   }
@@ -107,10 +107,10 @@ If you need to pass environment variables:
 {
   acp_providers = {
     ["opencode"] = {
-      command = "opencode",
+      command = "opencode-personal",
       args = { "acp" },
       env = {
-        OPENCODE_API_KEY = os.getenv("OPENCODE_API_KEY")
+        ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
       }
     }
   }
@@ -129,7 +129,7 @@ require("codecompanion").setup({
     chat = {
       adapter = {
         name = "opencode",
-        model = "claude-sonnet-4",
+        model = "claude-sonnet-4-5",
       },
     },
   },
@@ -138,7 +138,7 @@ require("codecompanion").setup({
 
 This config sets up CodeCompanion to use OpenCode as the ACP agent for chat.
 
-If you need to pass environment variables (like `OPENCODE_API_KEY`), refer to [Configuring Adapters: Environment Variables](https://codecompanion.olimorris.dev/getting-started#setting-an-api-key) in the CodeCompanion.nvim documentation for full details.
+If you need to pass environment variables (like `ANTHROPIC_API_KEY`), refer to [Configuring Adapters: Environment Variables](https://codecompanion.olimorris.dev/getting-started#setting-an-api-key) in the CodeCompanion.nvim documentation for full details.
 
 ## Session options
 
@@ -156,7 +156,7 @@ set `OPENCODE_ACP_TERMINAL_BACKEND` to `auto` (default), `client` (require the
 client terminal), or `local` (always use a local shell):
 
 ```bash
-OPENCODE_ACP_TERMINAL_BACKEND=client opencode acp
+OPENCODE_ACP_TERMINAL_BACKEND=client opencode-personal acp
 ```
 
 If the client terminal fails to start, OpenCode reports the error instead of
@@ -169,7 +169,7 @@ client supports interactive question prompts. Enable it only with a compatible
 client:
 
 ```bash
-OPENCODE_ENABLE_QUESTION_TOOL=1 opencode acp
+OPENCODE_ENABLE_QUESTION_TOOL=1 opencode-personal acp
 ```
 
 ## Support
@@ -178,5 +178,5 @@ ACP exposes OpenCode sessions through the protocol, but client support varies.
 Built-in tools, custom tools, MCP servers, project instructions, formatters,
 agents, and permissions are available subject to the client's capabilities.
 The ACP `authenticate` request is not implemented; sign in beforehand with
-`opencode auth login`. Slash commands such as `/undo` and `/redo` are not
+`opencode-personal auth login`. Slash commands such as `/undo` and `/redo` are not
 available through ACP.

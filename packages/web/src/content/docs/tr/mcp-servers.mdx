@@ -23,7 +23,7 @@ GitHub MCP sunucusu gibi belirli MCP sunucuları çok sayıda belirteç ekleme e
 
 ## Etkinleştirme
 
-MCP sunucularını [opencode Config](https://opencode.ai/docs/config/)'nizde `mcp` altında tanımlayabilirsiniz. Her MCP'ü benzersiz bir adla ekleyin. LLM isteminde bulunurken bu MCP adına başvurabilirsiniz.
+MCP sunucularını [opencode Config](../config/)'nizde `mcp` altında tanımlayabilirsiniz. Her MCP'ü benzersiz bir adla ekleyin. LLM isteminde bulunurken bu MCP adına başvurabilirsiniz.
 
 ```jsonc title="opencode.jsonc" {6}
 {
@@ -63,7 +63,7 @@ Kuruluşunuzun uzak yapılandırmasından belirli bir sunucuyu etkinleştirmek i
 }
 ```
 
-Yerel yapılandırma değerleriniz uzak varsayılanları geçersiz kılar. Daha fazla ayrıntı için [config precedence](/docs/config#precedence-order)'a bakın.
+Yerel yapılandırma değerleriniz uzak varsayılanları geçersiz kılar. Daha fazla ayrıntı için [config precedence](../config/#öncelik-sırası)'a bakın.
 
 ---
 
@@ -189,7 +189,7 @@ OAuth'un etkin olduğu çoğu MCP sunucusu için özel bir yapılandırmaya gere
 }
 ```
 
-Sunucu kimlik doğrulama gerektiriyorsa opencode, onu ilk kez kullanmaya çalıştığınızda kimlik doğrulamanızı isteyecektir. Değilse, `opencode mcp auth <server-name>` ile [manually trigger the flow](#authenticating) yapabilirsiniz.
+Sunucu kimlik doğrulama gerektiriyorsa opencode, onu ilk kez kullanmaya çalıştığınızda kimlik doğrulamanızı isteyecektir. Değilse, `opencode-personal mcp auth <server-name>` ile [manually trigger the flow](#kimlik-doğrulama) yapabilirsiniz.
 
 ---
 
@@ -223,19 +223,19 @@ Kimlik doğrulamayı manuel olarak tetikleyebilir veya kimlik bilgilerini yönet
 Belirli bir MCP sunucusuyla kimlik doğrulaması yapın:
 
 ```bash
-opencode mcp auth my-oauth-server
+opencode-personal mcp auth my-oauth-server
 ```
 
 Tüm MCP sunucularını ve kimlik doğrulama durumlarını listeleyin:
 
 ```bash
-opencode mcp list
+opencode-personal mcp list
 ```
 
 Remove stored credentials:
 
 ```bash
-opencode mcp logout my-oauth-server
+opencode-personal mcp logout my-oauth-server
 ```
 
 `mcp auth` komutu tarayıcınızı yetkilendirme için açacaktır. Yetkilendirmenizin ardından opencode, belirteçleri `~/.local/share/opencode/mcp-auth.json`'de güvenli bir şekilde saklar.
@@ -279,10 +279,10 @@ Uzak bir MCP sunucusunun kimlik doğrulaması başarısız olursa aşağıdakile
 
 ```bash
 # View auth status for all OAuth-capable servers
-opencode mcp auth list
+opencode-personal mcp auth list
 
 # Debug connection and OAuth flow for a specific server
-opencode mcp debug my-oauth-server
+opencode-personal mcp debug my-oauth-server
 ```
 
 `mcp debug` komutu mevcut kimlik doğrulama durumunu gösterir, HTTP bağlantısını test eder ve OAuth bulma akışını dener.
@@ -348,7 +348,7 @@ Burada `my-mcp` sunucusundaki tüm araçları devre dışı bırakmak için `mcp
 Çok sayıda MCP sunucunuz varsa, bunları yalnızca aracı başına etkinleştirmek ve genel olarak devre dışı bırakmak isteyebilirsiniz. Bunu yapmak için:
 
 1. Global olarak bir araç olarak devre dışı bırakın.
-2. [agent config](/docs/agents#tools)'nizde, MCP sunucusunu bir araç olarak etkinleştirin.
+2. [agent config](../agents/#araçlar)'nizde, MCP sunucusunu bir araç olarak etkinleştirin.
 
 ```json title="opencode.json" {11, 14-18}
 {
@@ -420,7 +420,7 @@ Sentry projelerinizle ve sorunlarınızla etkileşimde bulunmak için [Sentry MC
 Yapılandırmayı ekledikten sonra Sentry ile kimlik doğrulaması yapın:
 
 ```bash
-opencode mcp auth sentry
+opencode-personal mcp auth sentry
 ```
 
 Bu, OAuth akışını tamamlamak ve opencode'u Sentry hesabınıza bağlamak için bir tarayıcı penceresi açacaktır.
@@ -474,7 +474,7 @@ Context7 MCP sunucunu kullanmak için isteklerinize `use context7` ekleyin.
 Explain how to cache JSON API responses for five minutes in this project. use context7
 ```
 
-Alternatif olarak [AGENTS.md](/docs/rules/)'a buna benzer bir şey ekleyebilirsiniz.
+Alternatif olarak [AGENTS.md](../rules/)'a buna benzer bir şey ekleyebilirsiniz.
 
 ```md title="AGENTS.md"
 When you need to search docs, use `context7` tools.
@@ -504,7 +504,7 @@ MCP sunucumuzu `gh_grep` olarak adlandırdığımız için, aracının onu kulla
 What's the right way to set a custom domain in an SST Astro component? use the gh_grep tool
 ```
 
-Alternatif olarak [AGENTS.md](/docs/rules/)'a buna benzer bir şey ekleyebilirsiniz.
+Alternatif olarak [AGENTS.md](../rules/)'a buna benzer bir şey ekleyebilirsiniz.
 
 ```md title="AGENTS.md"
 If you are unsure how to do something, use `gh_grep` to search code examples from GitHub.

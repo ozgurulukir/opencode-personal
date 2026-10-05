@@ -10,13 +10,13 @@ OpenCode, projelerinizde LLM ile çalışmak için etkileşimli bir terminal ara
 OpenCode'u çalıştırdığınızda mevcut dizin için TUI başlar.
 
 ```bash
-opencode
+opencode-personal
 ```
 
 İsterseniz belirli bir çalışma dizini için de başlatabilirsiniz.
 
 ```bash
-opencode /path/to/project
+opencode-personal /path/to/project
 ```
 
 TUI içine girdiğinizde, bir mesajla istem gönderebilirsiniz.
@@ -63,7 +63,7 @@ OpenCode TUI kullanırken `/` ve ardından komut adını yazarak hızlı eylemle
 /help
 ```
 
-Komutların çoğu, lider tuşu `ctrl+x` olan bir kısayola da sahiptir. [Daha fazla bilgi](/docs/keybinds).
+Komutların çoğu, lider tuşu `ctrl+x` olan bir kısayola da sahiptir. [Daha fazla bilgi](../keybinds/).
 
 İşte mevcut slash komutlarının tümü:
 
@@ -105,7 +105,7 @@ Araç çalıştırma detaylarını göster/gizle yapar.
 
 ### editor
 
-Mesaj yazmak için harici editör açar. `EDITOR` ortam değişkeninde ayarlı editörü kullanır. [Daha fazla bilgi](#editor-setup).
+Mesaj yazmak için harici editör açar. `EDITOR` ortam değişkeninde ayarlı editörü kullanır. [Daha fazla bilgi](#editör-kurulumu).
 
 ```bash frame="none"
 /editor
@@ -129,7 +129,7 @@ OpenCode'dan çıkar. _Takma adlar_: `/quit`, `/q`
 
 ### export
 
-Mevcut konuşmayı Markdown olarak dışa aktarır ve varsayılan editörünüzde açar. `EDITOR` ortam değişkeninde ayarlı editörü kullanır. [Daha fazla bilgi](#editor-setup).
+Mevcut konuşmayı Markdown olarak dışa aktarır ve varsayılan editörünüzde açar. `EDITOR` ortam değişkeninde ayarlı editörü kullanır. [Daha fazla bilgi](#editör-kurulumu).
 
 ```bash frame="none"
 /export
@@ -153,7 +153,7 @@ Yardım penceresini gösterir.
 
 ### init
 
-`AGENTS.md` dosyasını oluşturur veya günceller. [Daha fazla bilgi](/docs/rules).
+`AGENTS.md` dosyasını oluşturur veya günceller. [Daha fazla bilgi](../rules/).
 
 ```bash frame="none"
 /init
@@ -219,7 +219,7 @@ Oturumları listeler ve aralarında geçiş yapar. _Takma adlar_: `/resume`, `/c
 
 ### share
 
-Mevcut oturumu paylaşır. [Daha fazla bilgi](/docs/share).
+Mevcut oturumu paylaşır. [Daha fazla bilgi](../share/).
 
 ```bash frame="none"
 /share
@@ -275,7 +275,7 @@ Dahili olarak bu işlem dosya değişikliklerini yönetmek için Git kullanır. 
 
 ### unshare
 
-Mevcut oturumun paylaşımını kaldırır. [Daha fazla bilgi](/docs/share#un-sharing).
+Mevcut oturumun paylaşımını kaldırır. [Daha fazla bilgi](../share/#paylasimi-kaldirma).
 
 ```bash frame="none"
 /unshare
@@ -386,8 +386,8 @@ Bu, sunucu/çalışma zamanı davranışını yapılandıran `opencode.json` dos
 
 ### Seçenekler
 
-- `theme` - UI temanızı ayarlar. [Daha fazla bilgi](/docs/themes).
-- `keybinds` - Klavye kısayollarını özelleştirir. [Daha fazla bilgi](/docs/keybinds).
+- `theme` - UI temanızı ayarlar. [Daha fazla bilgi](../themes/).
+- `keybinds` - Klavye kısayollarını özelleştirir. [Daha fazla bilgi](../keybinds/).
 - `scroll_acceleration.enabled` - Pürüzsüz, doğal kaydırma için macOS tarzı kaydırma ivmesini etkinleştirin. Etkinleştirildiğinde, kaydırma hızı hızlı kaydırma hareketleriyle artar ve daha yavaş hareketler için hassas kalır. **Bu ayar `scroll_speed` ayarından önceliklidir ve etkinleştirildiğinde onu geçersiz kılar.**
 - `scroll_speed` - Kaydırma komutlarını kullanırken TUI'nin ne kadar hızlı kaydırılacağını kontrol eder (minimum: `0.001`, ondalık değerleri destekler). Varsayılan değer `3`'tür. **Not: `scroll_acceleration.enabled` `true` olarak ayarlanmışsa bu yok sayılır.**
 - `diff_style` - Fark (diff) oluşturmayı kontrol eder. `"auto"` terminal genişliğine uyum sağlar, `"stacked"` her zaman tek sütunlu bir düzen gösterir.

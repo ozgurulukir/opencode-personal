@@ -3,7 +3,7 @@ import { defineConfig } from "astro/config"
 import starlight from "@astrojs/starlight"
 import solidJs from "@astrojs/solid-js"
 import config from "./config.mjs"
-import { rehypeHeadingIds } from "@astrojs/markdown-remark"
+import { rehypeHeadingIds, unified } from "@astrojs/markdown-remark"
 import rehypeAutolinkHeadings from "rehype-autolink-headings"
 
 // https://astro.build/config
@@ -18,13 +18,15 @@ export default defineConfig({
     host: "0.0.0.0",
   },
   markdown: {
-    rehypePlugins: [rehypeHeadingIds, [rehypeAutolinkHeadings, { behavior: "wrap" }]],
+    processor: unified({
+      rehypePlugins: [rehypeHeadingIds, [rehypeAutolinkHeadings, { behavior: "wrap" }]],
+    }),
   },
   build: {},
   integrations: [
     solidJs(),
     starlight({
-      title: "OpenCode",
+      title: "OpenCode Personal",
       defaultLocale: "root",
       locales: {
         root: {
@@ -44,7 +46,7 @@ export default defineConfig({
           tag: "link",
           attrs: {
             rel: "icon",
-            href: "/favicon-v3.ico",
+            href: `${config.base}/favicon-v3.ico`,
             sizes: "32x32",
           },
         },
@@ -53,7 +55,7 @@ export default defineConfig({
           attrs: {
             rel: "icon",
             type: "image/png",
-            href: "/favicon-96x96-v3.png",
+            href: `${config.base}/favicon-96x96-v3.png`,
             sizes: "96x96",
           },
         },
@@ -61,7 +63,7 @@ export default defineConfig({
           tag: "link",
           attrs: {
             rel: "apple-touch-icon",
-            href: "/apple-touch-icon-v3.png",
+            href: `${config.base}/apple-touch-icon-v3.png`,
             sizes: "180x180",
           },
         },
@@ -77,6 +79,7 @@ export default defineConfig({
       logo: {
         light: "./src/assets/logo-light.svg",
         dark: "./src/assets/logo-dark.svg",
+        alt: "OpenCode Personal",
         replacesTitle: true,
       },
       sidebar: [

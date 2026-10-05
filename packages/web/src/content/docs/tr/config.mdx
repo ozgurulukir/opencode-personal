@@ -120,7 +120,7 @@ Bunun Git'te kontrol edilmesi de güvenlidir ve global olanla aynı şemayı kul
 
 ```bash
 export OPENCODE_CONFIG=/path/to/my/custom-config.json
-opencode run "Hello world"
+opencode-personal run "Hello world"
 ```
 
 Özel yapılandırma genel ve proje yapılandırmaları arasında öncelik sırasına göre yüklenir.
@@ -136,7 +136,7 @@ aynı yapıyı takip edin.
 
 ```bash
 export OPENCODE_CONFIG_DIR=/path/to/my/config-directory
-opencode run "Hello world"
+opencode-personal run "Hello world"
 ```
 
 Özel dizin, genel yapılandırma ve `.opencode` dizinlerinden sonra yüklenir, böylece bunların ayarlarını **geçersiz kılabilir**.
@@ -174,13 +174,13 @@ Mevcut seçenekler:
 - `scroll_speed` - Özel kaydırma hızı çarpanı (varsayılan: `3`, minimum: `1`). `scroll_acceleration.enabled` `true` ise dikkate alınmaz.
 - `diff_style` - Fark oluşturmayı kontrol edin. `"auto"` terminal genişliğine uyum sağlar, `"stacked"` her zaman tek sütunu gösterir.
 
-[TUI kullanımı hakkında daha fazla bilgi](/docs/tui).
+[TUI kullanımı hakkında daha fazla bilgi](../tui/).
 
 ---
 
 ### Sunucu
 
-`opencode serve` ve `opencode web` komutları için sunucu ayarlarını `server` seçeneği aracılığıyla yapılandırabilirsiniz.
+`opencode-personal serve` ve `opencode-personal web` komutları için sunucu ayarlarını `server` seçeneği aracılığıyla yapılandırabilirsiniz.
 
 ```json title="opencode.json"
 {
@@ -203,7 +203,7 @@ Mevcut seçenekler:
 - `mdnsDomain` - mDNS hizmeti için özel alan adı. Varsayılan olarak `opencode.local` şeklindedir. Aynı ağda birden fazla örneği çalıştırmak için kullanışlıdır.
 - `cors` - Tarayıcı tabanlı bir istemciden HTTP sunucusunu kullanırken CORS'ye izin verecek ek kaynaklar. Değerler tam kaynaklar olmalıdır (şema + ana bilgisayar + isteğe bağlı bağlantı noktası), örneğin `https://app.example.com`.
 
-[Sunucu hakkında daha fazla bilgi](/docs/server).
+[Sunucu hakkında daha fazla bilgi](../server/).
 
 ---
 
@@ -221,7 +221,7 @@ Bir LLM'nin kullanabileceği araçları `tools` seçeneği aracılığıyla yön
 }
 ```
 
-[Araçlar hakkında daha fazla bilgi](/docs/tools).
+[Araçlar hakkında daha fazla bilgi](../tools/).
 
 ---
 
@@ -259,7 +259,7 @@ Sağlayıcı seçenekleri `timeout` ve `setCacheKey` içerebilir:
 - `timeout` - Milisaniye cinsinden istek zaman aşımı (varsayılan: 300000). Devre dışı bırakmak için `false` olarak ayarlayın.
 - `setCacheKey` - Belirlenen sağlayıcı için her zaman bir önbellek anahtarının ayarlandığından emin olun.
 
-Ayrıca [local models](/docs/models#local) ayarlayabilirsiniz. [Daha fazla bilgi](/docs/models).
+Ayrıca [local models](../models/) ayarlayabilirsiniz. [Daha fazla bilgi](../models/).
 
 ---
 
@@ -291,10 +291,10 @@ Amazon Bedrock, AWS'a özgü yapılandırmayı destekler:
 - `endpoint` - VPC uç noktaları için özel uç nokta URL. Bu, AWS'e özgü terminolojiyi kullanan genel `baseURL` seçeneğinin takma adıdır. Her ikisi de belirtilirse `endpoint` öncelikli olur.
 
 :::note
-Taşıyıcı belirteçleri (`AWS_BEARER_TOKEN_BEDROCK` veya `/connect`) profil tabanlı kimlik doğrulamaya göre önceliklidir. Ayrıntılar için [authentication precedence](/docs/providers#authentication-precedence)'ye bakın.
+Taşıyıcı belirteçleri (`AWS_BEARER_TOKEN_BEDROCK` veya `/connect`) profil tabanlı kimlik doğrulamaya göre önceliklidir. Ayrıntılar için [authentication precedence](../providers/#kimlik-doğrulama-önceliği)'ye bakın.
 :::
 
-[Amazon Bedrock yapılandırması hakkında daha fazla bilgi](/docs/providers#amazon-bedrock).
+[Amazon Bedrock yapılandırması hakkında daha fazla bilgi](../providers/#amazon-bedrock).
 
 ---
 
@@ -309,7 +309,7 @@ opencode yapılandırmanızda kullanmak istediğiniz temayı `theme` seçeneği 
 }
 ```
 
-[Daha fazla bilgi](/docs/themes).
+[Daha fazla bilgi](../themes/).
 
 ---
 
@@ -336,7 +336,7 @@ opencode yapılandırmanızda kullanmak istediğiniz temayı `theme` seçeneği 
 }
 ```
 
-Agent'ları `~/.config/opencode/agents/` veya `.opencode/agents/` içindeki Markdown dosyalarıyla da tanımlayabilirsiniz. [Daha fazla bilgi](/docs/agents).
+Agent'ları `~/.config/opencode/agents/` veya `.opencode/agents/` içindeki Markdown dosyalarıyla da tanımlayabilirsiniz. [Daha fazla bilgi](../agents/).
 
 ---
 
@@ -351,15 +351,15 @@ Agent'ları `~/.config/opencode/agents/` veya `.opencode/agents/` içindeki Mark
 }
 ```
 
-Varsayılan agent, birincil agent olmalıdır (alt agent değil). Bu, `"build"` veya `"plan"` gibi yerleşik bir agent ya da tanımladığınız bir [özel agent](/docs/agents) olabilir. Belirtilen agent mevcut değilse veya bir alt agent ise, opencode bir uyarıyla birlikte `"build"`'ye geri döner.
+Varsayılan agent, birincil agent olmalıdır (alt agent değil). Bu, `"build"` veya `"plan"` gibi yerleşik bir agent ya da tanımladığınız bir [özel agent](../agents/) olabilir. Belirtilen agent mevcut değilse veya bir alt agent ise, opencode bir uyarıyla birlikte `"build"`'ye geri döner.
 
-Bu ayar tüm arayüzler için geçerlidir: TUI, CLI (`opencode run`), masaüstü uygulaması ve GitHub Action.
+Bu ayar fork'un arayüzleri için geçerlidir: TUI, CLI (`opencode-personal run`), web uygulaması, HTTP sunucusu ve yukarı akışla uyumlu GitHub Action.
 
 ---
 
 ### Paylaşma
 
-[share](/docs/share) özelliğini `share` seçeneği aracılığıyla yapılandırabilirsiniz.
+[share](../share/) özelliğini `share` seçeneği aracılığıyla yapılandırabilirsiniz.
 
 ```json title="opencode.json"
 {
@@ -400,7 +400,7 @@ Varsayılan olarak paylaşım, `/share` komutunu kullanarak konuşmaları açık
 }
 ```
 
-Komutları `~/.config/opencode/commands/` veya `.opencode/commands/` içindeki Markdown dosyalarıyla da tanımlayabilirsiniz. [Daha fazla bilgi](/docs/commands).
+Komutları `~/.config/opencode/commands/` veya `.opencode/commands/` içindeki Markdown dosyalarıyla da tanımlayabilirsiniz. [Daha fazla bilgi](../commands/).
 
 ---
 
@@ -415,7 +415,7 @@ Tuş atamalarınızı `keybinds` seçeneği aracılığıyla özelleştirebilirs
 }
 ```
 
-[Daha fazla bilgi](/docs/keybinds).
+[Daha fazla bilgi](../keybinds/).
 
 ---
 
@@ -441,7 +441,7 @@ Kod formatlayıcılarını `formatter` seçeneği aracılığıyla yapılandıra
 }
 ```
 
-[Formatter'lar hakkında daha fazla bilgi](/docs/formatters).
+[Formatter'lar hakkında daha fazla bilgi](../formatters/).
 
 ---
 
@@ -461,7 +461,7 @@ Varsayılan olarak, opencode açık bir onay gerektirmeden **tüm işlemlere izi
 }
 ```
 
-[İzinler hakkında daha fazla bilgi](/docs/permissions).
+[İzinler hakkında daha fazla bilgi](../permissions/).
 
 ---
 
@@ -530,7 +530,7 @@ Beceri keşfini ve otomatik eşleştirmeyi `skills` seçeneğiyle yapılandırab
 | `autoMatchCount` | `number` | `3` | `autoMatch` etkin olduğunda eklenecek en iyi eşleşme sayısı. |
 | `autoMatchThreshold` | `number` | `0.25` | En düşük kosinüs benzerliği (0–1); altındaki beceriler eklenmez. |
 
-[Beceriler hakkında daha fazla bilgi](/docs/skills).
+[Beceriler hakkında daha fazla bilgi](../skills/).
 
 ---
 
@@ -559,7 +559,7 @@ Beceri keşfini ve otomatik eşleştirmeyi `skills` seçeneğiyle yapılandırab
 | `dimension` | `number` | Yerel `384`, OpenAI `1536` | Gömme vektörünün boyutu. Seçilen modelin çıktısıyla eşleşmelidir. |
 | `openaiApiKey` | `string` | `OPENAI_API_KEY` | OpenAI API anahtarı. Ortam değişkeni tanımlı değilse config değeri kullanılır. |
 
-Çalışma alanını indekslemek için [Araçlar](/docs/tools#index_workspace), arama yapmak için [semantic search](/docs/tools#semantic_search) sayfasına bakın.
+Çalışma alanını indekslemek için [Araçlar](../tools/#index_workspace), arama yapmak için [semantic search](../tools/#semantic_search) sayfasına bakın.
 
 ---
 
@@ -591,13 +591,13 @@ Kullanmak istediğiniz MCP sunucularını `mcp` seçeneği aracılığıyla yap�
 }
 ```
 
-[Daha fazla bilgi](/docs/mcp-servers).
+[Daha fazla bilgi](../mcp-servers/).
 
 ---
 
 ### Eklentiler
 
-[Eklentiler](/docs/plugins) opencode'u özel araçlar, kancalar ve entegrasyonlarla genişletin.
+[Eklentiler](../plugins/) opencode'u özel araçlar, kancalar ve entegrasyonlarla genişletin.
 
 Eklenti dosyalarını `.opencode/plugins/` veya `~/.config/opencode/plugins/` içine yerleştirin. Ayrıca eklentileri `plugin` seçeneği aracılığıyla npm'den de yükleyebilirsiniz.
 
@@ -608,7 +608,7 @@ Eklenti dosyalarını `.opencode/plugins/` veya `~/.config/opencode/plugins/` i�
 }
 ```
 
-[Daha fazla bilgi](/docs/plugins).
+[Daha fazla bilgi](../plugins/).
 
 ---
 
@@ -623,7 +623,7 @@ Kullandığınız modele ilişkin talimatları `instructions` seçeneği aracıl
 }
 ```
 
-Bu, talimat dosyalarına giden bir dizi yolu ve glob desenini alır. [Kurallar hakkında daha fazla bilgiyi buradan edinin](/docs/rules).
+Bu, talimat dosyalarına giden bir dizi yolu ve glob desenini alır. [Kurallar hakkında daha fazla bilgiyi buradan edinin](../rules/).
 
 ---
 

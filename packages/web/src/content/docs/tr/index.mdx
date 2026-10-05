@@ -3,7 +3,7 @@ title: Giriş
 description: Kişisel OpenCode fork'unu kullanmaya başlayın.
 ---
 
-[**OpenCode**](/) açık kaynaklı bir AI kodlama ajanıdır. Bu kişisel fork, depoda sürdürülen terminal arayüzünü ve entegrasyonları belgeler.
+[**OpenCode**](./) açık kaynaklı bir AI kodlama ajanıdır. Bu kişisel fork, depoda sürdürülen terminal arayüzünü ve entegrasyonları belgeler.
 
 Kullandığınız sağlayıcının API anahtarını `/connect` ile ekleyebilir veya uyumlu bir sağlayıcıyı `opencode.json` içinde yapılandırabilirsiniz.
 
@@ -29,7 +29,38 @@ OpenCode'u terminalinizde kullanmak için ihtiyacınız olacak:
 
 ## Kurulum
 
-Bu fork, derlenmiş ikili dosyalarını [GitHub Releases](https://github.com/ozgurulukir/opencode-personal/releases) sayfasında yayımlar. Kurulumcular `opencode-personal` komutunu `~/.opencode-personal/bin` dizinine kurar — mevcut bir upstream `opencode` kurulumuyla birlikte güvenle kullanılır (`personal` kanalı sayesinde ayrı oturum veritabanı). Tek satırlık kurulum komutları ve manuel indirme için fork'un README'sine bakın.
+Bu, bağımsız olarak sürdürülen bir fork'tur; resmî bir OpenCode sürümü değildir. Linux, macOS ve Windows için hazır ikili dosyalar bu fork'un [GitHub sürümlerinde](https://github.com/ozgurulukir/opencode-personal/releases) yayımlanır.
+
+macOS / Linux:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/ozgurulukir/opencode-personal/main/install.sh | bash
+```
+
+Windows (PowerShell):
+
+```powershell
+irm https://raw.githubusercontent.com/ozgurulukir/opencode-personal/main/install.ps1 | iex
+```
+
+Kurulum betikleri `opencode-personal` komutunu `~/.opencode-personal/bin` dizinine kurar (Windows: `%USERPROFILE%\.opencode-personal\bin`). Mevcut bir kaynak proje `opencode` kurulumunu korurlar. Yayımlanan ikili dosyalar oturumları `opencode-personal.db` içinde saklar; yapılandırma ve sağlayıcı kimlik bilgileri kaynak projeyle paylaşılır. `OPENCODE_DB` veya `OPENCODE_DISABLE_CHANNEL_DB` bu veritabanı ayrımını geçersiz kılabilir.
+
+Takvim tabanlı bir sürümü seçmek için `--version <v>` / `-Version <v>`, yerel bir derlemeyi kurmak için `--binary <path>` / `-Binary <path>` kullanın. Paketle gelen `libopentui.*` / `opentui.dll` dosyalarını çalıştırılabilir dosyanın yanında tutun. Bash betiği `--no-modify-path` seçeneğini destekler; PowerShell betiği dizini her zaman kullanıcı PATH değişkenine ekler.
+
+Fork'u kaldırmak için kurulum dizinini ve PATH girdisini silin. Kaynak proje OpenCode'u kullanmaya devam ediyorsanız paylaşılan yapılandırma ve veri dizinlerini koruyun.
+
+### Kaynaktan çalıştırma
+
+Çalışma alanı, kök `package.json` dosyasında sabitlenen Bun 1.4.2 sürümünü kullanır:
+
+```bash
+git clone https://github.com/ozgurulukir/opencode-personal.git
+cd opencode-personal
+bun install
+bun dev
+```
+
+Kaynaktan derlemeler, veritabanını derleme kanalına göre seçer. Yolu görmek için `bun dev db path` çalıştırın. Aşağıdaki komut örnekleri, kurulu sürümün `opencode-personal` komutunu kullanır.
 
 ---
 
@@ -52,7 +83,7 @@ OpenCode ile herhangi bir LLM sağlayıcısının API anahtarlarını yapıland�
    └ enter
    ```
 
-Alternatif olarak diğer sağlayıcılardan birini seçebilirsiniz. [Daha fazla bilgi](/docs/providers#directory).
+Alternatif olarak diğer sağlayıcılardan birini seçebilirsiniz. [Daha fazla bilgi](./providers/#dizin).
 
 ---
 
@@ -67,7 +98,7 @@ cd /path/to/project
 Ve OpenCode'u çalıştırın.
 
 ```bash
-opencode
+opencode-personal
 ```
 
 Daha sonra aşağıdaki komutu çalıştırarak proje için OpenCode'u başlatın.
@@ -222,7 +253,7 @@ Veya `/redo` komutunu kullanarak değişiklikleri **yeniden yapabilirsiniz**.
 
 ## Paylaşma
 
-OpenCode görüşmelerini [herkese açık bir bağlantıyla paylaşabilirsiniz](/docs/share).
+OpenCode görüşmelerini [herkese açık bir bağlantıyla paylaşabilirsiniz](./share/).
 
 ```bash frame="none"
 /share
@@ -240,4 +271,4 @@ Konuşmalar varsayılan olarak paylaşılmaz.
 
 İşte bu kadar! Artık OpenCode'u kullanma konusunda profesyonelsiniz.
 
-Kendinize göre uyarlamak için [tema seçebilir](/docs/themes), [tuş atamalarını özelleştirebilir](/docs/keybinds), [kod biçimlendirici ayarlayabilir](/docs/formatters), [özel komutlar oluşturabilir](/docs/commands) veya [OpenCode config](/docs/config) ile oynayabilirsiniz.
+Kendinize göre uyarlamak için [tema seçebilir](./themes/), [tuş atamalarını özelleştirebilir](./keybinds/), [kod biçimlendirici ayarlayabilir](./formatters/), [özel komutlar oluşturabilir](./commands/) veya [OpenCode config](./config/) ile oynayabilirsiniz.

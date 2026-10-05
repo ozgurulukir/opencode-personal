@@ -3,7 +3,7 @@ title: Modeller
 description: LLM sağlayıcılarını ve model seçimlerini yapılandırın.
 ---
 
-opencode, **75+ LLM sağlayıcısını** desteklemek için [AI SDK](https://ai-sdk.dev/) ve [Models.dev](https://models.dev) kullanır ve yerel modellerin çalıştırılmasını destekler.
+opencode, birçok LLM sağlayıcısını desteklemek için [AI SDK](https://ai-sdk.dev/) ve [Models.dev](https://models.dev) kullanır; ayrıca yerel modelleri çalıştırmayı da destekler.
 
 ---
 
@@ -11,7 +11,7 @@ opencode, **75+ LLM sağlayıcısını** desteklemek için [AI SDK](https://ai-s
 
 Çoğu popüler sağlayıcı varsayılan olarak önceden yüklenmiştir. Bir sağlayıcının kimlik bilgilerini `/connect` komutu aracılığıyla eklediyseniz, bunlar opencode'u başlattığınızda kullanılabilir olacaktır.
 
-[Sağlayıcılar](/docs/providers) hakkında daha fazla bilgi edinin.
+[Sağlayıcılar](../providers/) hakkında daha fazla bilgi edinin.
 
 ---
 
@@ -25,24 +25,13 @@ Sağlayıcınızı yapılandırdıktan sonra aşağıdaki komutu yazarak istedi�
 
 ---
 
-## Önerilen modeller
+## Model seçimi
 
-Piyasada pek çok model var ve her hafta yeni modeller çıkıyor.
-
-:::tip
-Önerdiğimiz modellerden birini kullanmayı düşünün.
-:::
-
-Ancak, hem kod oluşturmada hem de araç çağırmada iyi olan yalnızca birkaçı var.
-
-Burada, opencode ile belirli bir sıraya göre iyi çalışan birkaç model yer almaktadır. (Bu kapsamlı bir liste değildir ve mutlaka güncel olması da gerekmez):
-
-- GPT 5.2
-- GPT 5.1 Codex
-- Claude Opus 4.5
-- Claude Sonnet 4.5
-- Minimax M2.1
-- Gemini 3 Pro
+Model kullanılabilirliği, yetenekleri ve varyantları yapılandırdığınız sağlayıcı
+kimlik bilgilerine ve bu derlemenin Models.dev verilerine bağlıdır. Kurulumunuzda
+kullanılabilir modelleri görmek için `/models` komutunu kullanın. Agent iş
+akışlarında araç çağırmayı destekleyen ve projeniz için yeterli bağlam penceresi
+sunan bir model seçin; sağlayıcı sayfası ve model meta verileri asıl kaynaktır.
 
 ---
 
@@ -59,7 +48,7 @@ opencode yapılandırması
 ```
 
 
-Bir [custom provider](/docs/providers#custom) yapılandırılmışsa, `provider_id`, performansınızın `provider` bölümünden gelen anahtardır ve `model_id`, `provider.models`'den gelen anahtardır.
+Bir [custom provider](../providers/#özel-sağlayıcı) yapılandırılmışsa, `provider_id`, performansınızın `provider` bölümünden gelen anahtardır ve `model_id`, `provider.models`'den gelen anahtardır.
 
 ---
 
@@ -99,10 +88,10 @@ Bir modelin seçeneklerini genel olarak yapılandırma aracılığıyla yapılan
 }
 ```
 
-Burada iki yerleşik model için genel ayarları yapılandırıyoruz: `gpt-5` sağlayıcısı aracılığıyla erişildiğinde `openai` ve `claude-sonnet-4-20250514` sağlayıcısı aracılığıyla erişildiğinde `anthropic`.
+Burada iki yerleşik model için genel ayarları yapılandırıyoruz: `gpt-5` sağlayıcısı aracılığıyla erişildiğinde `openai` ve `claude-sonnet-4-5-20250929` sağlayıcısı aracılığıyla erişildiğinde `anthropic`.
 Yerleşik sağlayıcı ve model adları [Models.dev](https://models.dev) adresinde bulunabilir.
 
-Bu seçenekleri kullandığınız tüm aracılar için de yapılandırabilirsiniz. Aracı yapılandırması burada tüm genel seçenekleri geçersiz kılar. [Daha fazla bilgi](/docs/agents/#additional).
+Bu seçenekleri kullandığınız tüm aracılar için de yapılandırabilirsiniz. Aracı yapılandırması burada tüm genel seçenekleri geçersiz kılar. [Daha fazla bilgi](../agents/#ek).
 
 Ayrıca yerleşik çeşitleri genişleten özel varyantlar da tanımlayabilirsiniz. Varyantlar, yinelenen girişler oluşturmadan aynı model için farklı ayarları yapılandırmanıza olanak tanır:
 
@@ -196,7 +185,7 @@ Mevcut varyantları geçersiz kılabilir veya kendinizinkini ekleyebilirsiniz:
 
 ### Döngü çeşitleri
 
-Çeşitler arasında hızlı geçiş yapmak için `variant_cycle` tuş atamasını kullanın. [Daha fazla bilgi](/docs/keybinds).
+Çeşitler arasında hızlı geçiş yapmak için `variant_cycle` tuş atamasını kullanın. [Daha fazla bilgi](../keybinds/).
 
 ---
 
@@ -211,7 +200,7 @@ opencode başlatıldığında modelleri aşağıdaki öncelik sırasına göre k
    ```json title="opencode.json"
    {
      "$schema": "https://ozgurulukir.github.io/opencode-personal/config.json",
-     "model": "anthropic/claude-sonnet-4-20250514"
+     "model": "anthropic/claude-sonnet-4-5-20250929"
    }
    ```
 

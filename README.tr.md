@@ -1,121 +1,103 @@
-<p align="center">
-  <a href="https://opencode.ai">
-    <picture>
-      <source srcset="packages/console/app/src/asset/logo-ornate-dark.svg" media="(prefers-color-scheme: dark)">
-      <source srcset="packages/console/app/src/asset/logo-ornate-light.svg" media="(prefers-color-scheme: light)">
-      <img src="packages/console/app/src/asset/logo-ornate-light.svg" alt="OpenCode logo">
-    </picture>
-  </a>
-</p>
-<p align="center">Açık kaynaklı yapay zeka kodlama asistanı.</p>
-<p align="center">
-  <a href="https://opencode.ai/discord"><img alt="Discord" src="https://img.shields.io/discord/1391832426048651334?style=flat-square&label=discord" /></a>
-  <a href="https://www.npmjs.com/package/opencode-ai"><img alt="npm" src="https://img.shields.io/npm/v/opencode-ai?style=flat-square" /></a>
-  <a href="https://github.com/anomalyco/opencode/actions/workflows/publish.yml"><img alt="Build status" src="https://img.shields.io/github/actions/workflow/status/anomalyco/opencode/publish.yml?style=flat-square&branch=dev" /></a>
-</p>
+# OpenCode Kişisel Fork
 
-<p align="center">
-  <a href="README.md">English</a> |
-  <a href="README.tr.md">Türkçe</a>
-</p>
+OpenCode, terminalinizde ve tarayıcınızda çalışan açık kaynaklı bir yapay zekâ kodlama ajanıdır. Bu depo, [OpenCode](https://github.com/anomalyco/opencode) projesinin, kaynak projeden bağımsız olarak sürdürülen kişisel bir fork'udur. Resmî bir OpenCode sürümü değildir ve kaynak projenin ekibiyle bağlantılı değildir.
 
-[![OpenCode Terminal UI](packages/web/src/assets/lander/screenshot.png)](https://opencode.ai)
+Bu fork, temel OpenCode deneyimini korurken bu depoda sürdürülen değişiklikleri içerir. Özellikler, uyumluluk, destek ve sürüm takvimi kaynak projeden farklı olabilir. Resmî proje için [opencode.ai](https://opencode.ai) adresini veya [kaynak depoyu](https://github.com/anomalyco/opencode) ziyaret edin.
 
----
+## Neler yapabilir?
 
-### Kurulum
+- Desteklenen barındırılan ve yerel model sağlayıcılarına bağlanabilir.
+- Yerleşik araçlar, yapılandırılabilir izinler ve `AGENTS.md` gibi proje talimatlarıyla bir projeyi inceleyebilir ve değiştirebilir.
+- Uzmanlaşmış ajanlar oluşturabilir; eklentiler, beceriler ve MCP sunucularıyla ajanı genişletebilir.
+- Çalışma alanını indeksleyebilir ve tam metin aramasının yanında anlamsal kod araması yapabilir.
+- Otomatik bağlam sıkıştırma ve araç çıktısı budama ile uzun oturumları yönetebilir.
+- Terminal arayüzü, tarayıcı uygulaması ve desteklenen editör entegrasyonları üzerinden çalışmayı sürdürebilir.
 
-```bash
-# YOLO
-curl -fsSL https://opencode.ai/install | bash
+Kullanım, yapılandırma, sağlayıcılar ve entegrasyonlar için [fork dokümantasyonuna](https://ozgurulukir.github.io/opencode-personal/) bakın. Üretilen [yapılandırma şeması](https://ozgurulukir.github.io/opencode-personal/config.json) ve [TUI yapılandırma şeması](https://ozgurulukir.github.io/opencode-personal/tui.json) da burada yayımlanır.
 
-# Paket yöneticileri
-npm i -g opencode-ai@latest        # veya bun/pnpm/yarn
-scoop install opencode             # Windows
-choco install opencode             # Windows
-brew install anomalyco/tap/opencode # macOS ve Linux (önerilir, her zaman güncel)
-brew install opencode              # macOS ve Linux (resmi brew formülü, daha az güncellenir)
-sudo pacman -S opencode            # Arch Linux (Stable)
-paru -S opencode-bin               # Arch Linux (Latest from AUR)
-mise use -g opencode               # Tüm işletim sistemleri
-nix run nixpkgs#opencode           # veya en güncel geliştirme dalı için github:anomalyco/opencode
-```
+## Bu fork neler ekliyor?
 
-> [!TIP]
-> Kurulumdan önce 0.1.x'ten eski sürümleri kaldırın.
+Bu fork, OpenCode 1.14.48 kaynak sürümü üzerine kuruludur. Bu depoda sürdürülen başlıca değişiklikler:
 
-### Masaüstü Uygulaması (BETA)
+- `/usage` içinde sağlayıcı kullanımı ve kotalar: Anthropic (Claude), ChatGPT abonelikleri, ZAI ve ClinePass; her sağlayıcının sunduğu limitler, bakiyeler ve plan ayrıntıları dâhil.
+- Düşünme modu yapılandırması ve sağlayıcıya özgü mesaj işleme dâhil Qwen3 uyumluluğu.
+- V2 SDK arayüzüyle V1/V2 oturum mimarisi.
+- İsteğe bağlı otomatik beceri eşleştirmesiyle yerel anlamsal çalışma alanı araması (zvec).
+- Rust/WASM tabanlı fark motoru (`packages/diff-wasm`).
+- ACP (Agent Client Protocol) terminal arka ucu desteği (ör. Zed).
+- TUI iyileştirmeleri: soluk metin olarak gösterilen sonraki istem önerileri, kabuk `!` çıktısının görüntülenmesi ve ortak bir yükleme göstergesi.
+- İzin sistemi iyileştirmeleri: MCP araç anahtarları, ret kurallarına öncelik veren değerlendirme, kalıcı "her zaman izin ver" ve geliştirilmiş alt ajan izin yönetimi.
+- Güvenlik düzeltmeleri: webfetch aracında SSRF koruması, sıkı CORS kaynak doğrulaması, komut enjeksiyonu ve yol geçişi düzeltmeleri, okuma aracında sembolik bağlantıyla izin verilen dizinin dışına çıkmanın önlenmesi, TUI çıktı sızıntısının önlenmesi ve kriptografik olarak üretilen diyalog/istek kimlikleri.
+- İstem/oturum motoru yeniden düzenlemeleri: `prompt.ts` dosyasının modüllere ayrılması ve sağlayıcı mesaj dönüşümlerinin bölünmesi.
+- Otomatik bağlam sıkıştırma iyileştirmeleri: `context_limit` yapılandırması, özet bütçesi ve meta verilerin korunması.
+- Performans çalışmaları: oturum özeti taramalarının azaltılması, olay döngüsünün bloke olmasına yönelik düzeltmeler, toplu veritabanı yazımları ve gömülü arayüzün önbelleğe alınması.
+- Monorepo sadeleştirmesi ve derleme/CI iyileştirmeleri: paket temizliği, fork için tip denetimi iş akışı ve daha sıkı bağımlılık güncelleme kontrolleri.
+- Araçlar: birden fazla beceri yükleme, uyarılarla beceri doğrulama ve yapılacak işlerin otomatik kapatılmasıyla entegre değişiklik bloğu farkları.
 
-OpenCode ayrıca masaüstü uygulaması olarak da mevcuttur. Doğrudan [sürüm sayfasından](https://github.com/anomalyco/opencode/releases) veya [opencode.ai/download](https://opencode.ai/download) adresinden indirebilirsiniz.
+## Kurulum
 
-| Platform              | İndirme                            |
-| --------------------- | ---------------------------------- |
-| macOS (Apple Silicon) | `opencode-desktop-mac-arm64.dmg`   |
-| macOS (Intel)         | `opencode-desktop-mac-x64.dmg`     |
-| Windows               | `opencode-desktop-windows-x64.exe` |
-| Linux                 | `.deb`, `.rpm` veya AppImage       |
+Hazır ikili dosyalar, bu fork'un [GitHub sürümlerinde](https://github.com/ozgurulukir/opencode-personal/releases) Linux (x64/arm64, glibc ve musl), macOS (x64/arm64) ve Windows (x64/arm64) için yayımlanır.
+
+macOS / Linux:
 
 ```bash
-# macOS (Homebrew)
-brew install --cask opencode-desktop
-# Windows (Scoop)
-scoop bucket add extras; scoop install extras/opencode-desktop
+curl -fsSL https://raw.githubusercontent.com/ozgurulukir/opencode-personal/main/install.sh | bash
 ```
 
-#### Kurulum Dizini (Installation Directory)
+Windows (PowerShell):
 
-Kurulum betiği (install script), kurulum yolu (installation path) için aşağıdaki öncelik sırasını takip eder:
+```powershell
+irm https://raw.githubusercontent.com/ozgurulukir/opencode-personal/main/install.ps1 | iex
+```
 
-1. `$OPENCODE_INSTALL_DIR` - Özel kurulum dizini
-2. `$XDG_BIN_DIR` - XDG Base Directory Specification uyumlu yol
-3. `$HOME/bin` - Standart kullanıcı binary dizini (varsa veya oluşturulabiliyorsa)
-4. `$HOME/.opencode/bin` - Varsayılan yedek konum
+Her iki betik de **`opencode-personal`** komutunu kurar ve PATH değişkeninize yalnızca kendi dizinini ekler: macOS/Linux üzerinde `~/.opencode-personal/bin`, Windows üzerinde `%USERPROFILE%\.opencode-personal\bin`. Fork, mevcut bir kaynak proje `opencode` kurulumuyla birlikte çalışacak şekilde tasarlanmıştır: `~/.opencode`, `~/.local/bin/opencode` veya mevcut PATH girdilerine dokunmaz; derleme sırasında belirlenen `personal` kanalı üzerinden oturumları kendi veritabanında (`opencode-personal.db`) saklar. Yapılandırma (`opencode.json`, kimlik doğrulama bilgileri) kaynak projeyle bilinçli olarak paylaşılır. Dikkat: `OPENCODE_DISABLE_CHANNEL_DB` veya `OPENCODE_DB` ortam değişkenlerini ayarlarsanız veritabanlarının ayrılmasını sizin yönetmeniz gerekir.
+
+Belirli bir sürümü kurmak için `--version <v>` (bash) veya `-Version <v>` (PowerShell) kullanın (fork sürümleri takvim tabanlıdır, ör. `2026.9.29`). Yerel bir derlemeyi kurmak için `--binary <path>` / `-Binary <path>` kullanın (bu durumda paketle gelen `libopentui.*` / `opentui.dll` dosyasını da ikili dosyanın yanına kopyalayın). PATH düzenlemesini atlamak için `--no-modify-path` (bash) kullanın. Not: `install.ps1` betiğinde **PATH düzenlemesini atlayan bir seçenek yoktur**; kurulum dizinini her zaman kullanıcı PATH değişkenine ekler. İstemiyorsanız bu girdiyi elle kaldırın. Windows ikili dosyaları imzasızdır; SmartScreen uyarı gösterebilir. "Daha fazla bilgi" → "Yine de çalıştır" seçeneğini kullanın. Fork sürümleri takvim tabanlıdır (`YYYY.M.D`, ör. `2026.9.29`): aynı gün yeniden yayımlamak aynı sürümü ve etiketi kullanır, sürüm dosyalarının üzerine yazar; daha sonraki bir gün yayımlamak yeni bir sürüm oluşturur.
+
+Kaldırma: `~/.opencode-personal` dizinini (Windows: `%USERPROFILE%\.opencode-personal`) silin ve kabuğunuzun rc dosyasından `# opencode-personal` PATH satırını kaldırın (Windows: dizini kullanıcı PATH değişkeninizden kaldırın).
+
+### Elle indirme
+
+[Sürümler sayfasından](https://github.com/ozgurulukir/opencode-personal/releases) bir arşiv indirin, açın, `opencode` ikili dosyasını `opencode-personal` olarak yeniden adlandırın (paketle gelen yerel kütüphaneyi, `libopentui.*` / `opentui.dll`, aynı dizinde tutun) ve bu dizini PATH değişkeninize ekleyin.
+
+### Kaynaktan çalıştırma
+
+[Bun](https://bun.sh/) kurun (depo Bun 1.4.2 sürümünü hedefler), ardından depoyu klonlayıp çalışma alanının bağımlılıklarını yükleyin:
 
 ```bash
-# Örnekler
-OPENCODE_INSTALL_DIR=/usr/local/bin curl -fsSL https://opencode.ai/install | bash
-XDG_BIN_DIR=$HOME/.local/bin curl -fsSL https://opencode.ai/install | bash
+git clone https://github.com/ozgurulukir/opencode-personal.git
+cd opencode-personal
+bun install
+bun dev
 ```
 
-### Ajanlar
+Terminal arayüzünde `/connect` ile bir model sağlayıcısına bağlanın veya `opencode.json` içinde bir sağlayıcı yapılandırın. Seçtiğiniz sağlayıcının kimlik doğrulama bilgilerine ihtiyacınız olacaktır.
 
-OpenCode, `Tab` tuşuyla aralarında geçiş yapabileceğiniz iki yerleşik (built-in) ajan içerir.
+## Geliştirme
 
-- **build** - Varsayılan, geliştirme çalışmaları için tam erişimli ajan
-- **plan** - Analiz ve kod keşfi için salt okunur ajan
-  - Varsayılan olarak dosya düzenlemelerini reddeder
-  - Bash komutlarını çalıştırmadan önce izin ister
-  - Tanımadığınız kod tabanlarını keşfetmek veya değişiklikleri planlamak için ideal
+Bu depo bir Bun çalışma alanı monorepo'sudur. Depo kökünden çalıştırılan yaygın komutlar:
 
-Ayrıca, karmaşık aramalar ve çok adımlı görevler için bir **genel** alt ajan bulunmaktadır.
-Bu dahili olarak kullanılır ve mesajlarda `@general` ile çağrılabilir.
+| Komut | Amaç |
+| --- | --- |
+| `bun dev` | OpenCode'u kaynaktan çalıştırır. |
+| `bun run dev:web` | Tarayıcı uygulamasını başlatır. |
+| `bun run --cwd packages/web dev` | Astro/Starlight dokümantasyon sitesini başlatır. |
+| `bun run dev:storybook` | Arayüz Storybook'unu başlatır. |
+| `bun run lint` | Çalışma alanının lint denetimini yapar. |
+| `bun run typecheck` | Çalışma alanındaki paketlerin tip denetimini yapar. |
+| `bun run --cwd packages/web build` | Statik dokümantasyon sitesini derler. |
 
-[Ajanlar](https://opencode.ai/docs/agents) hakkında daha fazla bilgi edinin.
+## Depo yapısı
 
-### Dokümantasyon
+| Paket | İçerik |
+| --- | --- |
+| `packages/opencode` | CLI, terminal arayüzü, sunucu, araçlar, sağlayıcılar ve ajan çalışma zamanı. |
+| `packages/app` | Tarayıcı uygulaması. |
+| `packages/ui` | Paylaşılan arayüz bileşenleri. |
+| `packages/core` | Paylaşılan çalışma zamanı yardımcıları ve temel yapıları. |
+| `packages/sdk/js` | JavaScript/TypeScript SDK. |
+| `packages/web` | İngilizce ve Türkçe dokümantasyon sitesi. |
 
-OpenCode'u nasıl yapılandıracağınız hakkında daha fazla bilgi için [**dokümantasyonumuza göz atın**](https://opencode.ai/docs).
+## Lisans
 
-### Katkıda Bulunma
-
-OpenCode'a katkıda bulunmak istiyorsanız, lütfen bir pull request göndermeden önce [katkıda bulunma dokümanlarımızı](./CONTRIBUTING.md) okuyun.
-
-### OpenCode Üzerine Geliştirme
-
-OpenCode ile ilgili bir proje üzerinde çalışıyorsanız ve projenizin adının bir parçası olarak "opencode" kullanıyorsanız (örneğin, "opencode-dashboard" veya "opencode-mobile"), lütfen README dosyanıza projenin OpenCode ekibi tarafından geliştirilmediğini ve bizimle hiçbir şekilde bağlantılı olmadığını belirten bir not ekleyin.
-
-### SSS
-
-#### Bu Claude Code'dan nasıl farklı?
-
-Yetenekler açısından Claude Code'a çok benzer. İşte temel farklar:
-
-- %100 açık kaynak
-- Herhangi bir sağlayıcıya bağlı değil. [OpenCode Zen](https://opencode.ai/zen) üzerinden sunduğumuz modelleri önermekle birlikte; OpenCode, Claude, OpenAI, Google veya hatta yerel modellerle kullanılabilir. Modeller geliştikçe aralarındaki farklar kapanacak ve fiyatlar düşecek, bu nedenle sağlayıcıdan bağımsız olmak önemlidir.
-- Kurulum gerektirmeyen hazır LSP desteği
-- TUI odaklı yaklaşım. OpenCode, neovim kullanıcıları ve [terminal.shop](https://terminal.shop)'un geliştiricileri tarafından geliştirilmektedir; terminalde olabileceklerin sınırlarını zorlayacağız.
-- İstemci/sunucu (client/server) mimarisi. Bu, örneğin OpenCode'un bilgisayarınızda çalışması ve siz onu bir mobil uygulamadan uzaktan yönetmenizi sağlar. TUI arayüzü olası istemcilerden sadece biridir.
-
----
-
-**Topluluğumuza katılın** [Discord](https://discord.gg/opencode) | [X.com](https://x.com/opencode)
+Bu proje MIT Lisansı altında dağıtılır. Gerekli telif hakkı ve izin bildirimi için [LICENSE](./LICENSE) dosyasına bakın. Kaynak projenin telif hakkı atfı bu dosyada korunmuştur.

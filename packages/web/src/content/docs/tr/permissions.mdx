@@ -5,7 +5,7 @@ description: Hangi işlemlerin çalıştırılması için onay sürecini kontrol
 
 opencode, belirli bir eylemin otomatik olarak mı çalıştırılacağına, size sorulacağına veya engelleneceğine karar vermek için `permission` yapılandırmasını kullanır.
 
-`v1.1.1` itibarıyla eski `tools` boolean yapılandırması kullanımdan kaldırıldı ve `permission` ile birleştirildi. Eski `tools` yapılandırması geriye dönük uyumluluk açısından hâlâ desteklenmektedir.
+Eski `tools` boolean yapılandırması kullanımdan kaldırıldı ve `permission` içine dönüştürüldü. Eski `tools` yapılandırması geriye dönük uyumluluk açısından hâlâ desteklenmektedir.
 
 ---
 
@@ -80,7 +80,7 @@ Kurallar, **son eşleşen kuralın kazanması** ile kalıp eşleşmesine göre d
 
 ### Ana Dizin Genişletme
 
-Ana dizininize referans vermek için bir modelin başlangıcında `~` veya `$HOME` kullanabilirsiniz. Bu özellikle [`external_directory`](#external-directories) kuralları için kullanışlıdır.
+Ana dizininize referans vermek için bir modelin başlangıcında `~` veya `$HOME` kullanabilirsiniz. Bu özellikle [`external_directory`](#harici-dizinler) kuralları için kullanışlıdır.
 
 - `~/projects/*` -> `/Users/username/projects/*`
 - `$HOME/projects/*` -> `/Users/username/projects/*`
@@ -105,7 +105,7 @@ Ana sayfa genişletmesi (`~/...` gibi) yalnızca bir kalıbın nasıl yazıldı�
 }
 ```
 
-Burada izin verilen herhangi bir dizin, geçerli çalışma alanıyla aynı varsayılanları devralır. [`read` defaults to `allow`](#defaults)'dan bu yana, geçersiz kılınmadığı sürece `external_directory` altındaki girişler için okumalara da izin verilir. Bir aracın bu yollarda kısıtlanması gerektiğinde (okumaları tutarken düzenlemeleri engellemek gibi) açık kurallar ekleyin:
+Burada izin verilen herhangi bir dizin, geçerli çalışma alanıyla aynı varsayılanları devralır. [`read` defaults to `allow`](#varsayılanlar)'dan bu yana, geçersiz kılınmadığı sürece `external_directory` altındaki girişler için okumalara da izin verilir. Bir aracın bu yollarda kısıtlanması gerektiğinde (okumaları tutarken düzenlemeleri engellemek gibi) açık kurallar ekleyin:
 
 ```json title="opencode.json"
 {
@@ -173,7 +173,7 @@ Hiçbir şey belirtmezseniz opencode izin verilen varsayılanlardan başlar:
 opencode onay istediğinde kullanıcı arayüzü üç sonuç sunar:
 
 - `once` — yalnızca bu isteği onayla
-- `always` — önerilen kalıplarla eşleşen gelecekteki istekleri onaylayın (geçerli opencode oturumunun geri kalanı için)
+- `always` — önerilen kalıplarla eşleşen gelecekteki istekleri onaylayın (SQLite içinde proje bazında saklanır ve yeniden başlatmalardan sonra kullanılır; açık yapılandırma/ajan ret kuralları yine önceliklidir)
 - `reject` — isteği reddet
 
 `always`'ın onaylayacağı kalıp seti araç tarafından sağlanır (örneğin, bash onayları genellikle `git status*` gibi güvenli bir komut önekini beyaz listeye alır).
@@ -182,10 +182,10 @@ opencode onay istediğinde kullanıcı arayüzü üç sonuç sunar:
 
 ## Agent'lar
 
-Agent bazında izinleri geçersiz kılabilirsiniz. Agent izinleri global yapılandırmayla birleştirilir ve agent kuralları önceliklidir. [Daha fazla bilgi](/docs/agents#permissions).
+Agent bazında izinleri geçersiz kılabilirsiniz. Agent izinleri global yapılandırmayla birleştirilir ve agent kuralları önceliklidir. [Daha fazla bilgi](../agents/).
 
 :::note
-Daha ayrıntılı desen eşleştirme örnekleri için yukarıdaki [Ayrıntılı kurallar (nesne söz dizimi)](#granular-rules-object-syntax) bölümüne bakın.
+Daha ayrıntılı desen eşleştirme örnekleri için yukarıdaki [Ayrıntılı kurallar (nesne söz dizimi)](#ayrıntılı-kurallar-nesne-sözdizimi) bölümüne bakın.
 :::
 
 ```json title="opencode.json"

@@ -3,7 +3,7 @@ title: Custom Tools
 description: Create tools the LLM can call in opencode.
 ---
 
-Custom tools are functions you create that the LLM can call during conversations. They work alongside opencode's [built-in tools](/docs/tools) like `read`, `write`, and `bash`.
+Custom tools are functions you create that the LLM can call during conversations. They work alongside opencode's [built-in tools](../tools/) like `read`, `write`, and `bash`.
 
 ---
 
@@ -59,7 +59,7 @@ export const add = tool({
     b: tool.schema.number().describe("Second number"),
   },
   async execute(args) {
-    return args.a + args.b
+    return String(args.a + args.b)
   },
 })
 
@@ -70,7 +70,7 @@ export const multiply = tool({
     b: tool.schema.number().describe("Second number"),
   },
   async execute(args) {
-    return args.a * args.b
+    return String(args.a * args.b)
   },
 })
 ```
@@ -100,7 +100,7 @@ export default tool({
 ```
 
 :::note
-Prefer unique names unless you intentionally want to replace a built-in tool. If you want to disable a built in tool but not override it, use [permissions](/docs/permissions).
+Prefer unique names unless you intentionally want to replace a built-in tool. If you want to disable a built in tool but not override it, use [permissions](../permissions/).
 :::
 
 ---

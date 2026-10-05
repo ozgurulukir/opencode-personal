@@ -14,6 +14,7 @@ Create one folder per skill name and put a `SKILL.md` inside it.
 OpenCode searches these locations:
 
 - Project config: `.opencode/skills/<name>/SKILL.md`
+- Project config (singular form): `.opencode/skill/<name>/SKILL.md`
 - Global config: `~/.config/opencode/skills/<name>/SKILL.md`
 - Project Claude-compatible: `.claude/skills/<name>/SKILL.md`
 - Global Claude-compatible: `~/.claude/skills/<name>/SKILL.md`
@@ -41,14 +42,17 @@ Only these fields are recognized:
 - `license` (optional)
 - `compatibility` (optional)
 - `metadata` (optional, string-to-string map)
+- `allowed-tools` (optional string; retained as metadata, not an automatic permission grant)
 
 Unknown frontmatter fields are ignored.
+
+This fork emits `skill.warning` for issues such as a missing description or a folder/name mismatch. Definitions with warnings are excluded from the normal skill list and auto-match. Unsafe names fall back to a safe folder name or are skipped. When duplicate names are discovered, the later definition replaces the earlier one; use unique names.
 
 ---
 
 ## Validate names
 
-`name` must:
+For portable skills, use the following naming convention:
 
 - Be 1–64 characters
 - Be lowercase alphanumeric with single hyphen separators
@@ -243,3 +247,10 @@ If a skill does not show up:
 2. Check that frontmatter includes `name` and `description`
 3. Ensure skill names are unique across all locations
 4. Check permissions—skills with `deny` are hidden from agents
+
+
+Inspect validation warnings, including definitions hidden from the normal list:
+
+```bash
+opencode-personal debug skill validate
+```

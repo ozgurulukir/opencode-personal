@@ -6,21 +6,21 @@ description: Interact with opencode server over HTTP.
 import config from "../../../config.mjs"
 export const typesUrl = `${config.github}/blob/main/packages/sdk/js/src/v2/gen/types.gen.ts`
 
-The `opencode serve` command runs a headless HTTP server that exposes an OpenAPI endpoint that an opencode client can use.
+The `opencode-personal serve` command runs a headless HTTP server that exposes an OpenAPI endpoint that an opencode client can use.
 
 ---
 
 ### Usage
 
 ```bash
-opencode serve [--port <number>] [--hostname <string>] [--cors <origin>]
+opencode-personal serve [--port <number>] [--hostname <string>] [--cors <origin>]
 ```
 
 #### Options
 
 | Flag            | Description                         | Default          |
 | --------------- | ----------------------------------- | ---------------- |
-| `--port`        | Port to listen on                   | `4096`           |
+| `--port`        | Port to listen on                   | `0` (tries `4096`, then an available port) |
 | `--hostname`    | Hostname to listen on               | `127.0.0.1`      |
 | `--mdns`        | Enable mDNS discovery               | `false`          |
 | `--mdns-domain` | Custom domain name for mDNS service | `opencode.local` |
@@ -29,26 +29,26 @@ opencode serve [--port <number>] [--hostname <string>] [--cors <origin>]
 `--cors` can be passed multiple times:
 
 ```bash
-opencode serve --cors http://localhost:5173 --cors https://app.example.com
+opencode-personal serve --cors http://localhost:5173 --cors https://app.example.com
 ```
 
 ---
 
 ### Authentication
 
-Set `OPENCODE_SERVER_PASSWORD` to protect the server with HTTP basic auth. The username defaults to `opencode`, or set `OPENCODE_SERVER_USERNAME` to override it. This applies to both `opencode serve` and `opencode web`.
+Set `OPENCODE_SERVER_PASSWORD` to protect the server with HTTP basic auth. The username defaults to `opencode`, or set `OPENCODE_SERVER_USERNAME` to override it. This applies to both `opencode-personal serve` and `opencode-personal web`.
 
 ```bash
-OPENCODE_SERVER_PASSWORD=your-password opencode serve
+OPENCODE_SERVER_PASSWORD=your-password opencode-personal serve
 ```
 
 ---
 
 ### How it works
 
-When you run `opencode` it starts a TUI and a server. Where the TUI is the
+When you run `opencode-personal` it starts a TUI and a server. Where the TUI is the
 client that talks to the server. The server exposes an OpenAPI 3.1 spec
-endpoint. This endpoint is also used to generate an [SDK](/docs/sdk).
+endpoint. This endpoint is also used to generate an [SDK](../sdk/).
 
 :::tip
 Use the opencode server to interact with opencode programmatically.
@@ -56,28 +56,28 @@ Use the opencode server to interact with opencode programmatically.
 
 This architecture lets opencode support multiple clients and allows you to interact with opencode programmatically.
 
-You can run `opencode serve` to start a standalone server. If you have the
-opencode TUI running, `opencode serve` will start a new server.
+You can run `opencode-personal serve` to start a standalone server. If you have the
+opencode TUI running, `opencode-personal serve` will start a new server.
 
 ---
 
 #### Connect to an existing server
 
-When you start the TUI it randomly assigns a port and hostname. You can instead pass in the `--hostname` and `--port` [flags](/docs/cli). Then use this to connect to its server.
+The TUI uses the same server listener and normally binds to `127.0.0.1`; port `4096` is preferred and an available port is used if it is occupied. You can set the `--hostname` and `--port` [flags](../cli/) when starting `serve` or `web`, then use the printed URL to connect a client.
 
-The [`/tui`](#tui) endpoint can be used to drive the TUI through the server. For example, you can prefill or run a prompt. This setup is used by the OpenCode [IDE](/docs/ide) plugins.
+The [`/tui`](#tui) endpoint can be used to drive the TUI through the server. For example, you can prefill or run a prompt. This setup is used by the OpenCode [IDE](../ide/) plugins.
 
 ---
 
 ## Spec
 
-The server publishes an OpenAPI 3.1 spec that can be viewed at:
+The server publishes the OpenAPI 3.1 document as JSON at:
 
 ```
 http://<hostname>:<port>/doc
 ```
 
-For example, `http://localhost:4096/doc`. Use the spec to generate clients or inspect request and response types. Or view it in a Swagger explorer.
+For example, `http://localhost:4096/doc`. Use the JSON document to generate clients or inspect request and response types. The server does not host a Swagger explorer itself.
 
 ---
 

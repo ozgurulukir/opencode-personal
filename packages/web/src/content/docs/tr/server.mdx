@@ -6,21 +6,21 @@ description: opencode sunucusuyla HTTP uzerinden etkilesin.
 import config from "../../../../config.mjs"
 export const typesUrl = `${config.github}/blob/main/packages/sdk/js/src/v2/gen/types.gen.ts`
 
-`opencode serve` komutu, opencode istemcisinin kullanabileceği bir OpenAPI endpoint'i açan headless bir HTTP sunucusu çalıştırır.
+`opencode-personal serve` komutu, opencode istemcisinin kullanabileceği bir OpenAPI endpoint'i açan headless bir HTTP sunucusu çalıştırır.
 
 ---
 
 ### Kullanım
 
 ```bash
-opencode serve [--port <number>] [--hostname <string>] [--cors <origin>]
+opencode-personal serve [--port <number>] [--hostname <string>] [--cors <origin>]
 ```
 
 #### Seçenekler
 
 | Bayrak          | Açıklama                                       | Varsayılan       |
 | --------------- | ---------------------------------------------- | ---------------- |
-| `--port`        | Dinlenecek bağlantı noktası                    | `4096`           |
+| `--port`        | Dinlenecek bağlantı noktası                    | `0` (`4096` denenir, sonra boş bir port kullanılır) |
 | `--hostname`    | Dinlenecek ana bilgisayar adı                  | `127.0.0.1`      |
 | `--mdns`        | mDNS keşfini etkinleştir                       | `false`          |
 | `--mdns-domain` | mDNS hizmeti için özel alan adı                | `opencode.local` |
@@ -29,25 +29,25 @@ opencode serve [--port <number>] [--hostname <string>] [--cors <origin>]
 `--cors` birden fazla kez geçilebilir:
 
 ```bash
-opencode serve --cors http://localhost:5173 --cors https://app.example.com
+opencode-personal serve --cors http://localhost:5173 --cors https://app.example.com
 ```
 
 ---
 
 ### Kimlik Doğrulama
 
-Sunucuyu HTTP temel kimlik doğrulama (basic auth) ile korumak için `OPENCODE_SERVER_PASSWORD` ayarlayın. Kullanıcı adı varsayılan olarak `opencode` değeridir; değiştirmek isterseniz `OPENCODE_SERVER_USERNAME` ayarlayabilirsiniz. Bu ayar hem `opencode serve` hem de `opencode web` için geçerlidir.
+Sunucuyu HTTP temel kimlik doğrulama (basic auth) ile korumak için `OPENCODE_SERVER_PASSWORD` ayarlayın. Kullanıcı adı varsayılan olarak `opencode` değeridir; değiştirmek isterseniz `OPENCODE_SERVER_USERNAME` ayarlayabilirsiniz. Bu ayar hem `opencode-personal serve` hem de `opencode-personal web` için geçerlidir.
 
 ```bash
-OPENCODE_SERVER_PASSWORD=your-password opencode serve
+OPENCODE_SERVER_PASSWORD=your-password opencode-personal serve
 ```
 
 ---
 
 ### Nasıl çalışır
 
-`opencode` çalıştırdığınızda hem TUI hem de sunucu başlar. TUI, sunucuyla konuşan istemci tarafıdır.
-Sunucu bir OpenAPI 3.1 spesifikasyon uç noktası açar. Bu uç nokta [SDK](/docs/sdk) üretiminde de kullanılır.
+`opencode-personal` çalıştırdığınızda hem TUI hem de sunucu başlar. TUI, sunucuyla konuşan istemci tarafıdır.
+Sunucu bir OpenAPI 3.1 spesifikasyon uç noktası açar. Bu uç nokta [SDK](../sdk/) üretiminde de kullanılır.
 
 :::tip
 opencode ile programatik etkileşim için opencode sunucusunu kullanın.
@@ -55,27 +55,27 @@ opencode ile programatik etkileşim için opencode sunucusunu kullanın.
 
 Bu mimari, opencode'un birden fazla istemciyi desteklemesini ve programatik kullanımları mümkün kılmasını sağlar.
 
-`opencode serve` ile bağımsız bir sunucu başlatabilirsiniz. opencode TUI açıksa, `opencode serve` yeni bir sunucu başlatır.
+`opencode-personal serve` ile bağımsız bir sunucu başlatabilirsiniz. opencode TUI açıksa, `opencode-personal serve` yeni bir sunucu başlatır.
 
 ---
 
 #### Mevcut sunucuya bağlanın
 
-TUI başlarken rastgele bir port ve hostname atanır. Bunun yerine `--hostname` ve `--port` [bayraklarını](/docs/cli) verebilirsiniz.
+TUI aynı sunucu dinleyicisini kullanır ve normalde `127.0.0.1` adresine bağlanır; önce `4096` portu denenir, doluysa boş bir port kullanılır. `serve` veya `web` başlatırken `--hostname` ve `--port` [bayraklarını](../cli/) ayarlayabilir, ardından yazdırılan URL ile istemciyi bağlayabilirsiniz.
 
-[`/tui`](#tui) uç noktası sunucu üzerinden TUI'yi sürmek için kullanılabilir. Örneğin bir istemi önceden doldurabilir veya çalıştırabilirsiniz. Bu kurulum opencode [IDE](/docs/ide) eklentileri tarafından kullanılır.
+[`/tui`](#tui) uç noktası sunucu üzerinden TUI'yi sürmek için kullanılabilir. Örneğin bir istemi önceden doldurabilir veya çalıştırabilirsiniz. Bu kurulum opencode [IDE](../ide/) eklentileri tarafından kullanılır.
 
 ---
 
 ## Spesifikasyon
 
-Sunucu, şu adreste görülebilen bir OpenAPI 3.1 spesifikasyonu yayınlar:
+Sunucu, OpenAPI 3.1 belgesini JSON olarak şu adreste yayınlar:
 
 ```
 http://<hostname>:<port>/doc
 ```
 
-Örneğin `http://localhost:4096/doc`. İstemci oluşturmak, istek/yanit tiplerini incelemek veya Swagger gezgininde açmak için bu spec'i kullanın.
+Örneğin `http://localhost:4096/doc`. İstemci oluşturmak veya istek/yanıt tiplerini incelemek için JSON belgesini kullanın. Sunucunun kendisi Swagger gezgini barındırmaz.
 
 ---
 

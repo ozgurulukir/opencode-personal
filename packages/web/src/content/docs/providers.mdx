@@ -4,7 +4,7 @@ description: Using any LLM provider in OpenCode.
 ---
 
 
-OpenCode uses the [AI SDK](https://ai-sdk.dev/) and [Models.dev](https://models.dev) to support **75+ LLM providers** and it supports running local models.
+OpenCode uses the [AI SDK](https://ai-sdk.dev/) and [Models.dev](https://models.dev) to support many LLM providers and it supports running local models.
 
 To add a provider you need to:
 
@@ -105,13 +105,13 @@ To use Amazon Bedrock with OpenCode:
 
    ```bash
    # Option 1: Using AWS access keys
-   AWS_ACCESS_KEY_ID=XXX AWS_SECRET_ACCESS_KEY=YYY opencode
+   AWS_ACCESS_KEY_ID=XXX AWS_SECRET_ACCESS_KEY=YYY opencode-personal
 
    # Option 2: Using named AWS profile
-   AWS_PROFILE=my-profile opencode
+   AWS_PROFILE=my-profile opencode-personal
 
    # Option 3: Using Bedrock bearer token
-   AWS_BEARER_TOKEN_BEDROCK=XXX opencode
+   AWS_BEARER_TOKEN_BEDROCK=XXX opencode-personal
    ```
 
    Or add them to your bash profile:
@@ -336,7 +336,7 @@ If you encounter "I'm sorry, but I cannot assist with that request" errors, try 
 5. Set your resource name as an environment variable:
 
    ```bash
-   AZURE_RESOURCE_NAME=XXX opencode
+   AZURE_RESOURCE_NAME=XXX opencode-personal
    ```
 
    Or add it to your bash profile:
@@ -383,7 +383,7 @@ If you encounter "I'm sorry, but I cannot assist with that request" errors, try 
 5. Set your resource name as an environment variable:
 
    ```bash
-   AZURE_COGNITIVE_SERVICES_RESOURCE_NAME=XXX opencode
+   AZURE_COGNITIVE_SERVICES_RESOURCE_NAME=XXX opencode-personal
    ```
 
    Or add it to your bash profile:
@@ -935,7 +935,7 @@ To use Google Vertex AI with OpenCode:
    Set them while running opencode.
 
    ```bash
-   GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json GOOGLE_CLOUD_PROJECT=your-project-id opencode
+   GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json GOOGLE_CLOUD_PROJECT=your-project-id opencode-personal
    ```
 
    Or add them to your bash profile.
@@ -1064,8 +1064,8 @@ Here's [Helicone's Model Directory](https://helicone.ai/models), you'll need thi
           // Model ID (from Helicone's model directory page)
           "name": "GPT-4o", // Your own custom name for the model
         },
-        "claude-sonnet-4-20250514": {
-          "name": "Claude Sonnet 4",
+        "claude-sonnet-4-5-20250929": {
+          "name": "Claude Sonnet 4.5",
         },
       },
     },
@@ -1639,7 +1639,7 @@ SAP AI Core provides access to 40+ models from OpenAI, Anthropic, Google, Amazon
    Or set the `AICORE_SERVICE_KEY` environment variable:
 
    ```bash
-   AICORE_SERVICE_KEY='{"clientid":"...","clientsecret":"...","url":"...","serviceurls":{"AI_API_URL":"..."}}' opencode
+   AICORE_SERVICE_KEY='{"clientid":"...","clientsecret":"...","url":"...","serviceurls":{"AI_API_URL":"..."}}' opencode-personal
    ```
 
    Or add it to your bash profile:
@@ -1651,7 +1651,7 @@ SAP AI Core provides access to 40+ models from OpenAI, Anthropic, Google, Amazon
 4. Optionally set deployment ID and resource group:
 
    ```bash
-   AICORE_DEPLOYMENT_ID=your-deployment-id AICORE_RESOURCE_GROUP=your-resource-group opencode
+   AICORE_DEPLOYMENT_ID=your-deployment-id AICORE_RESOURCE_GROUP=your-resource-group opencode-personal
    ```
 
    :::note
@@ -2084,7 +2084,7 @@ Here's an example setting the `apiKey`, `headers`, and model `limit` options.
 
 Configuration details:
 
-- **apiKey**: Set using `env` variable syntax, [learn more](/docs/config#env-vars).
+- **apiKey**: Set using `env` variable syntax, [learn more](../config/#env-vars).
 - **headers**: Custom headers sent with each request.
 - **limit.context**: Maximum input tokens the model accepts.
 - **limit.output**: Maximum tokens the model can generate.
@@ -2097,7 +2097,7 @@ The `limit` fields allow OpenCode to understand how much context you have left. 
 
 If you are having trouble with configuring a provider, check the following:
 
-1. **Check the auth setup**: Run `opencode auth list` to see if the credentials
+1. **Check the auth setup**: Run `opencode-personal auth list` to see if the credentials
    for the provider are added to your config.
 
    This doesn't apply to providers like Amazon Bedrock, that rely on environment variables for their auth.

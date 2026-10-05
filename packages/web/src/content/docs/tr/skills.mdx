@@ -14,6 +14,7 @@ Her beceri adi icin bir klasor olusturun ve icine bir `SKILL.md` koyun.
 opencode su konumlari tarar:
 
 - Proje konfigurasyonu: `.opencode/skills/<name>/SKILL.md`
+- Proje konfigurasyonu (tekil bicim): `.opencode/skill/<name>/SKILL.md`
 - Genel konfigurasyon: `~/.config/opencode/skills/<name>/SKILL.md`
 - Proje Claude uyumlu: `.claude/skills/<name>/SKILL.md`
 - Genel Claude uyumlu: `~/.claude/skills/<name>/SKILL.md`
@@ -41,14 +42,17 @@ Sadece su alanlar taninir:
 - `license` (istege bagli)
 - `compatibility` (istege bagli)
 - `metadata` (istege bagli, string-to-string map)
+- `allowed-tools` (isteğe bağlı metin; meta veri olarak saklanır, otomatik izin sağlamaz)
 
 Bilinmeyen frontmatter alanlari yok sayilir.
+
+Bu fork, eksik açıklama veya klasör/ad uyuşmazlığı gibi sorunları `skill.warning` olarak bildirir. Uyarısı olan tanımlar normal beceri listesinden ve otomatik eşleştirmeden çıkarılır. Güvensiz adlar güvenli klasör adına dönüştürülür veya kaydedilmez. Aynı adlı birden fazla tanım bulunduğunda sonraki tanım öncekinin yerini alır; benzersiz adlar kullanın.
 
 ---
 
 ## Adlari dogrulayin
 
-`name` su kurallari saglamalidir:
+Taşınabilir beceriler için şu adlandırma kurallarını kullanın:
 
 - 1-64 karakter olmali
 - Kucuk harf alfanumerik ve tekli tire ayirici kullanmali
@@ -121,6 +125,22 @@ skill({ name: "git-release" })
 
 # load multiple skills in one call (up to 10)
 skill({ names: ["git-release", "changelog"] })
+```
+
+---
+
+## Otomatik eşleştirme
+
+`skills.autoMatch` etkinleştirildiğinde kullanıcı mesajı beceri açıklamalarıyla anlamsal olarak karşılaştırılır. En fazla `autoMatchCount` beceri, `autoMatchThreshold` eşiğini aşarsa sistem istemine eklenir. `skill` aracıyla daha önce yüklenmiş beceriler yeniden eklenmez.
+
+```json
+{
+  "skills": {
+    "autoMatch": true,
+    "autoMatchCount": 3,
+    "autoMatchThreshold": 0.25
+  }
+}
 ```
 
 ---
@@ -223,3 +243,10 @@ Bir beceri listede gorunmuyorsa:
 2. Frontmatter icinde `name` ve `description` oldugunu kontrol edin
 3. Tum konumlarda beceri adlarinin benzersiz oldugundan emin olun
 4. Izinleri kontrol edin - `deny` olan beceriler ajanlardan gizlenir
+
+
+Doğrulama uyarılarını, normal listede gizlenen tanımlar dâhil, incelemek için:
+
+```bash
+opencode-personal debug skill validate
+```

@@ -35,13 +35,13 @@ opencode, **Build** ve **Plan** olmak üzere iki yerleşik birincil agent ile bi
 
 Alt agent'lar, birincil agent'ların belirli görevler için çağırabileceği uzman yardımcılardır. Ayrıca mesajlarınızda **@ bahsederek** bunları manuel olarak da çağırabilirsiniz.
 
-OpenCode, **General**, **Explore** ve **Scout** olmak üzere üç yerleşik alt agent ile birlikte gelir. Buna aşağıda bakacağız.
+OpenCode varsayılan olarak **General** ve **Explore** olmak üzere iki yerleşik alt agent ile birlikte gelir. Deneysel Scout bayrağı etkinleştirildiğinde **Scout** da eklenir.
 
 ---
 
 ## Yerleşik
 
-OpenCode iki yerleşik birincil agent ve üç yerleşik alt agent ile birlikte gelir.
+OpenCode varsayılan olarak iki yerleşik birincil ve iki yerleşik alt agent ile birlikte gelir. Deneysel Scout agent'ı salt okunur üçüncü bir araştırma alt agent'ı ekler.
 
 ---
 
@@ -57,13 +57,7 @@ Build, tüm araçların etkin olduğu **varsayılan** birincil agent'tır. Bu, d
 
 _Mod_: `primary`
 
-Planlama ve analiz için tasarlanmış kısıtlı bir agent. Size daha fazla kontrol sağlamak ve istenmeyen değişiklikleri önlemek için bir izin sistemi kullanıyoruz.
-Varsayılan olarak aşağıdakilerin tümü `ask` olarak ayarlanmıştır:
-
-- `file edits`: Tüm yazmalar, yamalar ve düzenler
-- `bash`: Tüm bash komutları
-
-Bu agent, LLM'in kodu analiz etmesini, değişiklik önermesini veya kod tabanınızda herhangi bir gerçek değişiklik yapmadan plan oluşturmasını istediğinizde kullanışlıdır.
+Planlama ve analiz için tasarlanmış kısıtlı bir agent. Varsayılan olarak düzenleme araçlarını reddeder; proje içindeki `.opencode/plans/` dizinine ve paylaşılan veri dizinindeki plan dosyalarına yazmaya izin verir. Diğer izinler normal varsayılanları izlediği için, agent veya proje izinlerini değiştirmediğiniz sürece komutlar çalıştırılabilir. Kodun analiz edilmesini ve değişiklik önerilmesini, normal dosya düzenlemelerini kapalı tutarak istediğinizde bu agent kullanışlıdır.
 
 ---
 
@@ -87,7 +81,7 @@ Kod tabanlarını keşfetmeye yönelik hızlı, salt okunur bir agent. Dosyalar 
 
 _Mod_: `subagent`
 
-Harici dokümanlar ve bağımlılık API'leri için salt okunur bir araştırma agent'ıdır. Geçerli projeyi değiştirmeden kütüphane belgelerini veya uygulama ayrıntılarını incelemek için kullanın.
+Harici dokümanlar ve bağımlılık API'leri için salt okunur bir araştırma agent'ıdır. Yalnızca `OPENCODE_EXPERIMENTAL_SCOUT=1` (veya `OPENCODE_EXPERIMENTAL=1`) etkinleştirildiğinde kullanılabilir. Geçerli projeyi değiştirmeden kütüphane belgelerini veya uygulama ayrıntılarını incelemek için kullanın; depo klonlama ve genel bakış erişimi agent'ın yönetilen araştırma yollarıyla sınırlıdır.
 
 ---
 
@@ -151,7 +145,7 @@ Agent'ları `opencode.json` yapılandırma dosyanızda yapılandırın:
   "agent": {
     "build": {
       "mode": "primary",
-      "model": "anthropic/claude-sonnet-4-20250514",
+      "model": "anthropic/claude-sonnet-4-5-20250929",
       "prompt": "{file:./prompts/build.txt}",
       "tools": {
         "write": true,
@@ -161,7 +155,7 @@ Agent'ları `opencode.json` yapılandırma dosyanızda yapılandırın:
     },
     "plan": {
       "mode": "primary",
-      "model": "anthropic/claude-haiku-4-20250514",
+      "model": "anthropic/claude-haiku-4-5",
       "tools": {
         "write": false,
         "edit": false,
@@ -171,7 +165,7 @@ Agent'ları `opencode.json` yapılandırma dosyanızda yapılandırın:
     "code-reviewer": {
       "description": "Reviews code for best practices and potential issues",
       "mode": "subagent",
-      "model": "anthropic/claude-sonnet-4-20250514",
+      "model": "anthropic/claude-sonnet-4-5-20250929",
       "prompt": "You are a code reviewer. Focus on security, performance, and maintainability.",
       "tools": {
         "write": false,
@@ -195,7 +189,7 @@ Ayrıca agent'ları Markdown dosyalarını kullanarak da tanımlayabilirsiniz. B
 ---
 description: Reviews code for quality and best practices
 mode: subagent
-model: anthropic/claude-sonnet-4-20250514
+model: anthropic/claude-sonnet-4-5-20250929
 temperature: 0.1
 tools:
   write: false
@@ -353,14 +347,14 @@ Bu yol, yapılandırma dosyasının bulunduğu yere göredir. Yani bu hem global
 Bu agent'ın modelini geçersiz kılmak için `model` ayarını kullanın. Farklı bölümler için optimize edilmiş farklı modelleri kullanmak için kullanışlıdır. Örneğin planlama için daha hızlı bir model, uygulama için daha yetenekli bir model.
 
 :::tip
-Bir model belirtmezseniz, birincil agent'lar [küresel olarak yapılandırılmış modeli](/docs/config#models) kullanırken alt agent'lar, alt agent'ı çağıran birincil agent'ın modelini kullanır.
+Bir model belirtmezseniz, birincil agent'lar [küresel olarak yapılandırılmış modeli](../config/#modeller) kullanırken alt agent'lar, alt agent'ı çağıran birincil agent'ın modelini kullanır.
 :::
 
 ```json title="opencode.json"
 {
   "agent": {
     "plan": {
-      "model": "anthropic/claude-haiku-4-20250514"
+      "model": "anthropic/claude-haiku-4-5"
     }
   }
 }
@@ -412,7 +406,7 @@ Aynı anda birden fazla aracı kontrol etmek için joker karakterleri de kullana
 }
 ```
 
-[Araçlar hakkında daha fazla bilgi](/docs/tools).
+[Araçlar hakkında daha fazla bilgi](../tools/).
 
 ---
 
@@ -524,7 +518,7 @@ Son eşleşen kural öncelikli olduğundan, `*` joker karakterini ilk sıraya ve
 }
 ```
 
-[İzinler hakkında daha fazla bilgi](/docs/permissions).
+[İzinler hakkında daha fazla bilgi](../permissions/).
 
 ---
 
@@ -663,7 +657,7 @@ Agent yapılandırmanızdaki diğer seçenekler, model seçenekleri olarak **do�
 Bu ek seçenekler modele ve sağlayıcıya özeldir. Kullanılabilir parametreler için sağlayıcınızın belgelerine bakın.
 
 :::tip
-Mevcut modellerin listesini görmek için `opencode models` komutunu çalıştırın.
+Mevcut modellerin listesini görmek için `opencode-personal models` komutunu çalıştırın.
 :::
 
 ---
@@ -673,7 +667,7 @@ Mevcut modellerin listesini görmek için `opencode models` komutunu çalıştı
 Aşağıdaki komutu kullanarak yeni agent'lar oluşturabilirsiniz:
 
 ```bash
-opencode agent create
+opencode-personal agent create
 ```
 
 Bu etkileşimli komut şunları sağlayacaktır:

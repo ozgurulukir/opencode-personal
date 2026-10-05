@@ -5,7 +5,7 @@ description: OpenCode'u genişletmek için kendi eklentilerinizi yazın.
 
 Eklentiler, çeşitli olaylara bağlanarak ve davranışı özelleştirerek OpenCode'u genişletmenize olanak tanır. Yeni özellikler eklemek, harici hizmetlerle entegrasyon sağlamak veya OpenCode'un varsayılan davranışını değiştirmek için eklentiler oluşturabilirsiniz.
 
-Örnekler için topluluk tarafından oluşturulan [eklentilere](/docs/ecosystem#plugins) göz atın.
+Örnekler için topluluk tarafından oluşturulan [eklentilere](../ecosystem/#agent-davranışını-genişletin) göz atın.
 
 ---
 
@@ -39,7 +39,7 @@ Yapılandırma dosyanızda npm paketlerini belirtin.
 
 Hem normal hem de kapsamlı npm paketleri desteklenir.
 
-[Ekosistem](/docs/ecosystem#plugins)'deki mevcut eklentilere göz atın.
+[Ekosistem](../ecosystem/#agent-davranışını-genişletin)'deki mevcut eklentilere göz atın.
 
 ---
 
@@ -47,7 +47,7 @@ Hem normal hem de kapsamlı npm paketleri desteklenir.
 
 **npm eklentileri** başlangıçta Bun kullanılarak otomatik olarak yüklenir. Paketler ve bağımlılıkları `~/.cache/opencode/node_modules/`'da önbelleğe alınır.
 
-**Yerel eklentiler** doğrudan eklenti dizininden yüklenir. Harici paketleri kullanmak için, sisteminizin dizininde bir `package.json` oluşturmanız (bkz. [Bağımlılıklar](#dependencies)) veya eklentiyi npm ve [yapılandırmanıza eklemeniz](/docs/config#plugins) gerekir.
+**Yerel eklentiler** doğrudan eklenti dizininden yüklenir. Harici paketleri kullanmak için, sisteminizin dizininde bir `package.json` oluşturmanız (bkz. [Bağımlılıklar](#bağımlılıklar)) veya eklentiyi npm ve [yapılandırmanıza eklemeniz](../config/#eklentiler) gerekir.
 
 ---
 
@@ -230,7 +230,7 @@ export const NotificationPlugin = async ({ project, client, $, directory, worktr
 macOS'ta AppleScript'i çalıştırmak için `osascript` kullanıyoruz. Burada bildirim göndermek için kullanıyoruz.
 
 :::note
-OpenCode masaüstü uygulamasını kullanıyorsanız yanıt hazır olduğunda veya oturum hataları oluştuğunda otomatik olarak sistem bildirimleri gönderebilir.
+Bu fork yukarı akıştaki masaüstü uygulamasını içermez. Terminal ve web iş akışlarında bildirimler için yukarıdaki eklenti kancasını kullanın.
 :::
 
 ---
@@ -326,7 +326,7 @@ export const MyPlugin = async ({ client }) => {
 }
 ```
 
-Seviyeler: `debug`, `info`, `warn`, `error`. Ayrıntılar için [SDK belgelerine](https://opencode.ai/docs/sdk) bakın.
+Seviyeler: `debug`, `info`, `warn`, `error`. Ayrıntılar için [SDK belgelerine](../sdk/) bakın.
 
 ---
 

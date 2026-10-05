@@ -59,6 +59,8 @@ _plan/
 _proposal/
 _review/
 specs/
+/docs/plans/
+/.nova/todos.txt
 
 # Local tooling state (code-tandem review tool, commandcode settings)
 .code-tandem/

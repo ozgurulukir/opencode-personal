@@ -12,31 +12,31 @@ OpenCode can run as a web application in your browser, providing the same powerf
 Start the web interface by running:
 
 ```bash
-opencode web
+opencode-personal web
 ```
 
-This starts a local server on `127.0.0.1` with a random available port and automatically opens OpenCode in your default browser.
+This starts a local server on `127.0.0.1`, tries port `4096` first, then falls back to an available port, and automatically opens OpenCode in your default browser.
 
 :::caution
 If `OPENCODE_SERVER_PASSWORD` is not set, the server will be unsecured. This is fine for local use but should be set for network access.
 :::
 
 :::tip[Windows Users]
-For the best experience, run `opencode web` from [WSL](/docs/windows-wsl) rather than PowerShell. This ensures proper file system access and terminal integration.
+OpenCode supports native Windows and WSL. Use [WSL](../windows-wsl/) when you want a Linux toolchain; native PowerShell works for the fork's CLI as well.
 :::
 
 ---
 
 ## Configuration
 
-You can configure the web server using command line flags or in your [config file](/docs/config).
+You can configure the web server using command line flags or in your [config file](../config/).
 
 ### Port
 
-By default, OpenCode picks an available port. You can specify a port:
+By default, OpenCode tries port `4096` and falls back to an available port. You can specify a port:
 
 ```bash
-opencode web --port 4096
+opencode-personal web --port 4096
 ```
 
 ### Hostname
@@ -44,7 +44,7 @@ opencode web --port 4096
 By default, the server binds to `127.0.0.1` (localhost only). To make OpenCode accessible on your network:
 
 ```bash
-opencode web --hostname 0.0.0.0
+opencode-personal web --hostname 0.0.0.0
 ```
 
 When using `0.0.0.0`, OpenCode will display both local and network addresses:
@@ -59,7 +59,7 @@ When using `0.0.0.0`, OpenCode will display both local and network addresses:
 Enable mDNS to make your server discoverable on the local network:
 
 ```bash
-opencode web --mdns
+opencode-personal web --mdns
 ```
 
 This automatically sets the hostname to `0.0.0.0` and advertises the server as `opencode.local`.
@@ -67,7 +67,7 @@ This automatically sets the hostname to `0.0.0.0` and advertises the server as `
 You can customize the mDNS domain name to run multiple instances on the same network:
 
 ```bash
-opencode web --mdns --mdns-domain myproject.local
+opencode-personal web --mdns --mdns-domain myproject.local
 ```
 
 ### CORS
@@ -75,7 +75,7 @@ opencode web --mdns --mdns-domain myproject.local
 To allow additional domains for CORS (useful for custom frontends):
 
 ```bash
-opencode web --cors https://example.com
+opencode-personal web --cors https://example.com
 ```
 
 ### Authentication
@@ -83,7 +83,7 @@ opencode web --cors https://example.com
 To protect access, set a password using the `OPENCODE_SERVER_PASSWORD` environment variable:
 
 ```bash
-OPENCODE_SERVER_PASSWORD=secret opencode web
+OPENCODE_SERVER_PASSWORD=secret opencode-personal web
 ```
 
 The username defaults to `opencode` but can be changed with `OPENCODE_SERVER_USERNAME`.
@@ -118,10 +118,10 @@ You can attach a terminal TUI to a running web server:
 
 ```bash
 # Start the web server
-opencode web --port 4096
+opencode-personal web --port 4096
 
 # In another terminal, attach the TUI
-opencode attach http://localhost:4096
+opencode-personal attach http://localhost:4096
 ```
 
 This allows you to use both the web interface and terminal simultaneously, sharing the same sessions and state.

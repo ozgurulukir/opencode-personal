@@ -12,31 +12,31 @@ opencode, tarayıcınızda bir web uygulaması olarak çalışabilir ve bir term
 Aşağıdakileri çalıştırarak web arayüzünü başlatın:
 
 ```bash
-opencode web
+opencode-personal web
 ```
 
-Bu, `127.0.0.1` üzerinde rastgele kullanılabilir bir bağlantı noktasına sahip yerel bir sunucuyu başlatır ve opencode'u varsayılan tarayıcınızda otomatik olarak açar.
+Bu, `127.0.0.1` üzerinde önce `4096` portunu deneyen, doluysa boş bir port kullanan yerel bir sunucu başlatır ve opencode'u varsayılan tarayıcınızda otomatik olarak açar.
 
 :::caution
 `OPENCODE_SERVER_PASSWORD` ayarlanmadıysa sunucunun güvenliği kaldırılacaktır. Bu, yerel kullanım için iyidir ancak ağ erişimi için ayarlanmalıdır.
 :::
 
 :::tip[Windows Kullanıcıları]
-En iyi deneyim için PowerShell yerine `opencode web`'yi [WSL](/docs/windows-wsl)'den çalıştırın. Bu, uygun dosya sistemi erişimini ve terminal entegrasyonunu sağlar.
+OpenCode yerel Windows ve WSL'yi destekler. Linux araç zincirine ihtiyacınız olduğunda [WSL](../windows-wsl/)'yi, fork'un CLI'si için PowerShell'i kullanabilirsiniz.
 :::
 
 ---
 
 ## Yapılandırma
 
-Web sunucusunu komut satırı bayraklarıyla veya [config dosyanızda](/docs/config) yapılandırabilirsiniz.
+Web sunucusunu komut satırı bayraklarıyla veya [config dosyanızda](../config/) yapılandırabilirsiniz.
 
 ### Port
 
-opencode varsayılan olarak kullanılabilir bir bağlantı noktasını seçer. Bir bağlantı noktası belirtebilirsiniz:
+opencode varsayılan olarak önce `4096` portunu dener, doluysa boş bir port seçer. Bir bağlantı noktası belirtebilirsiniz:
 
 ```bash
-opencode web --port 4096
+opencode-personal web --port 4096
 ```
 
 ### Ana makine adı
@@ -44,7 +44,7 @@ opencode web --port 4096
 Varsayılan olarak sunucu `127.0.0.1` (yalnızca localhost) öğesine bağlanır. opencode'u ağınızda erişilebilir kılmak için:
 
 ```bash
-opencode web --hostname 0.0.0.0
+opencode-personal web --hostname 0.0.0.0
 ```
 
 `0.0.0.0` kullanıldığında, opencode hem yerel hem de ağ adreslerini gösterecektir:
@@ -59,7 +59,7 @@ opencode web --hostname 0.0.0.0
 Sunucunuzun yerel ağda bulunabilir olmasını sağlamak için mDNS'yi etkinleştirin:
 
 ```bash
-opencode web --mdns
+opencode-personal web --mdns
 ```
 
 Bu, ana bilgisayar adını otomatik olarak `0.0.0.0` olarak ayarlar ve sunucuyu `opencode.local` olarak tanıtır.
@@ -67,7 +67,7 @@ Bu, ana bilgisayar adını otomatik olarak `0.0.0.0` olarak ayarlar ve sunucuyu 
 Aynı ağ üzerinde birden fazla örneği çalıştıracak şekilde mDNS alan adını özelleştirebilirsiniz:
 
 ```bash
-opencode web --mdns --mdns-domain myproject.local
+opencode-personal web --mdns --mdns-domain myproject.local
 ```
 
 ### CORS
@@ -75,7 +75,7 @@ opencode web --mdns --mdns-domain myproject.local
 CORS'a yönelik ek alan adlarına izin vermek için (özel ön uçlar için kullanışlıdır):
 
 ```bash
-opencode web --cors https://example.com
+opencode-personal web --cors https://example.com
 ```
 
 ### Kimlik Doğrulaması
@@ -83,7 +83,7 @@ opencode web --cors https://example.com
 Erişimi korumak için `OPENCODE_SERVER_PASSWORD` ortam değişkenini kullanarak bir parola ayarlayın:
 
 ```bash
-OPENCODE_SERVER_PASSWORD=secret opencode web
+OPENCODE_SERVER_PASSWORD=secret opencode-personal web
 ```
 
 Kullanıcı adı varsayılan olarak `opencode` şeklindedir ancak `OPENCODE_SERVER_USERNAME` ile değiştirilebilir.
@@ -117,10 +117,10 @@ Proje kenar çubuğu oturumları çalışma alanlarına göre gruplandırır. Su
 
 ```bash
 # Start the web server
-opencode web --port 4096
+opencode-personal web --port 4096
 
 # In another terminal, attach the TUI
-opencode attach http://localhost:4096
+opencode-personal attach http://localhost:4096
 ```
 
 Bu, aynı oturumları ve durumu paylaşarak hem web arayüzünü hem de terminali aynı anda kullanmanıza olanak tanır.

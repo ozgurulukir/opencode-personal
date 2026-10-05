@@ -3,7 +3,7 @@ title: GitHub
 description: GitHub sorunlarında ve çekme isteklerinde opencode'u kullanın.
 ---
 
-opencode, GitHub iş akışınızla bütünleşir. Yorumunuzda `/opencode` veya `/oc`'den bahsedin; opencode, GitHub Actions çalıştırıcınızdaki görevleri yürütecektir.
+opencode, GitHub iş akışınızla bütünleşir. Yorumunuzda `/opencode` veya `/oc`'den bahsedin; OpenCode, GitHub Actions çalıştırıcınızdaki görevleri yürütecektir. Fork'un GitHub entegrasyonu, yukarı akıştaki OpenCode GitHub App'i ve action'ı ile uyumluluğunu korur.
 
 ---
 
@@ -20,10 +20,10 @@ opencode, GitHub iş akışınızla bütünleşir. Yorumunuzda `/opencode` veya 
 GitHub deposundaki bir projede aşağıdaki komutu çalıştırın:
 
 ```bash
-opencode github install
+opencode-personal github install
 ```
 
-Bu size GitHub uygulamasını yükleme, iş akışını oluşturma ve gizli dizileri ayarlama adımlarında yol gösterecektir.
+Bu işlem yukarı akıştaki GitHub App'ini kurma, iş akışını oluşturma ve gizli anahtarları ayarlama konusunda yol gösterir. Oluşturulan iş akışı şu anda `anomalyco/opencode/github@latest` ve yukarı akış kurucusunu kullanır; `opencode-personal` ikilisini kurmaz.
 
 ---
 
@@ -57,20 +57,20 @@ Veya manuel olarak ayarlayabilirsiniz.
        permissions:
          id-token: write
        steps:
-          - name: Checkout repository
-            uses: actions/checkout@v6
-            with:
-              fetch-depth: 1
-              persist-credentials: false
+       - name: Checkout repository
+         uses: actions/checkout@v6
+         with:
+           fetch-depth: 1
+           persist-credentials: false
 
-          - name: Run OpenCode
-           uses: ozgurulukir/opencode-personal/github@main
-           env:
-             ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-           with:
-             model: anthropic/claude-sonnet-4-20250514
-             # share: true
-             # github_token: xxxx
+       - name: Run OpenCode
+         uses: anomalyco/opencode/github@latest
+         env:
+           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+         with:
+           model: anthropic/claude-sonnet-4-5-20250929
+           # share: true
+           # use_github_token: true
    ```
 
 3. **API anahtarlarını gizli olarak saklayın**
@@ -84,8 +84,13 @@ Veya manuel olarak ayarlayabilirsiniz.
 - `model`: opencode ile kullanılacak model. `provider/model` biçimini alır. Bu **gerekli**.
 - `agent`: Kullanılacak aracı. Birincil ajan olmalı. Yapılandırmadan `default_agent`'ye veya bulunamazsa `"build"`'ye geri döner.
 - `share`: opencode hesabının paylaşılıp paylaşılmayacağı. Genel depolar için varsayılan olarak **true** olur.
-- `prompt`: Varsayılan çalışma geçersiz olduğundan dolayı özel istem. opencode'un işleme biçimini kişiselleştirmek için bunu kullanın.
-- `token`: Yorum oluşturma, değişiklik yapma ve çekme isteklerini açma gibi işlemleri gerçekleştirmek için isteğe bağlı GitHub erişim belirteci. Varsayılan olarak opencode, opencode GitHub Uygulamasındaki kurulum erişim belirtecini kullanır, bu nedenle taahhütler, yorumlar ve çekme istekleri uygulamadan geliyormuş gibi görünür.
+ - `prompt`: Varsayılan çalışma geçersiz olduğundan dolayı özel istem. opencode'un işleme biçimini kişiselleştirmek için bunu kullanın.
+ - `use_github_token`: OpenCode App belirteci yerine iş akışının `GITHUB_TOKEN` değerini kullanmak için `true` olarak ayarlayın. İş akışınıza gereken izinleri verin.
+ - `mentions`: Virgülle ayrılmış tetikleyici ifadeler. Varsayılanı `/opencode,/oc` değeridir.
+ - `variant`: `high`, `max` veya `minimal` gibi sağlayıcıya özel model varyantı.
+ - `oidc_base_url`: Özel bir GitHub App kurulumu kullanırken OIDC token değişim uç noktasını geçersiz kılın.
+
+  Varsayılan olarak opencode, opencode GitHub App'indeki kurulum erişim belirtecini kullanır; bu nedenle taahhütler, yorumlar ve çekme istekleri uygulamadan geliyormuş gibi görünür.
 
   Alternatif olarak, opencode GitHub'u yüklemeden GitHub Eylem çalıştırıcısının [built-in `GITHUB_TOKEN`](https://docs.github.com/en/actions/tutorials/authenticate-with-github_token) akışını kullanabilirsiniz. İşinizde gerekli izinlere sahip olduğunuzdan emin olun:
 
@@ -140,11 +145,11 @@ jobs:
           persist-credentials: false
 
       - name: Run OpenCode
-        uses: ozgurulukir/opencode-personal/github@main
+        uses: anomalyco/opencode/github@latest
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         with:
-          model: anthropic/claude-sonnet-4-20250514
+          model: anthropic/claude-sonnet-4-5-20250929
           prompt: |
             Review the codebase for any TODO comments and create a summary.
             If you find issues worth addressing, open an issue to track them.
@@ -177,12 +182,12 @@ jobs:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
-      - uses: ozgurulukir/opencode-personal/github@main
+      - uses: anomalyco/opencode/github@latest
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          model: anthropic/claude-sonnet-4-20250514
+          model: anthropic/claude-sonnet-4-5-20250929
           use_github_token: true
           prompt: |
             Review this pull request:
@@ -233,12 +238,12 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: ozgurulukir/opencode-personal/github@main
+      - uses: anomalyco/opencode/github@latest
         if: steps.check.outputs.result == 'true'
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         with:
-          model: anthropic/claude-sonnet-4-20250514
+          model: anthropic/claude-sonnet-4-5-20250929
           prompt: |
             Review this issue. If there's a clear fix or relevant docs:
             - Provide documentation links
@@ -255,7 +260,7 @@ jobs:
 opencode'un davranışını iş akışınız için özelleştirmek için varsayılan istemi geçersiz kılın.
 
 ```yaml title=".github/workflows/opencode.yml"
-- uses: ozgurulukir/opencode-personal/github@main
+- uses: anomalyco/opencode/github@latest
   with:
     model: anthropic/claude-sonnet-4-5
     prompt: |
