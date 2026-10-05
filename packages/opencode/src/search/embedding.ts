@@ -156,7 +156,7 @@ function createLocalProvider(_modelId: string, dimension: number): EmbeddingProv
       const vocabPath = path.join(dir, "vocab.txt")
       await ensureDownloaded("onnx/model_quantized.onnx", modelPath)
       await ensureDownloaded("vocab.txt", vocabPath)
-      tokenizer = new WordPieceTokenizer(fs.readFileSync(vocabPath, "utf8").split("\n"))
+      tokenizer = new WordPieceTokenizer((await fs.promises.readFile(vocabPath, "utf8")).split("\n"))
       const env = ortModule.env as unknown as { wasm: Record<string, unknown> }
       env.wasm = env.wasm ?? {}
       env.wasm.numThreads = 1
