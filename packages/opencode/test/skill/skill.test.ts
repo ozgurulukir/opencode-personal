@@ -882,7 +882,7 @@ describe("skill.fmt", () => {
     expect(resultVerbose.indexOf("zebra")).toBeLessThan(resultVerbose.indexOf("alpha"))
   })
 
-  test("handles skills with empty descriptions and special characters", () => {
+  test("preserves special characters in skill descriptions", () => {
     const skill = mkSkill("custom-tool", "Tool with <special> & markdown *chars*", "/path/SKILL.md")
     const nonVerbose = Skill.fmt([skill], { verbose: false })
     expect(nonVerbose).toBe("## Available Skills\n- **custom-tool**: Tool with <special> & markdown *chars*")

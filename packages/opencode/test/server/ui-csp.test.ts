@@ -69,7 +69,7 @@ describe("UI CSP utilities", () => {
       expect(result).toContain(`'sha256-${expectedHash}'`)
     })
 
-    test("uses cached CSP for identical HTML bodies", () => {
+    test("returns consistent CSP for identical HTML bodies", () => {
       const html = `<html><body data-cache-test="1">test</body></html>`
       const result1 = cspForHtml(html)
       const result2 = cspForHtml(html)
@@ -77,13 +77,13 @@ describe("UI CSP utilities", () => {
       expect(result1).toBe(result2)
     })
 
-    test("evicts oldest cache entries when exceeding cache capacity (256 items)", () => {
-      // Fill cache beyond limit
+    test("keeps script hashes correct after processing more than the cache capacity", () => {
       for (let i = 0; i < 260; i++) {
-        cspForHtml(`<html><body>cache-test-${i}</body></html>`)
+        const script = `window.theme = ${i}`
+        const html = `<script id="oc-theme-preload-script">${script}</script>`
+        expect(cspForHtml(html)).toBe(csp(createHash("sha256").update(script).digest("base64")))
       }
 
-      // The early items should have been evicted without error
       const htmlNew = "<html><body>cache-test-new</body></html>"
       expect(cspForHtml(htmlNew)).toBe(DEFAULT_CSP)
     })

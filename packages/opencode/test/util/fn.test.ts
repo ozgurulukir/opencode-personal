@@ -53,12 +53,9 @@ describe("util.fn", () => {
     const errorSpy = spyOn(console, "error").mockImplementation(() => {})
 
     const customError = new Error("Custom parsing failure")
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion
-    const schema = {
-      parse: () => {
-        throw customError
-      },
-    } as unknown as z.ZodType
+    const schema = z.string().transform<string>(() => {
+      throw customError
+    })
     const wrapper = fn(schema, (input) => input)
 
     expect(() => wrapper("test")).toThrow("Custom parsing failure")
