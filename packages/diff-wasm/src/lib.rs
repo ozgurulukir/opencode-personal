@@ -150,10 +150,12 @@ pub fn structured_patch_rs(
         let ops = hunk.ops();
         let first = ops.first();
         let last = ops.last();
-        let old_start = first.map(|op| op.old_range().start).unwrap_or(0);
-        let old_lines = last.map(|op| op.old_range().end).unwrap_or(0) - old_start;
-        let new_start = first.map(|op| op.new_range().start).unwrap_or(0);
-        let new_lines = last.map(|op| op.new_range().end).unwrap_or(0) - new_start;
+        let old_start_index = first.map(|op| op.old_range().start).unwrap_or(0);
+        let new_start_index = first.map(|op| op.new_range().start).unwrap_or(0);
+        let old_start = old_start_index + 1;
+        let old_lines = last.map(|op| op.old_range().end).unwrap_or(0) - old_start_index;
+        let new_start = new_start_index + 1;
+        let new_lines = last.map(|op| op.new_range().end).unwrap_or(0) - new_start_index;
 
         let mut lines_vec = Vec::new();
         for change in hunk.iter_changes() {

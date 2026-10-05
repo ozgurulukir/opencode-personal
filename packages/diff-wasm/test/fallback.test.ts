@@ -52,4 +52,16 @@ describe("WASM failure and JS fallback behavior", () => {
     expect(patchObj.hunks[0]).toHaveProperty("oldStart")
     expect(patchObj.hunks[0]).toHaveProperty("newStart")
   })
+
+  test("uses the WASM initializer and exports when the module loads", async () => {
+    const wasmGlobal = globalThis as { OPENCODE_DIFF_WASM_JS_PATH?: string }
+    wasmGlobal.OPENCODE_DIFF_WASM_JS_PATH = "../test/wasm-fixture.ts"
+
+    await expect(diffLines("old", "new")).resolves.toEqual([{ value: "fixture\n", count: 1 }])
+    await expect(createTwoFilesPatch("old.txt", "new.txt", "old", "new")).resolves.toBe("fixture patch")
+    await expect(structuredPatch("old.txt", "new.txt", "old", "new")).resolves.toMatchObject({
+      oldFileName: "fixture-old.txt",
+      newFileName: "fixture-new.txt",
+    })
+  })
 })

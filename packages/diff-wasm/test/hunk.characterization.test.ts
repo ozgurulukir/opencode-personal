@@ -16,6 +16,16 @@ test("structuredPatch preserves hunks and lines structure", async () => {
   expect(Array.isArray(result.hunks[0].lines)).toBe(true)
 })
 
+test("structuredPatch uses one-based ranges accepted by formatPatch and applyPatch", async () => {
+  const original = "a\nb\n"
+  const modified = "a\nc\n"
+  const result = await structuredPatch("a.txt", "b.txt", original, modified)
+
+  expect(result.hunks[0].oldStart).toBe(1)
+  expect(result.hunks[0].newStart).toBe(1)
+  expect(applyPatch(original, formatPatch(result))).toBe(modified)
+})
+
 test("createTwoFilesPatch and parsePatch are bidirectional", async () => {
   const oldText = "function foo() {\n  return 1\n}\n"
   const newText = "function foo() {\n  return 2\n}\n"
