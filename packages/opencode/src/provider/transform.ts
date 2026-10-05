@@ -38,11 +38,6 @@ export function systemPromptDelivery(providerID: string, authInfo: Auth.Info | u
   return { type: "messages" }
 }
 
-/** @deprecated Use {@link systemPromptDelivery} instead. */
-export function shouldUseInstructions(providerID: string, authInfo: Auth.Info | undefined): boolean {
-  return systemPromptDelivery(providerID, authInfo).type === "instructions"
-}
-
 export type SystemMessageMode = "single" | "multiple"
 
 // Providers whose transports tolerate (or benefit from) multiple leading

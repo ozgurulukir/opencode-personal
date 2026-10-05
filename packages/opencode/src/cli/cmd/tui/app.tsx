@@ -103,7 +103,7 @@ const appBindingCommands = [
   "app.toggle.session_directory_filter",
 ] as const
 
-function rendererConfig(_config: TuiConfig.Resolved): CliRendererConfig {
+export function rendererConfig(_config: TuiConfig.Resolved): CliRendererConfig {
   const mouseEnabled = !Flag.OPENCODE_DISABLE_MOUSE && (_config.mouse ?? true)
 
   return {
@@ -126,7 +126,7 @@ function rendererConfig(_config: TuiConfig.Resolved): CliRendererConfig {
   }
 }
 
-function errorMessage(error: unknown) {
+export function errorMessage(error: unknown) {
   const formatted = FormatError(error)
   if (formatted !== undefined) return formatted
   if (

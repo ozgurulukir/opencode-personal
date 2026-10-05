@@ -50,19 +50,34 @@ for (const genDir of ["src/v2/gen"] as const) {
   const typesFile = path.join(dir, genDir, "client", "types.gen.ts")
 
   const clientText = await Bun.file(clientFile).text()
-  const patchedClient = clientText.replace(
-    `    // TODO: we probably want to return error and improve types\n    return opts.responseStyle === "data"\n      ? undefined\n      : {\n          error: finalError,\n          ...result,\n        }`,
-    `    return opts.responseStyle === "data"\n      ? finalError\n      : {\n          error: finalError,\n          ...result,\n        }`,
-  )
+  const patchedClient = clientText
+    .replace(
+      `      // TODO: we probably want to return error and improve types\n      return responseStyle === "data"\n        ? undefined\n        : {\n            error: finalError,\n            request,\n            response,\n          }`,
+      `      return responseStyle === "data"\n        ? finalError\n        : {\n            error: finalError,\n            request,\n            response,\n          }`,
+    )
+    .replace(
+      `    // TODO: we probably want to return error and improve types\n    return opts.responseStyle === "data"\n      ? undefined\n      : {\n          error: finalError,\n          ...result,\n        }`,
+      `    return opts.responseStyle === "data"\n      ? finalError\n      : {\n          error: finalError,\n          ...result,\n        }`,
+    )
+  if (!/return (?:opts\.)?responseStyle === "data"\s*\? finalError/.test(patchedClient)) {
+    throw new Error("Generated SDK error return changed; update the data-style error patch")
+  }
   if (patchedClient !== clientText) await Bun.write(clientFile, patchedClient)
 
   const typesText = await Bun.file(typesFile).text()
-  const patchedTypes = typesText.replace(
-    `        ? (TData extends Record<string, unknown> ? TData[keyof TData] : TData) | undefined`,
-    `        ? (TData extends Record<string, unknown> ? TData[keyof TData] : TData) | TError`,
-  )
+  const patchedTypes = typesText
+    .replace(
+      `        ? (TData extends Record<string, unknown> ? TData[keyof TData] : TData) | undefined`,
+      `        ? (TData extends Record<string, unknown> ? TData[keyof TData] : TData) | (TError extends Record<string, unknown> ? TError[keyof TError] : TError)`,
+    )
+    .replace(
+      `        ? (TData extends Record<string, unknown> ? TData[keyof TData] : TData) | TError`,
+      `        ? (TData extends Record<string, unknown> ? TData[keyof TData] : TData) | (TError extends Record<string, unknown> ? TError[keyof TError] : TError)`,
+    )
   if (patchedTypes !== typesText) await Bun.write(typesFile, patchedTypes)
 }
+
+await $`bun prettier --write src/v2/gen/client/types.gen.ts`
 
 await $`rm -rf dist`
 await $`bun tsc`

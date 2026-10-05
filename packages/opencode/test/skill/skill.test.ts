@@ -38,6 +38,7 @@ import { CrossSpawnSpawner } from "@opencode-ai/core/cross-spawn-spawner"
 import { provideInstance, provideTmpdirInstance, tmpdir } from "../fixture/fixture"
 import { testEffect } from "../lib/effect"
 import path from "path"
+import { pathToFileURL } from "node:url"
 import fs from "fs/promises"
 
 const node = CrossSpawnSpawner.defaultLayer
@@ -810,10 +811,10 @@ description: Name mismatch with folder.
 })
 
 describe("skill.fmt", () => {
-  const mkSkill = (name: string, description: string): Skill.Info => ({
+  const mkSkill = (name: string, description: string, location?: string): Skill.Info => ({
     name,
     description,
-    location: `/skills/${name}/SKILL.md`,
+    location: location ?? `/skills/${name}/SKILL.md`,
     content: "body",
   })
 
@@ -824,22 +825,70 @@ describe("skill.fmt", () => {
 
   test("lists described skills in non-verbose mode", () => {
     const result = Skill.fmt([mkSkill("alpha", "Alpha skill")], { verbose: false })
-    expect(result).toContain("## Available Skills")
-    expect(result).toContain("**alpha**")
-    expect(result).toContain("Alpha skill")
+    expect(result).toBe("## Available Skills\n- **alpha**: Alpha skill")
   })
 
   test("lists described skills in verbose mode", () => {
-    const result = Skill.fmt([mkSkill("alpha", "Alpha skill")], { verbose: true })
-    expect(result).toContain("<available_skills>")
-    expect(result).toContain("<name>alpha</name>")
-    expect(result).toContain("<description>Alpha skill</description>")
+    const skill = mkSkill("alpha", "Alpha skill", "/skills/alpha/SKILL.md")
+    const expectedUrl = pathToFileURL(skill.location).href
+    const result = Skill.fmt([skill], { verbose: true })
+    expect(result).toBe(
+      [
+        "<available_skills>",
+        "  <skill>",
+        "    <name>alpha</name>",
+        "    <description>Alpha skill</description>",
+        `    <location>${expectedUrl}</location>`,
+        "  </skill>",
+        "</available_skills>",
+      ].join("\n"),
+    )
   })
 
-  test("preserves input order without re-sorting", () => {
+  test("formats multiple skills in non-verbose mode", () => {
+    const skills = [mkSkill("alpha", "Alpha skill"), mkSkill("beta", "Beta skill")]
+    const result = Skill.fmt(skills, { verbose: false })
+    expect(result).toBe("## Available Skills\n- **alpha**: Alpha skill\n- **beta**: Beta skill")
+  })
+
+  test("formats multiple skills in verbose mode", () => {
+    const s1 = mkSkill("alpha", "Alpha skill", "/skills/alpha/SKILL.md")
+    const s2 = mkSkill("beta", "Beta skill", "/skills/beta/SKILL.md")
+    const result = Skill.fmt([s1, s2], { verbose: true })
+    expect(result).toBe(
+      [
+        "<available_skills>",
+        "  <skill>",
+        "    <name>alpha</name>",
+        "    <description>Alpha skill</description>",
+        `    <location>${pathToFileURL(s1.location).href}</location>`,
+        "  </skill>",
+        "  <skill>",
+        "    <name>beta</name>",
+        "    <description>Beta skill</description>",
+        `    <location>${pathToFileURL(s2.location).href}</location>`,
+        "  </skill>",
+        "</available_skills>",
+      ].join("\n"),
+    )
+  })
+
+  test("preserves input order without re-sorting in non-verbose and verbose modes", () => {
     const input = [mkSkill("zebra", "z"), mkSkill("alpha", "a")]
-    const result = Skill.fmt(input, { verbose: false })
-    expect(result.indexOf("zebra")).toBeLessThan(result.indexOf("alpha"))
+    const resultNonVerbose = Skill.fmt(input, { verbose: false })
+    expect(resultNonVerbose.indexOf("zebra")).toBeLessThan(resultNonVerbose.indexOf("alpha"))
+
+    const resultVerbose = Skill.fmt(input, { verbose: true })
+    expect(resultVerbose.indexOf("zebra")).toBeLessThan(resultVerbose.indexOf("alpha"))
+  })
+
+  test("handles skills with empty descriptions and special characters", () => {
+    const skill = mkSkill("custom-tool", "Tool with <special> & markdown *chars*", "/path/SKILL.md")
+    const nonVerbose = Skill.fmt([skill], { verbose: false })
+    expect(nonVerbose).toBe("## Available Skills\n- **custom-tool**: Tool with <special> & markdown *chars*")
+
+    const verbose = Skill.fmt([skill], { verbose: true })
+    expect(verbose).toContain("<description>Tool with <special> & markdown *chars*</description>")
   })
 })
 
