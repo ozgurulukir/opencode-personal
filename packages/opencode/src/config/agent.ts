@@ -82,14 +82,15 @@ const KNOWN_KEYS = new Set([
 //    `permission` shape (write-adjacent tools collapse into `permission.edit`).
 //  - Coalesce `steps ?? maxSteps` so downstream can ignore the deprecated alias.
 const normalize = (agent: Schema.Schema.Type<typeof AgentSchema>): Schema.Schema.Type<typeof AgentSchema> => {
+  const { tools: rawTools, maxSteps, ...rest } = agent
   const options: Record<string, unknown> = { ...agent.options }
   for (const [key, value] of Object.entries(agent)) {
     if (!KNOWN_KEYS.has(key)) options[key] = value
   }
 
-  const tools = Array.isArray(agent.tools)
-    ? Object.fromEntries(agent.tools.map((tool) => [tool.toLowerCase(), true]))
-    : (agent.tools ?? {})
+  const tools = Array.isArray(rawTools)
+    ? Object.fromEntries(rawTools.map((tool) => [tool.toLowerCase(), true]))
+    : (rawTools ?? {})
   const permission: ConfigPermission.Info = {}
   for (const [tool, enabled] of Object.entries(tools)) {
     const action = enabled ? "allow" : "deny"
@@ -101,8 +102,14 @@ const normalize = (agent: Schema.Schema.Type<typeof AgentSchema>): Schema.Schema
   }
   globalThis.Object.assign(permission, agent.permission)
 
-  const steps = agent.steps ?? agent.maxSteps
-  return { ...agent, tools, options, permission, ...(steps !== undefined ? { steps } : {}) }
+  const steps = agent.steps ?? maxSteps
+  return {
+    ...rest,
+    ...(rawTools !== undefined ? { tools } : {}),
+    options,
+    permission,
+    ...(steps !== undefined ? { steps } : {}),
+  }
 }
 
 export const Info = AgentSchema.pipe(
