@@ -26,6 +26,16 @@ describe("ConfigAgent Schema Normalization", () => {
     expect(decoded.permission?.custom).toBe("allow")
   })
 
+  test("normalizes list-form tools from compatible agent frontmatter", () => {
+    const decoded = Schema.decodeSync(Info)({
+      tools: ["Read", "Write", "Bash"],
+    })
+    expect(decoded.tools).toEqual({ read: true, write: true, bash: true })
+    expect(decoded.permission?.read).toBe("allow")
+    expect(decoded.permission?.edit).toBe("allow")
+    expect(decoded.permission?.bash).toBe("allow")
+  })
+
   test("promotes unknown keys to options", () => {
     const raw = {
       unknownKey: "some-value",
