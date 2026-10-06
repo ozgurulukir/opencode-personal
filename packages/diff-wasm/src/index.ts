@@ -12,6 +12,14 @@ declare const OPENCODE_DIFF_WASM_JS_PATH: string | undefined
 const DEFAULT_WASM_JS_PATH =
   typeof OPENCODE_DIFF_WASM_JS_PATH === "string" ? OPENCODE_DIFF_WASM_JS_PATH : "../pkg/opencode_diff_rs.js"
 
+function hasStandaloneCarriageReturn(value: string) {
+  return /\r(?!\n)/.test(value)
+}
+
+function supportsWasmContext(context: number | undefined) {
+  return context === undefined || (Number.isInteger(context) && context >= 0 && context <= 0xffffffff)
+}
+
 let wasmReady: Promise<void> | null = null
 let wasmFailed = false
 let wasmPath: string | undefined
@@ -82,7 +90,9 @@ export async function diffLines(
   newStr: string,
   options?: { ignoreWhitespace?: boolean },
 ): Promise<Change[]> {
-  if (options?.ignoreWhitespace) return jsDiffLines(oldStr, newStr, options) as unknown as Change[]
+  if (options?.ignoreWhitespace || hasStandaloneCarriageReturn(oldStr) || hasStandaloneCarriageReturn(newStr)) {
+    return jsDiffLines(oldStr, newStr, options) as unknown as Change[]
+  }
   try {
     await ensureWasm()
     const result = diff_lines_rs(oldStr, newStr)
@@ -101,6 +111,13 @@ export async function createTwoFilesPatch(
   newHeader?: string,
   options?: { context?: number },
 ): Promise<string> {
+  if (
+    !supportsWasmContext(options?.context) ||
+    hasStandaloneCarriageReturn(oldStr) ||
+    hasStandaloneCarriageReturn(newStr)
+  ) {
+    return jsCreateTwoFilesPatch(oldFileName, newFileName, oldStr, newStr, oldHeader, newHeader, options)
+  }
   try {
     await ensureWasm()
     const context = options?.context
@@ -127,8 +144,21 @@ export async function structuredPatch(
   newHeader?: string,
   options?: { context?: number; ignoreWhitespace?: boolean },
 ): Promise<ParsedDiff> {
-  if (options?.ignoreWhitespace) {
-    return jsStructuredPatch(oldFileName, newFileName, oldStr, newStr, oldHeader, newHeader, options) as unknown as ParsedDiff
+  if (
+    options?.ignoreWhitespace ||
+    !supportsWasmContext(options?.context) ||
+    hasStandaloneCarriageReturn(oldStr) ||
+    hasStandaloneCarriageReturn(newStr)
+  ) {
+    return jsStructuredPatch(
+      oldFileName,
+      newFileName,
+      oldStr,
+      newStr,
+      oldHeader,
+      newHeader,
+      options,
+    ) as unknown as ParsedDiff
   }
   try {
     await ensureWasm()
@@ -144,7 +174,15 @@ export async function structuredPatch(
     )
     return result as unknown as ParsedDiff
   } catch {
-    return jsStructuredPatch(oldFileName, newFileName, oldStr, newStr, oldHeader, newHeader, options) as unknown as ParsedDiff
+    return jsStructuredPatch(
+      oldFileName,
+      newFileName,
+      oldStr,
+      newStr,
+      oldHeader,
+      newHeader,
+      options,
+    ) as unknown as ParsedDiff
   }
 }
 
@@ -160,7 +198,7 @@ export function parsePatch(diffStr: string, options?: { timeout?: number }): Par
 export function applyPatch(
   source: string,
   patch: string | ParsedDiff | ParsedDiff[],
-  options?: { fuzzFactor?: number }
+  options?: { fuzzFactor?: number },
 ): string | false {
   // ParsedDiff is structurally compatible with diff's internal patch format
   return jsApplyPatch(source, patch as unknown as Parameters<typeof jsApplyPatch>[1], options)

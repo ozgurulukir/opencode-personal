@@ -48,7 +48,7 @@ pub fn diff_lines_rs(old_str: &str, new_str: &str) -> JsValue {
         match tag {
             ChangeTag::Equal => {
                 if let Some(last) = changes.last_mut() {
-                    if last.added.is_none() && last.removed.is_none() {
+                    if last.added == Some(false) && last.removed == Some(false) {
                         last.value.push_str(&val);
                         last.count = Some(last.count.unwrap_or(0) + 1);
                         continue;
@@ -56,8 +56,8 @@ pub fn diff_lines_rs(old_str: &str, new_str: &str) -> JsValue {
                 }
                 changes.push(Change {
                     value: val,
-                    added: None,
-                    removed: None,
+                    added: Some(false),
+                    removed: Some(false),
                     count: Some(1),
                 });
             }
@@ -71,7 +71,7 @@ pub fn diff_lines_rs(old_str: &str, new_str: &str) -> JsValue {
                 }
                 changes.push(Change {
                     value: val,
-                    added: None,
+                    added: Some(false),
                     removed: Some(true),
                     count: Some(1),
                 });
@@ -87,7 +87,7 @@ pub fn diff_lines_rs(old_str: &str, new_str: &str) -> JsValue {
                 changes.push(Change {
                     value: val,
                     added: Some(true),
-                    removed: None,
+                    removed: Some(false),
                     count: Some(1),
                 });
             }
@@ -107,24 +107,28 @@ pub fn create_two_files_patch_rs(
     new_header: Option<String>,
     context: Option<usize>,
 ) -> String {
-    let ctx = context.unwrap_or(3);
+    let ctx = context.unwrap_or(4);
     let diff = TextDiff::configure()
         .algorithm(Algorithm::Myers)
         .diff_lines(old_str, new_str);
 
     let mut unified = diff.unified_diff();
     let u_diff = unified.context_radius(ctx);
-    let header_old = old_header.unwrap_or_default();
-    let header_new = new_header.unwrap_or_default();
+    let header_old = old_header
+        .map(|header| format!("\t{}", header))
+        .unwrap_or_default();
+    let header_new = new_header
+        .map(|header| format!("\t{}", header))
+        .unwrap_or_default();
+    let index = if old_file_name == new_file_name {
+        format!("Index: {}\n", old_file_name)
+    } else {
+        String::new()
+    };
 
     format!(
-        "Index: {}\n===================================================================\n--- {}\t{}\n+++ {}\t{}\n{}",
-        old_file_name,
-        old_file_name,
-        header_old,
-        new_file_name,
-        header_new,
-        u_diff
+        "{}===================================================================\n--- {}{}\n+++ {}{}\n{}",
+        index, old_file_name, header_old, new_file_name, header_new, u_diff
     )
 }
 
@@ -138,7 +142,7 @@ pub fn structured_patch_rs(
     new_header: Option<String>,
     context: Option<usize>,
 ) -> JsValue {
-    let ctx = context.unwrap_or(3);
+    let ctx = context.unwrap_or(4);
     let diff = TextDiff::configure()
         .algorithm(Algorithm::Myers)
         .diff_lines(old_str, new_str);
@@ -164,7 +168,14 @@ pub fn structured_patch_rs(
                 ChangeTag::Delete => "-",
                 ChangeTag::Insert => "+",
             };
-            lines_vec.push(format!("{}{}", prefix, change.value().trim_end_matches('\n')));
+            lines_vec.push(format!(
+                "{}{}",
+                prefix,
+                change.value().trim_end_matches('\n')
+            ));
+            if change.missing_newline() {
+                lines_vec.push("\\ No newline at end of file".to_string());
+            }
         }
 
         hunks_js.push(Hunk {

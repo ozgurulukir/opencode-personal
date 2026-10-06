@@ -26,6 +26,58 @@ test("structuredPatch uses one-based ranges accepted by formatPatch and applyPat
   expect(applyPatch(original, formatPatch(result))).toBe(modified)
 })
 
+test("structuredPatch preserves missing-newline markers", async () => {
+  const result = await structuredPatch("a.txt", "b.txt", "a", "b")
+
+  expect(result.hunks[0].lines).toEqual(["-a", "\\ No newline at end of file", "+b", "\\ No newline at end of file"])
+  expect(applyPatch("a", formatPatch(result))).toBe("b")
+})
+
+test("structuredPatch uses the diff package default context", async () => {
+  const original = "1\n2\n3\n4\n5\n6\n7\n8\n9\n"
+  const modified = "1\n2\n3\n4\nchanged\n6\n7\n8\n9\n"
+  const result = await structuredPatch("a.txt", "b.txt", original, modified)
+
+  expect(result.hunks[0].lines).toHaveLength(10)
+})
+
+test("structuredPatch falls back for contexts outside the WASM integer range", async () => {
+  const original = "1\n2\n3\n4\n5\n6\n7\n8\n9\n"
+  const modified = "1\n2\n3\n4\nchanged\n6\n7\n8\n9\n"
+  const result = await structuredPatch("a.txt", "b.txt", original, modified, undefined, undefined, {
+    context: Infinity,
+  })
+
+  expect(result.hunks[0].lines).toHaveLength(10)
+})
+
+test("createTwoFilesPatch matches the diff package file headers", async () => {
+  const patch = await createTwoFilesPatch("old.txt", "new.txt", "old\n", "new\n")
+
+  expect(patch).toBe(
+    "===================================================================\n--- old.txt\n+++ new.txt\n@@ -1,1 +1,1 @@\n-old\n+new\n",
+  )
+})
+
+test("diffLines returns explicit boolean change flags", async () => {
+  const changes = await diffLines("same\nold\n", "same\nnew\n")
+
+  expect(changes).toEqual([
+    { value: "same\n", added: false, removed: false, count: 1 },
+    { value: "old\n", added: false, removed: true, count: 1 },
+    { value: "new\n", added: true, removed: false, count: 1 },
+  ])
+})
+
+test("falls back to JS line semantics for standalone carriage returns", async () => {
+  const changes = await diffLines("a\rb\r", "a\rc\r")
+
+  expect(changes).toEqual([
+    { value: "a\rb\r", added: false, removed: true, count: 1 },
+    { value: "a\rc\r", added: true, removed: false, count: 1 },
+  ])
+})
+
 test("createTwoFilesPatch and parsePatch are bidirectional", async () => {
   const oldText = "function foo() {\n  return 1\n}\n"
   const newText = "function foo() {\n  return 2\n}\n"
