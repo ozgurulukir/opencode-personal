@@ -140,7 +140,7 @@ const filterExperimentalServers = (servers: Record<string, LSPServer.Info>) => {
 type LocInput = { file: string; line: number; character: number }
 
 interface State {
-  clients: LSPClient.Info[]
+  clients: Map<string, LSPClient.Info>
   servers: Record<string, LSPServer.Info>
   broken: Map<string, { attempts: number; lastAttempt: number }>
   spawning: Map<string, Promise<LSPClient.Info | undefined>>
@@ -218,7 +218,7 @@ export const layer = Layer.effect(
         }
 
         const s: State = {
-          clients: [],
+          clients: new Map(),
           servers,
           broken: new Map(),
           spawning: new Map(),
@@ -229,8 +229,8 @@ export const layer = Layer.effect(
           Effect.promise(async () => {
             s.disposed = true
             await Promise.allSettled([...s.spawning.values()])
-            await Promise.allSettled(s.clients.map((client) => client.shutdown()))
-            s.clients.length = 0
+            await Promise.allSettled([...s.clients.values()].map((client) => client.shutdown()))
+            s.clients.clear()
             s.broken.clear()
             s.spawning.clear()
           }),
@@ -289,13 +289,13 @@ export const layer = Layer.effect(
 
           s.broken.delete(key)
 
-          const existing = s.clients.find((x) => x.root === root && x.serverID === server.id)
+          const existing = s.clients.get(key)
           if (existing) {
             await Process.stop(handle.process)
             return existing
           }
 
-          s.clients.push(client)
+          s.clients.set(key, client)
           return client
         }
 
@@ -306,7 +306,8 @@ export const layer = Layer.effect(
           if (!root) continue
           if (isInBackoff(s, root + server.id)) continue
 
-          const match = s.clients.find((x) => x.root === root && x.serverID === server.id)
+          const key = root + server.id
+          const match = s.clients.get(key)
           if (match) {
             result.push(match)
             continue
@@ -349,7 +350,7 @@ export const layer = Layer.effect(
 
     const runAll = Effect.fnUntraced(function* <T>(fn: (client: LSPClient.Info) => Promise<T>) {
       const s = yield* InstanceState.get(state)
-      return yield* Effect.promise(() => Promise.all(s.clients.map((x) => fn(x))))
+      return yield* Effect.promise(() => Promise.all([...s.clients.values()].map((x) => fn(x))))
     })
 
     const init = Effect.fn("LSP.init")(function* () {
@@ -361,7 +362,7 @@ export const layer = Layer.effect(
       const s = yield* InstanceState.get(state)
       if (s.disposed) return []
       const result: Status[] = []
-      for (const client of s.clients) {
+      for (const client of s.clients.values()) {
         result.push({
           id: client.serverID,
           name: s.servers[client.serverID].id,
