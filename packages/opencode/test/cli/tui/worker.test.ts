@@ -4,7 +4,7 @@ import { Server } from "../../../src/server/server"
 import { ServerAuth } from "../../../src/server/auth"
 import { InstanceRuntime } from "../../../src/project/instance-runtime"
 import { AppRuntime } from "../../../src/effect/app-runtime"
-import { GlobalBus } from "../../../src/bus/global"
+import { GlobalBus, type GlobalEvent } from "../../../src/bus/global"
 import { Rpc } from "../../../src/util/rpc"
 import * as v8 from "node:v8"
 
@@ -15,7 +15,7 @@ describe("cli/cmd/tui/worker rpc", () => {
 
   test("GlobalBus event listener forwards events via Rpc.emit", () => {
     const emitSpy = spyOn(Rpc, "emit").mockImplementation(() => {})
-    const mockEvent = { type: "test.event", properties: { foo: "bar" } }
+    const mockEvent: GlobalEvent = { payload: { foo: "bar" } }
 
     GlobalBus.emit("event", mockEvent)
 
@@ -116,7 +116,8 @@ describe("cli/cmd/tui/worker rpc", () => {
   })
 
   test("reload runs AppRuntime promise to invalidate config and dispose instances", async () => {
-    const runPromiseSpy = spyOn(AppRuntime, "runPromise").mockImplementation(async () => {})
+    // oxlint-disable-next-line no-unsafe-type-assertion
+    const runPromiseSpy = spyOn(AppRuntime, "runPromise").mockImplementation(() => Promise.resolve(undefined as never))
 
     await rpc.reload()
 
