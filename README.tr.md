@@ -17,21 +17,21 @@ Kullanım, yapılandırma, sağlayıcılar ve entegrasyonlar için [fork doküma
 
 ## Bu fork neler ekliyor?
 
-Bu fork, OpenCode 1.14.48 kaynak sürümü üzerine kuruludur. Bu depoda sürdürülen başlıca değişiklikler:
+Bu fork, OpenCode 1.14.48 kaynak sürümünü temel alır. Aşağıdaki maddeler bu depoda sürdürülen değişiklik ve entegrasyonları listeler; upstream ile eksiksiz bir karşılaştırma değildir:
 
-- `/usage` içinde sağlayıcı kullanımı ve kotalar: Anthropic (Claude), ChatGPT abonelikleri, ZAI ve ClinePass; her sağlayıcının sunduğu limitler, bakiyeler ve plan ayrıntıları dâhil.
+- `/usage` içinde sağlayıcı kullanımı ve kotalar: Anthropic (Claude), ChatGPT OAuth, ZAI ve ClinePass; her sağlayıcının sunduğu limitler, bakiyeler ve plan ayrıntıları dâhil.
 - Düşünme modu yapılandırması ve sağlayıcıya özgü mesaj işleme dâhil Qwen3 uyumluluğu.
-- V2 SDK arayüzüyle V1/V2 oturum mimarisi.
+- V2 oturum mimarisi ve SDK yüzeyiyle birlikte V1 uyumluluğu.
 - İsteğe bağlı otomatik beceri eşleştirmesiyle yerel anlamsal çalışma alanı araması (zvec).
-- Rust/WASM tabanlı fark motoru (`packages/diff-wasm`).
+- Hibrit bir fark katmanı (`packages/diff-wasm`): Rust/WASM destekli fark üretimi; JavaScript uyumlu patch biçimlendirme, ayrıştırma, uygulama ve fallback’ler.
 - ACP (Agent Client Protocol) terminal arka ucu desteği (ör. Zed).
 - TUI iyileştirmeleri: soluk metin olarak gösterilen sonraki istem önerileri, kabuk `!` çıktısının görüntülenmesi ve ortak bir yükleme göstergesi.
-- İzin sistemi iyileştirmeleri: MCP araç anahtarları, ret kurallarına öncelik veren değerlendirme, kalıcı "her zaman izin ver" ve geliştirilmiş alt ajan izin yönetimi.
-- Güvenlik düzeltmeleri: webfetch aracında SSRF koruması, sıkı CORS kaynak doğrulaması, komut enjeksiyonu ve yol geçişi düzeltmeleri, okuma aracında sembolik bağlantıyla izin verilen dizinin dışına çıkmanın önlenmesi, TUI çıktı sızıntısının önlenmesi ve kriptografik olarak üretilen diyalog/istek kimlikleri.
-- İstem/oturum motoru yeniden düzenlemeleri: `prompt.ts` dosyasının modüllere ayrılması ve sağlayıcı mesaj dönüşümlerinin bölünmesi.
+- İzin sistemi iyileştirmeleri: MCP araç anahtarları, izin isteklerinde ret önceliği, kalıcı "her zaman izin ver" ve geliştirilmiş alt ajan izin yönetimi.
+- Güvenlik sertleştirmeleri arasında webfetch aracında SSRF koruması, sıkı CORS kaynak doğrulaması, sembolik bağlantıları çözen yol sınırları, kabuk komutlarında ayrıştırma ve izin kontrolleri, okuma aracında sembolik bağlantıyla izin verilen dizinin dışına çıkmanın önlenmesi, TUI çıktı sızıntısının önlenmesi ve kriptografik tohumlu diyalog/istek kimlikleri bulunur.
+- İstem/oturum motoru yeniden düzenlemeleri: istem orkestrasyonunun odaklı modüllere ayrılması ve sağlayıcı mesaj dönüşümlerinin sorumluluklarına göre bölünmesi.
 - Otomatik bağlam sıkıştırma iyileştirmeleri: `context_limit` yapılandırması, özet bütçesi ve meta verilerin korunması.
-- Performans çalışmaları: oturum özeti taramalarının azaltılması, olay döngüsünün bloke olmasına yönelik düzeltmeler, toplu veritabanı yazımları ve gömülü arayüzün önbelleğe alınması.
-- Monorepo sadeleştirmesi ve derleme/CI iyileştirmeleri: paket temizliği, fork için tip denetimi iş akışı ve daha sıkı bağımlılık güncelleme kontrolleri.
+- Performans odaklı değişiklikler arasında hedefli oturum özeti sorguları, olay döngüsü/backpressure yönetimi, toplu veritabanı yazımları ve gömülü arayüz önbelleği bulunur.
+- Monorepo/derleme/CI bakımı: takip edilen paketlerin sadeleştirilmesi, tip denetimi iş akışı ve daha sıkı bağımlılık güncelleme kontrolleri.
 - Araçlar: birden fazla beceri yükleme, uyarılarla beceri doğrulama ve yapılacak işlerin otomatik kapatılmasıyla entegre değişiklik bloğu farkları.
 
 ## Kurulum
