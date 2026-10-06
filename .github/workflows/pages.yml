@@ -36,8 +36,8 @@ jobs:
           bun-version: 1.4.2
       - uses: actions/configure-pages@v5
       - run: bun install --frozen-lockfile
-      - name: Generate config schemas
-        run: bun run --cwd packages/opencode script/schema.ts ../web/public/config.json ../web/public/tui.json
+      - name: Generate JSON schemas
+        run: bun run --cwd packages/opencode script/schema.ts ../web/public/config.json ../web/public/tui.json ../web/public/theme.json
         env:
           XDG_CONFIG_HOME: ${{ runner.temp }}/opencode-config
           XDG_DATA_HOME: ${{ runner.temp }}/opencode-data
