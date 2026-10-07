@@ -25,6 +25,7 @@ import { containsPath } from "../project/instance-context"
 import { zod } from "@opencode-ai/core/effect-zod"
 import { NonNegativeInt, PositiveInt, withStatics, type DeepMutable } from "@opencode-ai/core/schema"
 import { ConfigAgent } from "./agent"
+import { toolsToPermissions } from "@/permission/tools"
 import { ConfigAttachment } from "./attachment"
 import { ConfigCommand } from "./command"
 import { ConfigFormatter } from "./formatter"
@@ -755,15 +756,7 @@ export const layer = Layer.effect(
         }
 
         if (result.tools) {
-          const perms: Record<string, ConfigPermission.Action> = {}
-          for (const [tool, enabled] of Object.entries(result.tools)) {
-            const action: ConfigPermission.Action = enabled ? "allow" : "deny"
-            if (tool === "write" || tool === "edit" || tool === "patch") {
-              perms.edit = action
-              continue
-            }
-            perms[tool] = action
-          }
+          const perms = toolsToPermissions(result.tools, { foldEdit: true })
           result.permission = mergeDeep(perms, result.permission ?? {})
         }
 

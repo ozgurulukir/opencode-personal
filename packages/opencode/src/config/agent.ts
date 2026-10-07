@@ -12,6 +12,7 @@ import * as ConfigMarkdown from "./markdown"
 import { ConfigModelID } from "./model-id"
 import { ConfigParse } from "./parse"
 import { ConfigPermission } from "./permission"
+import { toolsToPermissions } from "@/permission/tools"
 
 const log = Log.create({ service: "config" })
 
@@ -91,15 +92,7 @@ const normalize = (agent: Schema.Schema.Type<typeof AgentSchema>): Schema.Schema
   const tools = Array.isArray(rawTools)
     ? Object.fromEntries(rawTools.map((tool) => [tool.toLowerCase(), true]))
     : (rawTools ?? {})
-  const permission: ConfigPermission.Info = {}
-  for (const [tool, enabled] of Object.entries(tools)) {
-    const action = enabled ? "allow" : "deny"
-    if (tool === "write" || tool === "edit" || tool === "patch") {
-      permission.edit = action
-      continue
-    }
-    permission[tool] = action
-  }
+  const permission: ConfigPermission.Info = toolsToPermissions(tools, { foldEdit: true })
   globalThis.Object.assign(permission, agent.permission)
 
   const steps = agent.steps ?? maxSteps

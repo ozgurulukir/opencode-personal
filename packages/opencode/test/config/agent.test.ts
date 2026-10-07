@@ -3,6 +3,15 @@ import { Schema } from "effect"
 import { Info } from "@/config/agent"
 
 describe("ConfigAgent Schema Normalization", () => {
+  test("folds edit aliases in input order and lets explicit permission win", () => {
+    const decoded = Schema.decodeSync(Info)({
+      tools: { write: true, edit: false, patch: true, "mcp_*": false },
+      permission: { edit: { "*.ts": "ask" } },
+    })
+    expect(decoded.permission).toEqual({ edit: { "*.ts": "ask" }, "mcp_*": "deny" })
+    expect(Schema.decodeSync(Info)({ tools: { patch: true, write: false } }).permission).toEqual({ edit: "deny" })
+  })
+
   test("translates maxSteps to steps", () => {
     const raw = {
       maxSteps: 100,

@@ -1,5 +1,5 @@
-import type { UsageProvider, UsageReport, UsageLimit, UsageAmount, UsageWindow, UsageCredential } from "./types"
-import { buildUsageStatus } from "./types"
+import type { UsageProvider, UsageReport, UsageLimit, UsageWindow, UsageCredential } from "./types"
+import { buildUsageAmount, buildUsageStatus } from "./types"
 
 const ZAI_BASE_URL = "https://api.z.ai"
 const QUOTA_PATH = "/api/monitor/usage/quota/limit"
@@ -46,29 +46,6 @@ function parseLimitItem(raw: unknown): ZaiLimitItem | null {
   }
 }
 
-function buildAmount(args: {
-  used: number | undefined
-  limit: number | undefined
-  remaining: number | undefined
-  percentage: number | undefined
-  unit: UsageAmount["unit"]
-}): UsageAmount {
-  const usedFraction =
-    args.percentage !== undefined
-      ? Math.min(Math.max(args.percentage / 100, 0), 1)
-      : args.used !== undefined && args.limit !== undefined && args.limit > 0
-        ? Math.min(args.used / args.limit, 1)
-        : undefined
-  return {
-    used: args.used,
-    limit: args.limit,
-    remaining: args.remaining,
-    usedFraction,
-    remainingFraction: usedFraction !== undefined ? Math.max(1 - usedFraction, 0) : undefined,
-    unit: args.unit,
-  }
-}
-
 function formatDate(d: Date): string {
   const p = (n: number) => String(n).padStart(2, "0")
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}+${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`
@@ -108,7 +85,7 @@ async function fetchZaiUsage(credential: UsageCredential): Promise<UsageReport |
     }
 
     if (item.type === "TOKENS_LIMIT") {
-      const amount = buildAmount({
+      const amount = buildUsageAmount({
         used: item.currentValue,
         limit: item.usage,
         remaining: item.remaining,
@@ -126,7 +103,7 @@ async function fetchZaiUsage(credential: UsageCredential): Promise<UsageReport |
     }
 
     if (item.type === "TIME_LIMIT") {
-      const amount = buildAmount({
+      const amount = buildUsageAmount({
         used: item.currentValue,
         limit: item.usage,
         remaining: item.remaining,

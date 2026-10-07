@@ -61,7 +61,10 @@ export interface UsageProvider {
 }
 
 export function resolveUsedFraction(limit: UsageLimit): number | undefined {
-  const amount = limit.amount
+  return resolveAmountFraction(limit.amount)
+}
+
+function resolveAmountFraction(amount: UsageAmount): number | undefined {
   if (amount.usedFraction !== undefined) return amount.usedFraction
   if (amount.used !== undefined && amount.limit !== undefined && amount.limit > 0) {
     return amount.used / amount.limit
@@ -69,6 +72,22 @@ export function resolveUsedFraction(limit: UsageLimit): number | undefined {
   if (amount.unit === "percent" && amount.used !== undefined) return amount.used / 100
   if (amount.remainingFraction !== undefined) return Math.max(0, 1 - amount.remainingFraction)
   return undefined
+}
+
+export function buildUsageAmount(args: UsageAmount & { percentage?: number }): UsageAmount {
+  const fraction = resolveAmountFraction({
+    ...args,
+    ...(args.percentage !== undefined ? { usedFraction: Math.min(Math.max(args.percentage / 100, 0), 1) } : {}),
+  })
+  const usedFraction = fraction !== undefined ? Math.min(fraction, 1) : undefined
+  return {
+    used: args.used,
+    limit: args.limit,
+    remaining: args.remaining,
+    usedFraction,
+    remainingFraction: usedFraction !== undefined ? Math.max(1 - usedFraction, 0) : undefined,
+    unit: args.unit,
+  }
 }
 
 export function buildUsageStatus(usedFraction: number | undefined): UsageStatus | undefined {
