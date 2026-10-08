@@ -76,15 +76,13 @@ export function SessionSidePanel(props: {
   })
   const treeWidth = createMemo(() => (fileOpen() ? `${layout.fileTree.width()}px` : "0px"))
 
-  const diffs = createMemo(() => props.diffs().filter(renderDiff))
-  const diffFiles = createMemo(() => {
-    const list = diffs()
-    const result = new Array(list.length)
-    let i = 0
-    for (let j = 0; j < list.length; j++) result[i++] = list[j].file
-    return result
-  })
-  const kinds = createMemo(() => {
+  // ⚡ Bolt Optimization: Consolidate diffs, diffFiles, and kinds into a single createMemo to perform a single pass over diffs and eliminate intermediate array allocations & path segment GC pressure
+  const diffInfo = createMemo(() => {
+    const raw = props.diffs()
+    const diffs: RenderDiff[] = []
+    const diffFiles: string[] = []
+    const kinds = new Map<string, "add" | "del" | "mix">()
+
     const merge = (a: "add" | "del" | "mix" | undefined, b: "add" | "del" | "mix") => {
       if (!a) return b
       if (a === b) return a
@@ -93,22 +91,33 @@ export function SessionSidePanel(props: {
 
     const normalize = (p: string) => p.replaceAll("\\\\", "/").replace(/\/+$/, "")
 
-    const out = new Map<string, "add" | "del" | "mix">()
-    for (const diff of diffs()) {
-      const file = normalize(diff.file)
-      const kind = diff.status === "added" ? "add" : diff.status === "deleted" ? "del" : "mix"
+    for (let i = 0; i < raw.length; i++) {
+      const item = raw[i]
+      if (!renderDiff(item)) continue
 
-      out.set(file, kind)
+      diffs.push(item)
+      diffFiles.push(item.file)
 
-      const parts = file.split("/")
-      for (const [idx] of parts.slice(0, -1).entries()) {
-        const dir = parts.slice(0, idx + 1).join("/")
-        if (!dir) continue
-        out.set(dir, merge(out.get(dir), kind))
+      const file = normalize(item.file)
+      const kind = item.status === "added" ? "add" : item.status === "deleted" ? "del" : "mix"
+
+      kinds.set(file, kind)
+
+      let idx = file.indexOf("/")
+      while (idx !== -1) {
+        const dir = file.slice(0, idx)
+        if (dir) {
+          kinds.set(dir, merge(kinds.get(dir), kind))
+        }
+        idx = file.indexOf("/", idx + 1)
       }
     }
-    return out
+
+    return { diffFiles, kinds }
   })
+
+  const diffFiles = () => diffInfo().diffFiles
+  const kinds = () => diffInfo().kinds
 
   const empty = (msg: string) => (
     <div class="h-full flex flex-col">
