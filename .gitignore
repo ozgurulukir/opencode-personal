@@ -67,4 +67,3 @@ specs/
 # Local tooling state (code-tandem review tool, commandcode settings)
 .code-tandem/
 .commandcode/
-IMPROVEMENT-REPORT.md
