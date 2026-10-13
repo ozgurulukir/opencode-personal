@@ -76,10 +76,8 @@ export function SessionSidePanel(props: {
   })
   const treeWidth = createMemo(() => (fileOpen() ? `${layout.fileTree.width()}px` : "0px"))
 
-  // ⚡ Bolt Optimization: Consolidate diffs, diffFiles, and kinds into a single createMemo to perform a single pass over diffs and eliminate intermediate array allocations & path segment GC pressure
   const diffInfo = createMemo(() => {
     const raw = props.diffs()
-    const diffs: RenderDiff[] = []
     const diffFiles: string[] = []
     const kinds = new Map<string, "add" | "del" | "mix">()
 
@@ -95,7 +93,6 @@ export function SessionSidePanel(props: {
       const item = raw[i]
       if (!renderDiff(item)) continue
 
-      diffs.push(item)
       diffFiles.push(item.file)
 
       const file = normalize(item.file)
