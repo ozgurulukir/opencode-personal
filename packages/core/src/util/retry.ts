@@ -17,8 +17,38 @@ const TRANSIENT_MESSAGES = [
   "socket hang up",
 ]
 
-function isTransientError(error: unknown): boolean {
-  if (!error) return false
+const TRANSIENT_CODES = new Set([
+  "econnreset",
+  "econnrefused",
+  "etimedout",
+  "ehostunreach",
+  "eai_again",
+  "und_err_connect_timeout",
+  "fetch_error",
+])
+
+const TRANSIENT_STATUS_CODES = new Set([429, 502, 503, 504])
+
+function isTransientError(error: unknown, depth = 0): boolean {
+  if (!error || depth > 3) return false
+
+  if (typeof error === "object" && error !== null) {
+    const errObj = error as Record<string, unknown>
+
+    if (typeof errObj.code === "string" && TRANSIENT_CODES.has(errObj.code.toLowerCase())) {
+      return true
+    }
+
+    const status = errObj.status ?? errObj.statusCode
+    if (typeof status === "number" && TRANSIENT_STATUS_CODES.has(status)) {
+      return true
+    }
+
+    if ("cause" in errObj && errObj.cause && isTransientError(errObj.cause, depth + 1)) {
+      return true
+    }
+  }
+
   // oxlint-disable-next-line no-base-to-string -- error is unknown, intentional coercion for message matching
   const message = String(error instanceof Error ? error.message : error).toLowerCase()
   return TRANSIENT_MESSAGES.some((m) => message.includes(m))
