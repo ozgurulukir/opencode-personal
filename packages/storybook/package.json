@@ -11,7 +11,7 @@
     "@tailwindcss/vite": "catalog:",
     "@opencode-ai/ui": "workspace:*",
     "@solidjs/meta": "catalog:",
-    "@storybook/addon-a11y": "^10.2.13",
+    "@storybook/addon-a11y": "^10.6.1",
     "@storybook/addon-docs": "^10.6.1",
     "@storybook/addon-links": "^10.2.13",
     "@storybook/addon-onboarding": "^10.2.13",
