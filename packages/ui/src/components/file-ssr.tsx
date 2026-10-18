@@ -16,7 +16,7 @@ import {
 import { acquireVirtualizer, virtualMetrics } from "../pierre/virtualizer"
 import { File, type DiffFileProps, type FileProps } from "./file"
 
-type DiffPreload<T> = PreloadMultiFileDiffResult<T> | PreloadFileDiffResult<T>
+type DiffPreload<T> = PreloadMultiFileDiffResult<T, any> | PreloadFileDiffResult<T, any>
 
 type SSRDiffFileProps<T> = DiffFileProps<T> & {
   preloadedDiff: DiffPreload<T>
@@ -118,28 +118,42 @@ function DiffSSRViewer<T>(props: SSRDiffFileProps<T>) {
 
     // @ts-expect-error private field required for hydration
     fileDiffInstance.fileContainer = fileDiffRef
-    fileDiffInstance.hydrate(
-      local.fileDiff
-        ? {
-            fileDiff: local.fileDiff,
-            lineAnnotations: annotations,
-            fileContainer: fileDiffRef,
-            containerWrapper: container,
-            prerenderedHTML: local.preloadedDiff.prerenderedHTML,
-          }
-        : {
-            oldFile: local.before
-              ? { ...local.before, contents: typeof local.before.contents === "string" ? local.before.contents : "" }
-              : local.before,
-            newFile: local.after
-              ? { ...local.after, contents: typeof local.after.contents === "string" ? local.after.contents : "" }
-              : local.after,
-            lineAnnotations: annotations,
-            fileContainer: fileDiffRef,
-            containerWrapper: container,
-            prerenderedHTML: local.preloadedDiff.prerenderedHTML,
-          },
-    )
+    if (local.fileDiff) {
+      fileDiffInstance.hydrate({
+        fileDiff: local.fileDiff,
+        lineAnnotations: annotations,
+        fileContainer: fileDiffRef,
+        containerWrapper: container,
+        prerenderedHTML: local.preloadedDiff.prerenderedHTML,
+      })
+    } else if (local.before && local.after) {
+      fileDiffInstance.hydrate({
+        oldFile: { ...local.before, contents: typeof local.before.contents === "string" ? local.before.contents : "" },
+        newFile: { ...local.after, contents: typeof local.after.contents === "string" ? local.after.contents : "" },
+        lineAnnotations: annotations,
+        fileContainer: fileDiffRef,
+        containerWrapper: container,
+        prerenderedHTML: local.preloadedDiff.prerenderedHTML,
+      })
+    } else if (local.before) {
+      fileDiffInstance.hydrate({
+        oldFile: { ...local.before, contents: typeof local.before.contents === "string" ? local.before.contents : "" },
+        newFile: null,
+        lineAnnotations: annotations,
+        fileContainer: fileDiffRef,
+        containerWrapper: container,
+        prerenderedHTML: local.preloadedDiff.prerenderedHTML,
+      })
+    } else if (local.after) {
+      fileDiffInstance.hydrate({
+        oldFile: null,
+        newFile: { ...local.after, contents: typeof local.after.contents === "string" ? local.after.contents : "" },
+        lineAnnotations: annotations,
+        fileContainer: fileDiffRef,
+        containerWrapper: container,
+        prerenderedHTML: local.preloadedDiff.prerenderedHTML,
+      })
+    }
 
     notifyRendered()
   })

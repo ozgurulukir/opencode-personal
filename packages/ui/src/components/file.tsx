@@ -50,7 +50,6 @@ const VIRTUALIZE_BYTES = 500_000
 const codeMetrics = {
   ...DEFAULT_VIRTUAL_FILE_METRICS,
   lineHeight: 24,
-  fileGap: 0,
 } satisfies Partial<VirtualFileMetrics>
 
 type SharedProps<T> = {
@@ -73,17 +72,17 @@ export type FileSearchControl = {
   register: (handle: FileSearchHandle | null) => void
 }
 
-export type TextFileProps<T = {}> = FileOptions<T> &
+export type TextFileProps<T = {}> = FileOptions<T, any> &
   SharedProps<T> & {
     mode: "text"
     file: FileContents
     annotations?: LineAnnotation<T>[]
-    preloadedDiff?: PreloadMultiFileDiffResult<T>
+    preloadedDiff?: PreloadMultiFileDiffResult<T, any>
   }
 
-type DiffPreload<T> = PreloadMultiFileDiffResult<T> | PreloadFileDiffResult<T>
+type DiffPreload<T> = PreloadMultiFileDiffResult<T, any> | PreloadFileDiffResult<T, any>
 
-type DiffBaseProps<T> = FileDiffOptions<T> &
+type DiffBaseProps<T> = FileDiffOptions<T, any> &
   SharedProps<T> & {
     mode: "diff"
     annotations?: DiffLineAnnotation<T>[]
@@ -1009,7 +1008,7 @@ function DiffViewer<T>(props: DiffFileProps<T>) {
     lineDiffType: "none",
     maxLineDiffLength: 0,
     tokenizeMaxLineLength: 1,
-  } satisfies Pick<FileDiffOptions<T>, "lineDiffType" | "maxLineDiffLength" | "tokenizeMaxLineLength">
+  } satisfies Pick<FileDiffOptions<T, any>, "lineDiffType" | "maxLineDiffLength" | "tokenizeMaxLineLength">
 
   const lineCallbacks = createLineCallbacks({
     viewer,
@@ -1019,7 +1018,7 @@ function DiffViewer<T>(props: DiffFileProps<T>) {
     onLineNumberSelectionEnd: (range) => local.onLineNumberSelectionEnd?.(range),
   })
 
-  const options = createMemo<FileDiffOptions<T>>(() => {
+  const options = createMemo<FileDiffOptions<T, any>>(() => {
     const base = {
       ...createDefaultOptions(props.diffStyle),
       ...others,

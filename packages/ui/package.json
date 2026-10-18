@@ -54,7 +54,7 @@
     "@solidjs/router": "catalog:",
     "@opencode-ai/diff-wasm": "workspace:*",
     "diff": "catalog:",
-    "dompurify": "3.4.16",
+    "dompurify": "catalog:",
     "fuzzysort": "catalog:",
     "katex": "0.18.9",
     "marked": "catalog:",

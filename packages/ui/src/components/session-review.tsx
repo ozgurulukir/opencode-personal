@@ -63,12 +63,12 @@ export type SessionReviewCommentActions = {
 export type SessionReviewFocus = { file: string; id: string }
 
 type RawReviewDiff = (SnapshotFileDiff | VcsFileDiff) & {
-  preloaded?: PreloadMultiFileDiffResult<any>
+  preloaded?: PreloadMultiFileDiffResult<any, any>
 }
 type ReviewDiff = ((SnapshotFileDiff & { file: string }) | VcsFileDiff) & {
-  preloaded?: PreloadMultiFileDiffResult<any>
+  preloaded?: PreloadMultiFileDiffResult<any, any>
 }
-type Item = ViewDiff & { preloaded?: PreloadMultiFileDiffResult<any> }
+type Item = ViewDiff & { preloaded?: PreloadMultiFileDiffResult<any, any> }
 
 function diff(value: unknown): value is ReviewDiff {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false
