@@ -214,8 +214,17 @@ try {
 
 const binaries: Record<string, string> = {}
 if (!skipInstall) {
-  await $`bun install --os="*" --cpu="*" @opentui/core@${pkg.dependencies["@opentui/core"]}`
-  await $`bun install --os="*" --cpu="*" @parcel/watcher@${pkg.dependencies["@parcel/watcher"]}`
+  const rootPkg = await Bun.file(path.resolve(dir, "../../package.json")).json()
+  const catalog = rootPkg.workspaces?.catalog ?? {}
+  const resolveDepVersion = (name: string) => {
+    const version = (pkg.dependencies as Record<string, string>)?.[name]
+    if (!version || version === "catalog:") {
+      return catalog[name] ?? version
+    }
+    return version
+  }
+  await $`bun install --no-save --os="*" --cpu="*" @opentui/core@${resolveDepVersion("@opentui/core")}`
+  await $`bun install --no-save --os="*" --cpu="*" @parcel/watcher@${resolveDepVersion("@parcel/watcher")}`
 }
 // Resolve @opentui/core's parser.worker.js (may be in bun cache)
 const opentuiLocalPath = path.resolve(dir, "node_modules/@opentui/core/parser.worker.js")
