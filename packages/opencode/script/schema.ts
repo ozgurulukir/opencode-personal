@@ -3,10 +3,12 @@
 import { z } from "zod"
 import { Config } from "@/config/config"
 import { TuiConfig } from "../src/cli/cmd/tui/config/tui"
+import { ThemeJsonSchema } from "../src/cli/cmd/tui/context/theme-schema"
 
-function generate(schema: z.ZodType) {
+function generate(schema: z.ZodType, jsonc = false) {
   const result = z.toJSONSchema(schema, {
     io: "input", // Generate input shape (treats optional().default() as not required)
+    reused: "ref",
     /**
      * We'll use the `default` values of the field as the only value in `examples`.
      * This will ensure no docs are needed to be read, as the configuration is
@@ -44,20 +46,28 @@ function generate(schema: z.ZodType) {
     allowTrailingCommas?: boolean
   }
 
-  // used for json lsps since config supports jsonc
-  result.allowComments = true
-  result.allowTrailingCommas = true
+  if (jsonc) {
+    // used for json lsps since config supports jsonc
+    result.allowComments = true
+    result.allowTrailingCommas = true
+  }
 
   return result
 }
 
 const configFile = process.argv[2]
 const tuiFile = process.argv[3]
+const themeFile = process.argv[4]
 
 console.log(configFile)
-await Bun.write(configFile, JSON.stringify(generate(Config.Info.zod), null, 2))
+await Bun.write(configFile, JSON.stringify(generate(Config.Info.zod, true), null, 2))
 
 if (tuiFile) {
   console.log(tuiFile)
-  await Bun.write(tuiFile, JSON.stringify(generate(TuiConfig.JsonSchemaInfo), null, 2))
+  await Bun.write(tuiFile, JSON.stringify(generate(TuiConfig.JsonSchemaInfo, true), null, 2))
+}
+
+if (themeFile) {
+  console.log(themeFile)
+  await Bun.write(themeFile, JSON.stringify(generate(ThemeJsonSchema), null, 2))
 }

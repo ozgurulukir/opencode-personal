@@ -17,21 +17,21 @@ See the [fork documentation](https://ozgurulukir.github.io/opencode-personal/) f
 
 ## What this fork adds
 
-This fork is built on top of the OpenCode 1.14.48 source release. Notable changes maintained in this repository:
+This fork starts from the OpenCode 1.14.48 source release. The items below describe changes and integrations maintained in this repository; they are not a complete upstream comparison:
 
-- Provider usage & quotas in `/usage` — Anthropic (Claude), ChatGPT subscriptions, ZAI, and ClinePass, including the limits, balances, and plan details exposed by each provider.
+- Provider usage & quotas in `/usage` — Anthropic (Claude), ChatGPT OAuth, ZAI, and ClinePass, including the limits, balances, and plan details exposed by each provider.
 - Qwen3 compatibility, including thinking-mode configuration and provider-specific message handling.
-- V1/V2 session architecture with a V2 SDK surface.
+- V1 compatibility alongside a V2 session architecture and SDK surface.
 - Local semantic workspace search (zvec) with optional automatic skill matching.
-- A Rust/WASM diff engine (`packages/diff-wasm`).
+- A hybrid diff layer (`packages/diff-wasm`): Rust/WASM-backed diff generation with JavaScript-compatible patch formatting, parsing, applying, and fallbacks.
 - ACP (Agent Client Protocol) terminal backend support (e.g. Zed).
 - TUI enhancements: ghost-text next-prompt suggestions, shell `!` output rendering, and a unified spinner.
-- Permission system improvements: MCP tool keys, deny-first evaluation, persisted "always allow", and improved subagent permission handling.
-- Security-related fixes include SSRF protection in the webfetch tool, strict CORS origin validation, command-injection and path-traversal fixes, read-tool symlink-escape prevention, TUI output-leak prevention, and cryptographically backed dialog/request IDs.
-- Prompt/session engine refactors: decomposed `prompt.ts` and split provider message transforms.
+- Permission system improvements: MCP tool keys, deny precedence in permission asks, persisted "always allow", and improved subagent permission handling.
+- Security hardening includes SSRF protection in the webfetch tool, strict CORS origin validation, symlink-safe path containment, shell command parsing and permission checks, read-tool symlink-escape prevention, TUI output-leak prevention, and cryptographically seeded dialog/request IDs.
+- Prompt/session engine refactors: prompt orchestration split across focused modules and provider message transforms split by concern.
 - Auto-compaction improvements: `context_limit` config, summary budget, and metadata preservation.
-- Performance work includes reduced session-summary scanning, event-loop starvation fixes, batched DB writes, and embedded-UI caching.
-- Monorepo pruning and build/CI hardening: package cleanup, a fork typecheck workflow, and tighter dependency-update checks.
+- Performance-oriented changes include targeted session-summary queries, event-loop/backpressure handling, batched DB writes, and embedded-UI caching.
+- Monorepo/build/CI maintenance: tracked package cleanup, a typecheck workflow, and tighter dependency-update checks.
 - Tooling: multi-skill loading, skill validation with warnings, and hunk-diff integration with todo autoclose.
 
 ## Install

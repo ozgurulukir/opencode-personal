@@ -1,181 +1,289 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "OpenCode TUI Theme",
   "type": "object",
   "properties": {
     "$schema": {
-      "type": "string",
-      "description": "JSON schema reference for configuration validation"
+      "type": "string"
     },
     "defs": {
       "type": "object",
-      "description": "Color definitions that can be referenced in the theme",
-      "patternProperties": {
-        "^[a-zA-Z][a-zA-Z0-9_]*$": {
-          "oneOf": [
-            {
-              "type": "string",
-              "pattern": "^#[0-9a-fA-F]{6}$",
-              "description": "Hex color value"
-            },
-            {
-              "type": "integer",
-              "minimum": 0,
-              "maximum": 255,
-              "description": "ANSI color code (0-255)"
-            },
-            {
-              "type": "string",
-              "enum": ["none"],
-              "description": "No color (uses terminal default)"
-            }
-          ]
-        }
+      "propertyNames": {
+        "type": "string",
+        "pattern": "^[a-zA-Z][a-zA-Z0-9_-]*$"
       },
-      "additionalProperties": false
+      "additionalProperties": {
+        "$ref": "#/$defs/__schema0"
+      }
     },
     "theme": {
       "type": "object",
-      "description": "Theme color definitions",
       "properties": {
-        "primary": { "$ref": "#/definitions/colorValue" },
-        "secondary": { "$ref": "#/definitions/colorValue" },
-        "accent": { "$ref": "#/definitions/colorValue" },
-        "error": { "$ref": "#/definitions/colorValue" },
-        "warning": { "$ref": "#/definitions/colorValue" },
-        "success": { "$ref": "#/definitions/colorValue" },
-        "info": { "$ref": "#/definitions/colorValue" },
-        "text": { "$ref": "#/definitions/colorValue" },
-        "textMuted": { "$ref": "#/definitions/colorValue" },
-        "selectedListItemText": { "$ref": "#/definitions/colorValue" },
-        "background": { "$ref": "#/definitions/colorValue" },
-        "backgroundPanel": { "$ref": "#/definitions/colorValue" },
-        "backgroundElement": { "$ref": "#/definitions/colorValue" },
-        "border": { "$ref": "#/definitions/colorValue" },
-        "borderActive": { "$ref": "#/definitions/colorValue" },
-        "borderSubtle": { "$ref": "#/definitions/colorValue" },
-        "diffAdded": { "$ref": "#/definitions/colorValue" },
-        "diffRemoved": { "$ref": "#/definitions/colorValue" },
-        "diffContext": { "$ref": "#/definitions/colorValue" },
-        "diffHunkHeader": { "$ref": "#/definitions/colorValue" },
-        "diffHighlightAdded": { "$ref": "#/definitions/colorValue" },
-        "diffHighlightRemoved": { "$ref": "#/definitions/colorValue" },
-        "diffAddedBg": { "$ref": "#/definitions/colorValue" },
-        "diffRemovedBg": { "$ref": "#/definitions/colorValue" },
-        "diffContextBg": { "$ref": "#/definitions/colorValue" },
-        "diffLineNumber": { "$ref": "#/definitions/colorValue" },
-        "diffAddedLineNumberBg": { "$ref": "#/definitions/colorValue" },
-        "diffRemovedLineNumberBg": { "$ref": "#/definitions/colorValue" },
-        "markdownText": { "$ref": "#/definitions/colorValue" },
-        "markdownHeading": { "$ref": "#/definitions/colorValue" },
-        "markdownLink": { "$ref": "#/definitions/colorValue" },
-        "markdownLinkText": { "$ref": "#/definitions/colorValue" },
-        "markdownCode": { "$ref": "#/definitions/colorValue" },
-        "markdownBlockQuote": { "$ref": "#/definitions/colorValue" },
-        "markdownEmph": { "$ref": "#/definitions/colorValue" },
-        "markdownStrong": { "$ref": "#/definitions/colorValue" },
-        "markdownHorizontalRule": { "$ref": "#/definitions/colorValue" },
-        "markdownListItem": { "$ref": "#/definitions/colorValue" },
-        "markdownListEnumeration": { "$ref": "#/definitions/colorValue" },
-        "markdownImage": { "$ref": "#/definitions/colorValue" },
-        "markdownImageText": { "$ref": "#/definitions/colorValue" },
-        "markdownCodeBlock": { "$ref": "#/definitions/colorValue" },
-        "syntaxComment": { "$ref": "#/definitions/colorValue" },
-        "syntaxKeyword": { "$ref": "#/definitions/colorValue" },
-        "syntaxFunction": { "$ref": "#/definitions/colorValue" },
-        "syntaxVariable": { "$ref": "#/definitions/colorValue" },
-        "syntaxString": { "$ref": "#/definitions/colorValue" },
-        "syntaxNumber": { "$ref": "#/definitions/colorValue" },
-        "syntaxType": { "$ref": "#/definitions/colorValue" },
-        "syntaxOperator": { "$ref": "#/definitions/colorValue" },
-        "syntaxPunctuation": { "$ref": "#/definitions/colorValue" }
+        "primary": {
+          "$ref": "#/$defs/__schema1"
+        },
+        "secondary": {
+          "$ref": "#/$defs/__schema1"
+        },
+        "accent": {
+          "$ref": "#/$defs/__schema1"
+        },
+        "error": {
+          "$ref": "#/$defs/__schema1"
+        },
+        "warning": {
+          "$ref": "#/$defs/__schema1"
+        },
+        "success": {
+          "$ref": "#/$defs/__schema1"
+        },
+        "info": {
+          "$ref": "#/$defs/__schema1"
+        },
+        "text": {
+          "$ref": "#/$defs/__schema1"
+        },
+        "textMuted": {
+          "$ref": "#/$defs/__schema1"
+        },
+        "background": {
+          "$ref": "#/$defs/__schema1"
+        },
+        "backgroundPanel": {
+          "$ref": "#/$defs/__schema1"
+        },
+        "backgroundElement": {
+          "$ref": "#/$defs/__schema1"
+        },
+        "border": {
+          "$ref": "#/$defs/__schema1"
+        },
+        "borderActive": {
+          "$ref": "#/$defs/__schema1"
+        },
+        "borderSubtle": {
+          "$ref": "#/$defs/__schema1"
+        },
+        "diffAdded": {
+          "$ref": "#/$defs/__schema1"
+        },
+        "diffRemoved": {
+          "$ref": "#/$defs/__schema1"
+        },
+        "diffContext": {
+          "$ref": "#/$defs/__schema1"
+        },
+        "diffHunkHeader": {
+          "$ref": "#/$defs/__schema1"
+        },
+        "diffHighlightAdded": {
+          "$ref": "#/$defs/__schema1"
+        },
+        "diffHighlightRemoved": {
+          "$ref": "#/$defs/__schema1"
+        },
+        "diffAddedBg": {
+          "$ref": "#/$defs/__schema1"
+        },
+        "diffRemovedBg": {
+          "$ref": "#/$defs/__schema1"
+        },
+        "diffContextBg": {
+          "$ref": "#/$defs/__schema1"
+        },
+        "diffLineNumber": {
+          "$ref": "#/$defs/__schema1"
+        },
+        "diffAddedLineNumberBg": {
+          "$ref": "#/$defs/__schema1"
+        },
+        "diffRemovedLineNumberBg": {
+          "$ref": "#/$defs/__schema1"
+        },
+        "markdownText": {
+          "$ref": "#/$defs/__schema1"
+        },
+        "markdownHeading": {
+          "$ref": "#/$defs/__schema1"
+        },
+        "markdownLink": {
+          "$ref": "#/$defs/__schema1"
+        },
+        "markdownLinkText": {
+          "$ref": "#/$defs/__schema1"
+        },
+        "markdownCode": {
+          "$ref": "#/$defs/__schema1"
+        },
+        "markdownBlockQuote": {
+          "$ref": "#/$defs/__schema1"
+        },
+        "markdownEmph": {
+          "$ref": "#/$defs/__schema1"
+        },
+        "markdownStrong": {
+          "$ref": "#/$defs/__schema1"
+        },
+        "markdownHorizontalRule": {
+          "$ref": "#/$defs/__schema1"
+        },
+        "markdownListItem": {
+          "$ref": "#/$defs/__schema1"
+        },
+        "markdownListEnumeration": {
+          "$ref": "#/$defs/__schema1"
+        },
+        "markdownImage": {
+          "$ref": "#/$defs/__schema1"
+        },
+        "markdownImageText": {
+          "$ref": "#/$defs/__schema1"
+        },
+        "markdownCodeBlock": {
+          "$ref": "#/$defs/__schema1"
+        },
+        "syntaxComment": {
+          "$ref": "#/$defs/__schema1"
+        },
+        "syntaxKeyword": {
+          "$ref": "#/$defs/__schema1"
+        },
+        "syntaxFunction": {
+          "$ref": "#/$defs/__schema1"
+        },
+        "syntaxVariable": {
+          "$ref": "#/$defs/__schema1"
+        },
+        "syntaxString": {
+          "$ref": "#/$defs/__schema1"
+        },
+        "syntaxNumber": {
+          "$ref": "#/$defs/__schema1"
+        },
+        "syntaxType": {
+          "$ref": "#/$defs/__schema1"
+        },
+        "syntaxOperator": {
+          "$ref": "#/$defs/__schema1"
+        },
+        "syntaxPunctuation": {
+          "$ref": "#/$defs/__schema1"
+        },
+        "selectedListItemText": {
+          "$ref": "#/$defs/__schema1"
+        },
+        "backgroundMenu": {
+          "$ref": "#/$defs/__schema1"
+        },
+        "thinkingOpacity": {
+          "type": "number"
+        }
       },
-      "required": ["primary", "secondary", "accent", "text", "textMuted", "background"],
+      "required": [
+        "primary",
+        "secondary",
+        "accent",
+        "error",
+        "warning",
+        "success",
+        "info",
+        "text",
+        "textMuted",
+        "background",
+        "backgroundPanel",
+        "backgroundElement",
+        "border",
+        "borderActive",
+        "borderSubtle",
+        "diffAdded",
+        "diffRemoved",
+        "diffContext",
+        "diffHunkHeader",
+        "diffHighlightAdded",
+        "diffHighlightRemoved",
+        "diffAddedBg",
+        "diffRemovedBg",
+        "diffContextBg",
+        "diffLineNumber",
+        "diffAddedLineNumberBg",
+        "diffRemovedLineNumberBg",
+        "markdownText",
+        "markdownHeading",
+        "markdownLink",
+        "markdownLinkText",
+        "markdownCode",
+        "markdownBlockQuote",
+        "markdownEmph",
+        "markdownStrong",
+        "markdownHorizontalRule",
+        "markdownListItem",
+        "markdownListEnumeration",
+        "markdownImage",
+        "markdownImageText",
+        "markdownCodeBlock",
+        "syntaxComment",
+        "syntaxKeyword",
+        "syntaxFunction",
+        "syntaxVariable",
+        "syntaxString",
+        "syntaxNumber",
+        "syntaxType",
+        "syntaxOperator",
+        "syntaxPunctuation"
+      ],
       "additionalProperties": false
     }
   },
-  "required": ["theme"],
+  "required": [
+    "theme"
+  ],
   "additionalProperties": false,
-  "definitions": {
-    "colorValue": {
-      "oneOf": [
+  "$defs": {
+    "__schema0": {
+      "anyOf": [
         {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}$",
-          "description": "Hex color value (same for dark and light)"
+          "pattern": "^#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$"
         },
         {
           "type": "integer",
           "minimum": 0,
-          "maximum": 255,
-          "description": "ANSI color code (0-255, same for dark and light)"
+          "maximum": 255
         },
         {
           "type": "string",
-          "enum": ["none"],
-          "description": "No color (uses terminal default)"
+          "const": "none"
         },
         {
           "type": "string",
-          "pattern": "^[a-zA-Z][a-zA-Z0-9_]*$",
-          "description": "Reference to another color in the theme or defs"
+          "const": "transparent"
+        },
+        {
+          "type": "string",
+          "pattern": "^[a-zA-Z][a-zA-Z0-9_-]*$"
+        }
+      ]
+    },
+    "__schema1": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/__schema0"
         },
         {
           "type": "object",
           "properties": {
             "dark": {
-              "oneOf": [
-                {
-                  "type": "string",
-                  "pattern": "^#[0-9a-fA-F]{6}$",
-                  "description": "Hex color value for dark mode"
-                },
-                {
-                  "type": "integer",
-                  "minimum": 0,
-                  "maximum": 255,
-                  "description": "ANSI color code for dark mode"
-                },
-                {
-                  "type": "string",
-                  "enum": ["none"],
-                  "description": "No color (uses terminal default)"
-                },
-                {
-                  "type": "string",
-                  "pattern": "^[a-zA-Z][a-zA-Z0-9_]*$",
-                  "description": "Reference to another color for dark mode"
-                }
-              ]
+              "$ref": "#/$defs/__schema0"
             },
             "light": {
-              "oneOf": [
-                {
-                  "type": "string",
-                  "pattern": "^#[0-9a-fA-F]{6}$",
-                  "description": "Hex color value for light mode"
-                },
-                {
-                  "type": "integer",
-                  "minimum": 0,
-                  "maximum": 255,
-                  "description": "ANSI color code for light mode"
-                },
-                {
-                  "type": "string",
-                  "enum": ["none"],
-                  "description": "No color (uses terminal default)"
-                },
-                {
-                  "type": "string",
-                  "pattern": "^[a-zA-Z][a-zA-Z0-9_]*$",
-                  "description": "Reference to another color for light mode"
-                }
-              ]
+              "$ref": "#/$defs/__schema0"
             }
           },
-          "required": ["dark", "light"],
-          "additionalProperties": false,
-          "description": "Separate colors for dark and light modes"
+          "required": [
+            "dark",
+            "light"
+          ],
+          "additionalProperties": false
         }
       ]
     }

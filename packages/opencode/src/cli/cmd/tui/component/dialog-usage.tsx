@@ -8,6 +8,8 @@ import { For, Show, createMemo, createResource } from "solid-js"
 import { fetchUsageReports } from "@/provider/usage/registry"
 import { resolveUsedFraction } from "@/provider/usage/types"
 import type { UsageReport, UsageLimit } from "@/provider/usage/types"
+import { Auth } from "@/auth"
+import { Effect } from "effect"
 
 export type DialogUsageProps = {}
 
@@ -71,7 +73,13 @@ export function DialogUsage() {
 
   const [providerReports] = createResource(async () => {
     try {
-      return await fetchUsageReports()
+      const auth = await Effect.runPromise(
+        Effect.gen(function* () {
+          const service = yield* Auth.Service
+          return yield* service.all()
+        }).pipe(Effect.provide(Auth.defaultLayer)),
+      )
+      return await fetchUsageReports(auth)
     } catch {
       return [] as UsageReport[]
     }

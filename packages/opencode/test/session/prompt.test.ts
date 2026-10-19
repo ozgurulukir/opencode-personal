@@ -360,6 +360,34 @@ const boot = Effect.fn("test.boot")(function* (input?: { title?: string }) {
 
 // Loop semantics
 
+it.live("legacy prompt tools append literal permission rules and persist session precedence", () =>
+  provideTmpdirServer(
+    Effect.fnUntraced(function* () {
+      const prompt = yield* SessionPrompt.Service
+      const sessions = yield* Session.Service
+      const chat = yield* sessions.create({
+        permission: [{ permission: "write", pattern: "*", action: "deny" }],
+      })
+      yield* prompt.prompt({
+        sessionID: chat.id,
+        agent: "build",
+        noReply: true,
+        tools: { write: true, patch: false, "mcp_*": true },
+        parts: [{ type: "text", text: "hello" }],
+      })
+      const saved = yield* sessions.get(chat.id)
+      expect(saved.permission).toEqual([
+        { permission: "write", pattern: "*", action: "deny" },
+        { permission: "write", pattern: "*", action: "allow" },
+        { permission: "patch", pattern: "*", action: "deny" },
+        { permission: "mcp_*", pattern: "*", action: "allow" },
+      ])
+      expect(Permission.evaluate("write", "file.ts", saved.permission ?? []).action).toBe("allow")
+    }),
+    { git: true, config: providerCfg },
+  ),
+)
+
 it.live("loop exits immediately when last assistant has stop finish", () =>
   provideTmpdirServer(
     Effect.fnUntraced(function* ({ llm }) {

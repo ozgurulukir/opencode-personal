@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
-import { formatUsage, key, modelKey, remove, upsert } from "@/cli/cmd/run/session-data/utils"
+import { createSessionData, formatUsage, key, modelKey, out, remove, upsert } from "@/cli/cmd/run/session-data/utils"
+import type { SessionCommit } from "@/cli/cmd/run/session-data/types"
 
 describe("session data utils", () => {
   describe("key", () => {
@@ -73,6 +74,21 @@ describe("session data utils", () => {
     test("appends cost when tokens and cost are both present", () => {
       const tokens = { input: 1000, output: 500, reasoning: 0, cache: { read: 0, write: 0 } }
       expect(formatUsage(tokens, 3000, 0.25)).toBe("1.5K (50%) · $0.25")
+    })
+  })
+
+  describe("out", () => {
+    test("returns data and commits when footer is omitted", () => {
+      const data = createSessionData()
+      const commits: SessionCommit[] = []
+      expect(out(data, commits)).toEqual({ data, commits })
+    })
+
+    test("returns data, commits, and footer when footer is provided", () => {
+      const data = createSessionData()
+      const commits: SessionCommit[] = []
+      const footer = { view: { type: "prompt" } as const }
+      expect(out(data, commits, footer)).toEqual({ data, commits, footer })
     })
   })
 })

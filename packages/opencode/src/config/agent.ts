@@ -12,12 +12,18 @@ import * as ConfigMarkdown from "./markdown"
 import { ConfigModelID } from "./model-id"
 import { ConfigParse } from "./parse"
 import { ConfigPermission } from "./permission"
+import { toolsToPermissions } from "@/permission/tools"
 
 const log = Log.create({ service: "config" })
 
 const Color = Schema.Union([
   Schema.String.check(Schema.isPattern(/^#[0-9a-fA-F]{6}$/)),
   Schema.Literals(["primary", "secondary", "accent", "success", "warning", "error", "info"]),
+])
+
+const AgentTools = Schema.Union([
+  Schema.Record(Schema.String, Schema.Boolean),
+  Schema.mutable(Schema.Array(Schema.String)),
 ])
 
 const AgentSchema = Schema.StructWithRest(
@@ -29,7 +35,7 @@ const AgentSchema = Schema.StructWithRest(
     temperature: Schema.optional(Schema.Finite),
     top_p: Schema.optional(Schema.Finite),
     prompt: Schema.optional(Schema.String),
-    tools: Schema.optional(Schema.Record(Schema.String, Schema.Boolean)).annotate({
+    tools: Schema.optional(AgentTools).annotate({
       description: "@deprecated Use 'permission' field instead",
     }),
     disable: Schema.optional(Schema.Boolean),
@@ -77,24 +83,26 @@ const KNOWN_KEYS = new Set([
 //    `permission` shape (write-adjacent tools collapse into `permission.edit`).
 //  - Coalesce `steps ?? maxSteps` so downstream can ignore the deprecated alias.
 const normalize = (agent: Schema.Schema.Type<typeof AgentSchema>): Schema.Schema.Type<typeof AgentSchema> => {
+  const { tools: rawTools, maxSteps, ...rest } = agent
   const options: Record<string, unknown> = { ...agent.options }
   for (const [key, value] of Object.entries(agent)) {
     if (!KNOWN_KEYS.has(key)) options[key] = value
   }
 
-  const permission: ConfigPermission.Info = {}
-  for (const [tool, enabled] of Object.entries(agent.tools ?? {})) {
-    const action = enabled ? "allow" : "deny"
-    if (tool === "write" || tool === "edit" || tool === "patch") {
-      permission.edit = action
-      continue
-    }
-    permission[tool] = action
-  }
+  const tools = Array.isArray(rawTools)
+    ? Object.fromEntries(rawTools.map((tool) => [tool.toLowerCase(), true]))
+    : (rawTools ?? {})
+  const permission: ConfigPermission.Info = toolsToPermissions(tools, { foldEdit: true })
   globalThis.Object.assign(permission, agent.permission)
 
-  const steps = agent.steps ?? agent.maxSteps
-  return { ...agent, options, permission, ...(steps !== undefined ? { steps } : {}) }
+  const steps = agent.steps ?? maxSteps
+  return {
+    ...rest,
+    ...(rawTools !== undefined ? { tools } : {}),
+    options,
+    permission,
+    ...(steps !== undefined ? { steps } : {}),
+  }
 }
 
 export const Info = AgentSchema.pipe(

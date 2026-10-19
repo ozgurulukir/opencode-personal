@@ -30,6 +30,7 @@ import { NamedError } from "@opencode-ai/core/util/error"
 import { SessionProcessor } from "./processor"
 import { Tool } from "@/tool/tool"
 import { Permission } from "@/permission"
+import { toolsToPermissions } from "@/permission/tools"
 import { SessionStatus } from "./status"
 import { LLM } from "./llm"
 import { AppFileSystem } from "@opencode-ai/core/filesystem"
@@ -211,10 +212,7 @@ export const engineLayer = Layer.effect(
         )
         yield* sessions.touch(input.sessionID)
 
-        const permissions: Permission.Ruleset = []
-        for (const [t, enabled] of Object.entries(input.tools ?? {})) {
-          permissions.push({ permission: t, action: enabled ? "allow" : "deny", pattern: "*" })
-        }
+        const permissions = Permission.fromConfig(toolsToPermissions(input.tools))
         if (permissions.length > 0) {
           session.permission = Permission.merge(session.permission ?? [], permissions)
           yield* sessions.setPermission({ sessionID: session.id, permission: session.permission })

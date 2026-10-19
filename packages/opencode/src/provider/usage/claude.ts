@@ -1,13 +1,5 @@
-import type {
-  UsageProvider,
-  UsageReport,
-  UsageLimit,
-  UsageAmount,
-  UsageWindow,
-  UsageCredential,
-  UsageStatus,
-} from "./types"
-import { buildUsageStatus } from "./types"
+import type { UsageProvider, UsageReport, UsageLimit, UsageWindow, UsageCredential } from "./types"
+import { buildUsageAmount, buildUsageStatus } from "./types"
 
 const ANTHROPIC_USAGE_URL = "https://api.anthropic.com/api/oauth/usage"
 const ANTHROPIC_PROFILE_URL = "https://api.anthropic.com/api/oauth/profile"
@@ -46,20 +38,6 @@ function parseBucket(bucket: unknown): ParsedBucket | undefined {
   return { utilization, resetsAt }
 }
 
-function buildAmount(utilization: number | undefined): UsageAmount | undefined {
-  if (utilization === undefined) return undefined
-  const clamped = Math.min(Math.max(utilization, 0), 100)
-  const usedFraction = clamped / 100
-  return {
-    used: clamped,
-    limit: 100,
-    remaining: Math.max(0, 100 - clamped),
-    usedFraction,
-    remainingFraction: Math.max(0, 1 - usedFraction),
-    unit: "percent",
-  }
-}
-
 function buildLimit(args: {
   id: string
   label: string
@@ -69,9 +47,9 @@ function buildLimit(args: {
   bucket: ParsedBucket | undefined
   tier?: string
 }): UsageLimit | null {
-  if (!args.bucket) return null
-  const amount = buildAmount(args.bucket.utilization)
-  if (!amount) return null
+  if (args.bucket?.utilization === undefined) return null
+  const used = Math.min(Math.max(args.bucket.utilization, 0), 100)
+  const amount = buildUsageAmount({ used, limit: 100, remaining: Math.max(0, 100 - used), unit: "percent" })
   const window: UsageWindow = {
     id: args.windowId,
     label: args.windowLabel,
