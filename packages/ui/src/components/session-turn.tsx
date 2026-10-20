@@ -77,9 +77,14 @@ export function SessionTurn(
   const pending = createMemo(() => {
     if (typeof props.active === "boolean") return
     const messages = allMessages() ?? emptyMessages
-    return messages.findLast(
-      (item): item is AssistantMessage => item.role === "assistant" && typeof item.time.completed !== "number",
-    )
+    // ⚡ Bolt Optimization: Using backward loop instead of .findLast() to avoid GC pressure and O(N) traversal overhead
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const item = messages[i]
+      if (item.role === "assistant" && typeof item.time.completed !== "number") {
+        return item as AssistantMessage
+      }
+    }
+    return undefined
   })
 
   const pendingUser = createMemo(() => {
