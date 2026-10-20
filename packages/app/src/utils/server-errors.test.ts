@@ -60,7 +60,7 @@ describe("parseReadableConfigInvalidError", () => {
       },
     } satisfies ConfigInvalidError
 
-    const result = parseReadableConfigInvalidError(error, language.t)
+    const result = parseReadableConfigInvalidError(error, (key, vars) => language.t(key, vars))
 
     expect(result).toBe("Arquivo de config em config invalido: Bad value")
   })
@@ -124,7 +124,7 @@ describe("formatServerError", () => {
       },
     } satisfies ProviderModelNotFoundError
 
-    expect(formatServerError(error, language.t)).toBe(
+    expect(formatServerError(error, (key, vars) => language.t(key, vars))).toBe(
       ["Modelo nao encontrado: x/y", "Voce quis dizer: x/y2, x/y3", "Revise provider/model no config"].join("\n"),
     )
   })
