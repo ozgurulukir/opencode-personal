@@ -52,7 +52,7 @@ afterEach(() => {
   if (originalSecure) {
     Object.defineProperty(globalThis, "isSecureContext", originalSecure)
   } else {
-    delete (globalThis as Record<string, unknown>).isSecureContext
+    Reflect.deleteProperty(globalThis, "isSecureContext")
   }
 
   Math.random = originalRandom

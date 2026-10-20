@@ -236,11 +236,11 @@ export default function FileTree(props: {
   draggable?: boolean
   onFileClick?: (file: FileNode) => void
 
-  _filter?: Filter
-  _marks?: Set<string>
-  _deeps?: Map<string, number>
-  _kinds?: ReadonlyMap<string, Kind>
-  _chain?: readonly string[]
+  filterContext?: Filter
+  marksContext?: Set<string>
+  deepsContext?: Map<string, number>
+  kindsContext?: ReadonlyMap<string, Kind>
+  chainContext?: readonly string[]
 }) {
   const file = useFile()
   const level = props.level ?? 0
@@ -251,11 +251,11 @@ export default function FileTree(props: {
       .normalize(p)
       .replace(/[\\/]+$/, "")
       .replaceAll("\\", "/")
-  const chain = props._chain ? [...props._chain, key(props.path)] : [key(props.path)]
+  const chain = props.chainContext ? [...props.chainContext, key(props.path)] : [key(props.path)]
 
   // ⚡ Bolt Optimization: Use manual string parsing instead of expensive split()/slice()/join() to reduce GC pressure and O(D^2) complexity
   const filter = createMemo(() => {
-    if (props._filter) return props._filter
+    if (props.filterContext) return props.filterContext
 
     const allowed = props.allowed
     if (!allowed) return
@@ -264,7 +264,7 @@ export default function FileTree(props: {
   })
 
   const marks = createMemo(() => {
-    if (props._marks) return props._marks
+    if (props.marksContext) return props.marksContext
 
     const out = new Set<string>()
     for (const item of props.modified ?? []) out.add(item)
@@ -274,12 +274,12 @@ export default function FileTree(props: {
   })
 
   const kinds = createMemo(() => {
-    if (props._kinds) return props._kinds
+    if (props.kindsContext) return props.kindsContext
     return props.kinds
   })
 
   const deeps = createMemo(() => {
-    if (props._deeps) return props._deeps
+    if (props.deepsContext) return props.deepsContext
 
     const out = new Map<string, number>()
 
@@ -467,11 +467,11 @@ export default function FileTree(props: {
                         active={props.active}
                         draggable={props.draggable}
                         onFileClick={props.onFileClick}
-                        _filter={filter()}
-                        _marks={marks()}
-                        _deeps={deeps()}
-                        _kinds={kinds()}
-                        _chain={chain}
+                        filterContext={filter()}
+                        marksContext={marks()}
+                        deepsContext={deeps()}
+                        kindsContext={kinds()}
+                        chainContext={chain}
                       />
                     </Show>
                   </Collapsible.Content>

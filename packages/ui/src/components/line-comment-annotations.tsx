@@ -109,7 +109,8 @@ export function createLineCommentAnnotationRenderer<T>(props: {
   >()
 
   const mount = (meta: LineCommentAnnotationMeta<T>) => {
-    if (typeof document === "undefined") return
+
+    if (typeof document === "undefined") return undefined
 
     const host = document.createElement("div")
     host.setAttribute("data-prevent-autofocus", "")
@@ -180,15 +181,15 @@ export function createLineCommentAnnotationRenderer<T>(props: {
     return node
   }
 
-  const render = <A extends { metadata: LineCommentAnnotationMeta<T> }>(annotation: A) => {
+  const render = (annotation: { metadata: LineCommentAnnotationMeta<T> }) => {
     const meta = annotation.metadata
     const node = nodes.get(meta.key) ?? mount(meta)
-    if (!node) return
+    if (!node) return undefined
     node.setMeta(meta)
     return node.host
   }
 
-  const reconcile = <A extends { metadata: LineCommentAnnotationMeta<T> }>(annotations: A[]) => {
+  const reconcile = (annotations: { metadata: LineCommentAnnotationMeta<T> }[]) => {
     const next = new Set(annotations.map((annotation) => annotation.metadata.key))
     for (const [key, node] of nodes) {
       if (next.has(key)) continue
