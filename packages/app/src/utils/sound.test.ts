@@ -24,7 +24,7 @@ describe("sound utilities", () => {
   beforeEach(() => {
     originalAudio = globalThis.Audio
 
-    globalThis.Audio = class {
+    globalThis.Audio = class AudioMock {
       src: string
       constructor(src: string) {
         this.src = src
@@ -32,14 +32,14 @@ describe("sound utilities", () => {
       play = mock(() => Promise.resolve())
       pause = mock(() => {})
       currentTime = 0
-    } as any
+    } as unknown as typeof Audio
   })
 
   afterEach(() => {
     if (originalAudio) {
       globalThis.Audio = originalAudio
     } else {
-      delete (globalThis as any).Audio
+      Reflect.deleteProperty(globalThis, "Audio")
     }
   })
 
@@ -62,7 +62,7 @@ describe("sound utilities", () => {
 
   describe("playSound", () => {
     test("does not play if Audio is undefined", () => {
-      delete (globalThis as any).Audio
+      Reflect.deleteProperty(globalThis, "Audio")
       const res = playSound("test.aac")
       expect(res).toBeUndefined()
     })
@@ -83,7 +83,7 @@ describe("sound utilities", () => {
     })
 
     test("handles play rejection gracefully", () => {
-       globalThis.Audio = class {
+       globalThis.Audio = class AudioMock {
         src: string
         constructor(src: string) {
           this.src = src
@@ -91,7 +91,7 @@ describe("sound utilities", () => {
         play = mock(() => Promise.reject(new Error("Audio play failed")))
         pause = mock(() => {})
         currentTime = 0
-      } as any
+      } as unknown as typeof Audio
 
       const cleanup = playSound("test.aac")
       expect(cleanup).toBeTypeOf("function")

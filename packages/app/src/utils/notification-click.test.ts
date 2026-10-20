@@ -3,7 +3,7 @@ import { handleNotificationClick, setNavigate } from "./notification-click"
 
 describe("notification click", () => {
   afterEach(() => {
-    setNavigate(undefined as any)
+    setNavigate(undefined as unknown as (href: string) => void)
   })
 
   test("navigates via registered navigate function", () => {

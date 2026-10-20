@@ -14,7 +14,7 @@ describe("createAim", () => {
     const aim = createAim({
       enabled: () => true,
       active: () => undefined,
-      el: () => ({ getBoundingClientRect: () => ({ left: 0, right: 100, top: 0, bottom: 100 }) }) as any,
+      el: () => ({ getBoundingClientRect: () => ({ left: 0, right: 100, top: 0, bottom: 100 }) }) as HTMLElement,
       onActivate,
     })
 

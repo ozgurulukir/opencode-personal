@@ -318,7 +318,7 @@ describe("createTimelineStaging", () => {
   })
 
   test("returns all messages when turnStart is 0", () => {
-    const messages = Array.from({ length: 5 }, (_, i) => ({ id: `m${i}` } as UserMessage))
+    const messages = Array.from({ length: 5 }, (_, i) => ({ id: `m${i}` } as unknown as UserMessage))
     createRoot((dispose) => {
       const staging = createTimelineStaging(makeInput(messages))
       expect(staging.messages().length).toBe(5)
@@ -328,7 +328,7 @@ describe("createTimelineStaging", () => {
   })
 
   test("returns init-sized slice when windowed and not completed", () => {
-    const messages = Array.from({ length: 10 }, (_, i) => ({ id: `m${i}` } as UserMessage))
+    const messages = Array.from({ length: 10 }, (_, i) => ({ id: `m${i}` } as unknown as UserMessage))
     createRoot((dispose) => {
       const staging = createTimelineStaging(makeInput(messages, { turnStart: 2 }))
       expect(staging.messages().length).toBe(1)
@@ -338,7 +338,7 @@ describe("createTimelineStaging", () => {
   })
 
   test("returns all messages when total is less than init", () => {
-    const messages = Array.from({ length: 2 }, (_, i) => ({ id: `m${i}` } as UserMessage))
+    const messages = Array.from({ length: 2 }, (_, i) => ({ id: `m${i}` } as unknown as UserMessage))
     createRoot((dispose) => {
       const staging = createTimelineStaging(makeInput(messages, { turnStart: 2, config: { init: 5, batch: 3 } }))
       expect(staging.messages().length).toBe(2)
@@ -348,7 +348,7 @@ describe("createTimelineStaging", () => {
   })
 
   test("isStaging is true while activeSession matches", () => {
-    const messages = Array.from({ length: 10 }, (_, i) => ({ id: `m${i}` } as UserMessage))
+    const messages = Array.from({ length: 10 }, (_, i) => ({ id: `m${i}` } as unknown as UserMessage))
     createRoot((dispose) => {
       const staging = createTimelineStaging(makeInput(messages, { turnStart: 2 }))
       expect(staging.isStaging()).toBe(true)
@@ -357,7 +357,7 @@ describe("createTimelineStaging", () => {
   })
 
   test("isStaging is false when turnStart is 0", () => {
-    const messages = Array.from({ length: 10 }, (_, i) => ({ id: `m${i}` } as UserMessage))
+    const messages = Array.from({ length: 10 }, (_, i) => ({ id: `m${i}` } as unknown as UserMessage))
     createRoot((dispose) => {
       const staging = createTimelineStaging(makeInput(messages))
       expect(staging.isStaging()).toBe(false)
