@@ -311,9 +311,15 @@ function activeAssistant(messages: Message[] | undefined): AssistantMessage | un
   // newest message while streaming, so check it before paying for a full scan.
   const last = messages[messages.length - 1]
   if (last?.role === "assistant" && last.time.completed === undefined) return last
-  return messages.findLast(
-    (message): message is AssistantMessage => message.role === "assistant" && message.time.completed === undefined,
-  )
+
+  // ⚡ Bolt Optimization: Using backward loop instead of .findLast() to avoid GC pressure and O(N) traversal overhead
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const message = messages[i]
+    if (message.role === "assistant" && message.time.completed === undefined) {
+      return message as AssistantMessage
+    }
+  }
+  return undefined
 }
 
 function activeAssistantParts(input: MessageHandlerInput, sessionID: string) {
@@ -534,8 +540,15 @@ function handleTextDelta(input: MessageHandlerInput, event: MessageEvent) {
   const active = activeAssistantParts(input, props.sessionID)
   if (!active) return
   input.setStore("part", active.assistant.id, produce((draft) => {
-    const target = draft.findLast((part) => part.type === "text")
-    if (target?.type !== "text") return
+    // ⚡ Bolt Optimization: Using backward loop instead of .findLast() to avoid GC pressure and O(N) traversal overhead
+    let target: Extract<Part, { type: "text" }> | undefined
+    for (let i = draft.length - 1; i >= 0; i--) {
+      if (draft[i].type === "text") {
+        target = draft[i] as Extract<Part, { type: "text" }>
+        break
+      }
+    }
+    if (!target) return
     target.text += props.delta
   }))
 }
@@ -545,8 +558,15 @@ function handleTextEnded(input: MessageHandlerInput, event: MessageEvent) {
   const active = activeAssistantParts(input, props.sessionID)
   if (!active) return
   input.setStore("part", active.assistant.id, produce((draft) => {
-    const target = draft.findLast((part) => part.type === "text")
-    if (target?.type !== "text") return
+    // ⚡ Bolt Optimization: Using backward loop instead of .findLast() to avoid GC pressure and O(N) traversal overhead
+    let target: Extract<Part, { type: "text" }> | undefined
+    for (let i = draft.length - 1; i >= 0; i--) {
+      if (draft[i].type === "text") {
+        target = draft[i] as Extract<Part, { type: "text" }>
+        break
+      }
+    }
+    if (!target) return
     target.text = props.text
   }))
 }
