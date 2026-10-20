@@ -42,7 +42,9 @@ const iconPaths = {
   check: '<path d="M5 11.9657L8.37838 14.7529L15 5.83398" stroke="currentColor" stroke-linecap="square"/>',
 }
 
-function sanitize(html: string, options: any = {}): any {
+function sanitize(html: string, options: { RETURN_DOM_FRAGMENT: true }): DocumentFragment
+function sanitize(html: string, options?: Record<string, unknown>): string
+function sanitize(html: string, options: { RETURN_DOM_FRAGMENT?: boolean } = {}) {
   if (!DOMPurify.isSupported) return options.RETURN_DOM_FRAGMENT ? document.createDocumentFragment() : ""
   return DOMPurify.sanitize(html, { ...config, ...options })
 }
