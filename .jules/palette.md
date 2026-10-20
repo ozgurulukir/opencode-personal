@@ -14,6 +14,7 @@
 ## 2026-07-28 - ARIA Current for Navigation State
 **Learning:** Adding `data-active` attributes to items provides clear visual styling for the currently selected item, but screen readers require `aria-current="true"` to denote the active state of interactive list elements or navigation items. This helps users relying on assistive tech understand their current location within a widget or list (like the message timeline/nav).
 **Action:** When applying a `data-active` or similar state-tracking property to a focusable or interactive element inside a navigation context or list, always supplement it with `aria-current={isActive ? "true" : undefined}`.
+
 ## 2026-07-19 - Model visibility toggles missing ARIA label
 **Learning:** The `Switch` component uses `<Kobalte.Input />` under the hood. When used without children (e.g. just as a toggle element next to text), it has no accessible name unless `aria-label` is provided. This meant the model visibility toggles were announced just as generic switches to screen readers.
 **Action:** When using `Switch` components purely as UI toggles without textual children, always provide children and use `hideLabel` (such as the name of the item being toggled) so screen readers can announce what the toggle controls.
@@ -27,7 +28,7 @@
 ## 2026-07-19 - Missing ARIA Expansion States on Docks
 **Learning:** Collapsible side/dock panels that manage state using purely visual indicators (`data-collapsed="true"`) miss screen reader cues because `aria-expanded` is not set on their respective toggle buttons.
 **Action:** When implementing expandable or toggleable sections, alongside custom state attributes like `data-collapsed` or `data-active`, always include corresponding semantic ARIA attributes (`aria-expanded`, `aria-current`) for screen readers.
-WebUI is UX-ready
+
 ## 2024-07-20 - [WebUI Polish Audit]
 
 **Major Findings:**
@@ -62,6 +63,7 @@ WebUI is UX-ready
 
 **Lessons Learned:**
 - Proper focus management is critical for accessibility. When an action originates from within or conceptually adjacent to an input (like clearing it), focus *must* be returned to that input to preserve the user's interactive context.
+
 ## 2026-09-02 - [WebUI Polish Audit - TextField Focus]
 
 **Major Findings:**
@@ -76,3 +78,19 @@ WebUI is UX-ready
 
 **Lessons Learned:**
 - Simple interactions like "Clear" often break keyboard focus state if not explicitly managed. Whenever implementing action buttons inside input components, always verify focus is returned to the primary interactive element.
+
+## 2026-10-18 - [WebUI Polish Audit - Standardized Button Loading State & Dialog Escape]
+
+**Major Findings:**
+- Dialog "Submit" or "Continue" buttons frequently manually injected `<Spinner />` and managed disabled states manually, causing component-level boilerplate.
+- Some dialog components manually intercepted the `Escape` key to call custom closing logic or block bubbling, which bypasses Kobalte's built-in robust dialog dismissal behaviors, creating accessibility regressions.
+
+**Patterns to Repeat:**
+- Uplifting common state behaviors like loading states directly into the atomic components (e.g., `<Button loading={...} />`) rather than writing redundant conditional rendering locally.
+- Allowing Kobalte core elements to manage standard keyboard events natively (like dialog closing on Escape) instead of stopping event propagation prematurely unless absolutely required (e.g., within an inner text field that uses Escape to clear).
+
+**Patterns to Avoid:**
+- Overriding `Escape` keydown events on dialog bodies using `event.stopPropagation()` to handle closing manually. It breaks focus traps and other accessibility behaviors implemented natively by Kobalte's dialog wrapper.
+
+**Lessons Learned:**
+- Abstracting visual states into primitive UI components significantly cleans up complex form components. Furthermore, explicit event `stopPropagation()` should be used sparingly, as it frequently interferes with accessible headless library features.

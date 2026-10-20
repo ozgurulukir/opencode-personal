@@ -43,12 +43,6 @@ export function DialogReleaseNotes(props: { highlights: Highlight[] }) {
   }
 
   function handleKeyDown(e: KeyboardEvent) {
-    if (e.key === "Escape") {
-      e.preventDefault()
-      handleClose()
-      return
-    }
-
     if (!paged()) return
     if (e.key === "ArrowLeft" && !isFirst()) {
       e.preventDefault()
