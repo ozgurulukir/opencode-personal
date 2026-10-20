@@ -144,6 +144,245 @@ describe("Zls LSP Info", () => {
       }
     })
 
+    test("returns undefined when asset name is not supported by zls", async () => {
+      const prevFlag = Flag.OPENCODE_DISABLE_LSP_DOWNLOAD
+      Flag.OPENCODE_DISABLE_LSP_DOWNLOAD = false
+
+      const whichSpy = spyOn(Which, "which").mockImplementation((cmd: string) => {
+        if (cmd === "zig") return "/usr/bin/zig"
+        return null
+      })
+
+      const origPlatform = Object.getOwnPropertyDescriptor(process, "platform")
+      Object.defineProperty(process, "platform", { value: "freebsd", configurable: true })
+
+      const origFetch = globalThis.fetch
+      globalThis.fetch = (async () => ({
+        ok: true,
+        json: async () => ({ assets: [] }),
+      })) as unknown as typeof fetch
+
+      try {
+        const root = makeTempDir()
+        const ctx = mockInstanceContext(root)
+        const handle = await Zls.spawn(root, ctx)
+        expect(handle).toBeUndefined()
+      } finally {
+        Flag.OPENCODE_DISABLE_LSP_DOWNLOAD = prevFlag
+        whichSpy.mockRestore()
+        globalThis.fetch = origFetch
+        if (origPlatform) Object.defineProperty(process, "platform", origPlatform)
+      }
+    })
+
+    test("returns undefined when asset URL is missing in latest release", async () => {
+      const prevFlag = Flag.OPENCODE_DISABLE_LSP_DOWNLOAD
+      Flag.OPENCODE_DISABLE_LSP_DOWNLOAD = false
+
+      const whichSpy = spyOn(Which, "which").mockImplementation((cmd: string) => {
+        if (cmd === "zig") return "/usr/bin/zig"
+        return null
+      })
+
+      const origFetch = globalThis.fetch
+      globalThis.fetch = (async () => ({
+        ok: true,
+        json: async () => ({ assets: [] }),
+      })) as unknown as typeof fetch
+
+      try {
+        const root = makeTempDir()
+        const ctx = mockInstanceContext(root)
+        const handle = await Zls.spawn(root, ctx)
+        expect(handle).toBeUndefined()
+      } finally {
+        Flag.OPENCODE_DISABLE_LSP_DOWNLOAD = prevFlag
+        whichSpy.mockRestore()
+        globalThis.fetch = origFetch
+      }
+    })
+
+    test("returns undefined when binary download fails", async () => {
+      const prevFlag = Flag.OPENCODE_DISABLE_LSP_DOWNLOAD
+      Flag.OPENCODE_DISABLE_LSP_DOWNLOAD = false
+
+      const whichSpy = spyOn(Which, "which").mockImplementation((cmd: string) => {
+        if (cmd === "zig") return "/usr/bin/zig"
+        return null
+      })
+
+      const platform = process.platform
+      const arch = process.arch
+      let zlsArch: string = arch
+      if (arch === "arm64") zlsArch = "aarch64"
+      else if (arch === "x64") zlsArch = "x86_64"
+      else if (arch === "ia32") zlsArch = "x86"
+
+      let zlsPlatform: string = platform
+      if (platform === "darwin") zlsPlatform = "macos"
+      else if (platform === "win32") zlsPlatform = "windows"
+
+      const ext = platform === "win32" ? "zip" : "tar.xz"
+      const assetName = `zls-${zlsArch}-${zlsPlatform}.${ext}`
+
+      const origFetch = globalThis.fetch
+      globalThis.fetch = (async (input: RequestInfo | URL) => {
+        const urlStr = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url
+        if (urlStr.includes("api.github.com/repos/zigtools/zls/releases/latest")) {
+          return {
+            ok: true,
+            json: async () => ({
+              assets: [
+                {
+                  name: assetName,
+                  browser_download_url: `https://github.com/zigtools/zls/releases/download/v0.13.0/${assetName}`,
+                },
+              ],
+            }),
+          }
+        }
+        return { ok: false, status: 500 }
+      }) as unknown as typeof fetch
+
+      try {
+        const root = makeTempDir()
+        const ctx = mockInstanceContext(root)
+        const handle = await Zls.spawn(root, ctx)
+        expect(handle).toBeUndefined()
+      } finally {
+        Flag.OPENCODE_DISABLE_LSP_DOWNLOAD = prevFlag
+        whichSpy.mockRestore()
+        globalThis.fetch = origFetch
+      }
+    })
+
+    test("returns undefined when archive zip extraction fails", async () => {
+      const prevFlag = Flag.OPENCODE_DISABLE_LSP_DOWNLOAD
+      Flag.OPENCODE_DISABLE_LSP_DOWNLOAD = false
+
+      const whichSpy = spyOn(Which, "which").mockImplementation((cmd: string) => {
+        if (cmd === "zig") return "/usr/bin/zig"
+        return null
+      })
+
+      const origPlatform = Object.getOwnPropertyDescriptor(process, "platform")
+      Object.defineProperty(process, "platform", { value: "win32", configurable: true })
+      const origArch = Object.getOwnPropertyDescriptor(process, "arch")
+      Object.defineProperty(process, "arch", { value: "x64", configurable: true })
+
+      const assetName = "zls-x86_64-windows.zip"
+
+      const origFetch = globalThis.fetch
+      globalThis.fetch = (async (input: RequestInfo | URL) => {
+        const urlStr = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url
+        if (urlStr.includes("api.github.com/repos/zigtools/zls/releases/latest")) {
+          return {
+            ok: true,
+            json: async () => ({
+              assets: [
+                {
+                  name: assetName,
+                  browser_download_url: `https://github.com/zigtools/zls/releases/download/v0.13.0/${assetName}`,
+                },
+              ],
+            }),
+          }
+        }
+        return {
+          ok: true,
+          body: {} as ReadableStream,
+        }
+      }) as unknown as typeof fetch
+
+      const writeStreamSpy = spyOn(Filesystem, "writeStream").mockResolvedValue(undefined)
+      const extractZipSpy = spyOn(Archive, "extractZip").mockRejectedValue(new Error("Extraction failed"))
+
+      try {
+        const root = makeTempDir()
+        const ctx = mockInstanceContext(root)
+        const handle = await Zls.spawn(root, ctx)
+        expect(handle).toBeUndefined()
+      } finally {
+        Flag.OPENCODE_DISABLE_LSP_DOWNLOAD = prevFlag
+        whichSpy.mockRestore()
+        globalThis.fetch = origFetch
+        writeStreamSpy.mockRestore()
+        extractZipSpy.mockRestore()
+        if (origPlatform) Object.defineProperty(process, "platform", origPlatform)
+        if (origArch) Object.defineProperty(process, "arch", origArch)
+      }
+    })
+
+    test("returns undefined when extracted binary does not exist", async () => {
+      const prevFlag = Flag.OPENCODE_DISABLE_LSP_DOWNLOAD
+      Flag.OPENCODE_DISABLE_LSP_DOWNLOAD = false
+
+      const whichSpy = spyOn(Which, "which").mockImplementation((cmd: string) => {
+        if (cmd === "zig") return "/usr/bin/zig"
+        return null
+      })
+
+      const platform = process.platform
+      const arch = process.arch
+      let zlsArch: string = arch
+      if (arch === "arm64") zlsArch = "aarch64"
+      else if (arch === "x64") zlsArch = "x86_64"
+      else if (arch === "ia32") zlsArch = "x86"
+
+      let zlsPlatform: string = platform
+      if (platform === "darwin") zlsPlatform = "macos"
+      else if (platform === "win32") zlsPlatform = "windows"
+
+      const ext = platform === "win32" ? "zip" : "tar.xz"
+      const assetName = `zls-${zlsArch}-${zlsPlatform}.${ext}`
+
+      const origFetch = globalThis.fetch
+      globalThis.fetch = (async (input: RequestInfo | URL) => {
+        const urlStr = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url
+        if (urlStr.includes("api.github.com/repos/zigtools/zls/releases/latest")) {
+          return {
+            ok: true,
+            json: async () => ({
+              assets: [
+                {
+                  name: assetName,
+                  browser_download_url: `https://github.com/zigtools/zls/releases/download/v0.13.0/${assetName}`,
+                },
+              ],
+            }),
+          }
+        }
+        return {
+          ok: true,
+          body: {} as ReadableStream,
+        }
+      }) as unknown as typeof fetch
+
+      const writeStreamSpy = spyOn(Filesystem, "writeStream").mockResolvedValue(undefined)
+      const extractZipSpy = spyOn(Archive, "extractZip").mockResolvedValue(undefined)
+      const runSpy = spyOn(Process, "run").mockResolvedValue({
+        code: 0,
+        stdout: Buffer.from(""),
+        stderr: Buffer.from(""),
+      })
+      const existsSpy = spyOn(Filesystem, "exists").mockResolvedValue(false)
+
+      try {
+        const root = makeTempDir()
+        const ctx = mockInstanceContext(root)
+        const handle = await Zls.spawn(root, ctx)
+        expect(handle).toBeUndefined()
+      } finally {
+        Flag.OPENCODE_DISABLE_LSP_DOWNLOAD = prevFlag
+        whichSpy.mockRestore()
+        globalThis.fetch = origFetch
+        writeStreamSpy.mockRestore()
+        extractZipSpy.mockRestore()
+        runSpy.mockRestore()
+        existsSpy.mockRestore()
+      }
+    })
+
     test("downloads and spawns zls successfully when not in PATH", async () => {
       const prevFlag = Flag.OPENCODE_DISABLE_LSP_DOWNLOAD
       Flag.OPENCODE_DISABLE_LSP_DOWNLOAD = false
