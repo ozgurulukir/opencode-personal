@@ -1,7 +1,6 @@
 import style from "./content-bash.module.css"
 import { createResource, createSignal, createEffect } from "solid-js"
 import { isServer } from "solid-js/web"
-import DOMPurify from "isomorphic-dompurify"
 import { createOverflow, useShareMessages } from "./common"
 import { codeToHtml } from "shiki"
 
@@ -52,7 +51,9 @@ export function ContentBash(props: Props) {
     const content = commandHtml()
     if (!isServer && commandRef && content) {
       commandRef.textContent = ""
-      commandRef.appendChild(DOMPurify.sanitize(content, { RETURN_DOM_FRAGMENT: true }))
+      const template = document.createElement("template")
+      template.innerHTML = content
+      commandRef.appendChild(template.content.cloneNode(true))
     }
   })
 
@@ -60,7 +61,9 @@ export function ContentBash(props: Props) {
     const content = outputHtml()
     if (!isServer && outputRef && content) {
       outputRef.textContent = ""
-      outputRef.appendChild(DOMPurify.sanitize(content, { RETURN_DOM_FRAGMENT: true }))
+      const template = document.createElement("template")
+      template.innerHTML = content
+      outputRef.appendChild(template.content.cloneNode(true))
     }
   })
 
