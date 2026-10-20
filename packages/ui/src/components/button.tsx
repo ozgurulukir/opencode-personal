@@ -2,6 +2,7 @@ import { Button as Kobalte } from "@kobalte/core/button"
 import { type ComponentProps, Show, splitProps } from "solid-js"
 import { Icon, IconProps } from "./icon"
 import { Spinner } from "./spinner"
+import { buttonState } from "./button.shared"
 
 export interface ButtonProps
   extends ComponentProps<typeof Kobalte>,
@@ -14,15 +15,18 @@ export interface ButtonProps
 
 export function Button(props: ButtonProps) {
   const [split, rest] = splitProps(props, ["variant", "size", "icon", "class", "classList", "loading", "disabled"])
+  const state = () => buttonState({ disabled: split.disabled, loading: split.loading })
+
   return (
     <Kobalte
       {...rest}
-      disabled={split.disabled || split.loading}
+      disabled={state().disabled}
+      aria-busy={state().ariaBusy}
       data-component="button"
       data-size={split.size || "normal"}
       data-variant={split.variant || "secondary"}
       data-icon={split.icon}
-      data-loading={split.loading}
+      data-loading={state().dataLoading}
       classList={{
         ...split.classList,
         [split.class ?? ""]: !!split.class,
