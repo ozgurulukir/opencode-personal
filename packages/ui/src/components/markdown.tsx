@@ -42,9 +42,11 @@ const iconPaths = {
   check: '<path d="M5 11.9657L8.37838 14.7529L15 5.83398" stroke="currentColor" stroke-linecap="square"/>',
 }
 
-function sanitize(html: string, options: any = {}) {
+function sanitize(html: string, options: { RETURN_DOM_FRAGMENT: true }): DocumentFragment
+function sanitize(html: string, options?: Record<string, unknown>): string
+function sanitize(html: string, options: { RETURN_DOM_FRAGMENT?: boolean } = {}) {
   if (!DOMPurify.isSupported) return options.RETURN_DOM_FRAGMENT ? document.createDocumentFragment() : ""
-  return DOMPurify.sanitize(html, { ...config, ...options }) as any
+  return DOMPurify.sanitize(html, { ...config, ...options })
 }
 
 function escape(text: string) {
@@ -67,14 +69,14 @@ type CopyLabels = {
 
 const urlPattern = /^https?:\/\/[^\s<>()`"']+$/
 
-function codeUrl(text: string) {
+function codeUrl(text: string): string | undefined {
   const href = text.trim().replace(/[),.;!?]+$/, "")
-  if (!urlPattern.test(href)) return
+  if (!urlPattern.test(href)) return undefined
   try {
     const url = new URL(href)
     return url.toString()
   } catch {
-    return
+    return undefined
   }
 }
 
@@ -112,7 +114,6 @@ function setCopyState(button: HTMLButtonElement, labels: CopyLabels, copied: boo
     button.setAttribute("data-copied", "true")
     button.setAttribute("aria-label", labels.copied)
     button.setAttribute("data-tooltip", labels.copied)
-    return
   }
   button.removeAttribute("data-copied")
   button.setAttribute("aria-label", labels.copy)
@@ -129,7 +130,6 @@ function ensureCodeWrapper(block: HTMLPreElement, labels: CopyLabels) {
     parent.replaceChild(wrapper, block)
     wrapper.appendChild(block)
     wrapper.appendChild(createCopyButton(labels))
-    return
   }
 
   const buttons = Array.from(parent.querySelectorAll('[data-slot="markdown-copy-button"]')).filter(
@@ -138,7 +138,6 @@ function ensureCodeWrapper(block: HTMLPreElement, labels: CopyLabels) {
 
   if (buttons.length === 0) {
     parent.appendChild(createCopyButton(labels))
-    return
   }
 
   for (const button of buttons.slice(1)) {
@@ -297,7 +296,6 @@ export function Markdown(
 
     if (!content) {
       container.textContent = ""
-      return
     }
 
     const labels = {
@@ -306,7 +304,7 @@ export function Markdown(
     }
     const temp = document.createElement("div")
     const fragment = sanitize(content, { RETURN_DOM_FRAGMENT: true })
-    temp.appendChild(fragment as Node)
+    if (fragment instanceof Node) temp.appendChild(fragment)
     decorate(temp, labels)
 
     morphdom(container, temp, {
