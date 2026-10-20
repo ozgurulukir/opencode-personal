@@ -33,7 +33,6 @@ export const DialogSelectModelUnpaid: Component<{ model?: ModelState }> = (props
 
   let listRef: ListRef | undefined
   const handleKeyDown = (e: KeyboardEvent) => {
-    if (e.key === "Escape") return
     listRef?.onKeyDown(e)
   }
 

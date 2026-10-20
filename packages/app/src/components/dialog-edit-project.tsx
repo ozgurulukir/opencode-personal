@@ -13,7 +13,6 @@ import { getFilename } from "@opencode-ai/core/util/path"
 import { Avatar } from "@opencode-ai/ui/avatar"
 import { useLanguage } from "@/context/language"
 import { getProjectAvatarSource } from "@/pages/layout/sidebar-items"
-import { Spinner } from "@opencode-ai/ui/spinner"
 
 const AVATAR_COLOR_KEYS = ["pink", "mint", "orange", "purple", "cyan", "lime"] as const
 
@@ -256,15 +255,8 @@ export function DialogEditProject(props: { project: LocalProject }) {
           <Button type="button" variant="ghost" size="large" onClick={() => dialog.close()}>
             {language.t("common.cancel")}
           </Button>
-          <Button type="submit" variant="primary" size="large" disabled={saveMutation.isPending}>
-            {saveMutation.isPending ? (
-              <div class="flex items-center gap-2">
-                <Spinner class="size-4" />
-                <span>{language.t("common.saving")}</span>
-              </div>
-            ) : (
-              language.t("common.save")
-            )}
+          <Button type="submit" variant="primary" size="large" loading={saveMutation.isPending}>
+            {language.t("common.save")}
           </Button>
         </div>
       </form>

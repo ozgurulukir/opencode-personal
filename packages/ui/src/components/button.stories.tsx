@@ -14,7 +14,7 @@ Use \`IconButton\` for icon-only actions.
 
 ### Variants and states
 - Variants: primary, secondary, ghost.
-- States: disabled.
+- States: disabled, loading.
 
 ### Behavior
 - Renders an Icon when \`icon\` is set.
@@ -88,6 +88,23 @@ export const Disabled = {
   args: {
     variant: "primary",
     disabled: true,
+  },
+}
+
+export const Loading = {
+  args: {
+    variant: "primary",
+    loading: true,
+    children: "Saving...",
+  },
+}
+
+export const LoadingWithIcon = {
+  args: {
+    variant: "primary",
+    loading: true,
+    icon: "arrow-right",
+    children: "Continue",
   },
 }
 

@@ -6,7 +6,6 @@ import { ProviderIcon } from "@opencode-ai/ui/provider-icon"
 import { useMutation } from "@tanstack/solid-query"
 import { TextField } from "@opencode-ai/ui/text-field"
 import { showToast } from "@opencode-ai/ui/toast"
-import { Spinner } from "@opencode-ai/ui/spinner"
 import { batch, For } from "solid-js"
 import { createStore, produce } from "solid-js/store"
 import { Link } from "@/components/link"
@@ -319,16 +318,9 @@ export function DialogCustomProvider(props: Props) {
             type="submit"
             size="large"
             variant="primary"
-            disabled={saveMutation.isPending}
+            loading={saveMutation.isPending}
           >
-            {saveMutation.isPending ? (
-              <div class="flex items-center gap-2">
-                <Spinner class="size-4" />
-                <span>{language.t("common.saving")}</span>
-              </div>
-            ) : (
-              language.t("common.submit")
-            )}
+            {language.t("common.submit")}
           </Button>
         </form>
       </div>

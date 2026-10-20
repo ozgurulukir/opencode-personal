@@ -276,15 +276,8 @@ export function DialogConnectProvider(props: { provider: string }) {
                 setFormStore("value", prompt.key, value)
               }}
             />
-            <Button class="w-auto" type="submit" size="large" variant="primary" disabled={!valid() || formStore.pending}>
-              {formStore.pending ? (
-                <div class="flex items-center gap-2">
-                  <Spinner class="size-4" />
-                  <span>{language.t("common.continue")}</span>
-                </div>
-              ) : (
-                language.t("common.continue")
-              )}
+            <Button class="w-auto" type="submit" size="large" variant="primary" disabled={!valid()} loading={formStore.pending}>
+              {language.t("common.continue")}
             </Button>
           </Match>
           <Match when={item()?.prompt.type === "select"}>
@@ -330,7 +323,6 @@ export function DialogConnectProvider(props: { provider: string }) {
     if (e.key === "Enter" && e.target instanceof HTMLInputElement) {
       return
     }
-    if (e.key === "Escape") return
     listRef?.onKeyDown(e)
   }
 
@@ -477,15 +469,8 @@ export function DialogConnectProvider(props: { provider: string }) {
             validationState={formStore.error ? "invalid" : undefined}
             error={formStore.error}
           />
-          <Button class="w-auto" type="submit" size="large" variant="primary" disabled={formStore.pending}>
-            {formStore.pending ? (
-              <div class="flex items-center gap-2">
-                <Spinner class="size-4" />
-                <span>{language.t("common.continue")}</span>
-              </div>
-            ) : (
-              language.t("common.continue")
-            )}
+          <Button class="w-auto" type="submit" size="large" variant="primary" loading={formStore.pending}>
+            {language.t("common.continue")}
           </Button>
         </form>
       </div>
@@ -552,15 +537,8 @@ export function DialogConnectProvider(props: { provider: string }) {
             validationState={formStore.error ? "invalid" : undefined}
             error={formStore.error}
           />
-          <Button class="w-auto" type="submit" size="large" variant="primary" disabled={formStore.pending}>
-            {formStore.pending ? (
-              <div class="flex items-center gap-2">
-                <Spinner class="size-4" />
-                <span>{language.t("common.continue")}</span>
-              </div>
-            ) : (
-              language.t("common.continue")
-            )}
+          <Button class="w-auto" type="submit" size="large" variant="primary" loading={formStore.pending}>
+            {language.t("common.continue")}
           </Button>
         </form>
       </div>
