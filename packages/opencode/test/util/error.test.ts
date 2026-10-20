@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test"
+import * as Log from "@opencode-ai/core/util/log"
 import { errorData, errorFormat, errorMessage, safeCatch } from "../../src/util/error"
 
 describe("util.error", () => {
@@ -50,10 +51,10 @@ describe("util.error", () => {
   })
 
   test("safeCatch logs error with context and calls fallback", () => {
-    const logs: Array<[string, unknown]> = []
-    const original = console.error
-    console.error = (...args: unknown[]) => {
-      logs.push(args as [string, unknown])
+    const logged: Array<{ message: unknown; extra: Record<string, any> | undefined }> = []
+    const originalError = Log.Default.error.bind(Log.Default)
+    Log.Default.error = (message?: any, extra?: Record<string, any>) => {
+      logged.push({ message, extra })
     }
 
     let fallbackCalled = false
@@ -61,25 +62,27 @@ describe("util.error", () => {
       fallbackCalled = true
     })
 
-    console.error = original
-    expect(logs.length).toBe(1)
-    expect(logs[0][0]).toBe("[test-context]")
-    expect(logs[0][1]).toBeInstanceOf(Error)
-    expect((logs[0][1] as Error).message).toBe("catch me")
+    Log.Default.error = originalError
     expect(fallbackCalled).toBeTrue()
+    expect(logged.length).toBe(1)
+    expect(logged[0].message).toBe("[test-context]")
+    const loggedError = logged[0].extra?.error
+    expect(loggedError).toBeInstanceOf(Error)
+    expect(loggedError instanceof Error ? loggedError.message : "").toBe("catch me")
   })
 
   test("safeCatch works without fallback", () => {
-    const logs: unknown[] = []
-    const original = console.error
-    console.error = (...args: unknown[]) => {
-      logs.push(args)
+    const logged: Array<{ message: unknown; extra: Record<string, any> | undefined }> = []
+    const originalError = Log.Default.error.bind(Log.Default)
+    Log.Default.error = (message?: any, extra?: Record<string, any>) => {
+      logged.push({ message, extra })
     }
 
     safeCatch("no-fallback", { code: "E_FAIL" })
 
-    console.error = original
-    expect(logs.length).toBe(1)
-    expect(logs[0]).toEqual(["[no-fallback]", { code: "E_FAIL" }])
+    Log.Default.error = originalError
+    expect(logged.length).toBe(1)
+    expect(logged[0].message).toBe("[no-fallback]")
+    expect(logged[0].extra?.error).toEqual({ code: "E_FAIL" })
   })
 })

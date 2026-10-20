@@ -1,4 +1,5 @@
 import { isRecord } from "./record"
+import * as Log from "@opencode-ai/core/util/log"
 
 export function errorFormat(error: unknown): string {
   if (error instanceof Error) {
@@ -90,6 +91,6 @@ export function errorData(error: unknown) {
 }
 
 export function safeCatch(context: string, error: unknown, fallback?: () => void): void {
-  console.error(`[${context}]`, error)
+  Log.Default.error(`[${context}]`, { error })
   fallback?.()
 }
