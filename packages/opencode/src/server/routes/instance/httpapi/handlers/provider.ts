@@ -15,6 +15,13 @@ export const providerHandlers = HttpApiBuilder.group(InstanceHttpApi, "provider"
     const provider = yield* Provider.Service
     const svc = yield* ProviderAuth.Service
 
+    // Transforming the whole models.dev catalog costs ~60ms and allocates
+    // thousands of model objects. The catalog is cached in memory by
+    // ModelsDev.Service, so the raw provider objects are stable across
+    // requests — memoize on their identity and reuse the transformed result.
+    // A WeakMap lets the entries go when the catalog is replaced.
+    const transformed = new WeakMap<ModelsDev.Provider, Provider.Info>()
+
     const list = Effect.fn("ProviderHttpApi.list")(function* () {
       const config = yield* cfg.get()
       const all = yield* ModelsDev.Service.use((s) => s.get())
@@ -26,7 +33,13 @@ export const providerHandlers = HttpApiBuilder.group(InstanceHttpApi, "provider"
       }
       const connected = yield* provider.list()
       const providers = Object.assign(
-        mapValues(filtered, (item) => Provider.fromModelsDevProvider(item)),
+        mapValues(filtered, (item) => {
+          const cached = transformed.get(item)
+          if (cached) return cached
+          const info = Provider.fromModelsDevProvider(item)
+          transformed.set(item, info)
+          return info
+        }),
         connected,
       )
       return {

@@ -1061,9 +1061,11 @@ function fromModelsDevModel(provider: ModelsDev.Provider, model: ModelsDev.Model
     options: {},
     cost: cost(model.cost),
     limit: {
-      context: model.limit.context,
-      input: model.limit.input,
-      output: model.limit.output,
+      // models.dev is an unvalidated remote source; a model missing `limit`
+      // must not take down the whole provider.
+      context: model.limit?.context ?? 0,
+      input: model.limit?.input,
+      output: model.limit?.output ?? 0,
     },
     capabilities: {
       temperature: model.temperature ?? false,
@@ -1098,10 +1100,18 @@ function fromModelsDevModel(provider: ModelsDev.Provider, model: ModelsDev.Model
 
 export function fromModelsDevProvider(provider: ModelsDev.Provider): Info {
   const models: Record<string, Model> = {}
+  // Real catalog entries are written first so they always win over a
+  // colliding experimental-mode variant. A variant id can collide with a real
+  // model in the same provider (e.g. vercel's real "openai/gpt-5-fast" vs the
+  // "fast" variant of "openai/gpt-5"); overwriting the real entry would
+  // silently replace a catalog model with a differently-priced variant.
   for (const [key, model] of Object.entries(provider.models)) {
     models[key] = fromModelsDevModel(provider, model)
+  }
+  for (const model of Object.values(provider.models)) {
     for (const [mode, opts] of Object.entries(model.experimental?.modes ?? {})) {
       const id = `${model.id}-${mode}`
+      if (models[id]) continue
       const base = fromModelsDevModel(provider, model)
       models[id] = {
         ...base,

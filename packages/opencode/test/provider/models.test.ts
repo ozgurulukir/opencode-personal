@@ -6,7 +6,7 @@ import { Flag } from "@opencode-ai/core/flag/flag"
 import { Global } from "@opencode-ai/core/global"
 import { ModelsDev } from "../../src/provider/models"
 import { it } from "../lib/effect"
-import { rm, writeFile, utimes, mkdir } from "fs/promises"
+import { rm, writeFile, utimes, mkdir, readFile } from "fs/promises"
 import path from "path"
 
 // test/preload.ts pins OPENCODE_MODELS_PATH to a fixture so other tests can
@@ -101,6 +101,39 @@ const writeCache = (data: object, mtimeMs?: number) =>
     }
   })
 
+const writeCacheText = (text: string, mtimeMs?: number) =>
+  Effect.promise(async () => {
+    await mkdir(Global.Path.cache, { recursive: true })
+    await writeFile(cacheFile, text)
+    if (mtimeMs !== undefined) {
+      const t = mtimeMs / 1000
+      await utimes(cacheFile, t, t)
+    }
+  })
+
+const readCache = () => Effect.promise(() => readFile(cacheFile, "utf8").catch(() => undefined))
+
+/**
+ * Runs an effect with the network fetch enabled. The suite keeps
+ * OPENCODE_DISABLE_MODELS_FETCH on so the eager refresh fork never runs; the
+ * flag is read at effect-execution time, so flipping it here only affects the
+ * explicit refresh call under test.
+ */
+const withFetchEnabled = <A, E, R>(eff: Effect.Effect<A, E, R>) =>
+  Effect.suspend(() => {
+    const previous = Flag.OPENCODE_DISABLE_MODELS_FETCH
+    return Effect.gen(function* () {
+      Flag.OPENCODE_DISABLE_MODELS_FETCH = false
+      return yield* eff
+    }).pipe(
+      Effect.ensuring(
+        Effect.sync(() => {
+          Flag.OPENCODE_DISABLE_MODELS_FETCH = previous
+        }),
+      ),
+    )
+  })
+
 const provided = <A, E>(state: Ref.Ref<MockState>, eff: Effect.Effect<A, E, ModelsDev.Service>) =>
   eff.pipe(Effect.provide(buildLayer(state)))
 
@@ -133,14 +166,16 @@ describe("ModelsDev Service", () => {
     }),
   )
 
-  it.live("get() returns {} when disk empty and fetch disabled", () =>
+  it.live("get() falls back to the bundled snapshot when disk empty and fetch disabled", () =>
     Effect.gen(function* () {
       const state = yield* Ref.make(initialState)
       const result = yield* provided(
         state,
         ModelsDev.Service.use((s) => s.get()),
       )
-      expect(result).toEqual({})
+      // The bundled snapshot is the boot-time floor for the catalog: it is
+      // preferred over an empty result even when the network fetch is off.
+      expect(Object.keys(result).length).toBeGreaterThan(0)
       const final = yield* Ref.get(state)
       expect(final.calls).toEqual([])
     }),
@@ -189,13 +224,15 @@ describe("ModelsDev Service", () => {
       const state = yield* Ref.make({ ...initialState, body: JSON.stringify(fixture2) })
       const result = yield* provided(
         state,
-        Effect.gen(function* () {
-          const svc = yield* ModelsDev.Service
-          const before = yield* svc.get()
-          yield* svc.refresh(true)
-          const after = yield* svc.get()
-          return { before, after }
-        }),
+        withFetchEnabled(
+          Effect.gen(function* () {
+            const svc = yield* ModelsDev.Service
+            const before = yield* svc.get()
+            yield* svc.refresh(true)
+            const after = yield* svc.get()
+            return { before, after }
+          }),
+        ),
       )
       expect(result.before).toEqual(fixture)
       expect(result.after).toEqual(fixture2)
@@ -212,7 +249,7 @@ describe("ModelsDev Service", () => {
       const state = yield* Ref.make({ ...initialState, body: JSON.stringify(fixture2) })
       yield* provided(
         state,
-        ModelsDev.Service.use((s) => s.refresh(false)),
+        withFetchEnabled(ModelsDev.Service.use((s) => s.refresh(false))),
       )
       const final = yield* Ref.get(state)
       expect(final.calls).toEqual([])
@@ -226,11 +263,13 @@ describe("ModelsDev Service", () => {
       const state = yield* Ref.make({ ...initialState, body: JSON.stringify(fixture2) })
       const after = yield* provided(
         state,
-        Effect.gen(function* () {
-          const svc = yield* ModelsDev.Service
-          yield* svc.refresh(false)
-          return yield* svc.get()
-        }),
+        withFetchEnabled(
+          Effect.gen(function* () {
+            const svc = yield* ModelsDev.Service
+            yield* svc.refresh(false)
+            return yield* svc.get()
+          }),
+        ),
       )
       const final = yield* Ref.get(state)
       expect(final.calls.length).toBe(1)
@@ -244,16 +283,86 @@ describe("ModelsDev Service", () => {
       const state = yield* Ref.make({ ...initialState, status: 500, body: "boom" })
       const result = yield* provided(
         state,
-        Effect.gen(function* () {
-          const svc = yield* ModelsDev.Service
-          yield* svc.refresh(true)
-          return yield* svc.get()
-        }),
+        withFetchEnabled(
+          Effect.gen(function* () {
+            const svc = yield* ModelsDev.Service
+            yield* svc.refresh(true)
+            return yield* svc.get()
+          }),
+        ),
       )
       expect(result).toEqual(fixture)
       // withTransientReadRetry retries 5xx, so calls may be > 1.
       const final = yield* Ref.get(state)
       expect(final.calls.length).toBeGreaterThanOrEqual(1)
+    }),
+  )
+
+  it.live("get() survives a corrupt cache file instead of dying", () =>
+    Effect.gen(function* () {
+      // A truncated/garbage cache file used to make JSON.parse throw a defect,
+      // which Effect.catch does not intercept — the whole service died.
+      yield* writeCacheText('{"anthropic":{"id":"anthropic","models":{')
+      const state = yield* Ref.make(initialState)
+      const result = yield* provided(
+        state,
+        ModelsDev.Service.use((s) => s.get()),
+      )
+      // Falls back to the bundled snapshot rather than failing.
+      expect(Object.keys(result).length).toBeGreaterThan(0)
+    }),
+  )
+
+  it.live("refresh() does not poison the cache with a non-JSON body", () =>
+    Effect.gen(function* () {
+      yield* writeCache(fixture)
+      // A proxy/captive portal can answer 200 with an HTML error page.
+      const state = yield* Ref.make({ ...initialState, body: "<html>502 Bad Gateway</html>" })
+      yield* provided(
+        state,
+        withFetchEnabled(ModelsDev.Service.use((s) => s.refresh(true))),
+      )
+      const onDisk = yield* readCache()
+      expect(onDisk).toBeDefined()
+      // The previous, valid cache must survive untouched.
+      expect(JSON.parse(onDisk ?? "")).toEqual(fixture)
+    }),
+  )
+
+  it.live("refresh() honors OPENCODE_DISABLE_MODELS_FETCH", () =>
+    Effect.gen(function* () {
+      yield* writeCache(fixture)
+      const state = yield* Ref.make({ ...initialState, body: JSON.stringify(fixture2) })
+      // The flag is still enabled for this suite.
+      yield* provided(
+        state,
+        ModelsDev.Service.use((s) => s.refresh(true)),
+      )
+      const final = yield* Ref.get(state)
+      expect(final.calls).toEqual([])
+    }),
+  )
+
+  it.live("refresh() never writes to a user-provided OPENCODE_MODELS_PATH", () =>
+    Effect.gen(function* () {
+      const customPath = path.join(Global.Path.cache, "custom-models.json")
+      yield* Effect.promise(async () => {
+        await mkdir(Global.Path.cache, { recursive: true })
+        await writeFile(customPath, JSON.stringify(fixture))
+      })
+      const previous = Flag.OPENCODE_MODELS_PATH
+      Flag.OPENCODE_MODELS_PATH = customPath
+      const state = yield* Ref.make({ ...initialState, body: JSON.stringify(fixture2) })
+      yield* provided(
+        state,
+        withFetchEnabled(ModelsDev.Service.use((s) => s.refresh(true))),
+      )
+      const final = yield* Ref.get(state)
+      // The user's local catalog is authoritative — no upstream fetch.
+      expect(final.calls).toEqual([])
+      const custom = yield* Effect.promise(() => readFile(customPath, "utf8"))
+      expect(JSON.parse(custom)).toEqual(fixture)
+      Flag.OPENCODE_MODELS_PATH = previous
     }),
   )
 })
