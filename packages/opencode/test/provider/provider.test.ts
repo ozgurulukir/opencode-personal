@@ -2043,6 +2043,119 @@ test("mode cost preserves over-200k pricing from base model", () => {
   })
 })
 
+test("a real model is not overwritten by a colliding experimental mode variant", () => {
+  // models.dev ships both a real "openai/gpt-5-fast" model and a "fast"
+  // variant of "openai/gpt-5" whose id is also "openai/gpt-5-fast".
+  const provider: ModelsDev.Provider = {
+    id: "vercel",
+    name: "Vercel",
+    env: [],
+    models: {
+      "openai/gpt-5": {
+        id: "openai/gpt-5",
+        name: "GPT-5",
+        release_date: "2026-01-01",
+        attachment: false,
+        reasoning: false,
+        tool_call: true,
+        cost: { input: 1.25, output: 10, cache_read: 0.125 },
+        limit: { context: 400_000, output: 128_000 },
+        experimental: {
+          modes: {
+            fast: {
+              cost: { input: 2.5, output: 20, cache_read: 0.25 },
+              provider: { body: { service_tier: "priority" } },
+            },
+          },
+        },
+      },
+      "openai/gpt-5-fast": {
+        id: "openai/gpt-5-fast",
+        name: "GPT-5 (Fast)",
+        release_date: "2026-01-01",
+        attachment: false,
+        reasoning: false,
+        tool_call: true,
+        cost: { input: 2.5, output: 20, cache_read: 0.25 },
+        limit: { context: 400_000, output: 128_000 },
+      },
+    },
+  }
+
+  const models = Provider.fromModelsDevProvider(provider).models
+  // The real catalog entry wins — its display name is not the variant name.
+  expect(models["openai/gpt-5-fast"].name).toBe("GPT-5 (Fast)")
+  // The variant must not smuggle its request body into the real model.
+  expect(models["openai/gpt-5-fast"].options["serviceTier"]).toBeUndefined()
+})
+
+test("a real model wins over a colliding variant regardless of catalog order", () => {
+  const real: ModelsDev.Model = {
+    id: "openai/gpt-5-fast",
+    name: "GPT-5 (Fast)",
+    release_date: "2026-01-01",
+    attachment: false,
+    reasoning: false,
+    tool_call: true,
+    cost: { input: 2.5, output: 20, cache_read: 0.25 },
+    limit: { context: 400_000, output: 128_000 },
+  }
+  const base: ModelsDev.Model = {
+    id: "openai/gpt-5",
+    name: "GPT-5",
+    release_date: "2026-01-01",
+    attachment: false,
+    reasoning: false,
+    tool_call: true,
+    cost: { input: 1.25, output: 10, cache_read: 0.125 },
+    limit: { context: 400_000, output: 128_000 },
+    experimental: {
+      modes: {
+        fast: {
+          cost: { input: 2.5, output: 20, cache_read: 0.25 },
+          provider: { body: { service_tier: "priority" } },
+        },
+      },
+    },
+  }
+  // The real model is listed AFTER the model that produces the colliding
+  // variant — the real entry must still win.
+  const provider: ModelsDev.Provider = {
+    id: "vercel",
+    name: "Vercel",
+    env: [],
+    models: { "openai/gpt-5": base, "openai/gpt-5-fast": real },
+  }
+
+  const models = Provider.fromModelsDevProvider(provider).models
+  expect(models["openai/gpt-5-fast"].name).toBe("GPT-5 (Fast)")
+  expect(models["openai/gpt-5-fast"].options["serviceTier"]).toBeUndefined()
+})
+
+test("models.dev normalization tolerates a model without limit", () => {
+  // models.dev is an unvalidated remote source; a missing `limit` must not
+  // take down the whole provider.
+  const provider: ModelsDev.Provider = {
+    id: "gateway",
+    name: "Gateway",
+    env: [],
+    models: {
+      mystery: {
+        id: "mystery",
+        name: "Mystery",
+        release_date: "2026-01-01",
+        attachment: false,
+        reasoning: false,
+        tool_call: true,
+      },
+    },
+  }
+
+  const model = Provider.fromModelsDevProvider(provider).models["mystery"]
+  expect(model.limit.context).toBe(0)
+  expect(model.limit.output).toBe(0)
+})
+
 test("models.dev normalization fills required response fields", () => {
   const provider = {
     id: "gateway",
