@@ -313,6 +313,18 @@ describe("ModelsDev Service", () => {
     }),
   )
 
+  it.live("get() rejects a parseable cache with an invalid provider shape", () =>
+    Effect.gen(function* () {
+      // Valid JSON alone is not enough: nested provider/model data must match
+      // the schema before it can be used or persisted as the models catalog.
+      yield* writeCacheText(JSON.stringify({ broken: { id: "broken", name: "Broken", env: [] } }))
+      const state = yield* Ref.make(initialState)
+      const result = yield* provided(state, ModelsDev.Service.use((s) => s.get()))
+      expect(result.broken).toBeUndefined()
+      expect((yield* Ref.get(state)).calls).toEqual([])
+    }),
+  )
+
   it.live("refresh() does not poison the cache with a non-JSON body", () =>
     Effect.gen(function* () {
       yield* writeCache(fixture)
@@ -343,14 +355,14 @@ describe("ModelsDev Service", () => {
     }),
   )
 
-  it.live("refresh() never writes to a user-provided OPENCODE_MODELS_PATH", () =>
-    Effect.gen(function* () {
-      const customPath = path.join(Global.Path.cache, "custom-models.json")
+  it.live("refresh() never writes to a user-provided OPENCODE_MODELS_PATH", () => {
+    const customPath = path.join(Global.Path.cache, "custom-models.json")
+    const previous = Flag.OPENCODE_MODELS_PATH
+    return Effect.gen(function* () {
       yield* Effect.promise(async () => {
         await mkdir(Global.Path.cache, { recursive: true })
         await writeFile(customPath, JSON.stringify(fixture))
       })
-      const previous = Flag.OPENCODE_MODELS_PATH
       Flag.OPENCODE_MODELS_PATH = customPath
       const state = yield* Ref.make({ ...initialState, body: JSON.stringify(fixture2) })
       yield* provided(
@@ -362,7 +374,13 @@ describe("ModelsDev Service", () => {
       expect(final.calls).toEqual([])
       const custom = yield* Effect.promise(() => readFile(customPath, "utf8"))
       expect(JSON.parse(custom)).toEqual(fixture)
-      Flag.OPENCODE_MODELS_PATH = previous
-    }),
-  )
+    }).pipe(
+      Effect.ensuring(
+        Effect.promise(async () => {
+          Flag.OPENCODE_MODELS_PATH = previous
+          await rm(customPath, { force: true })
+        }),
+      ),
+    )
+  })
 })

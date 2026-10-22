@@ -151,10 +151,11 @@ export const layer: Layer.Layer<Service, never, AppFileSystem.Service | HttpClie
       if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return undefined
       const catalog: Record<string, Provider> = {}
       for (const [key, value] of Object.entries(parsed)) {
-        // Every catalog entry must look like a provider; a payload mixing
-        // unrelated shapes is not a models.dev catalog.
-        if (!value || typeof value !== "object" || Array.isArray(value)) return undefined
-        catalog[key] = value as Provider
+        // Validate nested provider/model records too; a parseable but partial
+        // response must not be cached and later crash provider normalization.
+        const provider = Option.getOrUndefined(Schema.decodeUnknownOption(Provider)(value))
+        if (!provider) return undefined
+        catalog[key] = provider
       }
       return Object.keys(catalog).length > 0 ? catalog : undefined
     }
