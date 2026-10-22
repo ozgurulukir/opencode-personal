@@ -7,20 +7,19 @@ import { Skill } from "../skill"
 import * as Tool from "./tool"
 import DESCRIPTION from "./skill.txt"
 
+const MAX_SKILLS_PER_CALL = 10
+
 export const Parameters = Schema.Struct({
-  name: Schema.optional(Schema.String).annotate({
-    description: "The name of a single skill from available_skills. Prefer 'names' for loading multiple skills.",
-  }),
-  names: Schema.optional(Schema.Array(Schema.String)).annotate({
-    description: "Array of skill names from available_skills. Use this to load multiple skills at once.",
-  }),
+  names: Schema.Array(Schema.String)
+    .check(Schema.isMinLength(1))
+    .check(Schema.isMaxLength(MAX_SKILLS_PER_CALL))
+    .annotate({
+      description: "One to ten skill names from available_skills. Use a one-item array to load a single skill.",
+    }),
 })
 
 // Each loaded skill spawns a ripgrep process and injects its full content into
-// the output, so an unbounded names array means unbounded process spawns and
-// context blowout. The model can split larger batches across calls.
-const MAX_SKILLS_PER_CALL = 10
-
+// the output. The model can split larger batches across calls.
 function formatSkillOutput(
   info: Skill.Info,
   files: string,
@@ -61,26 +60,8 @@ export const SkillTool = Tool.define(
       parameters: Parameters,
       execute: (params: Schema.Schema.Type<typeof Parameters>, ctx: Tool.Context) =>
         Effect.gen(function* () {
-          // Normalize to array of skill names. Loop, not spread — model-supplied
-          // arrays can be large enough to blow engine argument limits.
-          const skillNames: string[] = []
-          if (params.names) for (const n of params.names) skillNames.push(n)
-          if (params.name) skillNames.push(params.name)
-
-          if (skillNames.length === 0) {
-            const all = yield* skill.all()
-            const available = all.map((item) => item.name).join(", ")
-            throw new Error(`No skill names provided. Available skills: ${available || "none"}`)
-          }
-
           // Deduplicate preserving order
-          const uniqueNames = [...new Set(skillNames)]
-
-          if (uniqueNames.length > MAX_SKILLS_PER_CALL) {
-            throw new Error(
-              `Cannot load ${uniqueNames.length} skills because the limit is ${MAX_SKILLS_PER_CALL} per call. To fix, split the names across multiple skill tool calls.`,
-            )
-          }
+          const uniqueNames = [...new Set(params.names)]
 
           // Look up all skills
           const infos: Skill.Info[] = []

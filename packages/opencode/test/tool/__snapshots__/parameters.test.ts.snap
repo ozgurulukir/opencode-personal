@@ -65,7 +65,7 @@ exports[`tool parameters JSON Schema (wire shape) edit 1`] = `
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "properties": {
     "filePath": {
-      "description": "The absolute path to the file to modify",
+      "description": "The absolute path or project-relative path to the file to modify",
       "type": "string",
     },
     "newString": {
@@ -85,6 +85,29 @@ exports[`tool parameters JSON Schema (wire shape) edit 1`] = `
     "filePath",
     "oldString",
     "newString",
+  ],
+  "type": "object",
+}
+`;
+
+exports[`tool parameters JSON Schema (wire shape) codesearch 1`] = `
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "properties": {
+    "query": {
+      "description": "Search query to find relevant context for APIs, Libraries, and SDKs. For example, 'React useState hook examples', 'Python pandas dataframe filtering', 'Express.js middleware', 'Next js partial prerendering configuration'",
+      "type": "string",
+    },
+    "tokensNum": {
+      "default": 5000,
+      "description": "Number of tokens to return (1000-50000). Default is 5000 tokens. Adjust this value based on how much context you need - use lower values for focused queries and higher values for comprehensive documentation.",
+      "maximum": 50000,
+      "minimum": 1000,
+      "type": "integer",
+    },
+  },
+  "required": [
+    "query",
   ],
   "type": "object",
 }
@@ -153,6 +176,20 @@ exports[`tool parameters JSON Schema (wire shape) invalid 1`] = `
 }
 `;
 
+exports[`tool parameters JSON Schema (wire shape) index_workspace 1`] = `
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "properties": {
+    "force": {
+      "default": false,
+      "description": "Force re-indexing all files even if already indexed (default false)",
+      "type": "boolean",
+    },
+  },
+  "type": "object",
+}
+`;
+
 exports[`tool parameters JSON Schema (wire shape) lsp 1`] = `
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -160,7 +197,7 @@ exports[`tool parameters JSON Schema (wire shape) lsp 1`] = `
     "character": {
       "description": "The character offset (1-based, as shown in editors)",
       "maximum": 9007199254740991,
-      "minimum": 1,
+      "minimum": -9007199254740991,
       "type": "integer",
     },
     "filePath": {
@@ -170,7 +207,7 @@ exports[`tool parameters JSON Schema (wire shape) lsp 1`] = `
     "line": {
       "description": "The line number (1-based, as shown in editors)",
       "maximum": 9007199254740991,
-      "minimum": 1,
+      "minimum": -9007199254740991,
       "type": "integer",
     },
     "operation": {
@@ -196,8 +233,6 @@ exports[`tool parameters JSON Schema (wire shape) lsp 1`] = `
   "required": [
     "operation",
     "filePath",
-    "line",
-    "character",
   ],
   "type": "object",
 }
@@ -277,7 +312,7 @@ exports[`tool parameters JSON Schema (wire shape) read 1`] = `
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "properties": {
     "filePath": {
-      "description": "The absolute path to the file or directory to read",
+      "description": "The absolute path or project-relative path to the file or directory to read",
       "type": "string",
     },
     "limit": {
@@ -288,8 +323,8 @@ exports[`tool parameters JSON Schema (wire shape) read 1`] = `
     },
     "offset": {
       "description": "The line number to start reading from (1-indexed)",
+      "exclusiveMinimum": 0,
       "maximum": 9007199254740991,
-      "minimum": 0,
       "type": "integer",
     },
     "onlyHunks": {
@@ -304,17 +339,91 @@ exports[`tool parameters JSON Schema (wire shape) read 1`] = `
 }
 `;
 
-exports[`tool parameters JSON Schema (wire shape) skill 1`] = `
+exports[`tool parameters JSON Schema (wire shape) repo_clone 1`] = `
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "properties": {
-    "name": {
-      "description": "The name of the skill from available_skills",
+    "branch": {
+      "description": "Branch or ref to clone and inspect",
+      "type": "string",
+    },
+    "refresh": {
+      "description": "When true, fetches the latest remote state into the managed cache",
+      "type": "boolean",
+    },
+    "repository": {
+      "description": "Repository to clone, as a git URL, host/path reference, or GitHub owner/repo shorthand",
       "type": "string",
     },
   },
   "required": [
-    "name",
+    "repository",
+  ],
+  "type": "object",
+}
+`;
+
+exports[`tool parameters JSON Schema (wire shape) repo_overview 1`] = `
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "properties": {
+    "depth": {
+      "description": "Maximum structure depth to include. Defaults to 3.",
+      "maximum": 6,
+      "minimum": 1,
+      "type": "integer",
+    },
+    "target": {
+      "description": "Repository reference or local directory path to inspect. Prefix relative local paths with ./ to distinguish them from owner/repo references.",
+      "type": "string",
+    },
+  },
+  "required": [
+    "target",
+  ],
+  "type": "object",
+}
+`;
+
+exports[`tool parameters JSON Schema (wire shape) semantic_search 1`] = `
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "properties": {
+    "query": {
+      "description": "Semantic search query over workspace files. Returns the most relevant code passages.",
+      "type": "string",
+    },
+    "topK": {
+      "default": 10,
+      "description": "Number of results to return (default 10)",
+      "maximum": 9007199254740991,
+      "minimum": 1,
+      "type": "integer",
+    },
+  },
+  "required": [
+    "query",
+  ],
+  "type": "object",
+}
+`;
+
+exports[`tool parameters JSON Schema (wire shape) skill 1`] = `
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "properties": {
+    "names": {
+      "description": "One to ten skill names from available_skills. Use a one-item array to load a single skill.",
+      "items": {
+        "type": "string",
+      },
+      "maxItems": 10,
+      "minItems": 1,
+      "type": "array",
+    },
+  },
+  "required": [
+    "names",
   ],
   "type": "object",
 }
@@ -418,8 +527,10 @@ exports[`tool parameters JSON Schema (wire shape) webfetch 1`] = `
       "type": "string",
     },
     "timeout": {
-      "description": "Optional timeout in seconds (max 120)",
-      "type": "number",
+      "description": "Optional positive timeout in seconds. Values above 120 are capped at 120.",
+      "exclusiveMinimum": 0,
+      "maximum": 9007199254740991,
+      "type": "integer",
     },
     "url": {
       "description": "The URL to fetch content from",
@@ -487,7 +598,7 @@ exports[`tool parameters JSON Schema (wire shape) write 1`] = `
       "type": "string",
     },
     "filePath": {
-      "description": "The absolute path to the file to write (must be absolute, not relative)",
+      "description": "The absolute path or project-relative path to the file to write",
       "type": "string",
     },
   },

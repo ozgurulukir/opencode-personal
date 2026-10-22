@@ -32,7 +32,7 @@ function convertToLineEnding(text: string, ending: "\n" | "\r\n"): string {
 }
 
 export const Parameters = Schema.Struct({
-  filePath: Schema.String.annotate({ description: "The absolute path to the file to modify" }),
+  filePath: Schema.String.annotate({ description: "The absolute path or project-relative path to the file to modify" }),
   oldString: Schema.String.annotate({ description: "The text to replace" }),
   newString: Schema.String.annotate({
     description: "The text to replace it with (must be different from oldString)",

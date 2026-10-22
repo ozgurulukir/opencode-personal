@@ -56,6 +56,7 @@ import { webSearchProviderLabel, type WebSearchTool } from "@/tool/websearch"
 import type { TaskTool } from "@/tool/task"
 import type { QuestionTool } from "@/tool/question"
 import type { SkillTool } from "@/tool/skill"
+import { formatSkillLabel } from "../../feature-plugins/system/skill-label.shared"
 import { useRenderer, useTerminalDimensions, type JSX } from "@opentui/solid"
 import { useSDK } from "@tui/context/sdk"
 import { useEditorContext } from "@tui/context/editor"
@@ -2288,9 +2289,11 @@ function Question(props: ToolProps<typeof QuestionTool>) {
 }
 
 function Skill(props: ToolProps<typeof SkillTool>) {
+  const names = props.input.names ?? []
+  const label = formatSkillLabel({ names }, names[0])
   return (
-    <InlineTool icon="→" pending="Loading skill..." complete={props.input.name} part={props.part}>
-      Skill "{props.input.name}"
+    <InlineTool icon="→" pending="Loading skill..." complete={names.join(", ")} part={props.part}>
+      {label}
     </InlineTool>
   )
 }

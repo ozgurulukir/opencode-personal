@@ -19,14 +19,23 @@ const operations = [
   "incomingCalls",
   "outgoingCalls",
 ] as const
+const positionOperations = new Set([
+  "goToDefinition",
+  "findReferences",
+  "hover",
+  "goToImplementation",
+  "prepareCallHierarchy",
+  "incomingCalls",
+  "outgoingCalls",
+])
 
 export const Parameters = Schema.Struct({
   operation: Schema.Literals(operations).annotate({ description: "The LSP operation to perform" }),
   filePath: Schema.String.annotate({ description: "The absolute or relative path to the file" }),
-  line: Schema.Int.check(Schema.isGreaterThanOrEqualTo(1)).annotate({
+  line: Schema.optional(Schema.Int).annotate({
     description: "The line number (1-based, as shown in editors)",
   }),
-  character: Schema.Int.check(Schema.isGreaterThanOrEqualTo(1)).annotate({
+  character: Schema.optional(Schema.Int).annotate({
     description: "The character offset (1-based, as shown in editors)",
   }),
   query: Schema.optional(Schema.String).annotate({
@@ -46,13 +55,21 @@ export const LspTool = Tool.define(
         Effect.gen(function* () {
           const instance = yield* InstanceState.context
           const file = path.isAbsolute(args.filePath) ? args.filePath : path.join(instance.directory, args.filePath)
+          if (
+            positionOperations.has(args.operation) &&
+            (args.line === undefined || args.character === undefined || args.line < 1 || args.character < 1)
+          ) {
+            throw new Error(`${args.operation} requires line and character values of at least 1`)
+          }
+          const line = args.line ?? 1
+          const character = args.character ?? 1
           yield* assertExternalDirectoryEffect(ctx, file)
           const meta =
             args.operation === "workspaceSymbol"
               ? { operation: args.operation }
               : args.operation === "documentSymbol"
                 ? { operation: args.operation, filePath: file }
-                : { operation: args.operation, filePath: file, line: args.line, character: args.character }
+                : { operation: args.operation, filePath: file, line, character }
           yield* ctx.ask({
             permission: "lsp",
             patterns: ["*"],
@@ -61,14 +78,14 @@ export const LspTool = Tool.define(
           })
 
           const uri = pathToFileURL(file).href
-          const position = { file, line: args.line - 1, character: args.character - 1 }
+          const position = { file, line: line - 1, character: character - 1 }
           const relPath = path.relative(instance.worktree, file)
           const detail =
             args.operation === "workspaceSymbol"
               ? ""
               : args.operation === "documentSymbol"
                 ? relPath
-                : `${relPath}:${args.line}:${args.character}`
+                : `${relPath}:${line}:${character}`
           const title = detail ? `${args.operation} ${detail}` : args.operation
 
           const exists = yield* fs.existsSafe(file)

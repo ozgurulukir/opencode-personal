@@ -73,7 +73,7 @@ describe("tool.repo_overview", () => {
         yield* fs.writeWithDirs(path.join(repo, "src", "index.ts"), "export const value = 1\n")
 
         const tool = yield* init()
-        const result = yield* tool.execute({ path: repo }, ctx)
+        const result = yield* tool.execute({ target: repo }, ctx)
 
         expect(result.metadata.path).toBe(repo)
         expect(result.metadata.ecosystems).toContain("Node.js")
@@ -106,7 +106,7 @@ describe("tool.repo_overview", () => {
         yield* fs.writeWithDirs(path.join(cached, "README.md"), "cached\n")
 
         const tool = yield* init()
-        const result = yield* tool.execute({ repository: "owner/repo" }, ctx)
+        const result = yield* tool.execute({ target: "owner/repo" }, ctx)
 
         expect(result.metadata.path).toBe(cached)
         expect(result.metadata.repository).toBe("owner/repo")
@@ -120,7 +120,7 @@ describe("tool.repo_overview", () => {
     provideTmpdirInstance((_dir) =>
       Effect.gen(function* () {
         const tool = yield* init()
-        const result = yield* tool.execute({ repository: "missing/repo" }, ctx).pipe(Effect.exit)
+        const result = yield* tool.execute({ target: "missing/repo" }, ctx).pipe(Effect.exit)
 
         expect(Exit.isFailure(result)).toBe(true)
         if (Exit.isFailure(result)) {
@@ -139,7 +139,7 @@ describe("tool.repo_overview", () => {
         yield* fs.writeWithDirs(path.join(cached, "README.md"), "cached\n")
 
         const tool = yield* init()
-        const result = yield* tool.execute({ repository: "gitlab.com/group/repo" }, ctx)
+        const result = yield* tool.execute({ target: "gitlab.com/group/repo" }, ctx)
 
         expect(result.metadata.path).toBe(cached)
         expect(result.metadata.repository).toBe("gitlab.com/group/repo")

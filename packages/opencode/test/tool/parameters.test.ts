@@ -11,13 +11,18 @@ import { toJsonSchema } from "@opencode-ai/core/effect-zod"
 
 import { Parameters as ApplyPatch } from "../../src/tool/apply_patch"
 import { Parameters as Edit } from "../../src/tool/edit"
+import { Parameters as CodeSearch } from "../../src/tool/codesearch"
 import { Parameters as Glob } from "../../src/tool/glob"
 import { Parameters as Grep } from "../../src/tool/grep"
+import { Parameters as IndexWorkspace } from "../../src/tool/index-workspace"
 import { Parameters as Invalid } from "../../src/tool/invalid"
 import { Parameters as Lsp } from "../../src/tool/lsp"
 import { Parameters as Plan } from "../../src/tool/plan"
 import { Parameters as Question } from "../../src/tool/question"
 import { Parameters as Read } from "../../src/tool/read"
+import { Parameters as RepoClone } from "../../src/tool/repo_clone"
+import { Parameters as RepoOverview } from "../../src/tool/repo_overview"
+import { Parameters as SemanticSearch } from "../../src/tool/semantic-search"
 import { Parameters as Shell } from "../../src/tool/shell"
 import { Parameters as Skill } from "../../src/tool/skill"
 import { Parameters as Task } from "../../src/tool/task"
@@ -37,13 +42,18 @@ describe("tool parameters", () => {
     test("apply_patch", () => expect(toJsonSchema(ApplyPatch)).toMatchSnapshot())
     test("bash", () => expect(toJsonSchema(Shell)).toMatchSnapshot())
     test("edit", () => expect(toJsonSchema(Edit)).toMatchSnapshot())
+    test("codesearch", () => expect(toJsonSchema(CodeSearch)).toMatchSnapshot())
     test("glob", () => expect(toJsonSchema(Glob)).toMatchSnapshot())
     test("grep", () => expect(toJsonSchema(Grep)).toMatchSnapshot())
     test("invalid", () => expect(toJsonSchema(Invalid)).toMatchSnapshot())
+    test("index_workspace", () => expect(toJsonSchema(IndexWorkspace)).toMatchSnapshot())
     test("lsp", () => expect(toJsonSchema(Lsp)).toMatchSnapshot())
     test("plan", () => expect(toJsonSchema(Plan)).toMatchSnapshot())
     test("question", () => expect(toJsonSchema(Question)).toMatchSnapshot())
     test("read", () => expect(toJsonSchema(Read)).toMatchSnapshot())
+    test("repo_clone", () => expect(toJsonSchema(RepoClone)).toMatchSnapshot())
+    test("repo_overview", () => expect(toJsonSchema(RepoOverview)).toMatchSnapshot())
+    test("semantic_search", () => expect(toJsonSchema(SemanticSearch)).toMatchSnapshot())
     test("skill", () => expect(toJsonSchema(Skill)).toMatchSnapshot())
     test("task", () => expect(toJsonSchema(Task)).toMatchSnapshot())
     test("todo", () => expect(toJsonSchema(Todo)).toMatchSnapshot())
@@ -142,11 +152,11 @@ describe("tool parameters", () => {
       const parsed = parse(Lsp, { operation: "hover", filePath: "/a.ts", line: 1, character: 1 })
       expect(parsed.operation).toBe("hover")
     })
-    test("rejects line < 1", () => {
-      expect(accepts(Lsp, { operation: "hover", filePath: "/a.ts", line: 0, character: 1 })).toBe(false)
+    test("accepts documentSymbol without a position", () => {
+      expect(accepts(Lsp, { operation: "documentSymbol", filePath: "/a.ts" })).toBe(true)
     })
-    test("rejects character < 1", () => {
-      expect(accepts(Lsp, { operation: "hover", filePath: "/a.ts", line: 1, character: 0 })).toBe(false)
+    test("accepts workspaceSymbol without a position", () => {
+      expect(accepts(Lsp, { operation: "workspaceSymbol", filePath: "/a.ts", query: "Widget" })).toBe(true)
     })
     test("rejects unknown operation", () => {
       expect(accepts(Lsp, { operation: "bogus", filePath: "/a.ts", line: 1, character: 1 })).toBe(false)
@@ -187,14 +197,55 @@ describe("tool parameters", () => {
       expect(parsed.offset).toBe(10)
       expect(parsed.limit).toBe(100)
     })
+    test("rejects zero offset", () => {
+      expect(accepts(Read, { filePath: "/a", offset: 0 })).toBe(false)
+    })
+  })
+
+  describe("codesearch", () => {
+    test("defaults to an integer token count", () => {
+      expect(parse(CodeSearch, { query: "effect schema" }).tokensNum).toBe(5000)
+    })
+    test("rejects fractional and out-of-range token counts", () => {
+      expect(accepts(CodeSearch, { query: "effect schema", tokensNum: 5000.5 })).toBe(false)
+      expect(accepts(CodeSearch, { query: "effect schema", tokensNum: 50001 })).toBe(false)
+    })
   })
 
   describe("skill", () => {
-    test("accepts name", () => {
-      expect(parse(Skill, { name: "foo" }).name).toBe("foo")
+    test("accepts one to ten names", () => {
+      expect(parse(Skill, { names: ["foo"] }).names).toEqual(["foo"])
+      expect(parse(Skill, { names: ["foo", "bar"] }).names).toEqual(["foo", "bar"])
     })
-    test("rejects missing name", () => {
+    test("rejects missing or empty names", () => {
       expect(accepts(Skill, {})).toBe(false)
+      expect(accepts(Skill, { names: [] })).toBe(false)
+      expect(accepts(Skill, { names: Array.from({ length: 11 }, (_, index) => `skill-${index}`) })).toBe(false)
+      expect(accepts(Skill, { name: "foo" })).toBe(false)
+    })
+  })
+
+  describe("repo_overview", () => {
+    test("accepts a required target and optional depth", () => {
+      expect(parse(RepoOverview, { target: "owner/repo", depth: 4 })).toEqual({
+        target: "owner/repo",
+        depth: 4,
+      })
+    })
+    test("rejects missing target and invalid depth", () => {
+      expect(accepts(RepoOverview, {})).toBe(false)
+      expect(accepts(RepoOverview, { target: "owner/repo", depth: 1.5 })).toBe(false)
+      expect(accepts(RepoOverview, { target: "owner/repo", depth: 7 })).toBe(false)
+    })
+  })
+
+  describe("semantic_search", () => {
+    test("defaults to an integer result count", () => {
+      expect(parse(SemanticSearch, { query: "find the API" }).topK).toBe(10)
+    })
+    test("rejects non-positive or fractional result counts", () => {
+      expect(accepts(SemanticSearch, { query: "find the API", topK: 0 })).toBe(false)
+      expect(accepts(SemanticSearch, { query: "find the API", topK: 1.5 })).toBe(false)
     })
   })
 
@@ -223,6 +274,12 @@ describe("tool parameters", () => {
   describe("webfetch", () => {
     test("accepts url-only", () => {
       expect(parse(WebFetch, { url: "https://example.com" }).url).toBe("https://example.com")
+    })
+    test("requires a positive timeout when provided", () => {
+      expect(accepts(WebFetch, { url: "https://example.com", timeout: 0 })).toBe(false)
+      expect(accepts(WebFetch, { url: "https://example.com", timeout: -1 })).toBe(false)
+      expect(accepts(WebFetch, { url: "https://example.com", timeout: 0.5 })).toBe(false)
+      expect(accepts(WebFetch, { url: "https://example.com", timeout: 121 })).toBe(true)
     })
   })
 

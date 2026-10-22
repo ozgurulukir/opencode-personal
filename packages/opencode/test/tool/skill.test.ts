@@ -97,7 +97,7 @@ describe("tool.skill", () => {
               }),
           }
 
-          const result = yield* tool.execute({ name: "tool-skill" }, ctx)
+          const result = yield* tool.execute({ names: ["tool-skill"] }, ctx)
           const file = path.resolve(skill, "scripts", "demo.txt")
 
           expect(requests.length).toBe(1)
@@ -155,7 +155,7 @@ Missing description.
             ask: () => Effect.void,
           }
 
-          const result = yield* tool.execute({ name: "bad-skill" }, ctx)
+          const result = yield* tool.execute({ names: ["bad-skill"] }, ctx)
           expect(result.output).toContain(`⚠️ Skill "bad-skill" has validation issues:`)
           expect(result.output).toContain("Missing or empty description")
           expect(result.output).toContain(`<skill_content name="bad-skill">`)
@@ -209,7 +209,7 @@ description: Skill with many files.
             ask: () => Effect.void,
           }
 
-          const result = yield* tool.execute({ name: "many-files" }, ctx)
+          const result = yield* tool.execute({ names: ["many-files"] }, ctx)
           const fileCount = (result.output.match(/<file>/g) || []).length
           expect(fileCount).toBeLessThanOrEqual(10)
         }),
@@ -338,7 +338,7 @@ description: First skill.
               }),
           }
 
-          const result = yield* tool.execute({ name: "alpha", names: ["alpha", "alpha"] }, ctx)
+          const result = yield* tool.execute({ names: ["alpha", "alpha"] }, ctx)
 
           expect(requests[0].patterns).toEqual(["alpha"])
           expect(requests[0].always).toEqual(["alpha"])
@@ -398,7 +398,7 @@ description: First skill.
     ),
   )
 
-  it.live("execute errors when neither name nor names is provided", () =>
+  it.live("execute rejects a missing names array", () =>
     provideTmpdirInstance(
       (dir) =>
         Effect.gen(function* () {
@@ -427,13 +427,13 @@ description: First skill.
           const error = yield* tool.execute({}, ctx).pipe(
             Effect.catchDefect((defect) => Effect.succeed(defect instanceof Error ? defect.message : String(defect))),
           )
-          expect(error).toContain("No skill names provided")
+          expect(error).toContain("invalid arguments")
         }),
       { git: true },
     ),
   )
 
-  it.live("execute errors when names is empty array and no name given", () =>
+  it.live("execute rejects an empty names array", () =>
     provideTmpdirInstance(
       (dir) =>
         Effect.gen(function* () {
@@ -462,13 +462,13 @@ description: First skill.
           const error = yield* tool.execute({ names: [] }, ctx).pipe(
             Effect.catchDefect((defect) => Effect.succeed(defect instanceof Error ? defect.message : String(defect))),
           )
-          expect(error).toContain("No skill names provided")
+          expect(error).toContain("invalid arguments")
         }),
       { git: true },
     ),
   )
 
-  it.live("execute rejects more than 10 unique skills", () =>
+  it.live("execute rejects more than 10 skill names", () =>
     provideTmpdirInstance(
       (dir) =>
         Effect.gen(function* () {
@@ -498,7 +498,7 @@ description: First skill.
           const error = yield* tool.execute({ names }, ctx).pipe(
             Effect.catchDefect((defect) => Effect.succeed(defect instanceof Error ? defect.message : String(defect))),
           )
-          expect(error).toContain("limit is 10")
+          expect(error).toContain("invalid arguments")
         }),
       { git: true },
     ),
@@ -532,7 +532,7 @@ description: First skill.
 
           // Bare property lookup would resolve "__proto__" truthy and crash on
           // path.dirname(undefined); the own-property guard must yield "not found".
-          const error = yield* tool.execute({ name: "__proto__" }, ctx).pipe(
+          const error = yield* tool.execute({ names: ["__proto__"] }, ctx).pipe(
             Effect.catchDefect((defect) => Effect.succeed(defect instanceof Error ? defect.message : String(defect))),
           )
           expect(error).toContain("not found")

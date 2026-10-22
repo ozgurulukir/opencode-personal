@@ -562,6 +562,85 @@ describe("session.llm.stream", () => {
     })
   })
 
+  test("omits tools and required tool choice for models without tool calling", async () => {
+    const server = state.server
+    if (!server) throw new Error("Server not initialized")
+
+    const providerID = "alibaba"
+    const fixture = await loadFixture(providerID, "qwen-plus")
+    const request = waitRequest(
+      "/chat/completions",
+      new Response(createChatStream("Hello"), {
+        status: 200,
+        headers: { "Content-Type": "text/event-stream" },
+      }),
+    )
+
+    await using tmp = await tmpdir({
+      init: async (dir) => {
+        await Bun.write(
+          path.join(dir, "opencode.json"),
+          JSON.stringify({
+            $schema: "https://opencode.ai/config.json",
+            enabled_providers: [providerID],
+            provider: {
+              [providerID]: {
+                options: {
+                  apiKey: "test-key",
+                  baseURL: `${server.url.origin}/v1`,
+                },
+              },
+            },
+          }),
+        )
+      },
+    })
+
+    await WithInstance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        const resolved = await getModel(ProviderID.make(providerID), ModelID.make(fixture.model.id))
+        const model = { ...resolved, capabilities: { ...resolved.capabilities, toolcall: false } }
+        const sessionID = SessionID.make("session-test-no-tools")
+        const agent = {
+          name: "test",
+          mode: "primary",
+          options: {},
+          permission: [{ permission: "*", pattern: "*", action: "allow" }],
+        } satisfies Agent.Info
+        const user = {
+          id: MessageID.make("msg_user-no-tools"),
+          sessionID,
+          role: "user",
+          time: { created: Date.now() },
+          agent: agent.name,
+          model: { providerID: ProviderID.make(providerID), modelID: resolved.id },
+        } satisfies MessageV2.User
+
+        await drain({
+          user,
+          sessionID,
+          model,
+          agent,
+          system: { prefix: "", suffix: "You are a helpful assistant." },
+          messages: [{ role: "user", content: "Hello" }],
+          tools: {
+            question: tool({
+              description: "Ask a question",
+              inputSchema: z.object({}),
+              execute: async () => ({ output: "" }),
+            }),
+          },
+          toolChoice: "required",
+        })
+
+        const body = (await request).body
+        expect(body.tools).toBeUndefined()
+        expect(body.tool_choice).toBeUndefined()
+      },
+    })
+  })
+
   test("sends responses API payload for OpenAI models", async () => {
     const server = state.server
     if (!server) {
@@ -1389,8 +1468,7 @@ describe("session.llm.stream", () => {
         const capture = await request
         const body = capture.body
         const config = body.generationConfig as
-          | { temperature?: number; topP?: number; maxOutputTokens?: number }
-          | undefined
+          { temperature?: number; topP?: number; maxOutputTokens?: number } | undefined
 
         expect(capture.url.pathname).toBe(pathSuffix)
         expect(config?.temperature).toBe(0.3)

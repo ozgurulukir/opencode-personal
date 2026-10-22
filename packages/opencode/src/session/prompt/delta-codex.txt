@@ -1,9 +1,9 @@
 # Editing constraints
 
 - Default to ASCII when editing or creating files. Only introduce non-ASCII when there is clear justification and the file already uses them.
-- Try apply_patch for single file edits. Do not use it for auto-generated changes or when scripting is more efficient (e.g. search-and-replace across a codebase).
-- Use Read to view files, Edit to modify, Write only when needed. Use Glob to find files and Grep to search contents.
-- Use Bash for terminal operations (git, builds, tests, running scripts).
+- Use `read` to inspect files. Use `apply_patch` for file changes when it is available; otherwise use `edit` for existing files and `write` when needed. Do not use `apply_patch` for generated changes or when scripting is more efficient (e.g. search-and-replace across a codebase).
+- Use `glob` to find files and `grep` to search contents.
+- Use `bash` for terminal operations (git, builds, tests, running scripts).
 - Run tool calls in parallel when independent; otherwise sequential.
 
 # Frontend tasks

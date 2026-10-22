@@ -309,7 +309,7 @@ export const layer = Layer.effect(
             return [
               `You are configured reference @${reference.name}, a read-only research agent for external reference material.`,
               `Local directory: ${reference.path}`,
-              `Inspect this directory as the primary reference source. Prefer repo_overview with path ${JSON.stringify(reference.path)} before broader searches. Do not edit files.`,
+              `Inspect this directory as the primary reference source. Prefer repo_overview with target ${JSON.stringify(reference.path)} before broader searches. Do not edit files.`,
               `Return exact absolute file paths for findings whenever possible.`,
             ].join("\n\n")
           }
@@ -329,7 +329,7 @@ export const layer = Layer.effect(
             ...(reference.branch ? [`Branch/ref: ${reference.branch}`] : []),
             `Cached directory: ${reference.path}`,
             `OpenCode materializes this configured repository before use. Do not call repo_clone for this reference.`,
-            `Inspect the cached directory as the primary reference source. Prefer repo_overview with path ${JSON.stringify(reference.path)} before broader searches, then use Glob, Grep, and Read inside that directory. Do not edit files.`,
+            `Inspect the cached directory as the primary reference source. Prefer repo_overview with target ${JSON.stringify(reference.path)} before broader searches, then use Glob, Grep, and Read inside that directory. Do not edit files.`,
             `Return exact absolute file paths for findings whenever possible.`,
           ].join("\n\n")
         }

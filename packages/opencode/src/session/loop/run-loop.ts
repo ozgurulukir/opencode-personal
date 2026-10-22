@@ -247,30 +247,32 @@ export const runLoop: (deps: RunLoopDeps, sessionID: SessionID) => Effect.Effect
       const lastUserMsg = msgs.findLast((m) => m.info.role === "user")
       const bypassAgentCheck = lastUserMsg?.parts.some((p) => p.type === "agent") ?? false
 
-      const tools = yield* resolveTools(
-        {
-          registry: deps.registry,
-          mcp: deps.mcp,
-          permission: deps.permission,
-          plugin: deps.plugin,
-          truncate: deps.truncate,
-          runner: deps.runner,
-          ops: deps.ops,
-          cachedToolSchema: deps.cachedToolSchema,
-          sync: deps.sync,
-        },
-        {
-          agent,
-          session,
-          model,
-          tools: lastUser.tools,
-          processor: handle,
-          bypassAgentCheck,
-          messages: msgs,
-        },
-      )
+      const tools = model.capabilities.toolcall
+        ? yield* resolveTools(
+            {
+              registry: deps.registry,
+              mcp: deps.mcp,
+              permission: deps.permission,
+              plugin: deps.plugin,
+              truncate: deps.truncate,
+              runner: deps.runner,
+              ops: deps.ops,
+              cachedToolSchema: deps.cachedToolSchema,
+              sync: deps.sync,
+            },
+            {
+              agent,
+              session,
+              model,
+              tools: lastUser.tools,
+              processor: handle,
+              bypassAgentCheck,
+              messages: msgs,
+            },
+          )
+        : {}
 
-      if (lastUser.format?.type === "json_schema") {
+      if (model.capabilities.toolcall && lastUser.format?.type === "json_schema") {
         tools["StructuredOutput"] = createStructuredOutputTool({
           schema: lastUser.format.schema,
           onSuccess(output) {
@@ -310,7 +312,18 @@ export const runLoop: (deps: RunLoopDeps, sessionID: SessionID) => Effect.Effect
       const suffixParts = [
         ...env,
         ...(skills ? [skills] : []),
-        ...(format.type === "json_schema" ? [STRUCTURED_OUTPUT_SYSTEM_PROMPT] : []),
+        ...(!model.capabilities.toolcall
+          ? [
+              "The selected model does not support tool calls. Do not attempt to use tools; explain when a requested action requires them.",
+            ]
+          : []),
+        ...(format.type === "json_schema"
+          ? [
+              model.capabilities.toolcall
+                ? STRUCTURED_OUTPUT_SYSTEM_PROMPT
+                : "This model cannot call the StructuredOutput tool required by the requested JSON schema format. Explain this limitation in plain text.",
+            ]
+          : []),
         ...(lastUser.system ? [lastUser.system] : []),
       ]
       const system: LLMSystemPrompt = {
@@ -334,7 +347,7 @@ export const runLoop: (deps: RunLoopDeps, sessionID: SessionID) => Effect.Effect
         ],
         tools,
         model,
-        toolChoice: format.type === "json_schema" ? "required" : undefined,
+        toolChoice: format.type === "json_schema" && model.capabilities.toolcall ? "required" : undefined,
       })
 
       if (structured !== undefined) {
@@ -353,7 +366,9 @@ export const runLoop: (deps: RunLoopDeps, sessionID: SessionID) => Effect.Effect
           const message: MessageV2.Assistant = {
             ...handle.message,
             error: new MessageV2.StructuredOutputError({
-              message: "Model did not produce structured output",
+              message: model.capabilities.toolcall
+                ? "Model did not produce structured output"
+                : "The selected model does not support the tool call required for structured output",
               retries: 0,
             }).toObject(),
           }

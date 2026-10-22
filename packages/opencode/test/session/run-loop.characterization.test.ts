@@ -380,9 +380,56 @@ const cfg = {
   },
 }
 
+const cfgWithoutToolCalls = {
+  provider: {
+    test: {
+      ...cfg.provider.test,
+      models: {
+        "test-model": { ...cfg.provider.test.models["test-model"], tool_call: false },
+      },
+    },
+  },
+}
+
 const ALLOW_ALL = [{ permission: "*", pattern: "*", action: "allow" as const }] satisfies Permission.Ruleset
 
 describe("runLoop characterization", () => {
+  it.live("does not advertise tools or force structured output when tool calling is unavailable", () =>
+    provideTmpdirInstance(
+      () =>
+        Effect.gen(function* () {
+          llm.reset()
+          const prompt = yield* SessionPrompt.Service
+          const sessions = yield* Session.Service
+          const chat = yield* sessions.create({ title: "no-tools", permission: ALLOW_ALL })
+          let captured: LLM.StreamInput | undefined
+          llm.push((input) => {
+            captured = input
+            return replyText("Tool calling is unavailable.")
+          })
+
+          const result = yield* prompt.prompt({
+            sessionID: chat.id,
+            agent: "build",
+            parts: [{ type: "text", text: "Return a structured answer" }],
+            format: {
+              type: "json_schema",
+              schema: { type: "object", properties: { answer: { type: "string" } }, required: ["answer"] },
+              retryCount: 0,
+            },
+          })
+
+          expect(llm.calls).toBe(1)
+          expect(captured?.tools).toEqual({})
+          expect(captured?.toolChoice).toBeUndefined()
+          expect(captured?.system.suffix).toContain("does not support tool calls")
+          expect(result.info.role).toBe("assistant")
+          if (result.info.role === "assistant") expect(result.info.error).toBeDefined()
+        }),
+      { git: true, config: cfgWithoutToolCalls },
+    ),
+  )
+
   // ---------------------------------------------------------------------------
   // Scenario A: the canonical happy path.
   //   user prompt -> LLM streams text -> finish(stop) -> loop exits immediately.
