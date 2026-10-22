@@ -2289,8 +2289,9 @@ function Question(props: ToolProps<typeof QuestionTool>) {
 }
 
 function Skill(props: ToolProps<typeof SkillTool>) {
-  const names = props.input.names ?? []
-  const label = formatSkillLabel({ names }, names[0])
+  const input = props.input as { names?: string[]; name?: string }
+  const names = input.names?.length ? input.names : (input.name ? [input.name] : [])
+  const label = formatSkillLabel(props.input, names[0])
   return (
     <InlineTool icon="→" pending="Loading skill..." complete={names.join(", ")} part={props.part}>
       {label}
