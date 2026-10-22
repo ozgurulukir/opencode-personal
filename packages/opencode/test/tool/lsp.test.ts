@@ -1,5 +1,5 @@
 import { afterEach, describe, expect } from "bun:test"
-import { Effect, Layer } from "effect"
+import { Cause, Effect, Exit, Layer } from "effect"
 import path from "path"
 import { Agent } from "../../src/agent/agent"
 import { CrossSpawnSpawner } from "@opencode-ai/core/cross-spawn-spawner"
@@ -131,7 +131,7 @@ describe("tool.lsp", () => {
             yield* put(file)
 
             const { items, next } = asks()
-            const result = yield* run({ operation: "documentSymbol", filePath: file, line: 3, character: 7 }, next)
+            const result = yield* run({ operation: "documentSymbol", filePath: file }, next)
             const req = items.find((item) => item.permission === "lsp")
 
             expect(req).toBeDefined()
@@ -154,7 +154,7 @@ describe("tool.lsp", () => {
             yield* put(file)
 
             const { items, next } = asks()
-            const result = yield* run({ operation: "workspaceSymbol", filePath: file, line: 3, character: 7 }, next)
+            const result = yield* run({ operation: "workspaceSymbol", filePath: file }, next)
             const req = items.find((item) => item.permission === "lsp")
 
             expect(req).toBeDefined()
@@ -175,10 +175,50 @@ describe("tool.lsp", () => {
             const file = path.join(dir, "test.ts")
             yield* put(file)
 
-            yield* run({ operation: "workspaceSymbol", filePath: file, line: 3, character: 7, query: "TestSymbol" })
-            yield* run({ operation: "workspaceSymbol", filePath: file, line: 3, character: 7 })
+            yield* run({ operation: "workspaceSymbol", filePath: file, query: "TestSymbol" })
+            yield* run({ operation: "workspaceSymbol", filePath: file })
 
             expect(workspaceSymbolQueries).toEqual(["TestSymbol", ""])
+          }),
+        { git: true },
+      ),
+    )
+
+    it.live("rejects position-based operations without line and character", () =>
+      provideTmpdirInstance(
+        (dir) =>
+          Effect.gen(function* () {
+            const file = path.join(dir, "test.ts")
+            yield* put(file)
+
+            const result = yield* run({ operation: "hover", filePath: file }).pipe(Effect.exit)
+            expect(Exit.isFailure(result)).toBe(true)
+            if (Exit.isFailure(result)) {
+              const error = Cause.squash(result.cause)
+              expect(error instanceof Error ? error.message : String(error)).toContain(
+                "hover requires line and character values of at least 1",
+              )
+            }
+          }),
+        { git: true },
+      ),
+    )
+
+    it.live("rejects position-based operations with zero-based coordinates", () =>
+      provideTmpdirInstance(
+        (dir) =>
+          Effect.gen(function* () {
+            const file = path.join(dir, "test.ts")
+            yield* put(file)
+
+            const result = yield* run({ operation: "hover", filePath: file, line: 0, character: 1 }).pipe(Effect.exit)
+            expect(Exit.isFailure(result)).toBe(true)
+            if (Exit.isFailure(result)) {
+              const error = Cause.squash(result.cause)
+              expect(error instanceof Error ? error.message : String(error)).toContain(
+                "hover requires line and character values of at least 1",
+              )
+            }
           }),
         { git: true },
       ),

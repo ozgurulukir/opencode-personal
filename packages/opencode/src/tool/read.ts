@@ -1,5 +1,5 @@
 import { Effect, Option, Schema, Scope } from "effect"
-import { NonNegativeInt } from "@opencode-ai/core/schema"
+import { NonNegativeInt, PositiveInt } from "@opencode-ai/core/schema"
 import * as path from "path"
 import * as Tool from "./tool"
 import { AppFileSystem } from "@opencode-ai/core/filesystem"
@@ -18,21 +18,21 @@ const DEFAULT_READ_LIMIT = 2000
 const SAMPLE_BYTES = 4096
 const SUPPORTED_IMAGE_MIMES = new Set(["image/jpeg", "image/png", "image/gif", "image/webp"])
 
-// `offset` and `limit` were originally `z.coerce.number()` — the runtime
-// coercion was useful when the tool was called from a shell but serves no
-// purpose in the LLM tool-call path (the model emits typed JSON). The JSON
-// Schema output is identical (`type: "number"`), so the LLM view is
-// unchanged; purely CLI-facing uses must now send numbers rather than strings.
+// The tool accepts integer offsets and limits. Shell callers must send numbers;
+// LLM tool calls already use typed JSON.
 export const Parameters = Schema.Struct({
-  filePath: Schema.String.annotate({ description: "The absolute path to the file or directory to read" }),
-  offset: Schema.optional(NonNegativeInt).annotate({
+  filePath: Schema.String.annotate({
+    description: "The absolute path or project-relative path to the file or directory to read",
+  }),
+  offset: Schema.optional(PositiveInt).annotate({
     description: "The line number to start reading from (1-indexed)",
   }),
   limit: Schema.optional(NonNegativeInt).annotate({
     description: "The maximum number of lines to read (defaults to 2000)",
   }),
   onlyHunks: Schema.optional(Schema.Boolean).annotate({
-    description: "If true, only returns lines that contain code hunks modified in git or current changes, along with a few lines of context",
+    description:
+      "If true, only returns lines that contain code hunks modified in git or current changes, along with a few lines of context",
   }),
 })
 
@@ -196,7 +196,7 @@ export const ReadTool = Tool.define(
       if (stat.type === "Directory") {
         const items = yield* list(filepath)
         const limit = params.limit ?? DEFAULT_READ_LIMIT
-        const offset = params.offset || 1
+        const offset = params.offset ?? 1
         const start = offset - 1
         const sliced = items.slice(start, start + limit)
         const truncated = start + sliced.length < items.length
@@ -259,23 +259,23 @@ export const ReadTool = Tool.define(
         const isTracked = yield* git.hasHead(instance.directory).pipe(Effect.orElseSucceed(() => false))
         if (isTracked) {
           const relPath = path.relative(instance.directory, filepath)
-          const patchResult = yield* git.patch(instance.directory, "HEAD", relPath).pipe(
-            Effect.orElseSucceed(() => ({ text: "", truncated: false })),
-          )
+          const patchResult = yield* git
+            .patch(instance.directory, "HEAD", relPath)
+            .pipe(Effect.orElseSucceed(() => ({ text: "", truncated: false })))
           diffText = patchResult.text
         }
-        
+
         const ranges = getChangedRanges(diffText)
         if (ranges.length > 0) {
           file = yield* Effect.promise(() => linesWithHunks(filepath, ranges))
         } else {
           file = yield* Effect.promise(() =>
-            lines(filepath, { limit: params.limit ?? DEFAULT_READ_LIMIT, offset: params.offset || 1 }),
+            lines(filepath, { limit: params.limit ?? DEFAULT_READ_LIMIT, offset: params.offset ?? 1 }),
           )
         }
       } else {
         file = yield* Effect.promise(() =>
-          lines(filepath, { limit: params.limit ?? DEFAULT_READ_LIMIT, offset: params.offset || 1 }),
+          lines(filepath, { limit: params.limit ?? DEFAULT_READ_LIMIT, offset: params.offset ?? 1 }),
         )
       }
 

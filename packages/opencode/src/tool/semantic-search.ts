@@ -8,9 +8,11 @@ export const Parameters = Schema.Struct({
   query: Schema.String.annotate({
     description: "Semantic search query over workspace files. Returns the most relevant code passages.",
   }),
-  topK: Schema.Number.pipe(Schema.optional, Schema.withDecodingDefault(Effect.succeed(10))).annotate({
-    description: "Number of results to return (default 10)",
-  }),
+  topK: Schema.Int.check(Schema.isGreaterThanOrEqualTo(1))
+    .pipe(Schema.optional, Schema.withDecodingDefault(Effect.succeed(10)))
+    .annotate({
+      description: "Number of results to return (default 10)",
+    }),
 })
 
 export const SemanticSearchTool = Tool.define(

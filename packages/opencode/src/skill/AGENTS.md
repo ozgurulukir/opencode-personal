@@ -6,7 +6,7 @@ The `skill` tool (`tool/skill.ts`) has no matching logic — it loads one or mor
 
 ## Multi-skill loading contract
 
-`tool/skill.ts` accepts both `name` (string, backward compatible) and `names` (string array). Execution order: normalize → dedupe → cap at `MAX_SKILLS_PER_CALL = 10` (fail-fast error before any lookup) → look up each name → fail fast with one error listing all unknown names → single permission ask covering all requested patterns → `markLoaded` loop → combined output with skills separated by `---`. Metadata is `{ names: string[], dirs: string[] }` (was `{ name, dir }`). The permission ask evaluates all requested patterns at once, so one "always" approval covers every skill in the call.
+`tool/skill.ts` requires `names` (a string array with 1–10 items); pass one item for a single skill. Schema validation enforces the item count before execution. Execution order: dedupe → look up each name → fail fast with one error listing all unknown names → single permission ask covering all requested patterns → `markLoaded` loop → combined output with skills separated by `---`. Metadata is `{ names: string[], dirs: string[] }`. The permission ask evaluates all requested patterns at once, so one "always" approval covers every skill in the call.
 
 ## Auto-match uses zvec, not brute-force
 

@@ -9,13 +9,13 @@ import { parseRepositoryReference, repositoryCachePath } from "@/util/repository
 import { Instance } from "@/project/instance"
 
 export const Parameters = Schema.Struct({
-  repository: Schema.optional(Schema.String).annotate({
-    description: "Cached repository to inspect, as a git URL, host/path reference, or GitHub owner/repo shorthand",
+  target: Schema.String.annotate({
+    description:
+      "Repository reference or local directory path to inspect. Prefix relative local paths with ./ to distinguish them from owner/repo references.",
   }),
-  path: Schema.optional(Schema.String).annotate({
-    description: "Directory path to inspect instead of a cached repository",
-  }),
-  depth: Schema.optional(Schema.Number).annotate({
+  depth: Schema.optional(
+    Schema.Int.check(Schema.isGreaterThanOrEqualTo(1)).check(Schema.isLessThanOrEqualTo(6)),
+  ).annotate({
     description: "Maximum structure depth to include. Defaults to 3.",
   }),
 })
@@ -107,15 +107,13 @@ export const RepoOverviewTool = Tool.define<typeof Parameters, Metadata, AppFile
     const resolveTarget = Effect.fn("RepoOverviewTool.resolveTarget")(function* (
       params: Schema.Schema.Type<typeof Parameters>,
     ) {
-      if (params.path) {
-        const full = path.isAbsolute(params.path) ? params.path : path.resolve(Instance.directory, params.path)
-        return { path: full, repository: params.repository }
+      if (path.isAbsolute(params.target) || params.target.startsWith(".")) {
+        const full = path.isAbsolute(params.target) ? params.target : path.resolve(Instance.directory, params.target)
+        return { path: full }
       }
 
-      if (!params.repository) throw new Error("Either repository or path is required")
-
-      const parsed = parseRepositoryReference(params.repository)
-      if (!parsed) throw new Error("Repository must be a git URL, host/path reference, or GitHub owner/repo shorthand")
+      const parsed = parseRepositoryReference(params.target)
+      if (!parsed) return { path: path.resolve(Instance.directory, params.target) }
 
       const repository = parsed.label
       return {
@@ -177,8 +175,7 @@ export const RepoOverviewTool = Tool.define<typeof Parameters, Metadata, AppFile
       execute: (params: Schema.Schema.Type<typeof Parameters>, ctx: Tool.Context<Metadata>) =>
         Effect.gen(function* () {
           const target = yield* resolveTarget(params)
-          const depth =
-            !params.depth || !Number.isInteger(params.depth) || params.depth < 1 || params.depth > 6 ? 3 : params.depth
+          const depth = params.depth ?? 3
 
           yield* assertExternalDirectoryEffect(ctx, target.path, { kind: "directory" })
           yield* ctx.ask({

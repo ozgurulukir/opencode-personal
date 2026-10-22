@@ -1,4 +1,5 @@
 import { Effect, Schema } from "effect"
+import { PositiveInt } from "@opencode-ai/core/schema"
 import { HttpClient, HttpClientRequest } from "effect/unstable/http"
 import * as Tool from "./tool"
 import TurndownService from "turndown"
@@ -92,7 +93,9 @@ export const Parameters = Schema.Struct({
     .annotate({
       description: "The format to return the content in (text, markdown, or html). Defaults to markdown.",
     }),
-  timeout: Schema.optional(Schema.Number).annotate({ description: "Optional timeout in seconds (max 120)" }),
+  timeout: Schema.optional(PositiveInt).annotate({
+    description: "Optional positive timeout in seconds. Values above 120 are capped at 120.",
+  }),
 })
 
 export const WebFetchTool = Tool.define(

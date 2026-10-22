@@ -67,6 +67,8 @@ export const resolveTools = Effect.fn("SessionPrompt.resolveTools")(function* (
 ) {
   using _ = log.time("resolveTools")
   const tools: Record<string, AITool> = {}
+  if (!input.model.capabilities.toolcall) return tools
+
   const run = yield* deps.runner()
   const promptOps = yield* deps.ops()
 

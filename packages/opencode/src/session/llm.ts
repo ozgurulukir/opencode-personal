@@ -173,7 +173,10 @@ const live: Layer.Layer<
       // of unconditionally; instructions-mode yields [] (never read downstream).
       const systemMessages =
         delivery.type === "messages"
-          ? ProviderTransform.systemPromptMessages(input.model, [system.prefix, system.suffix].filter((x) => x))
+          ? ProviderTransform.systemPromptMessages(
+              input.model,
+              [system.prefix, system.suffix].filter((x) => x),
+            )
           : []
 
       // Qwen3 chat templates require a single system message at index 0.
@@ -238,6 +241,7 @@ const live: Layer.Layer<
       // during compaction), inject a stub tool to satisfy the validation requirement.
       // The stub description explicitly tells the model not to call it.
       if (
+        input.model.capabilities.toolcall &&
         (isLiteLLMProxy || input.model.providerID.includes("github-copilot")) &&
         Object.keys(tools).length === 0 &&
         hasToolCalls(input.messages)
@@ -403,7 +407,7 @@ const live: Layer.Layer<
         providerOptions: ProviderTransform.providerOptions(input.model, params.options),
         activeTools: Object.keys(sortedTools).filter((x) => x !== "invalid"),
         tools: sortedTools,
-        toolChoice: input.toolChoice,
+        toolChoice: input.model.capabilities.toolcall ? input.toolChoice : undefined,
         maxOutputTokens: params.maxOutputTokens,
         abortSignal: input.abort,
         headers: {
@@ -488,7 +492,9 @@ export const defaultLayer = Layer.suspend(() =>
   ),
 )
 
-function resolveTools(input: Pick<StreamInput, "tools" | "agent" | "permission" | "user">) {
+function resolveTools(input: Pick<StreamInput, "tools" | "agent" | "permission" | "user" | "model">) {
+  if (!input.model.capabilities.toolcall) return {}
+
   const disabled = Permission.disabled(
     Object.keys(input.tools),
     Permission.merge(input.agent.permission, input.permission ?? []),
