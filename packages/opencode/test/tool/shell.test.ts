@@ -1065,6 +1065,23 @@ describe("tool.shell permissions", () => {
     })
   })
 
+  test("executes command when description is omitted and defaults to command", async () => {
+    await using tmp = await tmpdir()
+    await WithInstance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        const bash = await initBash()
+        const requests: Array<Omit<Permission.Request, "id" | "sessionID" | "tool">> = []
+        const result = await Effect.runPromise(
+          bash.execute({ command: "echo hello" }, capture(requests)),
+        )
+        expect(result.output.trim()).toBe("hello")
+        expect(result.title).toBe("echo hello")
+        expect(result.metadata.description).toBe("echo hello")
+      },
+    })
+  })
+
   for (const item of ps) {
     test(
       `strips the call operator from permission patterns [${item.label}]`,

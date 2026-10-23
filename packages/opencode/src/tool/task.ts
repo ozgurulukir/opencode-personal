@@ -23,7 +23,7 @@ export interface TaskPromptOps {
 const id = "task"
 
 export const Parameters = Schema.Struct({
-  description: Schema.String.annotate({ description: "A short (3-5 words) description of the task" }),
+  description: Schema.optional(Schema.String).annotate({ description: "A short (3-5 words) description of the task" }),
   prompt: Schema.String.annotate({ description: "The task for the agent to perform" }),
   subagent_type: Schema.String.annotate({ description: "The type of specialized agent to use for this task" }),
   task_id: Schema.optional(Schema.String).annotate({
@@ -45,6 +45,7 @@ export const TaskTool = Tool.define(
       ctx: Tool.Context,
     ) {
       const cfg = yield* config.get()
+      const description = params.description || params.prompt.slice(0, 50)
 
       // Check permission ruleset for deny even when bypassAgentCheck is true.
       // bypassAgentCheck only skips the user-facing ask dialog, not deny enforcement.
@@ -64,7 +65,7 @@ export const TaskTool = Tool.define(
           patterns: [params.subagent_type],
           always: ["*"],
           metadata: {
-            description: params.description,
+            description,
             subagent_type: params.subagent_type,
           },
         })
@@ -136,7 +137,7 @@ export const TaskTool = Tool.define(
         session ??
         (yield* sessions.create({
           parentID: ctx.sessionID,
-          title: params.description + ` (@${next.name} subagent)`,
+          title: description + ` (@${next.name} subagent)`,
           permission: subagentSessionPermission({
             parentSessionPermission: parent.permission ?? [],
             parentAgent,
@@ -154,7 +155,7 @@ export const TaskTool = Tool.define(
       }
 
       yield* ctx.metadata({
-        title: params.description,
+        title: description,
         metadata: {
           sessionId: nextSession.id,
           model,
@@ -198,7 +199,7 @@ export const TaskTool = Tool.define(
             })
 
             return {
-              title: params.description,
+              title: description,
               metadata: {
                 sessionId: nextSession.id,
                 model,
