@@ -98,7 +98,7 @@ export function formatToolValidationError(id: string, error: unknown): string {
   const raw = error instanceof Error ? error.message : String(error)
   const clean = raw.replace(/^SchemaError\((.*)\)$/s, "$1").replace(/^Error:\s*/, "").trim()
   return (
-    `The ${id} tool was called with invalid arguments: ${clean}.\n` +
+    `The ${id} tool was called with invalid JSON arguments: ${clean}.\n` +
     `Note: This is a tool parameter schema validation failure, NOT an execution or command syntax error. ` +
     `Please check your tool call arguments and provide all required parameters with the expected types.`
   )

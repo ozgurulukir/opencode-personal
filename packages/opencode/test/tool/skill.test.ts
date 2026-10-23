@@ -427,7 +427,7 @@ description: First skill.
           const error = yield* tool.execute({}, ctx).pipe(
             Effect.catchDefect((defect) => Effect.succeed(defect instanceof Error ? defect.message : String(defect))),
           )
-          expect(error).toContain("invalid arguments")
+          expect(error).toContain("invalid JSON arguments")
         }),
       { git: true },
     ),
@@ -462,7 +462,7 @@ description: First skill.
           const error = yield* tool.execute({ names: [] }, ctx).pipe(
             Effect.catchDefect((defect) => Effect.succeed(defect instanceof Error ? defect.message : String(defect))),
           )
-          expect(error).toContain("invalid arguments")
+          expect(error).toContain("invalid JSON arguments")
         }),
       { git: true },
     ),
@@ -498,7 +498,7 @@ description: First skill.
           const error = yield* tool.execute({ names }, ctx).pipe(
             Effect.catchDefect((defect) => Effect.succeed(defect instanceof Error ? defect.message : String(defect))),
           )
-          expect(error).toContain("invalid arguments")
+          expect(error).toContain("invalid JSON arguments")
         }),
       { git: true },
     ),
