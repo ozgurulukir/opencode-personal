@@ -77,16 +77,16 @@ describe("tool parameters", () => {
   })
 
   describe("shell", () => {
-    test("accepts minimum: command + description", () => {
+    test("accepts minimum: command-only", () => {
+      expect(parse(Shell, { command: "ls" })).toEqual({ command: "ls" })
+    })
+    test("accepts command + description", () => {
       expect(parse(Shell, { command: "ls", description: "list" })).toEqual({ command: "ls", description: "list" })
     })
     test("accepts optional timeout + workdir", () => {
       const parsed = parse(Shell, { command: "ls", description: "list", timeout: 5000, workdir: "/tmp" })
       expect(parsed.timeout).toBe(5000)
       expect(parsed.workdir).toBe("/tmp")
-    })
-    test("rejects missing description", () => {
-      expect(accepts(Shell, { command: "ls" })).toBe(false)
     })
     test("rejects missing command", () => {
       expect(accepts(Shell, { description: "list" })).toBe(false)
@@ -252,6 +252,10 @@ describe("tool parameters", () => {
   describe("task", () => {
     test("accepts description + prompt + subagent_type", () => {
       const parsed = parse(Task, { description: "d", prompt: "p", subagent_type: "general" })
+      expect(parsed.subagent_type).toBe("general")
+    })
+    test("accepts prompt + subagent_type without description", () => {
+      const parsed = parse(Task, { prompt: "p", subagent_type: "general" })
       expect(parsed.subagent_type).toBe("general")
     })
     test("rejects missing prompt", () => {

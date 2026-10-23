@@ -96,4 +96,45 @@ describe("Tool.define", () => {
 
     expect(calls).toEqual([{ count: 5 }, { count: 7 }])
   })
+
+  test("formatToolValidationError produces clear JSON argument guidance", () => {
+    const formatted = Tool.formatToolValidationError("bash", new Error("Missing key\n  at [\"description\"]"))
+    expect(formatted).toContain("The bash tool was called with invalid arguments: Missing key\n  at [\"description\"].")
+    expect(formatted).toContain("Note: This is a tool parameter schema validation failure, NOT an execution or command syntax error.")
+  })
+
+  test("execute surfaces clear validation error on missing required field", async () => {
+    const requiredSchema = Schema.Struct({ requiredField: Schema.String })
+    const info = await runtime.runPromise(
+      Tool.define(
+        "test-required",
+        Effect.succeed({
+          description: "test tool",
+          parameters: requiredSchema,
+          execute() {
+            return Effect.succeed({ title: "test", output: "ok", metadata: {} })
+          },
+        }),
+      ),
+    )
+    const ctx: Tool.Context = {
+      sessionID: SessionID.descending(),
+      messageID: MessageID.ascending(),
+      agent: "build",
+      abort: new AbortController().signal,
+      messages: [],
+      metadata() {
+        return Effect.void
+      },
+      ask() {
+        return Effect.void
+      },
+    }
+    const tool = await Effect.runPromise(info.init())
+    const execute = tool.execute as unknown as (args: unknown, ctx: Tool.Context) => ReturnType<typeof tool.execute>
+
+    expect(Effect.runPromise(execute({}, ctx))).rejects.toThrow(
+      "The test-required tool was called with invalid arguments",
+    )
+  })
 })

@@ -54,7 +54,6 @@ Output: Creates directory 'foo'"
   },
   "required": [
     "command",
-    "description",
   ],
   "type": "object",
 }
@@ -455,7 +454,6 @@ exports[`tool parameters JSON Schema (wire shape) task 1`] = `
     },
   },
   "required": [
-    "description",
     "prompt",
     "subagent_type",
   ],

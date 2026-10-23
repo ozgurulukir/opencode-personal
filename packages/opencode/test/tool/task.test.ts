@@ -463,6 +463,38 @@ describe("tool.task", () => {
     }),
   )
 
+  it.instance("execute succeeds and defaults title when description is omitted", () =>
+    Effect.gen(function* () {
+      const sessions = yield* Session.Service
+      const { chat, assistant } = yield* seed()
+      const tool = yield* TaskTool
+      const def = yield* tool.init()
+      const promptOps = stubOps({ text: "ok" })
+
+      const result = yield* def.execute(
+        {
+          prompt: "find all memory leaks in the codebase",
+          subagent_type: "general",
+        },
+        {
+          sessionID: chat.id,
+          messageID: assistant.id,
+          agent: "build",
+          abort: new AbortController().signal,
+          extra: { promptOps },
+          messages: [],
+          metadata: () => Effect.void,
+          ask: () => Effect.void,
+        },
+      )
+
+      const kids = yield* sessions.children(chat.id)
+      expect(kids).toHaveLength(1)
+      expect(kids[0]?.title).toBe("find all memory leaks in the codebase (@general subagent)")
+      expect(result.title).toBe("find all memory leaks in the codebase")
+    }),
+  )
+
   it.instance(
     "execute shapes child permissions for task, todowrite, and primary tools",
     () =>

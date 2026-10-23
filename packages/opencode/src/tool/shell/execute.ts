@@ -221,10 +221,11 @@ export function createShellTool(
         cwd: string
         env: NodeJS.ProcessEnv
         timeout: number
-        description: string
+        description?: string
       },
       ctx: Tool.Context,
     ) {
+      const description = input.description || input.command
       const limits = yield* trunc.limits()
       const keep = limits.maxBytes * 2
       let full = ""
@@ -240,7 +241,7 @@ export function createShellTool(
       yield* ctx.metadata({
         metadata: {
           output: "",
-          description: input.description,
+          description,
         },
       })
 
@@ -303,14 +304,14 @@ export function createShellTool(
           })
         }
         return {
-          title: input.description,
+          title: description,
           metadata: {
             output: terminalOutput.output ?? "",
             exit: result.exitCode ?? null,
-            description: input.description,
+            description,
             truncated: terminalOutput.truncated,
           },
-            output: finalOutput,
+          output: finalOutput,
         }
       }
 
@@ -350,7 +351,7 @@ export function createShellTool(
                       ctx.metadata({
                         metadata: {
                           output: last,
-                          description: input.description,
+                          description,
                         },
                       }),
                     ),
@@ -361,7 +362,7 @@ export function createShellTool(
               return ctx.metadata({
                 metadata: {
                   output: last,
-                  description: input.description,
+                  description,
                 },
               })
             }),
@@ -440,11 +441,11 @@ export function createShellTool(
       }
 
       return {
-        title: input.description,
+        title: description,
         metadata: {
           output: last || preview(output),
           exit: code,
-          description: input.description,
+          description,
           truncated: cut,
           ...(cut && file ? { outputPath: file } : {}),
         },
