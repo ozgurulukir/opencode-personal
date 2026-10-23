@@ -99,7 +99,7 @@ describe("Tool.define", () => {
 
   test("formatToolValidationError produces clear JSON argument guidance", () => {
     const formatted = Tool.formatToolValidationError("bash", new Error("Missing key\n  at [\"description\"]"))
-    expect(formatted).toContain("The bash tool was called with invalid JSON arguments: Missing key\n  at [\"description\"].")
+    expect(formatted).toContain("The bash tool was called with invalid arguments: Missing key\n  at [\"description\"].")
     expect(formatted).toContain("Note: This is a tool parameter schema validation failure, NOT an execution or command syntax error.")
   })
 
@@ -134,7 +134,7 @@ describe("Tool.define", () => {
     const execute = tool.execute as unknown as (args: unknown, ctx: Tool.Context) => ReturnType<typeof tool.execute>
 
     expect(Effect.runPromise(execute({}, ctx))).rejects.toThrow(
-      "The test-required tool was called with invalid JSON arguments",
+      "The test-required tool was called with invalid arguments",
     )
   })
 })
