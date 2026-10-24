@@ -2,29 +2,29 @@ import { describe, expect, test } from "bun:test"
 import { Identifier } from "@opencode-ai/core/util/identifier"
 
 describe("Identifier", () => {
-  test("generates 26-character IDs", () => {
-    expect(Identifier.ascending().length).toBe(26)
-    expect(Identifier.descending().length).toBe(26)
+  test("generates 28-character IDs", () => {
+    expect(Identifier.ascending().length).toBe(28)
+    expect(Identifier.descending().length).toBe(28)
   })
 
   test("ascending IDs sort lexicographically for increasing timestamps", () => {
-    const a = Identifier.create(false, 1000)
-    const b = Identifier.create(false, 2000)
-    const c = Identifier.create(false, 3000)
+    const a = Identifier.create(false, 1_700_000_000_000)
+    const b = Identifier.create(false, 1_800_000_000_000)
+    const c = Identifier.create(false, 1_900_000_000_000)
     expect(a < b).toBe(true)
     expect(b < c).toBe(true)
   })
 
   test("descending IDs sort inversely for increasing timestamps", () => {
-    const a = Identifier.create(true, 1000)
-    const b = Identifier.create(true, 2000)
-    const c = Identifier.create(true, 3000)
+    const a = Identifier.create(true, 1_700_000_000_000)
+    const b = Identifier.create(true, 1_800_000_000_000)
+    const c = Identifier.create(true, 1_900_000_000_000)
     expect(a > b).toBe(true)
     expect(b > c).toBe(true)
   })
 
   test("ascending IDs are monotonic within same timestamp", () => {
-    const ts = 5000
+    const ts = 1_700_000_000_000
     const a = Identifier.create(false, ts)
     const b = Identifier.create(false, ts)
     const c = Identifier.create(false, ts)
@@ -33,7 +33,7 @@ describe("Identifier", () => {
   })
 
   test("descending IDs are monotonic within same timestamp", () => {
-    const ts = 6000
+    const ts = 1_700_000_000_000
     const a = Identifier.create(true, ts)
     const b = Identifier.create(true, ts)
     const c = Identifier.create(true, ts)
@@ -42,17 +42,17 @@ describe("Identifier", () => {
   })
 
   test("ascending and descending produce different prefixes for same timestamp", () => {
-    const ts = 9000
+    const ts = 1_700_000_000_000
     const asc = Identifier.create(false, ts)
     const desc = Identifier.create(true, ts)
-    expect(asc.slice(0, 12)).not.toBe(desc.slice(0, 12))
+    expect(asc.slice(0, 14)).not.toBe(desc.slice(0, 14))
   })
 
   test("IDs contain only hex prefix and base62 suffix", () => {
     const id = Identifier.ascending()
-    const hexPrefix = id.slice(0, 12)
-    const base62Suffix = id.slice(12)
-    expect(hexPrefix).toMatch(/^[0-9a-f]{12}$/)
+    const hexPrefix = id.slice(0, 14)
+    const base62Suffix = id.slice(14)
+    expect(hexPrefix).toMatch(/^[0-9a-f]{14}$/)
     expect(base62Suffix).toMatch(/^[0-9A-Za-z]{14}$/)
   })
 
