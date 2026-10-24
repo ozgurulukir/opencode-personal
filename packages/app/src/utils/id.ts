@@ -9,7 +9,7 @@ const prefixes = {
   pty: "pty",
 } as const
 
-const LENGTH = 26
+const LENGTH = 28
 let lastTimestamp = 0
 let counter = 0
 
@@ -53,15 +53,15 @@ function create(prefix: Prefix, descending: boolean, timestamp?: number): string
   let now = BigInt(currentTimestamp) * BigInt(0x1000) + BigInt(counter)
 
   if (descending) {
-    now = ~now
+    now = ~now & BigInt("0xffffffffffffff")
   }
 
-  const timeBytes = new Uint8Array(6)
-  for (let i = 0; i < 6; i += 1) {
-    timeBytes[i] = Number((now >> BigInt(40 - 8 * i)) & BigInt(0xff))
+  const timeBytes = new Uint8Array(7)
+  for (let i = 0; i < 7; i += 1) {
+    timeBytes[i] = Number((now >> BigInt(48 - 8 * i)) & BigInt(0xff))
   }
 
-  return prefixes[prefix] + "_" + bytesToHex(timeBytes) + randomBase62(LENGTH - 12)
+  return prefixes[prefix] + "_" + bytesToHex(timeBytes) + randomBase62(LENGTH - 14)
 }
 
 function bytesToHex(bytes: Uint8Array): string {

@@ -10,15 +10,13 @@ test("create returns ID with correct prefix", () => {
 
 test("create returns an ID of reasonable length", () => {
   const id = create("evt", "ascending")
-  // 3-char prefix + "_" + 12 hex chars + 14 base62 chars = 30
-  expect(id.length).toBeGreaterThanOrEqual(26)
+  // 3-char prefix + "_" + 14 hex chars + 14 base62 chars = 32
+  expect(id.length).toBeGreaterThanOrEqual(28)
   expect(id.length).toBeLessThanOrEqual(40)
 })
 
-test("create with a small enough timestamp round-trips through timestamp", () => {
-  // 6 bytes = 48 bits. Max safe encoded value: 2^48 - 1 = 281474976710655
-  // Max safe timestamp: 281474976710655 / 4096 ≈ 68 719 476 735 ms
-  const known = 10_000_000_000
+test("create with a modern timestamp round-trips through timestamp", () => {
+  const known = 1_700_000_000_000
   const id = create("evt", "ascending", known)
   expect(timestamp(id)).toBe(known)
 })
@@ -39,11 +37,16 @@ test("ascending IDs produced within same millisecond are unique", () => {
   expect(a).not.toBe(b)
 })
 
-test("timestamp round-trips through ascending ID with small timestamp", () => {
-  // Only timestamps < ~68 billion ms fit in 6 bytes
-  const known = 1_000_000_000
-  const id = create("tool", "ascending", known)
-  expect(timestamp(id)).toBe(known)
+test("ascending IDs sort lexicographically for increasing timestamps", () => {
+  const a = create("tool", "ascending", 1_700_000_000_000)
+  const b = create("tool", "ascending", 1_800_000_000_000)
+  expect(a < b).toBe(true)
+})
+
+test("descending IDs sort inversely for increasing timestamps", () => {
+  const a = create("tool", "descending", 1_700_000_000_000)
+  const b = create("tool", "descending", 1_800_000_000_000)
+  expect(a > b).toBe(true)
 })
 
 // ---- edge cases ----
@@ -64,8 +67,8 @@ test("ascending with timestamp 0 produces valid ID", () => {
 })
 
 test("descending produces different output than ascending for same timestamp", () => {
-  const asc = create("evt", "ascending", 1_000_000_000)
-  const desc = create("evt", "descending", 1_000_000_000)
+  const asc = create("evt", "ascending", 1_700_000_000_000)
+  const desc = create("evt", "descending", 1_700_000_000_000)
   expect(asc).not.toBe(desc)
 })
 
