@@ -24,13 +24,13 @@ describe("Identifier", () => {
   test("ascending generates ID with correct prefix and length", () => {
     const id = Identifier.ascending("session")
     expect(id.startsWith("ses_")).toBe(true)
-    expect(id.length).toBe(30)
+    expect(id.length).toBe(32)
   })
 
   test("descending generates ID with correct prefix and length", () => {
     const id = Identifier.descending("message")
     expect(id.startsWith("msg_")).toBe(true)
-    expect(id.length).toBe(30)
+    expect(id.length).toBe(32)
   })
 
   test("schema validates prefix correctly", () => {
