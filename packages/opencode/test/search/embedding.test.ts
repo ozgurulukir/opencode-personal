@@ -1,10 +1,15 @@
 import { describe, expect, test } from "bun:test"
+import fs from "fs"
+import os from "os"
+import path from "path"
+
 import { Effect, Layer } from "effect"
 import {
   EmbeddingService,
   type EmbeddingServiceInterface,
   WordPieceTokenizer,
   meanPool,
+  ensureDownloaded,
 } from "../../src/search/embedding"
 
 describe("EmbeddingService DI", () => {
@@ -70,5 +75,20 @@ describe("meanPool", () => {
     const result = meanPool(logits, mask, 2)
     const norm = Math.sqrt(result[0] ** 2 + result[1] ** 2)
     expect(norm).toBeCloseTo(1)
+  })
+})
+
+describe("ensureDownloaded", () => {
+  test("returns early if file already exists without making HTTP request", async () => {
+    const tmpDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), "opencode-embed-test-"))
+    const testFile = path.join(tmpDir, "dummy.txt")
+    await fs.promises.writeFile(testFile, "already exists")
+    try {
+      await ensureDownloaded("dummy.txt", testFile)
+      const content = await fs.promises.readFile(testFile, "utf8")
+      expect(content).toBe("already exists")
+    } finally {
+      await fs.promises.rm(tmpDir, { recursive: true, force: true })
+    }
   })
 })

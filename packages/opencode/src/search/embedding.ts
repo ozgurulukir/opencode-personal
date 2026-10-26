@@ -36,8 +36,13 @@ function modelCacheDir(): string {
   return path.join(os.homedir(), ".cache", "opencode", "models", HF_REPO)
 }
 
-async function ensureDownloaded(file: string, dest: string): Promise<void> {
-  if (fs.existsSync(dest)) return
+export async function ensureDownloaded(file: string, dest: string): Promise<void> {
+  try {
+    await fs.promises.access(dest)
+    return
+  } catch {
+    // File does not exist, proceed to download
+  }
   await fs.promises.mkdir(path.dirname(dest), { recursive: true })
   const res = await fetch(`${HF_BASE}/${file}`)
   if (!res.ok) throw new Error(`Failed to download ${file}: HTTP ${res.status}`)
