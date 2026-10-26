@@ -20,7 +20,10 @@ Use in forms and multi-select lists.
 - Controlled or uncontrolled usage.
 
 ### Accessibility
-- TODO: confirm aria attributes from Kobalte.
+- Standard native \`<input type="checkbox">\` semantics managed by Kobalte.
+- Uses \`role="checkbox"\` with automatic state management (\`aria-checked\`, \`aria-disabled\`, \`aria-invalid\`).
+- Label is connected via \`aria-labelledby\` and description text is associated via \`aria-describedby\`.
+- Fully accessible via keyboard navigation (Focusable via \`Tab\`, toggles state on \`Space\`).
 
 ### Theming/tokens
 - Uses \`data-component="checkbox"\` and related slots.
