@@ -21,7 +21,9 @@ Provide concise title/description and keep body focused.
 - Intended to be rendered via \`useDialog().show\`.
 
 ### Accessibility
-- TODO: confirm focus trapping and aria attributes from Kobalte Dialog.
+- Focus is automatically trapped within the dialog while active, and returned upon closing.
+- Supports dismissal via the Escape key and overlay backdrop click.
+- Leverages Kobalte Dialog accessibility attributes (role="dialog", aria-labelledby referencing Kobalte.Title, and aria-describedby referencing Kobalte.Description).
 
 ### Theming/tokens
 - Uses \`data-component="dialog"\` and slot attributes.
