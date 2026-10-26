@@ -19,7 +19,8 @@ Use for small contextual details; avoid long forms.
 - Closes on outside click or Escape by default.
 
 ### Accessibility
-- TODO: confirm focus management from Kobalte.
+- Powered by Kobalte Popover primitive; manages \`dialog\` role, \`aria-expanded\`, \`aria-haspopup\`, \`aria-labelledby\`, and \`aria-describedby\` attributes.
+- Manages focus upon opening and restores focus to trigger on close (unless dismissed via outside click).
 
 ### Theming/tokens
 - Uses \`data-component="popover-content"\` and related slots.
