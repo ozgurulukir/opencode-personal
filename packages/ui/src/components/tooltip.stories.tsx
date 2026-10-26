@@ -18,7 +18,8 @@ Use for short hints; avoid long descriptions.
 - Opens on hover/focus; can be forced open.
 
 ### Accessibility
-- TODO: confirm trigger semantics and focus behavior.
+- Uses \`role="tooltip"\` on content and associates with trigger via \`aria-describedby\` when open.
+- Opens on hover and focus; dismisses on pointer/keyboard activation (Enter/Space), blur, or \`Escape\`.
 
 ### Theming/tokens
 - Uses \`data-component="tooltip"\` and related slots.
