@@ -271,6 +271,18 @@ describe("tool.read external_directory permission", () => {
     }),
   )
 
+  it.live("asks for external_directory permission when reading nested relative path traversing outside project", () =>
+    Effect.gen(function* () {
+      const dir = yield* tmpdirScoped({ git: true })
+
+      const { items, next } = asks()
+
+      yield* fail(dir, { filePath: "subdir/../../outside.txt" }, next)
+      const ext = items.find((item) => item.permission === "external_directory")
+      expect(ext).toBeDefined()
+    }),
+  )
+
   it.live("does not ask for external_directory permission when reading inside project", () =>
     Effect.gen(function* () {
       const dir = yield* tmpdirScoped({ git: true })
