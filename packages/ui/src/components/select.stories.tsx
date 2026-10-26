@@ -19,7 +19,10 @@ Use \`children\` to customize option rendering.
 - Uses Kobalte Select with optional item highlight callbacks.
 
 ### Accessibility
-- TODO: confirm keyboard navigation and aria attributes from Kobalte.
+- Follows WAI-ARIA Select (listbox/combobox) pattern via Kobalte Select.
+- Trigger manages \`aria-expanded\`, \`aria-haspopup="listbox"\`, and \`aria-controls\`.
+- Items use \`role="option"\` with appropriate \`aria-selected\` attributes.
+- Supports full keyboard navigation (Up/Down Arrow to navigate options, Enter/Space to select, Escape to dismiss, and type-ahead search).
 
 ### Theming/tokens
 - Uses \`data-component="select"\` with slot attributes.
