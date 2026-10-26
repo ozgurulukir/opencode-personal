@@ -9,17 +9,27 @@ describe("Slug", () => {
       expect(slug).toMatch(/^[a-z]+-[a-z]+$/)
     })
 
-    test("picks the first adjective and noun when Math.random is 0", () => {
-      const randomSpy = spyOn(Math, "random").mockReturnValue(0)
+    test("picks the first adjective and noun when getRandomValues returns 0", () => {
+      const randomSpy = spyOn(crypto, "getRandomValues").mockImplementation((array: any) => {
+        array.fill(0)
+        return array
+      })
 
       expect(Slug.create()).toBe("brave-cabin")
 
       randomSpy.mockRestore()
     })
 
-    test("picks the last adjective and noun when Math.random is close to 1", () => {
-      // 0.999 will floor to length - 1
-      const randomSpy = spyOn(Math, "random").mockReturnValue(0.999)
+    test("picks specific adjective and noun indices based on getRandomValues", () => {
+      let callCount = 0
+      const randomSpy = spyOn(crypto, "getRandomValues").mockImplementation((array: any) => {
+        callCount++
+        // ADJECTIVES length = 29, NOUNS length = 31
+        // 28 % 29 = 28 ("witty")
+        // 30 % 31 = 30 ("wolf")
+        array[0] = callCount === 1 ? 28 : 30
+        return array
+      })
 
       expect(Slug.create()).toBe("witty-wolf")
 

@@ -65,10 +65,13 @@ export namespace Slug {
     "wolf",
   ] as const
 
+  function pick<T>(list: readonly T[]): T {
+    const array = new Uint32Array(1)
+    crypto.getRandomValues(array)
+    return list[array[0] % list.length]
+  }
+
   export function create() {
-    return [
-      ADJECTIVES[Math.floor(Math.random() * ADJECTIVES.length)],
-      NOUNS[Math.floor(Math.random() * NOUNS.length)],
-    ].join("-")
+    return [pick(ADJECTIVES), pick(NOUNS)].join("-")
   }
 }
