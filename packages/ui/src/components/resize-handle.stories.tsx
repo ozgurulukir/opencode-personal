@@ -19,7 +19,7 @@ Use alongside resizable panels and split layouts.
 - Drag updates size and calls \`onResize\` with clamped values.
 
 ### Accessibility
-- TODO: provide keyboard resizing guidance if needed.
+- Drag handle driven by mouse events. Ensure accessible controls (e.g., buttons or key listeners) are provided if keyboard-driven resizing is needed.
 
 ### Theming/tokens
 - Uses \`data-component="resize-handle"\` with direction/edge data attributes.
