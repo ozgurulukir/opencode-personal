@@ -20,7 +20,8 @@ Use within panels or popovers where keyboard navigation is expected.
 - Keyboard navigation via arrow keys; Enter selects.
 
 ### Accessibility
-- TODO: confirm ARIA roles for list items and search input.
+- Search input uses Kobalte TextField with standard text input ARIA attributes.
+- List items are rendered as native HTML button elements with data-slot="list-item", providing standard button semantics and keyboard interactivity.
 
 ### Theming/tokens
 - Uses \`data-component="list"\` and data slots for structure.
