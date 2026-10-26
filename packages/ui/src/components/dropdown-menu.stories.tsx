@@ -18,7 +18,12 @@ Use \`DropdownMenu.ItemLabel\`/\`ItemDescription\` for richer rows.
 - Menu opens from trigger and renders in a portal by default.
 
 ### Accessibility
-- TODO: confirm keyboard navigation from Kobalte.
+- Built on Kobalte DropdownMenu; provides full WAI-ARIA Menu pattern support.
+- \`Enter\` or \`Space\` activates the focused item or opens submenus.
+- \`ArrowDown\` and \`ArrowUp\` navigate through menu items with roving tab index.
+- \`ArrowRight\` opens a submenu, and \`ArrowLeft\` closes it and moves focus back to the sub-trigger.
+- \`Home\` and \`End\` move focus to the first and last menu items, respectively.
+- \`Escape\` dismisses the menu and restores focus to the trigger element.
 
 ### Theming/tokens
 - Uses \`data-component="dropdown-menu"\` and slot attributes for styling.
