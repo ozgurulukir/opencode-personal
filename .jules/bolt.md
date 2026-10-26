@@ -135,3 +135,7 @@
 - Combined permission/question session ID collection (`ids`) and session grouping (`grouped`) into a single imperative `for` loop in `bootstrapDirectory` (`packages/app/src/context/global-sync/bootstrap.ts`).
 - Eliminated redundant intermediate array allocations and O(N) traversals from `perms.filter()` / `questions.filter()` and `groupBySession()`.
 - Benchmark measurements showed ~2x speedup across dataset sizes (100 to 10,000 items) and eliminated temporary array garbage collection pressure.
+
+## 2026-10-26 - Async file existence check in embedding initialization
+- **Pattern:** Using synchronous `fs.existsSync` to check for cached model/vocab files blocks the event loop during file I/O checks in async workflows.
+- **Action:** Replace `fs.existsSync(dest)` with `await fs.promises.access(dest)` in a `try/catch` block in `ensureDownloaded` (`packages/opencode/src/search/embedding.ts`) to make file existence checking asynchronous and non-blocking, ensuring event loop responsiveness during embedding initialization.
