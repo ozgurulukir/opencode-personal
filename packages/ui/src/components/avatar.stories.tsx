@@ -9,7 +9,7 @@ Use in user lists and headers.
 
 ### API
 - Required: \`fallback\` string.
-- Optional: \`src\`, \`background\`, \`foreground\`, \`size\`.
+- Optional: \`src\`, \`alt\`, \`background\`, \`foreground\`, \`size\`.
 
 ### Variants and states
 - Sizes: small, normal, large.
@@ -19,7 +19,7 @@ Use in user lists and headers.
 - Uses grapheme-aware fallback rendering.
 
 ### Accessibility
-- TODO: provide alt text when using images; currently image is decorative.
+- Provide \`alt\` text when using images; defaults to decorative empty string \`""\` if omitted.
 
 ### Theming/tokens
 - Uses \`data-component="avatar"\` with size and image state attributes.
@@ -53,6 +53,7 @@ export const Basic = story.Basic
 export const WithImage = {
   args: {
     src: "https://placehold.co/80x80/png",
+    alt: "User avatar",
     fallback: "J",
   },
 }

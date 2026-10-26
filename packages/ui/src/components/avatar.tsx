@@ -14,6 +14,7 @@ function first(value: string) {
 export interface AvatarProps extends ComponentProps<"div"> {
   fallback: string
   src?: string
+  alt?: string
   background?: string
   foreground?: string
   size?: "small" | "normal" | "large"
@@ -23,6 +24,7 @@ export function Avatar(props: AvatarProps) {
   const [split, rest] = splitProps(props, [
     "fallback",
     "src",
+    "alt",
     "background",
     "foreground",
     "size",
@@ -48,7 +50,7 @@ export function Avatar(props: AvatarProps) {
       }}
     >
       <Show when={src} fallback={first(split.fallback)}>
-        {(src) => <img src={src()} draggable={false} data-slot="avatar-image" />}
+        {(src) => <img src={src()} alt={split.alt ?? ""} draggable={false} data-slot="avatar-image" />}
       </Show>
     </div>
   )
