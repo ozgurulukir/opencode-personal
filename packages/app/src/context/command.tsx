@@ -299,16 +299,21 @@ export const { use: useCommand, provider: CommandProvider } = createSimpleContex
         keybind: bind(opt.id, opt.keybind),
       }))
 
-      const suggested = resolved.filter((x) => x.suggested && !x.disabled)
+      const suggestedCategory = language.t("command.category.suggested")
+      const suggested: typeof resolved = []
 
-      return [
-        ...suggested.map((x) => ({
-          ...x,
-          id: SUGGESTED_PREFIX + x.id,
-          category: language.t("command.category.suggested"),
-        })),
-        ...resolved,
-      ]
+      for (let i = 0; i < resolved.length; i++) {
+        const x = resolved[i]
+        if (x.suggested && !x.disabled) {
+          suggested.push({
+            ...x,
+            id: SUGGESTED_PREFIX + x.id,
+            category: suggestedCategory,
+          })
+        }
+      }
+
+      return [...suggested, ...resolved]
     })
 
     const suspended = () => store.suspendCount > 0
