@@ -145,9 +145,15 @@ export const layer = Layer.effect(
 
       active: Effect.fn("AuthV2.active")(function* (serviceID) {
         const data = yield* SynchronizedRef.get(state)
-        return (
-          data.accounts[data.active[serviceID]] ?? Object.values(data.accounts).find((a) => a.serviceID === serviceID)
-        )
+        const activeID = data.active[serviceID]
+        if (activeID) {
+          const activeAccount = data.accounts[activeID]
+          if (activeAccount) return activeAccount
+        }
+        for (const account of Object.values(data.accounts)) {
+          if (account.serviceID === serviceID) return account
+        }
+        return undefined
       }),
 
       forService: Effect.fn("AuthV2.list")(function* (serviceID) {
