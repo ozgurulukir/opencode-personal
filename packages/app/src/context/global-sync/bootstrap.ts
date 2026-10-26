@@ -130,16 +130,6 @@ export async function bootstrapGlobal(input: {
   // })
 }
 
-function groupBySession<T extends { id: string; sessionID: string }>(input: T[]) {
-  return input.reduce<Record<string, T[]>>((acc, item) => {
-    if (!item?.id || !item.sessionID) return acc
-    const list = acc[item.sessionID]
-    if (list) list.push(item)
-    if (!list) acc[item.sessionID] = [item]
-    return acc
-  }, {})
-}
-
 function projectID(directory: string, projects: Project[]) {
   return projects.find((project) => project.worktree === directory || project.sandboxes?.includes(directory))?.id
 }
@@ -254,16 +244,21 @@ export async function bootstrapDirectory(input: {
       () =>
         retry(() =>
           input.sdk.permission.list().then((x) => {
-            // ⚡ Bolt Optimization: Replace chained .map().filter() with a single loop to reduce GC pressure and O(N) traversals
+            // ⚡ Bolt Optimization: Collect session IDs and group permissions in a single loop to reduce GC pressure and traversals
             const ids: string[] = []
+            const grouped: Record<string, PermissionRequest[]> = {}
             const perms = x.data ?? []
             for (let i = 0; i < perms.length; i++) {
-              const id = perms[i]?.sessionID
-              if (id) ids.push(id)
+              const perm = perms[i]
+              if (!perm?.id || !perm.sessionID) continue
+              ids.push(perm.sessionID)
+              const list = grouped[perm.sessionID]
+              if (list) {
+                list.push(perm)
+              } else {
+                grouped[perm.sessionID] = [perm]
+              }
             }
-            const grouped = groupBySession(
-              perms.filter((perm): perm is PermissionRequest => !!perm?.id && !!perm.sessionID),
-            )
             return warmSessions({ ids, store: input.store, setStore: input.setStore, sdk: input.sdk }).then(() =>
               batch(() => {
                 for (const sessionID of Object.keys(input.store.permission)) {
@@ -287,14 +282,21 @@ export async function bootstrapDirectory(input: {
       () =>
         retry(() =>
           input.sdk.question.list().then((x) => {
-            // ⚡ Bolt Optimization: Replace chained .map().filter() with a single loop to reduce GC pressure and O(N) traversals
+            // ⚡ Bolt Optimization: Collect session IDs and group questions in a single loop to reduce GC pressure and traversals
             const ids: string[] = []
+            const grouped: Record<string, QuestionRequest[]> = {}
             const questions = x.data ?? []
             for (let i = 0; i < questions.length; i++) {
-              const id = questions[i]?.sessionID
-              if (id) ids.push(id)
+              const q = questions[i]
+              if (!q?.id || !q.sessionID) continue
+              ids.push(q.sessionID)
+              const list = grouped[q.sessionID]
+              if (list) {
+                list.push(q)
+              } else {
+                grouped[q.sessionID] = [q]
+              }
             }
-            const grouped = groupBySession(questions.filter((q): q is QuestionRequest => !!q?.id && !!q.sessionID))
             return warmSessions({ ids, store: input.store, setStore: input.setStore, sdk: input.sdk }).then(() =>
               batch(() => {
                 for (const sessionID of Object.keys(input.store.question)) {
