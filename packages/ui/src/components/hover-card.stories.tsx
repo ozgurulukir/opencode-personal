@@ -18,7 +18,11 @@ Use for short summaries; avoid dense interactive controls.
 - Opens on hover/focus over the trigger.
 
 ### Accessibility
-- TODO: confirm focus and hover intent behavior from Kobalte.
+- Built on Kobalte HoverCard; manages hover intent with customizable open/close delays (openDelay/closeDelay).
+- Adheres to WCAG 1.4.13 (Content on Hover or Focus):
+  - Dismissable via Escape without moving focus.
+  - Hoverable content allows cursor movement over the popover without hiding.
+  - Persistent until mouse leaves or element is dismissed.
 
 ### Theming/tokens
 - Uses \`data-component="hover-card-content"\` and slots for styling.
