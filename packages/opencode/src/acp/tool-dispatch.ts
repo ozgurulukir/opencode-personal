@@ -501,13 +501,24 @@ export function completedToolContent(
   return result
 }
 
+function parseDataUri(uri: string): { mime?: string; data: string } | undefined {
+  if (!uri.startsWith("data:")) return undefined
+  const comma = uri.indexOf(",")
+  if (comma === -1) return undefined
+  const header = uri.slice(5, comma)
+  if (!header.endsWith(";base64")) return undefined
+  const mime = header.slice(0, -7).split(";")[0]
+  const data = uri.slice(comma + 1)
+  return { mime: mime || undefined, data }
+}
+
 function imageContents(content: V2ToolContent[]): ToolCallContent[] {
   return content.flatMap((item): ToolCallContent[] => {
     if (item.type !== "file") return []
-    const match = item.uri.match(/^data:([^;,]+)(?:;[^,]*)*;base64,(.*)$/)
-    const mime = match?.[1] ?? item.mime
+    const parsed = parseDataUri(item.uri)
+    const mime = parsed?.mime ?? item.mime
     if (!mime.startsWith("image/")) return []
-    const data = match?.[2]
+    const data = parsed?.data
     if (data === undefined) return []
     return [
       {

@@ -63,11 +63,17 @@ const searchAndEmbeddingLayer = Layer.merge(searchDefaultLayer, embeddingDefault
 const log = Log.create({ service: "tool.registry" })
 
 function sanitizeDescription(desc: string): string {
-  return desc
-    .replace(/<[^>]*>/g, "") // strip HTML/XML tags
-    .replace(/\[\[.*?\]\]/g, "") // strip wiki-style links
-    .trim()
+  let prev: string
+  do {
+    prev = desc
+    desc = desc
+      .replace(/<[^<>]*>/g, "") // strip HTML/XML tags
+      .replace(/\[\[[^\[\]]*\]\]/g, "") // strip wiki-style links
+  } while (desc !== prev)
+  return desc.replace(/[<>]/g, "").trim()
 }
+
+export { sanitizeDescription as _sanitizeDescription }
 
 export function webSearchEnabled(
   providerID: ProviderID,
