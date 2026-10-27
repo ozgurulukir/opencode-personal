@@ -125,4 +125,12 @@ describe("util.process", () => {
       code: "ENOENT",
     })
   })
+
+  test("rejects shell path containing injection characters", () => {
+    expect(() => {
+      Process.spawn(["echo", "hello"], {
+        shell: "/bin/sh; rm -rf /",
+      })
+    }).toThrow("Invalid shell path")
+  })
 })
