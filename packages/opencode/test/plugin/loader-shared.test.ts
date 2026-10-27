@@ -606,7 +606,9 @@ describe("plugin.loader.shared", () => {
       },
     })
 
-    const install = spyOn(Npm, "add").mockRejectedValue(new Error("boom"))
+    const install = spyOn(Npm, "add").mockImplementation(async () => {
+      throw new Error("boom")
+    })
 
     try {
       await load(tmp.path)
