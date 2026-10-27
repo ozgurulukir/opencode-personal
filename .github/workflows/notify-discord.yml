@@ -4,6 +4,8 @@ on:
   release:
     types: [released] # fires when a draft release is published
 
+permissions: {}
+
 jobs:
   notify:
     runs-on: blacksmith-4vcpu-ubuntu-2404
