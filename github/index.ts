@@ -442,6 +442,20 @@ async function getUserPrompt() {
     throw new Error("Comments must mention `/opencode` or `/oc`")
   })()
 
+  function isSafeGitHubAttachmentUrl(rawUrl: string): boolean {
+    try {
+      const parsed = new URL(rawUrl)
+      return (
+        parsed.protocol === "https:" &&
+        parsed.hostname === "github.com" &&
+        parsed.pathname.startsWith("/user-attachments/") &&
+        !parsed.pathname.includes("..")
+      )
+    } catch {
+      return false
+    }
+  }
+
   // Handle images
   const imgData: {
     filename: string
@@ -467,11 +481,16 @@ async function getUserPrompt() {
     const url = m[1]
     const start = m.index
 
-    if (!url) continue
-    const filename = path.basename(url)
+    if (!url || !isSafeGitHubAttachmentUrl(url)) {
+      console.error(`Skipping untrusted or invalid image URL: ${url}`)
+      continue
+    }
+    const parsed = new URL(url)
+    const filename = path.basename(parsed.pathname)
 
-    // Download image
-    const res = await fetch(url, {
+    // Download image via hardcoded trusted origin to prevent SSRF
+    const safeUrl = new URL(parsed.pathname + parsed.search, "https://github.com")
+    const res = await fetch(safeUrl.href, {
       headers: {
         Authorization: `Bearer ${accessToken}`,
         Accept: "application/vnd.github.v3+json",

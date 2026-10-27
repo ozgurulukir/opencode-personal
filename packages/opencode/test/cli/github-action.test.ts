@@ -1,5 +1,5 @@
 import { test, expect, describe } from "bun:test"
-import { extractResponseText, formatPromptTooLargeError } from "../../src/cli/cmd/github"
+import { extractResponseText, formatPromptTooLargeError, isSafeGitHubAttachmentUrl } from "../../src/cli/cmd/github"
 import type { MessageV2 } from "../../src/session/message-v2"
 import { SessionID, MessageID, PartID } from "../../src/session/schema"
 
@@ -194,5 +194,21 @@ describe("formatPromptTooLargeError", () => {
     expect(result).toInclude("img1.png (3 KB)")
     expect(result).toInclude("img2.jpg (6 KB)")
     expect(result).toInclude("img3.gif (9 KB)")
+  })
+})
+
+describe("isSafeGitHubAttachmentUrl", () => {
+  test("allows valid GitHub user-attachments URLs", () => {
+    expect(isSafeGitHubAttachmentUrl("https://github.com/user-attachments/assets/12345")).toBe(true)
+    expect(isSafeGitHubAttachmentUrl("https://github.com/user-attachments/files/67890/doc.png")).toBe(true)
+  })
+
+  test("rejects non-github domains and untrusted URLs", () => {
+    expect(isSafeGitHubAttachmentUrl("https://attacker.com/evil.png")).toBe(false)
+    expect(isSafeGitHubAttachmentUrl("https://evil-github.com/user-attachments/assets/123")).toBe(false)
+    expect(isSafeGitHubAttachmentUrl("http://github.com/user-attachments/assets/123")).toBe(false)
+    expect(isSafeGitHubAttachmentUrl("https://github.com/other-path/image.png")).toBe(false)
+    expect(isSafeGitHubAttachmentUrl("https://github.com/user-attachments/../admin")).toBe(false)
+    expect(isSafeGitHubAttachmentUrl("invalid-url")).toBe(false)
   })
 })
