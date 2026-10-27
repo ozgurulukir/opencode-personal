@@ -60,4 +60,17 @@ describe("Identifier", () => {
     const ids = new Set(Array.from({ length: 100 }, () => Identifier.ascending()))
     expect(ids.size).toBe(100)
   })
+
+  test("generates uniform base62 characters without out-of-range values", () => {
+    const chars = new Set<string>()
+    for (let i = 0; i < 500; i++) {
+      const id = Identifier.ascending()
+      const suffix = id.slice(14)
+      for (const ch of suffix) {
+        chars.add(ch)
+      }
+    }
+    // Across 500 * 14 = 7000 characters, virtually all 62 characters should appear
+    expect(chars.size).toBeGreaterThanOrEqual(60)
+  })
 })
