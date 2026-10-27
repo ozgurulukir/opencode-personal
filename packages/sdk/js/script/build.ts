@@ -75,6 +75,14 @@ for (const genDir of ["src/v2/gen"] as const) {
       `        ? (TData extends Record<string, unknown> ? TData[keyof TData] : TData) | (TError extends Record<string, unknown> ? TError[keyof TError] : TError)`,
     )
   if (patchedTypes !== typesText) await Bun.write(typesFile, patchedTypes)
+
+  const paramsFile = path.join(dir, genDir, "core", "params.gen.ts")
+  const paramsText = await Bun.file(paramsFile).text()
+  const patchedParams = paramsText.replace(
+    `  function writeSlot(slot: Slot, key: string, value: unknown): void {\n    let record = params[slot] as Record<string, unknown> | undefined`,
+    `  function writeSlot(slot: Slot, key: string, value: unknown): void {\n    if (key === "__proto__" || key === "constructor" || key === "prototype") return\n    let record = params[slot] as Record<string, unknown> | undefined`,
+  )
+  if (patchedParams !== paramsText) await Bun.write(paramsFile, patchedParams)
 }
 
 await $`bun prettier --write src/v2/gen/client/types.gen.ts`

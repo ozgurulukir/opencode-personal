@@ -1990,7 +1990,14 @@ test("wellknown remote_config supports templated env vars in headers", async () 
         ),
       )
     }
-    if (urlStr.includes("config.example.com")) {
+    const host = (() => {
+      try {
+        return new URL(urlStr).hostname
+      } catch {
+        return ""
+      }
+    })()
+    if (host === "config.example.com") {
       remoteFetchedUrl = urlStr
       remoteHeaders = init?.headers
       return Promise.resolve(

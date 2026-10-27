@@ -41,7 +41,13 @@ describe("Auth", () => {
           token: "new",
         })
         const data = yield* auth.all()
-        const keys = Object.keys(data).filter((key) => key.includes("example.com"))
+        const keys = Object.keys(data).filter((key) => {
+          try {
+            return new URL(key).hostname === "example.com"
+          } catch {
+            return false
+          }
+        })
         expect(keys).toEqual(["https://example.com"])
         const entry = data["https://example.com"]!
         expect(entry.type).toBe("wellknown")
