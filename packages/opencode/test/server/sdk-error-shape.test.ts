@@ -9,6 +9,7 @@
  */
 import { afterEach, describe, expect, test } from "bun:test"
 import { createOpencodeClient } from "@opencode-ai/sdk/v2"
+import { buildClientParams } from "../../../sdk/js/src/v2/gen/core/params.gen"
 import { Server } from "../../src/server/server"
 import * as Log from "@opencode-ai/core/util/log"
 import { disposeAllInstances, tmpdir } from "../fixture/fixture"
@@ -95,5 +96,22 @@ describe("v2 SDK error shape", () => {
     expect(result).not.toBeUndefined()
     expect(typeof result).toBe("object")
     expect((result as any).name).toBe("NotFoundError")
+  })
+
+  test("buildClientParams ignores prototype-polluting properties", () => {
+    const malicious = JSON.parse('{"__proto__": {"polluted": true}, "constructor": {"polluted": true}, "queryParam": "val"}')
+    const params = buildClientParams([malicious], [
+      {
+        args: [
+          { in: "query", key: "__proto__" },
+          { in: "query", key: "constructor" },
+          { in: "query", key: "queryParam" },
+        ],
+      },
+    ])
+    expect((Object.prototype as any).polluted).toBeUndefined()
+    expect(params.query?.__proto__).toBeUndefined()
+    expect(params.query?.constructor).toBeUndefined()
+    expect(params.query?.queryParam).toBe("val")
   })
 })

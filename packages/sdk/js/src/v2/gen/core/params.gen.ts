@@ -113,6 +113,7 @@ export function buildClientParams(args: ReadonlyArray<unknown>, fields: FieldsCo
   const map = buildKeyMap(fields)
 
   function writeSlot(slot: Slot, key: string, value: unknown): void {
+    if (key === "__proto__" || key === "constructor" || key === "prototype") return
     let record = params[slot] as Record<string, unknown> | undefined
     if (record === undefined) {
       record = Object.create(null) as Record<string, unknown>
