@@ -248,7 +248,7 @@ export const RunCommand = effectCmd({
       }
 
       let message = [...args.message, ...(args["--"] || [])]
-        .map((arg) => (arg.includes(" ") ? `"${arg.replace(/"/g, '\\"')}"` : arg))
+        .map((arg) => (/[ \t\r\n"'\\]/.test(arg) ? `"${arg.replace(/["\\]/g, "\\$&")}"` : arg))
         .join(" ")
 
       if (args.interactive && args.command) {

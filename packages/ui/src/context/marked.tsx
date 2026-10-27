@@ -437,12 +437,22 @@ async function highlightCodeBlocks(html: string): Promise<string> {
   let result = html
   for (const match of matches) {
     const [fullMatch, lang, escapedCode] = match
-    const code = escapedCode
-      .replace(/&lt;/g, "<")
-      .replace(/&gt;/g, ">")
-      .replace(/&amp;/g, "&")
-      .replace(/&quot;/g, '"')
-      .replace(/&#39;/g, "'")
+    const code = escapedCode.replace(/&(?:lt|gt|amp|quot|#39);/g, (entity) => {
+      switch (entity) {
+        case "&lt;":
+          return "<"
+        case "&gt;":
+          return ">"
+        case "&amp;":
+          return "&"
+        case "&quot;":
+          return '"'
+        case "&#39;":
+          return "'"
+        default:
+          return entity
+      }
+    })
 
     let language = lang || "text"
     if (!(language in bundledLanguages)) {

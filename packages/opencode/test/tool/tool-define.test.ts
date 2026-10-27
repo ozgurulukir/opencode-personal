@@ -4,6 +4,7 @@ import { Agent } from "../../src/agent/agent"
 import { MessageID, SessionID } from "../../src/session/schema"
 import { Tool } from "@/tool/tool"
 import { Truncate } from "@/tool/truncate"
+import { _sanitizeDescription } from "@/tool/registry"
 
 const runtime = ManagedRuntime.make(Layer.mergeAll(Truncate.defaultLayer, Agent.defaultLayer))
 
@@ -136,5 +137,13 @@ describe("Tool.define", () => {
     expect(Effect.runPromise(execute({}, ctx))).rejects.toThrow(
       "The test-required tool was called with invalid JSON arguments",
     )
+  })
+
+  test("sanitizeDescription strips nested HTML tags and wiki links completely", () => {
+    expect(_sanitizeDescription("hello <<<script>>>world")).toBe("hello world")
+    expect(_sanitizeDescription("<scr<script>ipt>alert(1)</script>safe")).toBe("alert(1)safe")
+    expect(_sanitizeDescription("see [[nested [[link]] here]]")).toBe("see")
+    expect(_sanitizeDescription("<script")).toBe("script")
+    expect(_sanitizeDescription("foo <bar")).toBe("foo bar")
   })
 })

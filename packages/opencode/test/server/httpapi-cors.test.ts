@@ -133,6 +133,7 @@ describe("HttpApi CORS", () => {
       expect(yield* checkOrigin("https://evil.com.opencode.ai")).toBe(null)
       expect(yield* checkOrigin("https://user-controlled.opencode.ai")).toBe(null)
       expect(yield* checkOrigin("https://evilopencode.ai")).toBe(null)
+      expect(yield* checkOrigin("https://opencode.ai:8080")).toBe(null)
     }),
   )
 })

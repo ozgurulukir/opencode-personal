@@ -1,7 +1,6 @@
 import { Context } from "effect"
 
-const ALLOWED_ORIGINS = ["opencode.ai", "app.opencode.ai"]
-const opencodeOrigin = new RegExp(`^https:\\/\\/(${ALLOWED_ORIGINS.map((o) => o.replace(/\./g, "\\.")).join("|")})$`)
+const ALLOWED_ORIGIN_HOSTS = new Set(["opencode.ai", "app.opencode.ai"])
 
 export type CorsOptions = { readonly cors?: ReadonlyArray<string> }
 
@@ -23,13 +22,15 @@ export function isAllowedCorsOrigin(input: string | undefined, opts?: CorsOption
     if (url.protocol === "oc:" && url.hostname === "renderer") {
       return true
     }
+    if (url.protocol === "https:" && ALLOWED_ORIGIN_HOSTS.has(url.hostname) && !url.port) {
+      return true
+    }
   } catch {
     // Ignore invalid URLs
   }
 
   if (input === "tauri://localhost" || input === "http://tauri.localhost" || input === "https://tauri.localhost")
     return true
-  if (opencodeOrigin.test(input)) return true
   return opts?.cors?.includes(input) ?? false
 }
 
