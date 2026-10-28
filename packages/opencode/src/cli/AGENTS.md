@@ -16,3 +16,7 @@ old `MessageV2.Event.PartUpdated` stream.
 ## Unknown commands are project paths
 
 A subcommand that doesn't exist is NOT rejected as "unknown command" — it is parsed as the `opencode [project]` positional. After removing a CLI subcommand (e.g. `upgrade`), `opencode <word>` fails with `Error: Failed to change directory to <cwd>\<word>` because it tries to start in a directory named `<word>`. Removing a command also requires deleting its `.command(...)` entry in `src/index.ts`; there is no dynamic/auto command registration.
+
+## GitHub user-attachment validation in issue/PR comment workflows
+
+Attachment URLs extracted from PR and issue comment bodies in `cmd/github.ts` (and `github/index.ts`) are strictly validated against `SAFE_ATTACHMENT_REGEX` (`/^https:\/\/github\.com\/user-attachments\/(?:assets\/[0-9a-zA-Z_-]+|files\/\d+\/[0-9a-zA-Z._-]+)$/`) before downloading, eliminating SSRF and token leak risks (`js/request-forgery`).

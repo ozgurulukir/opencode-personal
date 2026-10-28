@@ -31,3 +31,7 @@
 ## Bounding a Map in a handler that then adds an entry: use `>= MAX` and evict to `MAX-1`
 
 When an LRU guard runs inside a handler that adds an entry to the same Map, `if (size > MAX) { evict to MAX }` oscillates at `MAX+1` (evict to 200, then add → 201), making bound tests flaky. Use `if (size >= MAX) { evict to MAX-1 }` so the in-flight entry keeps the map at exactly `MAX`. See the `MAX_DIAGNOSTICS` eviction in the `publishDiagnostics` handler.
+
+## GitHub release auto-download validation (clangd, lua-language-server, kotlin-lsp)
+
+Automated LSP server downloads validate external GitHub release metadata (`tag_name`, asset `name`, `version`) using strict semver and allowlist regexes (`/^v?[0-9]+(\.[0-9]+)*(-[a-zA-Z0-9.]+)?$/`, `/^[a-zA-Z0-9_.-]+$/`) before constructing download URLs or binary paths, preventing command-line and path injection from untrusted remote payloads.

@@ -78,10 +78,15 @@ for (const genDir of ["src/v2/gen"] as const) {
 
   const paramsFile = path.join(dir, genDir, "core", "params.gen.ts")
   const paramsText = await Bun.file(paramsFile).text()
-  const patchedParams = paramsText.replace(
-    `  function writeSlot(slot: Slot, key: string, value: unknown): void {\n    let record = params[slot] as Record<string, unknown> | undefined`,
-    `  function writeSlot(slot: Slot, key: string, value: unknown): void {\n    if (key === "__proto__" || key === "constructor" || key === "prototype") return\n    let record = params[slot] as Record<string, unknown> | undefined`,
-  )
+  const patchedParams = paramsText
+    .replace(
+      `  function writeSlot(slot: Slot, key: string, value: unknown): void {\n    let record = params[slot] as Record<string, unknown> | undefined`,
+      `  function writeSlot(slot: Slot, key: string, value: unknown): void {\n    if (key === "__proto__" || key === "constructor" || key === "prototype") return\n    let record = params[slot] as Record<string, unknown> | undefined`,
+    )
+    .replace(
+      `    record[key] = value`,
+      `    Object.defineProperty(record, key, {\n      value,\n      writable: true,\n      enumerable: true,\n      configurable: true,\n    })`,
+    )
   if (patchedParams !== paramsText) await Bun.write(paramsFile, patchedParams)
 }
 

@@ -1000,8 +1000,8 @@ export const Clangd: Info = {
     } = await releaseResponse.json()
 
     const tag = release.tag_name
-    if (!tag) {
-      log.error("clangd release did not include a tag name")
+    if (!tag || !/^v?[0-9]+(\.[0-9]+)*(-[a-zA-Z0-9.]+)?$/.test(tag)) {
+      log.error("clangd release did not include a valid tag name", { tag })
       return
     }
     const platform = process.platform
@@ -1034,6 +1034,10 @@ export const Clangd: Info = {
     }
 
     const name = asset.name
+    if (!name || !/^[a-zA-Z0-9_.-]+$/.test(name) || name.includes("..")) {
+      log.error("clangd encountered unsafe asset name", { name })
+      return
+    }
     const downloadResponse = await fetch(asset.browser_download_url)
     if (!downloadResponse.ok) {
       log.error("Failed to download clangd")
@@ -1309,11 +1313,11 @@ export const KotlinLS: Info = {
         return
       }
 
-      const release = await releaseResponse.json()
+      const release = (await releaseResponse.json()) as { name?: string }
       const version = release.name?.replace(/^v/, "")
 
-      if (!version) {
-        log.error("Could not determine Kotlin LSP version from release")
+      if (!version || !/^[0-9]+(\.[0-9]+)*(-[a-zA-Z0-9.]+)?$/.test(version)) {
+        log.error("Could not determine valid Kotlin LSP version from release", { version })
         return
       }
 
@@ -1428,7 +1432,16 @@ export const LuaLS: Info = {
         return
       }
 
-      const release = await releaseResponse.json()
+      const release = (await releaseResponse.json()) as {
+        tag_name?: string
+        assets?: { name?: string; browser_download_url?: string }[]
+      }
+      const rawTag = release.tag_name
+      if (!rawTag || !/^v?[0-9]+(\.[0-9]+)*(-[a-zA-Z0-9.]+)?$/.test(rawTag)) {
+        log.error("lua-language-server release did not include a valid tag name", { tag: rawTag })
+        return
+      }
+      const tag = rawTag
 
       const platform = process.platform
       const arch = process.arch
@@ -1446,7 +1459,7 @@ export const LuaLS: Info = {
 
       const ext = platform === "win32" ? "zip" : "tar.gz"
 
-      assetName = `lua-language-server-${release.tag_name}-${lualsPlatform}-${lualsArch}.${ext}`
+      assetName = `lua-language-server-${tag}-${lualsPlatform}-${lualsArch}.${ext}`
 
       const supportedCombos = [
         "darwin-arm64.tar.gz",
@@ -1463,8 +1476,9 @@ export const LuaLS: Info = {
         return
       }
 
-      const asset = release.assets.find((a: any) => a.name === assetName)
-      if (!asset) {
+      const assets = release.assets ?? []
+      const asset = assets.find((a) => a.name === assetName)
+      if (!asset?.browser_download_url) {
         log.error(`Could not find asset ${assetName} in latest lua-language-server release`)
         return
       }

@@ -24,6 +24,7 @@ This package follows the root [AGENTS.md](../../../AGENTS.md) for general repo r
 - `@hey-api/openapi-ts` 0.99.0 does not support the `data`-style error return contract. The generated code returns `undefined` on error for `responseStyle: "data"`.
 - The only way to fix generated client behavior is post-generation string patching in `script/build.ts`. Any fix to
   `client.gen.ts`, `types.gen.ts`, or `params.gen.ts` must include a matching patch in the build script.
+- `params.gen.ts`: `writeSlot` uses `Object.defineProperty` (and rejects `__proto__`, `constructor`, `prototype`) rather than dynamic property assignment (`record[key] = value`) to eliminate prototype-pollution alerts (`js/prototype-polluting-assignment`) while preserving empty-prototype `Object.create(null)` slot containers. Patched via `script/build.ts`.
 
 ## Regenerating the SDK can break downstream typecheck — run the `opencode` gate
 

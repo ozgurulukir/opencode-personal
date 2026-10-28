@@ -50,7 +50,7 @@ The index signature preserves backward compatibility for any other tool reading 
 
 ## Plugin tool description sanitization
 
-Plugin tool descriptions pass through `sanitizeDescription()` in `tool/registry.ts`. It runs a fixed-point loop
+Plugin tool descriptions pass through `sanitizeDescription()` in `tool/registry.ts`. It runs two sequential fixed-point loops
 stripping balanced `<...>` and `[[...]]` tags, followed by `replace(/[<>]/g, "")` to eliminate residual angle brackets
 and prevent HTML element injection into prompt contexts.
 

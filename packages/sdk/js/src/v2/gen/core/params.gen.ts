@@ -119,7 +119,12 @@ export function buildClientParams(args: ReadonlyArray<unknown>, fields: FieldsCo
       record = Object.create(null) as Record<string, unknown>
       params[slot] = record
     }
-    record[key] = value
+    Object.defineProperty(record, key, {
+      value,
+      writable: true,
+      enumerable: true,
+      configurable: true,
+    })
   }
 
   let config: FieldsConfig[number] | undefined

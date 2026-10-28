@@ -155,18 +155,11 @@ type RepoEvent = (typeof REPO_EVENTS)[number]
 
 export { parseGitHubRemote }
 
+export const SAFE_ATTACHMENT_REGEX =
+  /^https:\/\/github\.com\/user-attachments\/(?:assets\/[0-9a-zA-Z_-]+|files\/\d+\/[0-9a-zA-Z._-]+)$/
+
 export function isSafeGitHubAttachmentUrl(rawUrl: string): boolean {
-  try {
-    const parsed = new URL(rawUrl)
-    return (
-      parsed.protocol === "https:" &&
-      parsed.hostname === "github.com" &&
-      parsed.pathname.startsWith("/user-attachments/") &&
-      !parsed.pathname.includes("..")
-    )
-  } catch {
-    return false
-  }
+  return SAFE_ATTACHMENT_REGEX.test(rawUrl)
 }
 
 /**
@@ -862,12 +855,13 @@ export const GithubRunCommand = effectCmd({
             console.error(`Skipping untrusted or invalid image URL: ${url}`)
             continue
           }
-          const parsed = new URL(url)
+          const match = url.match(SAFE_ATTACHMENT_REGEX)!
+          const safeUrl = match[0]
+          const parsed = new URL(safeUrl)
           const filename = path.basename(parsed.pathname)
 
-          // Download image via hardcoded trusted origin to prevent SSRF
-          const safeUrl = new URL(parsed.pathname + parsed.search, "https://github.com")
-          const res = await fetch(safeUrl.href, {
+          // Download image via verified GitHub user-attachment URL
+          const res = await fetch(safeUrl, {
             headers: {
               Authorization: `Bearer ${appToken}`,
               Accept: "application/vnd.github.v3+json",

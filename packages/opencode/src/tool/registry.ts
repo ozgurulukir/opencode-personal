@@ -66,9 +66,11 @@ function sanitizeDescription(desc: string): string {
   let prev: string
   do {
     prev = desc
-    desc = desc
-      .replace(/<[^<>]*>/g, "") // strip HTML/XML tags
-      .replace(/\[\[[^\[\]]*\]\]/g, "") // strip wiki-style links
+    desc = desc.replace(/<[^<>]*>/g, "")
+  } while (desc !== prev)
+  do {
+    prev = desc
+    desc = desc.replace(/\[\[[^\[\]]*\]\]/g, "")
   } while (desc !== prev)
   return desc.replace(/[<>]/g, "").trim()
 }

@@ -209,6 +209,8 @@ describe("isSafeGitHubAttachmentUrl", () => {
     expect(isSafeGitHubAttachmentUrl("http://github.com/user-attachments/assets/123")).toBe(false)
     expect(isSafeGitHubAttachmentUrl("https://github.com/other-path/image.png")).toBe(false)
     expect(isSafeGitHubAttachmentUrl("https://github.com/user-attachments/../admin")).toBe(false)
+    expect(isSafeGitHubAttachmentUrl("https://github.com/user-attachments/assets/12345?evil=1")).toBe(false)
+    expect(isSafeGitHubAttachmentUrl("https://github.com/user-attachments/assets/12345#frag")).toBe(false)
     expect(isSafeGitHubAttachmentUrl("invalid-url")).toBe(false)
   })
 })

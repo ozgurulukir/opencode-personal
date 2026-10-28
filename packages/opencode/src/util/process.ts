@@ -57,20 +57,30 @@ export type Child = ChildProcess & { exited: Promise<number> }
 
 export function spawn(cmd: string[], opts: Options = {}): Child {
   if (cmd.length === 0) throw new Error("Command is required")
+  if (/[\0\r\n]/.test(cmd[0])) throw new Error(`Invalid command: ${cmd[0]}`)
   opts.abort?.throwIfAborted()
 
-  const shell = opts.shell ?? false
-  if (typeof shell === "string" && /[\0\r\n;|<>&`$]/.test(shell)) {
-    throw new Error(`Invalid shell path: ${shell}`)
+  const baseOpts = {
+    cwd: opts.cwd,
+    env: opts.env === null ? {} : opts.env ? { ...process.env, ...opts.env } : undefined,
+    stdio: [opts.stdin ?? "ignore", opts.stdout ?? "ignore", opts.stderr ?? "ignore"] as [Stdio, Stdio, Stdio],
+    windowsHide: process.platform === "win32",
   }
 
-  const proc = launch(cmd[0], cmd.slice(1), {
-    cwd: opts.cwd,
-    shell,
-    env: opts.env === null ? {} : opts.env ? { ...process.env, ...opts.env } : undefined,
-    stdio: [opts.stdin ?? "ignore", opts.stdout ?? "ignore", opts.stderr ?? "ignore"],
-    windowsHide: process.platform === "win32",
-  })
+  const proc = opts.shell
+    ? launch(cmd[0], cmd.slice(1), {
+        ...baseOpts,
+        shell: (() => {
+          if (typeof opts.shell === "string") {
+            if (/[\0\r\n;|<>&`$]/.test(opts.shell)) {
+              throw new Error(`Invalid shell path: ${opts.shell}`)
+            }
+            return opts.shell
+          }
+          return true
+        })(),
+      })
+    : launch(cmd[0], cmd.slice(1), baseOpts)
 
   let closed = false
   let timer: ReturnType<typeof setTimeout> | undefined

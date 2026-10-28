@@ -133,4 +133,13 @@ describe("util.process", () => {
       })
     }).toThrow("Invalid shell path")
   })
+
+  test("rejects command with control characters or null bytes", () => {
+    expect(() => {
+      Process.spawn(["echo\0malicious", "hello"])
+    }).toThrow("Invalid command")
+    expect(() => {
+      Process.spawn(["echo\nmalicious", "hello"])
+    }).toThrow("Invalid command")
+  })
 })
