@@ -963,9 +963,14 @@ export type AgentConfig = {
   temperature?: number
   top_p?: number
   prompt?: string
-  tools?: {
-    [key: string]: boolean
-  }
+  /**
+   * @deprecated Use 'permission' field instead
+   */
+  tools?:
+    | {
+        [key: string]: boolean
+      }
+    | Array<string>
   disable?: boolean
   description?: string
   mode?: "subagent" | "primary" | "all"
