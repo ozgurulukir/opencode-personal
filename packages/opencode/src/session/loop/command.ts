@@ -58,9 +58,10 @@ export const command = Effect.fn("SessionPrompt.command")(function* (deps: Comma
   if (shellMatches.length > 0) {
     const cfg = yield* deps.config.get()
     const sh = Shell.preferred(cfg.shell)
+    const cwd = process.cwd()
     const results = yield* Effect.promise(() =>
       Promise.all(
-        shellMatches.map(async ([, cmd]) => (await Process.text([sh, ...Shell.args(sh, cmd, process.cwd())], { nothrow: true })).text),
+        shellMatches.map(async ([, cmd]) => (await Process.text([sh, ...Shell.args(sh, cmd, ".")], { cwd, nothrow: true })).text),
       ),
     )
     let index = 0

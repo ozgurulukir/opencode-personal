@@ -1,5 +1,4 @@
-import { type ChildProcess } from "child_process"
-import launch from "cross-spawn"
+import { spawn as launch, type ChildProcess } from "node:child_process"
 import { buffer } from "node:stream/consumers"
 import { errorMessage } from "./error"
 
@@ -67,20 +66,14 @@ export function spawn(cmd: string[], opts: Options = {}): Child {
     windowsHide: process.platform === "win32",
   }
 
-  const proc = opts.shell
-    ? launch(cmd[0], cmd.slice(1), {
-        ...baseOpts,
-        shell: (() => {
-          if (typeof opts.shell === "string") {
-            if (/[\0\r\n;|<>&`$]/.test(opts.shell)) {
-              throw new Error(`Invalid shell path: ${opts.shell}`)
-            }
-            return opts.shell
-          }
-          return true
-        })(),
-      })
-    : launch(cmd[0], cmd.slice(1), baseOpts)
+  if (opts.shell) {
+    if (typeof opts.shell === "string" && /[\0\r\n;|<>&`$]/.test(opts.shell)) {
+      throw new Error(`Invalid shell path: ${opts.shell}`)
+    }
+    throw new Error("Shell execution is disabled for process spawning; pass executable directly")
+  }
+
+  const proc = launch(cmd[0], cmd.slice(1), baseOpts)
 
   let closed = false
   let timer: ReturnType<typeof setTimeout> | undefined

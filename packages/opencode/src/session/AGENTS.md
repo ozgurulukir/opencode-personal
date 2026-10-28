@@ -169,3 +169,7 @@ When filtering parts with `p is CompactionPart | SubtaskPart`, both types must b
 
 - `session/loop/shell.ts` (`shellImpl`) wraps its whole body in `Effect.uninterruptibleMask`; only the `restore(...)` execution block (~`:174`) is interruptible. `SessionEvent.Shell.Started.Sync` is emitted at ~`:134` AFTER `plugin.trigger("shell.env")` (~`:119`) and `createClientTerminal` (~`:124`) — so a block/failure there yields NO `shell.started` event, NO output, and NO visible error, and cannot be aborted. `Plugin.trigger` awaits hooks with no timeout (`plugin/index.ts`), so a hanging `shell.env` hook hangs every shell uninterruptibly.
 - `SessionPrompt.shell` → `SessionRunState.startShell` → `Runner.startShell` (`effect/runner.ts:140-174`): when the runner is not `Idle` it throws `Session.BusyError` (rejected, not queued); otherwise the work is forked via `Effect.forkChild` and the caller awaits the fiber, so the HTTP shell request stays open for the whole command.
+
+## Slash command inline shell execution (`command.ts`)
+
+Inline shell expansions (`!bash ...`) in command markdown templates execute `sh` with `-c` via `Process.text`. To prevent uncontrolled absolute path taint in CodeQL (`js/shell-command-injection-from-environment`), `process.cwd()` is not embedded into shell command arguments; instead, `Shell.args(sh, cmd, ".")` is passed with `{ cwd: process.cwd(), nothrow: true }` in process options.

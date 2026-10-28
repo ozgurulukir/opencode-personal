@@ -77,18 +77,12 @@ describe("util.process", () => {
     expect(out.stdout.toString()).toBe("set")
   })
 
-  test("uses shell in run on Windows", async () => {
-    if (process.platform !== "win32") return
-
-    const out = await Process.run(["set", "OPENCODE_TEST_SHELL"], {
-      shell: true,
-      env: {
-        OPENCODE_TEST_SHELL: "ok",
-      },
-    })
-
-    expect(out.code).toBe(0)
-    expect(out.stdout.toString()).toContain("OPENCODE_TEST_SHELL=ok")
+  test("rejects shell option in process spawning", () => {
+    expect(() => {
+      Process.spawn(["echo", "hello"], {
+        shell: true,
+      })
+    }).toThrow("Shell execution is disabled")
   })
 
   test("runs cmd scripts with spaces on Windows without shell", async () => {
