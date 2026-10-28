@@ -48,6 +48,12 @@ The index signature preserves backward compatibility for any other tool reading 
 
 `TaskPromptOps` is defined in `tool/task.ts` but referenced in `tool/tool.ts` (for `ToolContextExtra.promptOps`). Use `import type { TaskPromptOps } from "./task"` in `tool/tool.ts` — type-only import is erased at runtime, so no circular dependency even though `task.ts` imports `Tool` from `tool.ts` at runtime.
 
+## Plugin tool description sanitization
+
+Plugin tool descriptions pass through `sanitizeDescription()` in `tool/registry.ts`. It runs a fixed-point loop
+stripping balanced `<...>` and `[[...]]` tags, followed by `replace(/[<>]/g, "")` to eliminate residual angle brackets
+and prevent HTML element injection into prompt contexts.
+
 ## webSearchModelName — simplified by typed extra
 
 `webSearchModelName(ctx.extra)` in `tool/websearch.ts` previously had defensive `typeof`/`in` guards. With `ToolContextExtra.model` typed, the body simplifies to `model.api?.id ?? model.id` — equivalent and type-safe.
