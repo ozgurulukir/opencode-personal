@@ -137,7 +137,7 @@
     "drizzle-orm": "catalog:",
     "effect": "catalog:",
     "fuzzysort": "4.0.2",
-    "gitlab-ai-provider": "6.18.0",
+    "gitlab-ai-provider": "6.23.1",
     "glob": "13.0.6",
     "google-auth-library": "10.9.1",
     "gray-matter": "4.0.3",
