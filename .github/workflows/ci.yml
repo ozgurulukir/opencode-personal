@@ -17,3 +17,28 @@ jobs:
       - uses: oven-sh/setup-bun@v2
       - run: bun install
       - run: bun typecheck
+
+  diff-wasm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install
+      - name: Test JS fallback
+        working-directory: packages/diff-wasm
+        run: bun test
+      - name: Setup Rust (wasm32 target)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - name: Install wasm-pack
+        run: curl -sSf https://rustwasm.github.io/wasm-pack/installer/init.sh | sh
+      - name: Build WASM
+        working-directory: packages/diff-wasm
+        run: bun run build:wasm
+      - name: Verify WASM loads
+        working-directory: packages/diff-wasm
+        run: bun -e 'const m = await import("./pkg/opencode_diff_rs.js"); await m.default(); if (typeof m.create_two_files_patch_rs !== "function") throw new Error("missing export")'
+      - name: Test WASM path
+        working-directory: packages/diff-wasm
+        run: bun test
