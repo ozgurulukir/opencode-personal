@@ -2200,6 +2200,8 @@ export type SyncEventSessionNextCompactionEnded = {
     sessionID: string
     text: string
     include?: string
+    status?: "ok" | "failed"
+    error?: string
   }
 }
 
@@ -3207,6 +3209,8 @@ export type EventSessionNextCompactionEnded = {
     sessionID: string
     text: string
     include?: string
+    status?: "ok" | "failed"
+    error?: string
   }
 }
 
@@ -3597,6 +3601,8 @@ export type SessionMessageCompaction = {
   reason: "auto" | "manual"
   summary: string
   include?: string
+  status?: "ok" | "failed"
+  error?: string
   id: string
   metadata?: {
     [key: string]: unknown

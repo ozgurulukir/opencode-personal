@@ -383,3 +383,35 @@ test("prompted event with subtask stores subtask on user message", () => {
     },
   })
 })
+
+test("compaction ended with failed status projects to message", () => {
+  const state: SessionMessageUpdater.MemoryState = { messages: [] }
+  const sessionID = SessionID.make("session")
+  const id = EventV2.ID.create()
+
+  SessionMessageUpdater.update(SessionMessageUpdater.memory(state), {
+    id,
+    type: "session.next.compaction.started",
+    data: { sessionID, timestamp: DateTime.makeUnsafe(1), reason: "manual" },
+  } satisfies SessionEvent.Event)
+
+  SessionMessageUpdater.update(SessionMessageUpdater.memory(state), {
+    id: EventV2.ID.create(),
+    type: "session.next.compaction.ended",
+    data: {
+      sessionID,
+      timestamp: DateTime.makeUnsafe(2),
+      text: "",
+      status: "failed",
+      error: "ContextOverflowError",
+    },
+  } satisfies SessionEvent.Event)
+
+  expect(state.messages).toHaveLength(1)
+  expect(state.messages[0]).toMatchObject({
+    type: "compaction",
+    status: "failed",
+    error: "ContextOverflowError",
+  })
+})
+

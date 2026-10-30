@@ -234,11 +234,26 @@ function CompactionMessage(props: { message: SessionMessageCompaction }) {
     <box
       marginTop={1}
       border={["top"]}
-      title={props.message.reason === "auto" ? " Auto Compaction " : " Compaction "}
+      title={
+        props.message.status === "failed"
+          ? props.message.reason === "auto"
+            ? " Auto Compaction Failed "
+            : " Compaction Failed "
+          : props.message.reason === "auto"
+            ? " Auto Compaction "
+            : " Compaction "
+      }
       titleAlignment="center"
-      borderColor={theme.borderActive}
+      borderColor={props.message.status === "failed" ? theme.error : theme.borderActive}
       flexShrink={0}
     >
+      <Show when={props.message.error}>
+        {(err) => (
+          <box paddingLeft={3} paddingTop={1}>
+            <text fg={theme.error}>{err()}</text>
+          </box>
+        )}
+      </Show>
       <Show when={props.message.summary}>
         {(summary) => (
           <box paddingLeft={3} paddingTop={1}>

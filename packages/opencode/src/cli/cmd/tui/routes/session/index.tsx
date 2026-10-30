@@ -576,11 +576,11 @@ export function Session() {
             providerID: selectedModel.providerID,
           })
 
-          if (result.error) {
+          if (result.error || result.data === false) {
             toast.show({
               variant: "error",
               title: "Failed to compact session",
-              message: errorMessage(result.error),
+              message: result.error ? errorMessage(result.error) : "Compaction failed",
             })
           } else {
             toast.show({
@@ -1206,10 +1206,25 @@ export function Session() {
                             <box
                               marginTop={1}
                               border={["top"]}
-                              title={compaction.reason === "auto" ? " Auto Compaction " : " Compaction "}
+                              title={
+                                compaction.status === "failed"
+                                  ? compaction.reason === "auto"
+                                    ? " Auto Compaction Failed "
+                                    : " Compaction Failed "
+                                  : compaction.reason === "auto"
+                                    ? " Auto Compaction "
+                                    : " Compaction "
+                              }
                               titleAlignment="center"
-                              borderColor={theme.borderActive}
+                              borderColor={compaction.status === "failed" ? theme.error : theme.borderActive}
                             >
+                              <Show when={compaction.error}>
+                                {(err) => (
+                                  <box paddingLeft={3} paddingTop={1}>
+                                    <text fg={theme.error}>{err()}</text>
+                                  </box>
+                                )}
+                              </Show>
                               <Show when={compaction.summary}>
                                 {(summary) => (
                                   <box paddingLeft={3} paddingTop={1}>

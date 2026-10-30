@@ -280,12 +280,12 @@ function compactionProcessLayer(options?: CompactionProcessOptions) {
   )
 }
 
-function trackEnded(onEnded: () => void) {
+function trackEnded(onEnded: (payload?: any) => void) {
   return Layer.mock(SyncEvent.Service)({
-    run: (def) =>
+    run: (def, payload) =>
       Effect.sync(() => {
         if (def.type === SessionEvent.Compaction.Ended.Sync.type) {
-          onEnded()
+          onEnded(payload)
         }
       }),
     replay: () => Effect.void,

@@ -416,7 +416,7 @@ export const layer: Layer.Layer<
       overflow?: boolean
     }) {
       let ended = false
-      const emitEnded = (text: string, include?: MessageID) =>
+      const emitEnded = (text: string, include?: MessageID, status?: "ok" | "failed", error?: string) =>
         Effect.gen(function* () {
           if (ended) return
           ended = true
@@ -425,6 +425,8 @@ export const layer: Layer.Layer<
             timestamp: DateTime.makeUnsafe(Date.now()),
             text,
             include,
+            status,
+            error,
           })
         })
 
@@ -471,7 +473,7 @@ export const layer: Layer.Layer<
               Effect.catchDefect(() => Effect.void),
             )
           }
-          yield* emitEnded("")
+          yield* emitEnded("", undefined, "failed", err instanceof Error ? err.message : String(err))
           return yield* Effect.die(err)
         })
 
@@ -652,7 +654,7 @@ export const layer: Layer.Layer<
           }).toObject()
           processor.message.finish = "error"
           yield* session.updateMessage(processor.message)
-          yield* emitEnded("")
+          yield* emitEnded("", undefined, "failed", processor.message.error?.name ?? "ContextOverflowError")
           return "stop" as const
         }
 
@@ -780,7 +782,7 @@ export const layer: Layer.Layer<
         if (processor.message.error) {
           processor.message.finish = "error"
           yield* session.updateMessage(processor.message)
-          yield* emitEnded("")
+          yield* emitEnded("", undefined, "failed", processor.message.error.name ?? "CompactionFailed")
           return "stop" as const
         }
         if (result === "continue") {
@@ -790,7 +792,7 @@ export const layer: Layer.Layer<
               parts: [],
             },
           )
-          yield* emitEnded(summary ?? "", selected.tail_start_id)
+          yield* emitEnded(summary ?? "", selected.tail_start_id, "ok")
           yield* bus.publish(Event.Compacted, { sessionID: input.sessionID })
         }
         log.info("compaction finished", { result, overflow: input.overflow === true })
@@ -800,7 +802,7 @@ export const layer: Layer.Layer<
       return yield* body.pipe(
         Effect.catch(handleError),
         Effect.catchDefect(handleError),
-        Effect.ensuring(emitEnded("")),
+        Effect.ensuring(emitEnded("", undefined, "failed")),
       )
     })
 
