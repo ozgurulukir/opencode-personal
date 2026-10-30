@@ -180,7 +180,8 @@ const boot = Effect.fn("test.boot")(function* () {
   const processors = yield* SessionProcessor.Service
   const session = yield* Session.Service
   const provider = yield* Provider.Service
-  return { processors, session, provider }
+  const bus = yield* Bus.Service
+  return { processors, session, provider, bus }
 })
 
 // ---------------------------------------------------------------------------
@@ -608,7 +609,11 @@ it.live("session.processor effect tests compact on structured context overflow",
   provideTmpdirServer(
     ({ dir, llm }) =>
       Effect.gen(function* () {
-        const { processors, session, provider } = yield* boot()
+        const { processors, session, provider, bus } = yield* boot()
+        const errors: unknown[] = []
+        yield* bus.subscribeCallback(Session.Event.Error, (evt) => {
+          errors.push(evt)
+        })
 
         yield* llm.error(400, { type: "error", error: { code: "context_length_exceeded" } })
 
@@ -640,10 +645,56 @@ it.live("session.processor effect tests compact on structured context overflow",
         })
 
         expect(value).toBe("compact")
+        expect(handle.compactionReason).toBe("provider-rejected")
         expect(yield* llm.calls).toBe(1)
         expect(handle.message.error).toBeUndefined()
+        expect(errors).toHaveLength(0)
       }),
     { git: true, config: (url) => providerCfg(url) },
+  ),
+)
+
+it.live("session.processor does not compact on provider overflow when compaction.auto is false (#330)", () =>
+  provideTmpdirServer(
+    ({ dir, llm }) =>
+      Effect.gen(function* () {
+        const { processors, session, provider } = yield* boot()
+
+        yield* llm.error(400, { type: "error", error: { code: "context_length_exceeded" } })
+
+        const chat = yield* session.create({})
+        const parent = yield* user(chat.id, "stop on overflow")
+        const msg = yield* assistant(chat.id, parent.id, path.resolve(dir))
+        const mdl = yield* provider.getModel(ref.providerID, ref.modelID)
+        const handle = yield* processors.create({
+          assistantMessage: msg,
+          sessionID: chat.id,
+          model: mdl,
+        })
+
+        const value = yield* handle.process({
+          user: {
+            id: parent.id,
+            sessionID: chat.id,
+            role: "user",
+            time: parent.time,
+            agent: parent.agent,
+            model: { providerID: ref.providerID, modelID: ref.modelID },
+          } satisfies MessageV2.User,
+          sessionID: chat.id,
+          model: mdl,
+          agent: agent(),
+          system: { prefix: "", suffix: "" },
+          messages: [{ role: "user", content: "stop on overflow" }],
+          tools: {},
+        })
+
+        expect(value).toBe("stop")
+        expect(yield* llm.calls).toBe(1)
+        expect(handle.message.error).toBeDefined()
+        expect(handle.compactionReason).toBeUndefined()
+      }),
+    { git: true, config: (url) => ({ ...providerCfg(url), compaction: { auto: false } }) },
   ),
 )
 

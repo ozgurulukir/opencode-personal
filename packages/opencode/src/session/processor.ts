@@ -11,6 +11,7 @@ import { LLM } from "./llm"
 import { MessageV2 } from "./message-v2"
 import { Image } from "@/image/image"
 import { isOverflow } from "./overflow"
+import { compactionConfig } from "./context-budget"
 import { PartID } from "./schema"
 import type { SessionID } from "./schema"
 import { SessionRetry } from "./retry"
@@ -34,8 +35,11 @@ export type Result = "compact" | "stop" | "continue"
 
 export type Event = LLM.Event
 
+export type CompactionReason = "threshold" | "provider-rejected"
+
 export interface Handle {
   readonly message: MessageV2.Assistant
+  readonly compactionReason?: CompactionReason
   readonly updateToolCall: (
     toolCallID: string,
     update: (part: MessageV2.ToolPart) => MessageV2.ToolPart,
@@ -75,6 +79,7 @@ interface ProcessorContext extends Input {
   snapshot: string | undefined
   blocked: boolean
   needsCompaction: boolean
+  compactionReason?: CompactionReason
   currentText: MessageV2.TextPart | undefined
   reasoningMap: Record<string, MessageV2.ReasoningPart>
 }
@@ -550,6 +555,7 @@ export const layer: Layer.Layer<
               isOverflow({ cfg: yield* config.get(), tokens: usage.tokens, model: ctx.model })
             ) {
               ctx.needsCompaction = true
+              ctx.compactionReason = "threshold"
             }
             return
           }
@@ -713,8 +719,29 @@ export const layer: Layer.Layer<
         slog.error("process", { error: errorMessage(e), stack: e instanceof Error ? e.stack : undefined })
         const error = parse(e)
         if (MessageV2.ContextOverflowError.isInstance(error)) {
-          ctx.needsCompaction = true
-          yield* bus.publish(Session.Event.Error, { sessionID: ctx.sessionID, error })
+          const cfg = yield* config.get()
+          const cc = compactionConfig(cfg)
+          if (cc.auto) {
+            ctx.needsCompaction = true
+            ctx.compactionReason = "provider-rejected"
+            return
+          }
+          if (!ctx.assistantMessage.summary) {
+            yield* sync.run(SessionEvent.Step.Failed.Sync, {
+              sessionID: ctx.sessionID,
+              error: {
+                type: "unknown",
+                message: errorMessage(e),
+              },
+              timestamp: DateTime.makeUnsafe(Date.now()),
+            })
+          }
+          ctx.assistantMessage.error = error
+          yield* bus.publish(Session.Event.Error, {
+            sessionID: ctx.assistantMessage.sessionID,
+            error: ctx.assistantMessage.error,
+          })
+          yield* status.set(ctx.sessionID, { type: "idle" })
           return
         }
         if (!ctx.assistantMessage.summary) {
@@ -808,6 +835,9 @@ export const layer: Layer.Layer<
       return {
         get message() {
           return ctx.assistantMessage
+        },
+        get compactionReason() {
+          return ctx.compactionReason
         },
         updateToolCall,
         completeToolCall,

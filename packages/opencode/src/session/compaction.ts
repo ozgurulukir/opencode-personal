@@ -619,9 +619,14 @@ export const layer: Layer.Layer<
                   }),
                 ),
             })
+            const hasMedia = input.messages.some((m) =>
+              m.parts.some((p) => p.type === "file" && MessageV2.isMedia(p.mime)),
+            )
             const text =
               (input.overflow
-                ? "The previous request exceeded the provider's size limit due to large media attachments. The conversation was compacted and media files were removed from context. If the user was asking about attached images or files, explain that the attachments were too large to process and suggest they try again with smaller or fewer files.\n\n"
+                ? hasMedia
+                  ? "The previous request exceeded the provider's size limit due to large media attachments. The conversation was compacted and media files were removed from context. If the user was asking about attached images or files, explain that the attachments were too large to process and suggest they try again with smaller or fewer files.\n\n"
+                  : "The previous request exceeded the provider's size limit. The conversation was compacted to fit within context limits.\n\n"
                 : "") +
               "Continue if you have next steps, or stop and ask for clarification if you are unsure how to proceed." +
               todoBlock
@@ -646,6 +651,8 @@ export const layer: Layer.Layer<
       }
 
       if (processor.message.error) {
+        processor.message.finish = "error"
+        yield* session.updateMessage(processor.message)
         // Same stuck-view guard as the overflow path above: resolve the
         // compaction view even when the summary turn errored.
         yield* sync.run(SessionEvent.Compaction.Ended.Sync, {

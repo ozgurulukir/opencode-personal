@@ -179,7 +179,7 @@ export const runLoop: (deps: RunLoopDeps, sessionID: SessionID) => Effect.Effect
       }
       const result = yield* deps.compaction.process({
         messages: msgs,
-        parentID: lastUser.id,
+        parentID: task.messageID ?? lastUser.id,
         sessionID,
         auto: task.auto,
         overflow: task.overflow,
@@ -196,28 +196,34 @@ export const runLoop: (deps: RunLoopDeps, sessionID: SessionID) => Effect.Effect
       consecutiveAutoCompactions = 0
     }
 
+    const createAutoCompaction = (overflow?: boolean) =>
+      Effect.gen(function* () {
+        if (consecutiveAutoCompactions >= 2) {
+          const error = new NamedError.Unknown({
+            message: "Context still exceeds the limit after compaction. Raise compaction.context_limit or lower reserved.",
+          })
+          yield* deps.bus.publish(Session.Event.Error, { sessionID, error: error.toObject() })
+          throw error
+        }
+        yield* deps.compaction.create({
+          sessionID,
+          agent: lastUser.agent,
+          model: lastUser.model,
+          auto: true,
+          overflow,
+          tools: lastUser.tools,
+          format: lastUser.format,
+          system: lastUser.system,
+        })
+      })
+
     if (
       lastFinished &&
       lastFinished.summary !== true &&
       !isCurrentTurnContinue &&
       (yield* deps.compaction.isOverflow({ tokens: lastFinished.tokens, model }))
     ) {
-      if (consecutiveAutoCompactions >= 2) {
-        const error = new NamedError.Unknown({
-          message: "Context still exceeds the limit after compaction. Raise compaction.context_limit or lower reserved.",
-        })
-        yield* deps.bus.publish(Session.Event.Error, { sessionID, error: error.toObject() })
-        throw error
-      }
-      yield* deps.compaction.create({
-        sessionID,
-        agent: lastUser.agent,
-        model: lastUser.model,
-        auto: true,
-        tools: lastUser.tools,
-        format: lastUser.format,
-        system: lastUser.system,
-      })
+      yield* createAutoCompaction()
       continue
     }
 
@@ -394,21 +400,8 @@ export const runLoop: (deps: RunLoopDeps, sessionID: SessionID) => Effect.Effect
 
       if (result === "stop") return "break" as const
       if (result === "compact") {
-        if (consecutiveAutoCompactions >= 2) {
-          const error = new NamedError.Unknown({
-            message: "Context still exceeds the limit after compaction. Raise compaction.context_limit or lower reserved.",
-          })
-          yield* deps.bus.publish(Session.Event.Error, { sessionID, error: error.toObject() })
-          throw error
-        }
         // create() is Effect<void>; the next iteration re-reads compacted messages
-        yield* deps.compaction.create({
-          sessionID,
-          agent: lastUser.agent,
-          model: lastUser.model,
-          auto: true,
-          overflow: !handle.message.finish,
-        })
+        yield* createAutoCompaction(handle.compactionReason === "provider-rejected")
       }
       return "continue" as const
     }).pipe(Effect.ensuring(deps.instruction.clear(handle.message.id)))
