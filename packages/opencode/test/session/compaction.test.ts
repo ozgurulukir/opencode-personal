@@ -1538,7 +1538,93 @@ describe("session.compaction.process", () => {
       expect(last?.info.role).toBe("user")
       if (last?.parts[0]?.type === "text") {
         expect(last.parts[0].text).toContain("previous request exceeded the provider's size limit")
+        expect(last.parts[0].text).not.toContain("due to large media attachments")
       }
+    }),
+  )
+
+  it.instance(
+    "continue message inherits tools, format, and system metadata from parent (#329)",
+    Effect.gen(function* () {
+      const ssn = yield* SessionNs.Service
+      const session = yield* ssn.create({})
+      const msg = yield* ssn.updateMessage({
+        id: MessageID.ascending(),
+        role: "user",
+        sessionID: session.id,
+        agent: "build",
+        model: ref,
+        tools: { write: false },
+        format: { type: "json_schema", schema: { type: "object" } },
+        system: "Custom system instructions",
+        time: { created: Date.now() },
+      })
+      yield* ssn.updatePart({
+        id: PartID.ascending(),
+        messageID: msg.id,
+        sessionID: session.id,
+        type: "compaction",
+        auto: true,
+      })
+      const msgs = yield* ssn.messages({ sessionID: session.id })
+
+      const result = yield* SessionCompaction.use.process({
+        parentID: msg.id,
+        messages: msgs,
+        sessionID: session.id,
+        auto: true,
+      })
+
+      expect(result).toBe("continue")
+      const last = (yield* ssn.messages({ sessionID: session.id })).at(-1)
+      expect(last?.info.role).toBe("user")
+      if (last?.info.role === "user") {
+        expect(last.info.tools).toEqual({ write: false })
+        expect(last.info.format).toEqual({ type: "json_schema", schema: { type: "object" } })
+        expect(last.info.system).toBe("Custom system instructions")
+      }
+    }),
+  )
+
+  it.instance(
+    "failed summary sets finish: 'error' so stale task is not pending for future user prompts (#332)",
+    Effect.gen(function* () {
+      const ssn = yield* SessionNs.Service
+      const session = yield* ssn.create({})
+      const u1 = yield* createUserMessage(session.id, "initial request")
+      yield* ssn.updatePart({
+        id: PartID.ascending(),
+        messageID: u1.id,
+        sessionID: session.id,
+        type: "compaction",
+        auto: true,
+      })
+
+      // Simulate failed compaction assistant message
+      yield* ssn.updateMessage({
+        id: MessageID.ascending(),
+        role: "assistant",
+        sessionID: session.id,
+        parentID: u1.id,
+        agent: "compaction",
+        mode: "compaction",
+        modelID: ref.modelID,
+        providerID: ref.providerID,
+        summary: true,
+        error: { name: "APIError", data: { message: "Network failure", isRetryable: false } },
+        finish: "error",
+        cost: 0,
+        tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+        path: { cwd: "/", root: "/" },
+        time: { created: Date.now() },
+      })
+
+      const u2 = yield* createUserMessage(session.id, "subsequent request")
+      const msgs = yield* ssn.messages({ sessionID: session.id })
+      const { tasks, user } = MessageV2.latest(msgs)
+
+      expect(tasks.length).toBe(0)
+      expect(user?.id).toBe(u2.id)
     }),
   )
 
