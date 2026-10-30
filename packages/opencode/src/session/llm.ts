@@ -64,6 +64,7 @@ export type StreamInput = {
   tools: Record<string, Tool>
   retries?: number
   toolChoice?: "auto" | "required" | "none"
+  maxOutputTokens?: number
 }
 
 export type StreamRequest = StreamInput & {
@@ -202,9 +203,9 @@ const live: Layer.Layer<
             : undefined,
           topP: input.agent.topP ?? ProviderTransform.topP(input.model),
           topK: ProviderTransform.topK(input.model),
-          maxOutputTokens: ProviderTransform.supportsMaxOutputTokens(input.model)
+          maxOutputTokens: input.maxOutputTokens ?? (ProviderTransform.supportsMaxOutputTokens(input.model)
             ? ProviderTransform.maxOutputTokens(input.model)
-            : undefined,
+            : undefined),
           options,
         },
       )
