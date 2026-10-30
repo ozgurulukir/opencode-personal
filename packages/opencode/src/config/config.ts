@@ -263,7 +263,8 @@ export const Info = Schema.Struct({
   compaction: Schema.optional(
     Schema.Struct({
       auto: Schema.optional(Schema.Boolean).annotate({
-        description: "Enable automatic compaction when context is full (default: true)",
+        description:
+          "Enable automatic compaction when context is full or rejected by the provider for context overflow (default: true).",
       }),
       prune: Schema.optional(Schema.Boolean).annotate({
         description: "Enable pruning of old tool outputs (default: true)",
@@ -276,7 +277,8 @@ export const Info = Schema.Struct({
         description: "Maximum number of tokens from recent turns to preserve verbatim after compaction",
       }),
       reserved: Schema.optional(NonNegativeInt).annotate({
-        description: "Token buffer for compaction. Leaves enough window to avoid overflow during compaction.",
+        description:
+          "Token buffer for compaction headroom across all models and context limits (default: 20000). Clamped to at least the model's maxOutputTokens.",
       }),
       prune_minimum_tokens: Schema.optional(NonNegativeInt).annotate({
         description: "Minimum token savings required before pruning old tool outputs (default: 20000)",
@@ -285,7 +287,8 @@ export const Info = Schema.Struct({
         description: "Number of recent tool-output tokens to protect from pruning (default: 40000)",
       }),
       tool_output_max_chars: Schema.optional(NonNegativeInt).annotate({
-        description: "Maximum characters of tool output to include when estimating compaction size (default: 2000)",
+        description:
+          "Maximum characters of each tool output used during compaction tail size estimation and summarizer context truncation (default: 2000)",
       }),
       min_preserve_recent_tokens: Schema.optional(NonNegativeInt).annotate({
         description: "Minimum tokens to preserve from recent turns when auto-calculating the budget (default: 2000)",
@@ -299,7 +302,7 @@ export const Info = Schema.Struct({
       }),
       summary_max_tokens: Schema.optional(NonNegativeInt).annotate({
         description:
-          "Maximum tokens for the compaction summary. Defaults to min(model output limit, 8000).",
+          "Maximum token budget for the compaction summary, passed both as maxOutputTokens to the compaction LLM call and as the target length hint in the summary prompt. Defaults to min(model output limit, 8000).",
       }),
       autocontinue: Schema.optional(Schema.Boolean).annotate({
         description:
@@ -307,7 +310,7 @@ export const Info = Schema.Struct({
       }),
       context_limit: Schema.optional(NonNegativeInt).annotate({
         description:
-          "Explicit context window for compaction threshold. Overrides the model's context limit. E.g. 200000 triggers compaction when used tokens reach 200000 minus reserved buffer.",
+          "Explicit context window cap for compaction threshold (clamped to the model's context and input limits). E.g. 200000 triggers compaction when used tokens reach 200000 minus reserved buffer.",
       }),
     }),
   ),
