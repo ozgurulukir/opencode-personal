@@ -214,7 +214,7 @@ function stubCompactionLayer() {
         calls.create.push(input)
       }),
     process: () => Effect.succeed("stop" as const),
-    prune: () => Effect.void,
+    prune: () => Effect.succeed(0),
     isOverflow: () => Effect.succeed(false),
   })
   return { layer, calls }
