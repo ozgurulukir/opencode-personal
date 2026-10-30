@@ -1,7 +1,11 @@
 import type { Config } from "@/config/config"
 import { ProviderTransform } from "@/provider/transform"
 import type { Provider } from "@/provider/provider"
+import { Log } from "@opencode-ai/core/util/log"
 import type { MessageV2 } from "./message-v2"
+
+const log = Log.create({ service: "session.context-budget" })
+const warnedModels = new Set<string>()
 
 export const DEFAULTS = {
   compactionBuffer: 20_000,
@@ -43,31 +47,22 @@ function usableWith(
   model: Provider.Model,
   cc: ReturnType<typeof compactionConfig>,
 ) {
-  // When contextLimit is set, use it as the explicit context window.
-  // reserved defaults to compactionBuffer (20K) but is clamped to at least
-  // maxOutputTokens so the model always has headroom for its full output.
-  // User can override with explicit reserved, but the maxOutputTokens floor
-  // is a safety invariant — without it, a model with 128K max output could
-  // hit the context limit mid-response with only 20K headroom.
-  if (cc.contextLimit) {
-    const reserved = Math.max(
-      cc.reserved ?? DEFAULTS.compactionBuffer,
-      ProviderTransform.maxOutputTokens(model),
-    )
-    return Math.max(0, cc.contextLimit - reserved)
-  }
-
   const context = model.limit.context
-  if (context === 0) return 0
+  if (!cc.contextLimit && context === 0) return 0
 
-  const reserved = cc.reserved ?? ProviderTransform.maxOutputTokens(model)
-  // When limit.input is set, subtract maxOutputTokens to reserve headroom for the
-  // next model response. Without this, compaction triggers too late — the model
-  // has no room to generate output on the next turn.
-  // See compaction.test.ts:480-546 for regression tests.
-  return model.limit.input
-    ? Math.max(0, model.limit.input - reserved)
-    : Math.max(0, context - ProviderTransform.maxOutputTokens(model))
+  const reserved = Math.max(
+    cc.reserved ?? DEFAULTS.compactionBuffer,
+    ProviderTransform.maxOutputTokens(model),
+  )
+
+  const effectiveContext = context > 0 ? context : Infinity
+  const effectiveInput = model.limit.input ?? Infinity
+  const effectiveLimit = cc.contextLimit ?? Infinity
+
+  const base = Math.min(effectiveContext, effectiveInput, effectiveLimit)
+  if (!Number.isFinite(base)) return 0
+
+  return Math.max(0, base - reserved)
 }
 
 export { usableWith }
@@ -83,5 +78,17 @@ export function isOverflow(cfg: Config.Info, tokens: MessageV2.Assistant["tokens
   // Skip the model.limit.context === 0 guard — the user explicitly set a limit.
   if (!cc.contextLimit && model.limit.context === 0) return false
 
-  return used(tokens) >= usable(cfg, model)
+  const u = usable(cfg, model)
+  if (u <= 0) {
+    if (!warnedModels.has(model.id)) {
+      warnedModels.add(model.id)
+      log.warn("Usable context window is zero or negative; auto-compaction disabled for model", {
+        model: model.id,
+        context: model.limit.context,
+      })
+    }
+    return false
+  }
+
+  return used(tokens) >= u
 }

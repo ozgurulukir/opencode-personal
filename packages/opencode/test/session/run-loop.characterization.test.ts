@@ -21,7 +21,7 @@
 import { NodeFileSystem } from "@effect/platform-node"
 import { FetchHttpClient } from "effect/unstable/http"
 import { describe, expect } from "bun:test"
-import { Effect, Layer, Stream } from "effect"
+import { Cause, Effect, Exit, Layer, Stream } from "effect"
 import { Agent as AgentSvc } from "../../src/agent/agent"
 import { Bus } from "../../src/bus"
 import { GlobalBus, type GlobalEvent } from "../../src/bus/global"
@@ -179,7 +179,7 @@ const usage = {
 }
 
 /** A complete assistant text reply that ends the turn with a `stop` finish. */
-function replyText(text: string): Stream.Stream<LLM.Event, unknown> {
+function replyText(text: string, customUsage = usage): Stream.Stream<LLM.Event, unknown> {
   return Stream.make(
     { type: "start" } satisfies LLM.Event,
     { type: "text-start", id: "txt-0" } satisfies LLM.Event,
@@ -191,13 +191,13 @@ function replyText(text: string): Stream.Stream<LLM.Event, unknown> {
       rawFinishReason: "stop",
       response: { id: "res", modelId: "test-model", timestamp: new Date() },
       providerMetadata: undefined,
-      usage,
+      usage: customUsage,
     } satisfies LLM.Event,
     {
       type: "finish",
       finishReason: "stop",
       rawFinishReason: "stop",
-      totalUsage: usage,
+      totalUsage: customUsage,
     } satisfies LLM.Event,
   )
 }
@@ -667,6 +667,51 @@ describe("runLoop characterization", () => {
           } finally {
             GlobalBus.off("event", handler)
           }
+        }),
+      { git: true, config: cfg },
+    ),
+  )
+
+  it.live("circuit breaker stops after 2 consecutive auto-compactions when context still overflows (#327)", () =>
+    provideTmpdirInstance(
+      () =>
+        Effect.gen(function* () {
+          llm.reset()
+          const prompt = yield* SessionPrompt.Service
+          const sessions = yield* Session.Service
+          const chat = yield* sessions.create({ title: "char-circuit-breaker", permission: ALLOW_ALL })
+
+          const overflowUsage = {
+            ...usage,
+            inputTokens: 95_000,
+            totalTokens: 95_001,
+          }
+
+          // 1. Initial user prompt overflows
+          llm.push(replyText("step 1 overflows", overflowUsage))
+          // 2. Auto-compaction #1 summary
+          llm.push(replyText("summary 1"))
+          // 3. Continue turn #1 still overflows
+          llm.push(replyText("step 2 still overflows", overflowUsage))
+          // 4. Auto-compaction #2 summary
+          llm.push(replyText("summary 2"))
+          // 5. Continue turn #2 still overflows -> circuit breaker triggers before compaction #3
+          llm.push(replyText("step 3 still overflows", overflowUsage))
+
+          const exit = yield* Effect.exit(
+            prompt.prompt({
+              sessionID: chat.id,
+              agent: "build",
+              parts: [{ type: "text", text: "trigger endless compaction" }],
+            }),
+          )
+
+          expect(Exit.isFailure(exit)).toBe(true)
+          if (Exit.isFailure(exit)) {
+            const err = Cause.squash(exit.cause) as { data?: { message?: string } }
+            expect(err?.data?.message).toContain("Context still exceeds the limit after compaction")
+          }
+          expect(llm.calls).toBe(5)
         }),
       { git: true, config: cfg },
     ),

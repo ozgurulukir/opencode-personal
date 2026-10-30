@@ -558,6 +558,18 @@ describe("session.compaction.isOverflow", () => {
   )
 
   it.live(
+    "returns false when usable context is 0 (tight model context <= output reserve) (#327)",
+    provideTmpdirInstance(() =>
+      Effect.gen(function* () {
+        const compact = yield* SessionCompaction.Service
+        const model = createModel({ context: 16_000, output: 0 })
+        const tokens = { input: 10_000, output: 1_000, reasoning: 0, cache: { read: 0, write: 0 } }
+        expect(yield* compact.isOverflow({ tokens, model })).toBe(false)
+      }),
+    ),
+  )
+
+  it.live(
     "returns false when compaction.auto is disabled",
     provideTmpdirInstance(
       () =>
