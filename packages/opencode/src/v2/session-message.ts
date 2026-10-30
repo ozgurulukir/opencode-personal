@@ -249,6 +249,8 @@ export class Compaction extends Schema.Class<Compaction>("Session.Message.Compac
   reason: SessionEvent.Compaction.Started.fields.data.fields.reason,
   summary: Schema.String,
   include: Schema.String.pipe(Schema.optional),
+  status: Schema.optional(Schema.Union([Schema.Literal("ok"), Schema.Literal("failed")])),
+  error: Schema.optional(Schema.String),
   ...Base,
 }) {}
 

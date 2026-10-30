@@ -380,6 +380,8 @@ export namespace Compaction {
       ...Base,
       text: Schema.String,
       include: Schema.String.pipe(Schema.optional),
+      status: Schema.optional(Schema.Union([Schema.Literal("ok"), Schema.Literal("failed")])),
+      error: Schema.optional(Schema.String),
     },
   })
   export type Ended = Schema.Schema.Type<typeof Ended>

@@ -467,6 +467,8 @@ export function update<Result>(adapter: Adapter<Result>, event: SessionEvent.Eve
           produce(currentCompaction, (draft) => {
             draft.summary = event.data.text
             draft.include = event.data.include
+            if (event.data.status) draft.status = event.data.status
+            if (event.data.error) draft.error = event.data.error
           }),
         )
       }

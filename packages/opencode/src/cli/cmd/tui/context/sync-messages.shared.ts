@@ -270,6 +270,8 @@ export function reduceMessageEvent(messages: SessionMessage[], event: MessageSyn
       if (!match) return
       match.summary = event.properties.text
       match.include = event.properties.include
+      if (event.properties.status) match.status = event.properties.status
+      if (event.properties.error) match.error = event.properties.error
       break
     }
   }

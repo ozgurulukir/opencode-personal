@@ -377,6 +377,27 @@ describe("reduceMessageEvent", () => {
     expect(compaction.include).toBe("msg_123")
   })
 
+  it("projects status and error when compaction fails (#339)", () => {
+    const messages: SessionMessage[] = []
+    reduceMessageEvent(messages, ev("evt_1", "session.next.compaction.started", {
+      sessionID: "ses_1",
+      timestamp: now,
+      reason: "auto",
+    }))
+    reduceMessageEvent(messages, ev("evt_2", "session.next.compaction.ended", {
+      sessionID: "ses_1",
+      timestamp: now + 1,
+      text: "",
+      status: "failed",
+      error: "Provider rate limit exceeded",
+    }))
+    expect(messages).toHaveLength(1)
+    const compaction = messages[0]
+    if (compaction.type !== "compaction") throw new Error("expected compaction")
+    expect(compaction.status).toBe("failed")
+    expect(compaction.error).toBe("Provider rate limit exceeded")
+  })
+
   it("routes reasoning by reasoningID and finalizes text on ended", () => {
     const messages: SessionMessage[] = []
     reduceMessageEvent(messages, ev("evt_1", "session.next.step.started", {

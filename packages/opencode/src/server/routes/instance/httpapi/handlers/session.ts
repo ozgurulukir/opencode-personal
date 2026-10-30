@@ -251,6 +251,13 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
         auto: ctx.payload.auto ?? false,
       })
       yield* promptSvc.loop({ sessionID: ctx.params.sessionID })
+      const updatedMessages = yield* session.messages({ sessionID: ctx.params.sessionID })
+      const summaryMsg = updatedMessages.findLast((m) => m.info.role === "assistant" && m.info.mode === "compaction")
+      if (summaryMsg && summaryMsg.info.role === "assistant") {
+        if (summaryMsg.info.finish === "error" || summaryMsg.info.error) {
+          return yield* new HttpApiError.BadRequest({})
+        }
+      }
       return true
     })
 
