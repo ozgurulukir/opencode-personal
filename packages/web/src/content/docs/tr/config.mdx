@@ -486,10 +486,10 @@ Bağlam sıkıştırma davranışını `compaction` seçeneği aracılığıyla 
 
 **Otomatik sıkıştırmaya özel** (sadece auto-compaction'ı etkiler, manuel `/compact`'i değil):
 
-- `auto` - Bağlam dolduğunda oturumu otomatik olarak sıkıştırır (varsayılan: `true`).
-- `context_limit` - Sıkıştırma eşiği için açık bağlam penceresi. Modelin bağlam limitini geçersiz kılar. Örneğin `200000`, kullanılan tokenlar `reserved` tamponu çıkarıldıktan sonra 200000'e ulaştığında sıkıştırmayı tetikler.
-- `reserved` - Sıkıştırma için belirteç tamponu. Sıkıştırma sırasında taşmayı önlemek için yeterli pencere bırakır. `context_limit` set edildiğinde varsayılan 20000'dir ancak en az modelin `maxOutputTokens` değerine kırpılır — bu, modelin her zaman tam çıktısı için yeterli alana sahip olmasını garanti eder. Örneğin `context_limit: 200000` ve modelin `maxOutputTokens` değeri 8000 ise efektif `reserved` 20000 olur ve sıkıştırma 180000'de tetiklenir. `maxOutputTokens` 128000 ise efektif `reserved` 128000 olur ve sıkıştırma 72000'de tetiklenir.
-- `autocontinue` - Otomatik sıkıştırmadan sonra modelin kesintisiz devam edebilmesi için bekleyen görevleri (öncelik `[H]`/`[M]`/`[L]` ve `[IN PROGRESS]` durum rozetleriyle) ve araç/biçim ayarlarını koruyarak sentetik bir "Devam et" mesajı ekler (varsayılan: `true`). Sadece auto compaction için geçerlidir, manuel `/compact` için değil.
+- `auto` - Bağlam eşiğe ulaştığında veya sağlayıcı bağlam taşması nedeniyle isteği reddettiğinde oturumu otomatik olarak sıkıştırır (varsayılan: `true`). `auto: false` olarak ayarlandığında hem proaktif eşik sıkıştırması hem de reaktif sağlayıcı taşması sıkıştırması devre dışı bırakılır.
+- `context_limit` - Sıkıştırma eşiği için açık bağlam penceresi üst sınırı (modelin bağlam ve girdi limitleriyle sınırlandırılır). Örneğin `200000`, kullanılan tokenlar `reserved` tamponu çıkarıldıktan sonra 200000'e ulaştığında sıkıştırmayı tetikler.
+- `reserved` - Tüm modeller ve bağlam limitleri genelinde sıkıştırma için belirteç tamponu (varsayılan: `20000`). Modelin her zaman tam çıktısı için yeterli alana sahip olmasını garanti etmek üzere en az modelin `maxOutputTokens` değerine (`Math.max(reserved ?? 20000, maxOutputTokens)`) kırpılır. Örneğin efektif bağlam limiti `200000` ve modelin `maxOutputTokens` değeri `8000` ise efektif `reserved` `20000` olur ve sıkıştırma `180000`'de tetiklenir. `maxOutputTokens` `128000` ise efektif `reserved` `128000` olur ve sıkıştırma `72000`'de tetiklenir.
+- `autocontinue` - Otomatik sıkıştırmadan sonra modelin kesintisiz devam edebilmesi için bekleyen görevleri (öncelik `[H]`/`[M]`/`[L]` ve `[IN PROGRESS]` durum rozetleriyle) ve araç/biçim/sistem ayarlarını koruyarak sentetik bir "Devam et" mesajı ekler (varsayılan: `true`). Sadece auto compaction için geçerlidir, manuel `/compact` için değil.
 
 **Paylaşılan** (hem auto hem manuel sıkıştırmayı etkiler):
 
@@ -497,10 +497,10 @@ Bağlam sıkıştırma davranışını `compaction` seçeneği aracılığıyla 
 - `tail_turns` - Sıkıştırma sırasında aynen korunacak son kullanıcı tur sayısı (varsayılan: `2`).
 - `preserve_recent_tokens` - Son turlardan aynen korunacak en fazla belirteç sayısı. Belirtilmezse bütçe otomatik hesaplanır.
 - `min_preserve_recent_tokens` / `max_preserve_recent_tokens` - Otomatik hesaplanan son tur belirteç bütçesinin alt ve üst sınırları (varsayılanlar: `2000` ve `8000`).
-- `summary_max_tokens` - Sıkıştırma özeti için maksimum token. Varsayılan: `min(model çıktı limiti, 8000)`.
+- `summary_max_tokens` - Sıkıştırma özeti için maksimum belirteç bütçesi; hem sıkıştırma LLM çağrısına `maxOutputTokens` olarak hem de özet istemine hedef uzunluk ipucu olarak iletilir. Varsayılan: `min(model çıktı limiti, 8000)`.
 - `prune_minimum_tokens` - Eski araç çıktıları budanmadan önce gereken en az belirteç tasarrufu (varsayılan: `20000`).
 - `prune_protect_tokens` - Budamadan korunan en son araç çıktısı belirteçlerinin sayısı (varsayılan: `40000`).
-- `tool_output_max_chars` - Sıkıştırma boyutu tahmininde hesaba katılan her araç çıktısının en fazla karakter sayısı (varsayılan: `2000`).
+- `tool_output_max_chars` - Sıkıştırma kuyruk boyutu tahmini ve özetleyici bağlam kırpma sırasında kullanılan her bir araç çıktısının maksimum karakter sayısı (varsayılan: `2000`).
 - `prune_protected_tools` - Çıktısı asla budanmayacak araç adları (varsayılan: `["skill"]`).
 
 ---
