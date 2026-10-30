@@ -142,10 +142,14 @@ function buildPrompt(input: { previousSummary?: string; context: string[]; maxTo
 
 function preserveRecentBudget(input: { cfg: Config.Info; model: Provider.Model }) {
   const cc = ContextBudget.compactionConfig(input.cfg)
+  const windowScaledMax = Math.max(
+    cc.maxPreserveRecentTokens,
+    Math.floor(ContextBudget.usableWith(input.cfg, input.model, cc) * 0.25),
+  )
   return (
     cc.preserveRecentTokens ??
     Math.min(
-      cc.maxPreserveRecentTokens,
+      windowScaledMax,
       Math.max(cc.minPreserveRecentTokens, Math.floor(ContextBudget.usableWith(input.cfg, input.model, cc) * 0.25)),
     )
   )
@@ -155,12 +159,18 @@ function summaryBudget(model: Provider.Model, cc: ReturnType<typeof ContextBudge
   return cc.summaryMaxTokens ?? Math.min(ProviderTransform.maxOutputTokens(model), cc.maxSummaryTokens)
 }
 
+export function isRealUserTurn(msg: MessageV2.WithParts): msg is MessageV2.WithParts & { info: MessageV2.User } {
+  if (msg.info.role !== "user") return false
+  if (msg.parts.some((part) => part.type === "compaction")) return false
+  if (msg.parts.some((part) => part.type === "text" && part.metadata?.compaction_continue)) return false
+  return true
+}
+
 function turns(messages: MessageV2.WithParts[]) {
   const result: Turn[] = []
   for (let i = 0; i < messages.length; i++) {
     const msg = messages[i]
-    if (msg.info.role !== "user") continue
-    if (msg.parts.some((part) => part.type === "compaction")) continue
+    if (!isRealUserTurn(msg)) continue
     result.push({
       start: i,
       end: messages.length,
@@ -173,7 +183,7 @@ function turns(messages: MessageV2.WithParts[]) {
   return result
 }
 
-function splitTurn(input: {
+export function splitTurn(input: {
   messages: MessageV2.WithParts[]
   turn: Turn
   model: Provider.Model
@@ -183,12 +193,24 @@ function splitTurn(input: {
   return Effect.gen(function* () {
     if (input.budget <= 0) return undefined
     if (input.turn.end - input.turn.start <= 1) return undefined
-    for (let start = input.turn.start + 1; start < input.turn.end; start++) {
-      const size = yield* input.estimate({
-        messages: input.messages.slice(start, input.turn.end),
-        model: input.model,
-      })
-      if (size > input.budget) continue
+    const turnMessages = input.messages.slice(input.turn.start, input.turn.end)
+    const sizes = yield* Effect.forEach(
+      turnMessages,
+      (msg) => input.estimate({ messages: [msg], model: input.model }),
+      { concurrency: 1 },
+    )
+    let total = 0
+    let splitIdx = turnMessages.length
+    for (let i = turnMessages.length - 1; i > 0; i--) {
+      if (total + sizes[i] <= input.budget) {
+        total += sizes[i]
+        splitIdx = i
+      } else {
+        break
+      }
+    }
+    if (splitIdx < turnMessages.length && splitIdx > 0) {
+      const start = input.turn.start + splitIdx
       return {
         start,
         id: input.messages[start]!.info.id,
@@ -262,7 +284,12 @@ export const layer: Layer.Layer<
       messages: MessageV2.WithParts[]
       model: Provider.Model
     }) {
-      const msgs = yield* MessageV2.toModelMessagesEffect(input.messages, input.model)
+      const cfg = yield* config.get()
+      const cc = ContextBudget.compactionConfig(cfg)
+      const msgs = yield* MessageV2.toModelMessagesEffect(input.messages, input.model, {
+        stripMedia: true,
+        toolOutputMaxChars: cc.toolOutputMaxChars,
+      })
       return Token.estimate(JSON.stringify(msgs))
     })
 
@@ -312,7 +339,7 @@ export const layer: Layer.Layer<
         break
       }
 
-      if (!keep || keep.start === 0) return { head: input.messages, tail_start_id: undefined }
+      if (!keep || keep.start === 0) return { head: input.messages, tail_start_id: undefined, fallback: !keep }
       return {
         head: input.messages.slice(0, keep.start),
         tail_start_id: keep.id,
@@ -382,303 +409,393 @@ export const layer: Layer.Layer<
       auto: boolean
       overflow?: boolean
     }) {
-      const parent = input.messages.findLast((m) => m.info.id === input.parentID)
-      if (!parent || parent.info.role !== "user") {
-        throw new Error(`Compaction parent must be a user message: ${input.parentID}`)
-      }
-      const userMessage = parent.info
-      const compactionPart = parent.parts.find((part): part is MessageV2.CompactionPart => part.type === "compaction")
-
-      let messages = input.messages
-      let replay:
-        | {
-            info: MessageV2.User
-            parts: MessageV2.Part[]
-          }
-        | undefined
-      if (input.overflow) {
-        // Find the most recent non-compaction user turn before the compaction
-        // parent. That turn's content (with media stripped) will be replayed
-        // after compaction so the model can continue from where it left off.
-        const idx = input.messages.findIndex((m) => m.info.id === input.parentID)
-        for (let i = idx - 1; i >= 0; i--) {
-          const msg = input.messages[i]
-          if (msg.info.role === "user" && !msg.parts.some((p) => p.type === "compaction")) {
-            replay = { info: msg.info, parts: msg.parts }
-            messages = input.messages.slice(0, i)
-            break
-          }
-        }
-        // If slicing removed all non-compaction user content, there's nothing
-        // meaningful to replay — fall back to the full message set.
-        const hasContent =
-          replay && messages.some((m) => m.info.role === "user" && !m.parts.some((p) => p.type === "compaction"))
-        if (!hasContent) {
-          replay = undefined
-          messages = input.messages
-        }
-      }
-
-      const agent = yield* agents.get("compaction")
-      const model = agent.model
-        ? yield* provider.getModel(agent.model.providerID, agent.model.modelID)
-        : yield* provider.getModel(userMessage.model.providerID, userMessage.model.modelID)
-      const cfg = yield* config.get()
-      // Exclude the current compaction marker from history so completedCompactions
-      // doesn't count it as a prior compaction. The marker is the last message
-      // when no post-compaction messages exist yet; after filterCompacted reorder
-      // it may not be last, but that's safe because the current compaction hasn't
-      // produced a summary yet so it won't match completedCompactions' criteria.
-      const history = compactionPart && messages.at(-1)?.info.id === input.parentID ? messages.slice(0, -1) : messages
-      const prior = completedCompactions(history)
-      const hidden = new Set(prior.flatMap((item) => [item.userIndex, item.assistantIndex]))
-      const previousSummary = prior.at(-1)?.summary
-      const selected = yield* select({
-        messages: history.filter((_, index) => !hidden.has(index)),
-        cfg,
-        model,
-      })
-      log.info("compaction selected", {
-        tail_start_id: selected.tail_start_id,
-        budget: preserveRecentBudget({ cfg, model }),
-        overflow: input.overflow === true,
-      })
-      // Allow plugins to inject context or replace compaction prompt.
-      const compacting = yield* plugin.trigger(
-        "experimental.session.compacting",
-        { sessionID: input.sessionID },
-        { context: [], prompt: undefined },
-      )
-      const cc = ContextBudget.compactionConfig(cfg)
-      const nextPrompt = compacting.prompt
-        ?? buildPrompt({
-            previousSummary,
-            context: compacting.context,
-            maxTokens: summaryBudget(model, cc),
-          })
-      const msgs = structuredClone(selected.head)
-      yield* plugin.trigger("experimental.chat.messages.transform", {}, { messages: msgs })
-      const modelMessages = yield* MessageV2.toModelMessagesEffect(msgs, model, {
-        stripMedia: true,
-        toolOutputMaxChars: ContextBudget.compactionConfig(cfg).toolOutputMaxChars,
-      })
-      const ctx = yield* InstanceState.context
-      const msg: MessageV2.Assistant = {
-        id: MessageID.ascending(),
-        role: "assistant",
-        parentID: input.parentID,
-        sessionID: input.sessionID,
-        mode: "compaction",
-        agent: "compaction",
-        variant: userMessage.model.variant,
-        summary: true,
-        path: {
-          cwd: ctx.directory,
-          root: ctx.worktree,
-        },
-        cost: 0,
-        tokens: {
-          output: 0,
-          input: 0,
-          reasoning: 0,
-          cache: { read: 0, write: 0 },
-        },
-        modelID: model.id,
-        providerID: model.providerID,
-        time: {
-          created: Date.now(),
-        },
-      }
-      yield* session.updateMessage(msg)
-      const processor = yield* processors.create({
-        assistantMessage: msg,
-        sessionID: input.sessionID,
-        model,
-      })
-      const result = yield* processor.process({
-        user: userMessage,
-        agent,
-        sessionID: input.sessionID,
-        tools: {},
-        system: { prefix: "", suffix: "" },
-        messages: [
-          ...modelMessages,
-          {
-            role: "user",
-            content: [{ type: "text", text: nextPrompt }],
-          },
-        ],
-        model,
-      })
-
-      if (result === "compact") {
-        processor.message.error = new MessageV2.ContextOverflowError({
-          message: replay
-            ? "Conversation history too large to compact - exceeds model context limit"
-            : "Session too large to compact - context exceeds model limit even after stripping media",
-        }).toObject()
-        processor.message.finish = "error"
-        yield* session.updateMessage(processor.message)
-        // Resolve the compaction view even on failure — Started without Ended
-        // leaves the TUI stuck at "compacting..." forever.
-        yield* sync.run(SessionEvent.Compaction.Ended.Sync, {
-          sessionID: input.sessionID,
-          timestamp: DateTime.makeUnsafe(Date.now()),
-          text: "",
-        })
-        return "stop"
-      }
-
-      if (compactionPart && selected.tail_start_id && compactionPart.tail_start_id !== selected.tail_start_id) {
-        yield* session.updatePart({
-          ...compactionPart,
-          tail_start_id: selected.tail_start_id,
-        })
-      }
-
-      if (result === "continue" && input.auto) {
-        if (replay && replay.parts.some((p) => p.type !== "compaction")) {
-          const original = replay.info
-          const replayMsg = yield* session.updateMessage({
-            id: MessageID.ascending(),
-            role: "user",
+      let ended = false
+      const emitEnded = (text: string, include?: MessageID) =>
+        Effect.gen(function* () {
+          if (ended) return
+          ended = true
+          yield* sync.run(SessionEvent.Compaction.Ended.Sync, {
             sessionID: input.sessionID,
-            time: { created: Date.now() },
-            agent: original.agent,
-            model: original.model,
-            format: original.format,
-            tools: original.tools,
-            system: original.system,
+            timestamp: DateTime.makeUnsafe(Date.now()),
+            text,
+            include,
           })
-          const replayParts: MessageV2.Part[] = []
-          for (const part of replay.parts) {
-            if (part.type === "compaction") continue
-            const replayPart =
-              part.type === "file" && MessageV2.isMedia(part.mime)
-                ? { type: "text" as const, text: `[Attached ${part.mime}: ${part.filename ?? "file"}]` }
-                : part
-            replayParts.push({
-              ...replayPart,
-              id: PartID.ascending(),
-              messageID: replayMsg.id,
+        })
+
+      let parent: MessageV2.WithParts | undefined
+      let assistantMsg: MessageV2.Assistant | undefined
+      let resolvedModel: Provider.Model | undefined
+
+      const handleError = (err: unknown) =>
+        Effect.gen(function* () {
+          log.error("compaction failed", { err })
+          if (parent && parent.info.role === "user") {
+            const ctx = yield* InstanceState.context.pipe(
+              Effect.catch(() => Effect.succeed({ directory: "", worktree: "" } as { directory: string; worktree: string })),
+              Effect.catchDefect(() => Effect.succeed({ directory: "", worktree: "" } as { directory: string; worktree: string })),
+            )
+            const failMsg: MessageV2.Assistant = assistantMsg ?? {
+              id: MessageID.ascending(),
+              role: "assistant",
+              parentID: input.parentID,
               sessionID: input.sessionID,
-            })
+              mode: "compaction",
+              agent: "compaction",
+              variant: undefined,
+              summary: true,
+              path: {
+                cwd: ctx.directory,
+                root: ctx.worktree,
+              },
+              cost: 0,
+              tokens: { output: 0, input: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+              modelID: (resolvedModel?.id ?? "unknown") as ModelID,
+              providerID: (resolvedModel?.providerID ?? "unknown") as ProviderID,
+              time: { created: Date.now() },
+            }
+            failMsg.finish = "error"
+            failMsg.error = {
+              name: "UnknownError",
+              data: {
+                message: err instanceof Error ? err.message : String(err),
+              },
+            }
+            yield* session.updateMessage(failMsg).pipe(
+              Effect.catch(() => Effect.void),
+              Effect.catchDefect(() => Effect.void),
+            )
           }
-          if (replayParts.length > 0) yield* session.updateParts(replayParts)
+          yield* emitEnded("")
+          return yield* Effect.die(err)
+        })
+
+      const body = Effect.gen(function* () {
+        parent = input.messages.findLast((m) => m.info.id === input.parentID)
+        if (!parent || parent.info.role !== "user") {
+          throw new Error(`Compaction parent must be a user message: ${input.parentID}`)
+        }
+        const userMessage = parent.info
+        const compactionPart = parent.parts.find((part): part is MessageV2.CompactionPart => part.type === "compaction")
+
+        let messages = input.messages
+        let replay:
+          | {
+              info: MessageV2.User
+              parts: MessageV2.Part[]
+            }
+          | undefined
+        if (input.overflow) {
+          // Find the most recent non-compaction user turn before the compaction
+          // parent. That turn's content (with media stripped) will be replayed
+          // after compaction so the model can continue from where it left off.
+          const idx = input.messages.findIndex((m) => m.info.id === input.parentID)
+          for (let i = idx - 1; i >= 0; i--) {
+            const msg = input.messages[i]
+            if (msg.info.role === "user" && !msg.parts.some((p) => p.type === "compaction")) {
+              replay = { info: msg.info, parts: msg.parts }
+              messages = input.messages.slice(0, i)
+              break
+            }
+          }
+          // If slicing removed all non-compaction user content, there's nothing
+          // meaningful to replay — fall back to the full message set.
+          const hasContent =
+            replay && messages.some((m) => m.info.role === "user" && !m.parts.some((p) => p.type === "compaction"))
+          if (!hasContent) {
+            replay = undefined
+            messages = input.messages
+          }
         }
 
-        if (!replay && input.auto) {
-          const info = yield* provider.getProvider(userMessage.model.providerID)
-          if (
-            cc.autocontinue &&
-            (yield* plugin.trigger(
-              "experimental.compaction.autocontinue",
-              {
-                sessionID: input.sessionID,
-                agent: userMessage.agent,
-                model: yield* provider.getModel(userMessage.model.providerID, userMessage.model.modelID),
-                provider: {
-                  source: info.source,
-                  info,
-                  options: info.options,
-                },
-                message: userMessage,
-                overflow: input.overflow === true,
-              },
-              { enabled: true },
-            )).enabled
-          ) {
-            const continueMsg = yield* session.updateMessage({
+        const agent = yield* agents.get("compaction")
+        const model = agent.model
+          ? yield* provider.getModel(agent.model.providerID, agent.model.modelID)
+          : yield* provider.getModel(userMessage.model.providerID, userMessage.model.modelID)
+        resolvedModel = model
+        const cfg = yield* config.get()
+        // Exclude the current compaction marker from history so completedCompactions
+        // doesn't count it as a prior compaction. The marker is the last message
+        // when no post-compaction messages exist yet; after filterCompacted reorder
+        // it may not be last, but that's safe because the current compaction hasn't
+        // produced a summary yet so it won't match completedCompactions' criteria.
+        const history = compactionPart && messages.at(-1)?.info.id === input.parentID ? messages.slice(0, -1) : messages
+        const prior = completedCompactions(history)
+        const hidden = new Set(prior.flatMap((item) => [item.userIndex, item.assistantIndex]))
+        const previousSummary = prior.at(-1)?.summary
+        const selected = yield* select({
+          messages: history.filter((_, index) => !hidden.has(index)),
+          cfg,
+          model,
+        })
+        if (input.auto && selected.fallback && !replay) {
+          const lastReal = input.messages.findLast(isRealUserTurn)
+          if (lastReal) {
+            replay = { info: lastReal.info, parts: lastReal.parts }
+          }
+        }
+        log.info("compaction selected", {
+          tail_start_id: selected.tail_start_id,
+          budget: preserveRecentBudget({ cfg, model }),
+          overflow: input.overflow === true,
+        })
+        // Allow plugins to inject context or replace compaction prompt.
+        const compacting = yield* plugin.trigger(
+          "experimental.session.compacting",
+          { sessionID: input.sessionID, previousSummary },
+          { context: [], prompt: undefined },
+        )
+        const cc = ContextBudget.compactionConfig(cfg)
+        const maxSummaryTokens = summaryBudget(model, cc)
+        const nextPrompt = compacting.prompt
+          ?? buildPrompt({
+              previousSummary,
+              context: compacting.context,
+              maxTokens: maxSummaryTokens,
+            })
+        const summarizerCapacity = Math.max(1000, ContextBudget.usable(cfg, model) - maxSummaryTokens)
+        let msgs = structuredClone(selected.head)
+        yield* plugin.trigger("experimental.chat.messages.transform", {}, { messages: msgs })
+        let toolOutputMaxChars = cc.toolOutputMaxChars
+        let modelMessages = yield* MessageV2.toModelMessagesEffect(msgs, model, {
+          stripMedia: true,
+          toolOutputMaxChars,
+        })
+        const promptTokens = Token.estimate(nextPrompt)
+        let headTokens = Token.estimate(JSON.stringify(modelMessages))
+
+        let dropped = 0
+        while (msgs.length > 1 && headTokens + promptTokens > summarizerCapacity) {
+          msgs.shift()
+          dropped++
+          modelMessages = yield* MessageV2.toModelMessagesEffect(msgs, model, {
+            stripMedia: true,
+            toolOutputMaxChars,
+          })
+          headTokens = Token.estimate(JSON.stringify(modelMessages))
+        }
+
+        if (headTokens + promptTokens > summarizerCapacity && toolOutputMaxChars > 200) {
+          toolOutputMaxChars = Math.max(200, Math.floor(toolOutputMaxChars / 2))
+          modelMessages = yield* MessageV2.toModelMessagesEffect(msgs, model, {
+            stripMedia: true,
+            toolOutputMaxChars,
+          })
+          headTokens = Token.estimate(JSON.stringify(modelMessages))
+        }
+
+        if (dropped > 0) {
+          log.info("compaction head truncated for summarizer", { dropped, headTokens, summarizerCapacity })
+        }
+
+        const ctx = yield* InstanceState.context
+        const msg: MessageV2.Assistant = {
+          id: MessageID.ascending(),
+          role: "assistant",
+          parentID: input.parentID,
+          sessionID: input.sessionID,
+          mode: "compaction",
+          agent: "compaction",
+          variant: userMessage.model.variant,
+          summary: true,
+          path: {
+            cwd: ctx.directory,
+            root: ctx.worktree,
+          },
+          cost: 0,
+          tokens: {
+            output: 0,
+            input: 0,
+            reasoning: 0,
+            cache: { read: 0, write: 0 },
+          },
+          modelID: model.id,
+          providerID: model.providerID,
+          time: {
+            created: Date.now(),
+          },
+        }
+        assistantMsg = msg
+        yield* session.updateMessage(msg)
+        const processor = yield* processors.create({
+          assistantMessage: msg,
+          sessionID: input.sessionID,
+          model,
+        })
+        const result = yield* processor.process({
+          user: userMessage,
+          agent,
+          sessionID: input.sessionID,
+          tools: {},
+          system: { prefix: "", suffix: "" },
+          maxOutputTokens: maxSummaryTokens,
+          messages: [
+            ...modelMessages,
+            {
+              role: "user",
+              content: [{ type: "text", text: nextPrompt }],
+            },
+          ],
+          model,
+        })
+
+        if (result === "compact") {
+          processor.message.error = new MessageV2.ContextOverflowError({
+            message: replay
+              ? "Conversation history too large to compact - exceeds model context limit"
+              : "Session too large to compact - context exceeds model limit even after stripping media",
+          }).toObject()
+          processor.message.finish = "error"
+          yield* session.updateMessage(processor.message)
+          yield* emitEnded("")
+          return "stop" as const
+        }
+
+        if (compactionPart && selected.tail_start_id && compactionPart.tail_start_id !== selected.tail_start_id) {
+          yield* session.updatePart({
+            ...compactionPart,
+            tail_start_id: selected.tail_start_id,
+          })
+        }
+
+        if (result === "continue" && input.auto) {
+          if (replay && replay.parts.some((p) => p.type !== "compaction")) {
+            const original = replay.info
+            const replayMsg = yield* session.updateMessage({
               id: MessageID.ascending(),
               role: "user",
               sessionID: input.sessionID,
               time: { created: Date.now() },
-              agent: userMessage.agent,
-              model: userMessage.model,
-              format: userMessage.format,
-              tools: userMessage.tools,
-              system: userMessage.system,
+              agent: original.agent,
+              model: original.model,
+              format: original.format,
+              tools: original.tools,
+              system: original.system,
             })
-            const todoBlock = yield* Option.match(todo, {
-              onNone: () => Effect.succeed(""),
-              onSome: (svc) =>
-                svc.get(input.sessionID).pipe(
-                  Effect.map((todos) => {
-                    const pending = todos.filter((t) => t.status !== "completed" && t.status !== "cancelled")
-                    if (pending.length === 0) return ""
-                    return (
-                      "\n\nPending todos:\n" +
-                      pending
-                        .map((t) => {
-                          const badge = t.priority === "high" ? "[H] " : t.priority === "low" ? "[L] " : "[M] "
-                          const statusBadge = t.status === "in_progress" ? "[IN PROGRESS] " : ""
-                          return `- ${badge}${statusBadge}${t.content}`
-                        })
-                        .join("\n")
-                    )
-                  }),
-                ),
-            })
-            const hasMedia = input.messages.some((m) =>
-              m.parts.some((p) => p.type === "file" && MessageV2.isMedia(p.mime)),
-            )
-            const text =
-              (input.overflow
-                ? hasMedia
-                  ? "The previous request exceeded the provider's size limit due to large media attachments. The conversation was compacted and media files were removed from context. If the user was asking about attached images or files, explain that the attachments were too large to process and suggest they try again with smaller or fewer files.\n\n"
-                  : "The previous request exceeded the provider's size limit. The conversation was compacted to fit within context limits.\n\n"
-                : "") +
-              "Continue if you have next steps, or stop and ask for clarification if you are unsure how to proceed." +
-              todoBlock
-            yield* session.updatePart({
-              id: PartID.ascending(),
-              messageID: continueMsg.id,
-              sessionID: input.sessionID,
-              type: "text",
-              // Internal marker for auto-compaction followups so provider plugins
-              // can distinguish them from manual post-compaction user prompts.
-              // This is not a stable plugin contract and may change or disappear.
-              metadata: { compaction_continue: true },
-              synthetic: true,
-              text,
-              time: {
-                start: Date.now(),
-                end: Date.now(),
-              },
-            })
+            const replayParts: MessageV2.Part[] = []
+            for (const part of replay.parts) {
+              if (part.type === "compaction") continue
+              const replayPart =
+                part.type === "file" && MessageV2.isMedia(part.mime)
+                  ? { type: "text" as const, text: `[Attached ${part.mime}: ${part.filename ?? "file"}]` }
+                  : part
+              replayParts.push({
+                ...replayPart,
+                id: PartID.ascending(),
+                messageID: replayMsg.id,
+                sessionID: input.sessionID,
+              })
+            }
+            if (replayParts.length > 0) yield* session.updateParts(replayParts)
+          }
+
+          if (!replay && input.auto) {
+            const info = yield* provider.getProvider(userMessage.model.providerID)
+            if (
+              cc.autocontinue &&
+              (yield* plugin.trigger(
+                "experimental.compaction.autocontinue",
+                {
+                  sessionID: input.sessionID,
+                  agent: userMessage.agent,
+                  model: yield* provider.getModel(userMessage.model.providerID, userMessage.model.modelID),
+                  provider: {
+                    source: info.source,
+                    info,
+                    options: info.options,
+                  },
+                  message: userMessage,
+                  overflow: input.overflow === true,
+                },
+                { enabled: true },
+              )).enabled
+            ) {
+              const continueMsg = yield* session.updateMessage({
+                id: MessageID.ascending(),
+                role: "user",
+                sessionID: input.sessionID,
+                time: { created: Date.now() },
+                agent: userMessage.agent,
+                model: userMessage.model,
+                format: userMessage.format,
+                tools: userMessage.tools,
+                system: userMessage.system,
+              })
+              const todoBlock = yield* Option.match(todo, {
+                onNone: () => Effect.succeed(""),
+                onSome: (svc) =>
+                  svc.get(input.sessionID).pipe(
+                    Effect.map((todos) => {
+                      const pending = todos.filter((t) => t.status !== "completed" && t.status !== "cancelled")
+                      if (pending.length === 0) return ""
+                      return (
+                        "\n\nPending todos:\n" +
+                        pending
+                          .map((t) => {
+                            const badge = t.priority === "high" ? "[H] " : t.priority === "low" ? "[L] " : "[M] "
+                            const statusBadge = t.status === "in_progress" ? "[IN PROGRESS] " : ""
+                            return `- ${badge}${statusBadge}${t.content}`
+                          })
+                          .join("\n")
+                      )
+                    }),
+                  ),
+              })
+              const hasMedia = input.messages.some((m) =>
+                m.parts.some((p) => p.type === "file" && MessageV2.isMedia(p.mime)),
+              )
+              const text =
+                (input.overflow
+                  ? hasMedia
+                    ? "The previous request exceeded the provider's size limit due to large media attachments. The conversation was compacted and media files were removed from context. If the user was asking about attached images or files, explain that the attachments were too large to process and suggest they try again with smaller or fewer files.\n\n"
+                    : "The previous request exceeded the provider's size limit. The conversation was compacted to fit within context limits.\n\n"
+                  : "") +
+                "Continue if you have next steps, or stop and ask for clarification if you are unsure how to proceed." +
+                todoBlock
+              yield* session.updatePart({
+                id: PartID.ascending(),
+                messageID: continueMsg.id,
+                sessionID: input.sessionID,
+                type: "text",
+                // Internal marker for auto-compaction followups so provider plugins
+                // can distinguish them from manual post-compaction user prompts.
+                // This is not a stable plugin contract and may change or disappear.
+                metadata: { compaction_continue: true },
+                synthetic: true,
+                text,
+                time: {
+                  start: Date.now(),
+                  end: Date.now(),
+                },
+              })
+            }
           }
         }
-      }
 
-      if (processor.message.error) {
-        processor.message.finish = "error"
-        yield* session.updateMessage(processor.message)
-        // Same stuck-view guard as the overflow path above: resolve the
-        // compaction view even when the summary turn errored.
-        yield* sync.run(SessionEvent.Compaction.Ended.Sync, {
-          sessionID: input.sessionID,
-          timestamp: DateTime.makeUnsafe(Date.now()),
-          text: "",
-        })
-        return "stop"
-      }
-      if (result === "continue") {
-        const summary = summaryText(
-          (yield* session.messages({ sessionID: input.sessionID })).find((item) => item.info.id === msg.id) ?? {
-            info: msg,
-            parts: [],
-          },
-        )
-        yield* sync.run(SessionEvent.Compaction.Ended.Sync, {
-          sessionID: input.sessionID,
-          timestamp: DateTime.makeUnsafe(Date.now()),
-          text: summary ?? "",
-          include: selected.tail_start_id,
-        })
-        yield* bus.publish(Event.Compacted, { sessionID: input.sessionID })
-      }
-      log.info("compaction finished", { result, overflow: input.overflow === true })
-      return result
+        if (processor.message.error) {
+          processor.message.finish = "error"
+          yield* session.updateMessage(processor.message)
+          yield* emitEnded("")
+          return "stop" as const
+        }
+        if (result === "continue") {
+          const summary = summaryText(
+            (yield* session.messages({ sessionID: input.sessionID })).find((item) => item.info.id === msg.id) ?? {
+              info: msg,
+              parts: [],
+            },
+          )
+          yield* emitEnded(summary ?? "", selected.tail_start_id)
+          yield* bus.publish(Event.Compacted, { sessionID: input.sessionID })
+        }
+        log.info("compaction finished", { result, overflow: input.overflow === true })
+        return result
+      })
+
+      return yield* body.pipe(
+        Effect.catch(handleError),
+        Effect.catchDefect(handleError),
+        Effect.ensuring(emitEnded("")),
+      )
     })
 
     const create = Effect.fn("SessionCompaction.create")(function* (input: {

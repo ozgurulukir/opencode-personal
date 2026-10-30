@@ -29,6 +29,7 @@ import { CrossSpawnSpawner } from "@opencode-ai/core/cross-spawn-spawner"
 import { TestConfig } from "../fixture/config"
 import { SyncEvent } from "@/sync"
 import { Todo } from "../../src/session/todo"
+import { SessionEvent } from "@/v2/session-event"
 
 void Log.init({ print: false })
 
@@ -246,6 +247,7 @@ type CompactionProcessOptions = {
   plugin?: Layer.Layer<Plugin.Service>
   provider?: ReturnType<typeof ProviderTest.fake>
   config?: Layer.Layer<Config.Service>
+  sync?: Layer.Layer<SyncEvent.Service>
 }
 
 function withCompaction(options?: CompactionProcessOptions) {
@@ -273,9 +275,23 @@ function compactionProcessLayer(options?: CompactionProcessOptions) {
     Layer.provide(status),
     Layer.provide(bus),
     Layer.provide(options?.config ?? Config.defaultLayer),
-    Layer.provide(SyncEvent.defaultLayer),
+    Layer.provide(options?.sync ?? SyncEvent.defaultLayer),
     Layer.provide(Todo.defaultLayer),
   )
+}
+
+function trackEnded(onEnded: () => void) {
+  return Layer.mock(SyncEvent.Service)({
+    run: (def) =>
+      Effect.sync(() => {
+        if (def.type === SessionEvent.Compaction.Ended.Sync.type) {
+          onEnded()
+        }
+      }),
+    replay: () => Effect.void,
+    replayAll: () => Effect.succeed(undefined),
+    remove: () => Effect.void,
+  })
 }
 
 function createSummaryCompaction(sessionID: SessionID) {
@@ -389,6 +405,32 @@ function autocontinue(enabled: boolean) {
         ;(output as { enabled: boolean }).enabled = enabled
         return output
       })
+    },
+    list: () => Effect.succeed([]),
+    init: () => Effect.void,
+  })
+}
+
+function throwingPlugin() {
+  return Layer.mock(Plugin.Service)({
+    trigger: <Name extends string, Input, Output>(name: Name, _input: Input, output: Output) => {
+      if (name === "experimental.session.compacting") {
+        return Effect.die(new Error("Plugin exploded"))
+      }
+      return Effect.succeed(output)
+    },
+    list: () => Effect.succeed([]),
+    init: () => Effect.void,
+  })
+}
+
+function compactingPlugin(capture: (input: { sessionID: string; previousSummary?: string }) => void) {
+  return Layer.mock(Plugin.Service)({
+    trigger: <Name extends string, Input, Output>(name: Name, input: Input, output: Output) => {
+      if (name === "experimental.session.compacting") {
+        capture(input as { sessionID: string; previousSummary?: string })
+      }
+      return Effect.succeed(output)
     },
     list: () => Effect.succeed([]),
     init: () => Effect.void,
@@ -1358,7 +1400,7 @@ describe("session.compaction.process", () => {
   )
 
   itCompaction.instance(
-    "falls back to full summary when retained tail media exceeds preserve token budget",
+    "a turn containing a large image does not exhaust the tail budget (#341)",
     () => {
       const stub = llm()
       let captured = ""
@@ -1386,9 +1428,8 @@ describe("session.compaction.process", () => {
 
         const part = yield* readCompactionPart(session.id)
         expect(part?.type).toBe("compaction")
-        expect(part?.tail_start_id).toBeUndefined()
-        expect(captured).toContain("recent image turn")
-        expect(captured).toContain("Attached image/png: big.png")
+        expect(part?.tail_start_id).toBe(recent.id)
+        expect(captured).toContain("older")
       }).pipe(withCompaction({ llm: stub.layer, config: cfg({ tail_turns: 1, preserve_recent_tokens: 100 }) }))
     },
     { git: true },
@@ -1953,6 +1994,312 @@ describe("session.compaction.process", () => {
       expect(part?.tail_start_id).toBe(keep.id)
     }).pipe(withCompaction({ config: cfg({ tail_turns: 2, preserve_recent_tokens: 500 }) })),
   )
+
+  itCompaction.instance(
+    "invalid parent emits Compaction.Ended once (#333)",
+    () => {
+      let endedCount = 0
+      return Effect.gen(function* () {
+        const ssn = yield* SessionNs.Service
+        const session = yield* ssn.create({})
+        const exit = yield* Effect.exit(
+          SessionCompaction.use.process({
+            parentID: MessageID.ascending(),
+            messages: [],
+            sessionID: session.id,
+            auto: false,
+          }),
+        )
+        expect(Exit.isFailure(exit)).toBe(true)
+        expect(endedCount).toBe(1)
+      }).pipe(
+        withCompaction({
+          sync: trackEnded(() => endedCount++),
+        }),
+      )
+    },
+    { git: true },
+  )
+
+  itCompaction.instance(
+    "missing model emits Compaction.Ended once and marks message finish: 'error' (#333)",
+    () => {
+      let endedCount = 0
+      return Effect.gen(function* () {
+        const ssn = yield* SessionNs.Service
+        const session = yield* ssn.create({})
+
+        const userMsg = yield* ssn.updateMessage({
+          id: MessageID.ascending(),
+          role: "user",
+          sessionID: session.id,
+          agent: "build",
+          model: { providerID: ProviderID.make("non-existent"), modelID: ModelID.make("ghost-model") },
+          time: { created: Date.now() },
+        })
+        yield* ssn.updatePart({
+          id: PartID.ascending(),
+          messageID: userMsg.id,
+          sessionID: session.id,
+          type: "compaction",
+          auto: false,
+        })
+        const msgs = yield* ssn.messages({ sessionID: session.id })
+
+        const exit = yield* Effect.exit(
+          SessionCompaction.use.process({
+            parentID: userMsg.id,
+            messages: msgs,
+            sessionID: session.id,
+            auto: false,
+          }),
+        )
+        expect(Exit.isFailure(exit)).toBe(true)
+        expect(endedCount).toBe(1)
+
+        const allMsgs = yield* ssn.messages({ sessionID: session.id })
+        const failedCompaction = allMsgs.find((m) => m.info.role === "assistant" && m.info.mode === "compaction")
+        expect(failedCompaction).toBeTruthy()
+        const asst = failedCompaction?.info as MessageV2.Assistant
+        expect(asst.finish).toBe("error")
+        expect(asst.error?.name).toBe("UnknownError")
+      }).pipe(
+        withCompaction({
+          sync: trackEnded(() => endedCount++),
+        }),
+      )
+    },
+    { git: true },
+  )
+
+  itCompaction.instance(
+    "throwing plugin hook emits Compaction.Ended once (#333)",
+    () => {
+      let endedCount = 0
+      return Effect.gen(function* () {
+        const ssn = yield* SessionNs.Service
+        const session = yield* ssn.create({})
+
+        yield* createUserMessage(session.id, "hello")
+        yield* createCompactionMarker(session.id)
+        const msgs = yield* ssn.messages({ sessionID: session.id })
+        const parent = msgs.at(-1)?.info.id
+        expect(parent).toBeTruthy()
+
+        const exit = yield* Effect.exit(
+          SessionCompaction.use.process({
+            parentID: parent!,
+            messages: msgs,
+            sessionID: session.id,
+            auto: false,
+          }),
+        )
+        expect(Exit.isFailure(exit)).toBe(true)
+        expect(endedCount).toBe(1)
+      }).pipe(
+        withCompaction({
+          sync: trackEnded(() => endedCount++),
+          plugin: throwingPlugin(),
+        }),
+      )
+    },
+    { git: true },
+  )
+
+  itCompaction.instance(
+    "truncates head messages when head exceeds summarizer window (#334)",
+    () => {
+      const stub = llm()
+      let captured = ""
+      stub.push(reply("summary", (input) => (captured = JSON.stringify(input.messages))))
+      return Effect.gen(function* () {
+        const ssn = yield* SessionNs.Service
+        const session = yield* ssn.create({})
+        for (let i = 1; i <= 5; i++) {
+          yield* createUserMessage(session.id, `turn-${i}-content: ${"z".repeat(3000)}`)
+        }
+        yield* createSummaryCompaction(session.id)
+        const msgs = yield* ssn.messages({ sessionID: session.id })
+        const parent = msgs.at(-1)?.info.id
+        expect(parent).toBeTruthy()
+
+        const result = yield* SessionCompaction.use.process({
+          parentID: parent!,
+          messages: msgs,
+          sessionID: session.id,
+          auto: false,
+        })
+        expect(result).toBe("continue")
+        expect(captured).not.toContain("turn-1-content")
+        expect(captured).toContain("turn-5-content")
+      }).pipe(withCompaction({ llm: stub.layer, config: cfg({ context_limit: 2500, preserve_recent_tokens: 100 }) }))
+    },
+    { git: true },
+  )
+
+  itCompaction.instance(
+    "synthetic auto-continue messages do not consume tail_turns slot (#335)",
+    () => {
+      const stub = llm()
+      stub.push(reply("summary 1"))
+      stub.push(reply("summary 2"))
+      return Effect.gen(function* () {
+        const ssn = yield* SessionNs.Service
+        const session = yield* ssn.create({})
+        yield* createUserMessage(session.id, "real turn 0")
+        yield* createUserMessage(session.id, "real turn 1")
+        const u2 = yield* createUserMessage(session.id, "real turn 2")
+        yield* SessionCompaction.use.create({ sessionID: session.id, agent: "build", model: ref, auto: true })
+        let msgs = yield* ssn.messages({ sessionID: session.id })
+        let parent = msgs.at(-1)?.info.id
+        yield* SessionCompaction.use.process({ parentID: parent!, messages: msgs, sessionID: session.id, auto: true })
+
+        msgs = yield* ssn.messages({ sessionID: session.id })
+        const continueMsg = msgs.find((m) => m.parts.some((p) => p.type === "text" && p.metadata?.compaction_continue))
+        expect(continueMsg).toBeTruthy()
+
+        yield* createUserMessage(session.id, "real turn 3")
+        yield* SessionCompaction.use.create({ sessionID: session.id, agent: "build", model: ref, auto: true })
+        msgs = yield* ssn.messages({ sessionID: session.id })
+        parent = msgs.at(-1)?.info.id
+        yield* SessionCompaction.use.process({ parentID: parent!, messages: msgs, sessionID: session.id, auto: true })
+
+        const all = yield* ssn.messages({ sessionID: session.id })
+        const part = all
+          .flatMap((m) => m.parts)
+          .filter((p): p is MessageV2.CompactionPart => p.type === "compaction")
+          .at(-1)
+        expect(part?.type).toBe("compaction")
+        expect(part?.tail_start_id).toBe(u2.id)
+      }).pipe(withCompaction({ llm: stub.layer, plugin: autocontinue(true), config: cfg({ tail_turns: 2, preserve_recent_tokens: 5000 }) }))
+    },
+    { git: true },
+  )
+
+  itCompaction.instance(
+    "huge newest turn under auto-compaction replays the user prompt (#335)",
+    () => {
+      const stub = llm()
+      stub.push(reply("summary"))
+      return Effect.gen(function* () {
+        const ssn = yield* SessionNs.Service
+        const session = yield* ssn.create({})
+        yield* createUserMessage(session.id, "first prompt")
+        yield* createUserMessage(session.id, "huge prompt: " + "w".repeat(3000))
+        yield* createCompactionMarker(session.id)
+        const msgs = yield* ssn.messages({ sessionID: session.id })
+        const parent = msgs.at(-1)?.info.id
+
+        yield* SessionCompaction.use.process({ parentID: parent!, messages: msgs, sessionID: session.id, auto: true })
+
+        const allMsgs = yield* ssn.messages({ sessionID: session.id })
+        const replayed = allMsgs.find(
+          (m) =>
+            m.info.id > parent! &&
+            m.info.role === "user" &&
+            m.parts.some((p) => p.type === "text" && p.text?.includes("huge prompt")),
+        )
+        expect(replayed).toBeTruthy()
+      }).pipe(withCompaction({ llm: stub.layer, config: cfg({ tail_turns: 1, preserve_recent_tokens: 50 }) }))
+    },
+    { git: true },
+  )
+
+  itCompaction.instance(
+    "passes maxOutputTokens and previousSummary to compaction processor (#336)",
+    () => {
+      let capturedMaxOutputTokens: number | undefined
+      let capturedHookSummary: string | undefined
+      const stub = llm()
+      stub.push(
+        reply("summary 2", (input) => {
+          capturedMaxOutputTokens = input.maxOutputTokens
+        }),
+      )
+
+      return Effect.gen(function* () {
+        const ssn = yield* SessionNs.Service
+        const session = yield* ssn.create({})
+        yield* createUserMessage(session.id, "turn 1")
+        const priorCompactionUser = yield* ssn.updateMessage({
+          id: MessageID.ascending(),
+          role: "user",
+          model: ref,
+          sessionID: session.id,
+          agent: "build",
+          time: { created: Date.now() },
+        })
+        yield* ssn.updatePart({
+          id: PartID.ascending(),
+          messageID: priorCompactionUser.id,
+          sessionID: session.id,
+          type: "compaction",
+          auto: false,
+        })
+        const priorAssistant = yield* createAssistantMessage(session.id, priorCompactionUser.id, "")
+        yield* ssn.updateMessage({ ...priorAssistant, summary: true, finish: "end_turn" })
+        yield* ssn.updatePart({
+          id: PartID.ascending(),
+          messageID: priorAssistant.id,
+          sessionID: session.id,
+          type: "text",
+          text: "Previous summary content",
+        })
+
+        yield* createUserMessage(session.id, "turn 2")
+        yield* createCompactionMarker(session.id)
+        const msgs = yield* ssn.messages({ sessionID: session.id })
+        const parent = msgs.at(-1)?.info.id
+
+        yield* SessionCompaction.use.process({ parentID: parent!, messages: msgs, sessionID: session.id, auto: false })
+
+        expect(capturedMaxOutputTokens).toBe(1500)
+        expect(capturedHookSummary).toBe("Previous summary content")
+      }).pipe(
+        withCompaction({
+          llm: stub.layer,
+          plugin: compactingPlugin((input) => {
+            capturedHookSummary = input.previousSummary
+          }),
+          config: cfg({ summary_max_tokens: 1500 }),
+        }),
+      )
+    },
+    { git: true },
+  )
+
+  test("splitTurn performs a single O(N) estimation pass per message (#341)", async () => {
+    const count = 50
+    const messages: MessageV2.WithParts[] = Array.from({ length: count }, (_, idx) => ({
+      info: {
+        id: MessageID.ascending(),
+        role: idx === 0 ? "user" : "assistant",
+        sessionID: SessionID.make("ses_test"),
+        time: { created: Date.now() },
+      } as MessageV2.Info,
+      parts: [],
+    }))
+    let estimateCalls = 0
+    const result = await Effect.runPromise(
+      SessionCompaction.splitTurn({
+        messages,
+        turn: { start: 0, end: count, id: messages[0]!.info.id },
+        model: createModel({ context: 100_000, output: 8_000 }),
+        budget: 100,
+        estimate: ({ messages: slice }) =>
+          Effect.sync(() => {
+            estimateCalls++
+            expect(slice).toHaveLength(1)
+            return 10
+          }),
+      }),
+    )
+    expect(estimateCalls).toBe(count)
+    expect(result).toEqual({
+      start: 40,
+      id: messages[40]!.info.id,
+    })
+  })
 })
 
 describe("util.token.estimate", () => {

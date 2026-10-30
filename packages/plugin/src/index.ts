@@ -297,10 +297,11 @@ export interface Hooks {
    * the compaction prompt.
    *
    * - `context`: Additional context strings appended to the default prompt
-   * - `prompt`: If set, replaces the default compaction prompt entirely
+   * - `prompt`: If set, replaces the default compaction prompt entirely (including
+   *   the previous-summary anchor and length hint; use input.previousSummary to preserve it)
    */
   "experimental.session.compacting"?: (
-    input: { sessionID: string },
+    input: { sessionID: string; previousSummary?: string },
     output: { context: string[]; prompt?: string },
   ) => Promise<void>
   /**
