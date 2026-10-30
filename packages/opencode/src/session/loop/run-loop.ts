@@ -92,6 +92,7 @@ export const runLoop: (deps: RunLoopDeps, sessionID: SessionID) => Effect.Effect
   const slog = elog.with({ sessionID })
   let structured: unknown
   let step = 0
+  let consecutiveAutoCompactions = 0
   const session = yield* deps.sessions.get(sessionID).pipe(Effect.orDie)
 
   while (true) {
@@ -173,6 +174,9 @@ export const runLoop: (deps: RunLoopDeps, sessionID: SessionID) => Effect.Effect
     }
 
     if (task?.type === "compaction") {
+      if (task.auto) {
+        consecutiveAutoCompactions++
+      }
       const result = yield* deps.compaction.process({
         messages: msgs,
         parentID: lastUser.id,
@@ -188,12 +192,23 @@ export const runLoop: (deps: RunLoopDeps, sessionID: SessionID) => Effect.Effect
     const isCurrentTurnContinue =
       lastUserMsg?.parts.some((p) => p.type === "text" && p.metadata?.compaction_continue) ?? false
 
+    if (!isCurrentTurnContinue && tasks.length === 0) {
+      consecutiveAutoCompactions = 0
+    }
+
     if (
       lastFinished &&
       lastFinished.summary !== true &&
       !isCurrentTurnContinue &&
       (yield* deps.compaction.isOverflow({ tokens: lastFinished.tokens, model }))
     ) {
+      if (consecutiveAutoCompactions >= 2) {
+        const error = new NamedError.Unknown({
+          message: "Context still exceeds the limit after compaction. Raise compaction.context_limit or lower reserved.",
+        })
+        yield* deps.bus.publish(Session.Event.Error, { sessionID, error: error.toObject() })
+        throw error
+      }
       yield* deps.compaction.create({
         sessionID,
         agent: lastUser.agent,
@@ -379,6 +394,13 @@ export const runLoop: (deps: RunLoopDeps, sessionID: SessionID) => Effect.Effect
 
       if (result === "stop") return "break" as const
       if (result === "compact") {
+        if (consecutiveAutoCompactions >= 2) {
+          const error = new NamedError.Unknown({
+            message: "Context still exceeds the limit after compaction. Raise compaction.context_limit or lower reserved.",
+          })
+          yield* deps.bus.publish(Session.Event.Error, { sessionID, error: error.toObject() })
+          throw error
+        }
         // create() is Effect<void>; the next iteration re-reads compacted messages
         yield* deps.compaction.create({
           sessionID,

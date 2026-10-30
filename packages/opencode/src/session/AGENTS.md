@@ -109,9 +109,9 @@ When filtering parts with `p is CompactionPart | SubtaskPart`, both types must b
 
 `compaction.ts:335` — was hardcoded to `["skill"]`, now reads from `cc.pruneProtectedTools` (config key `compaction.prune_protected_tools`, default `["skill"]`). Add tools like `"task"` to protect subagent results from pruning.
 
-### `reserved` default changed from `min(compactionBuffer, maxOutputTokens)` to `maxOutputTokens`
+### `reserved` unified across all branches with `maxOutputTokens` floor
 
-`context-budget.ts:43` — the old default `min(20000, maxOutputTokens)` was too small for models with 32K+ output limits. The new default is `maxOutputTokens` (or user-configured `reserved`). This ensures compaction reserves enough headroom for the model's full output capacity.
+`context-budget.ts:41` — `reserve = Math.max(cc.reserved ?? DEFAULTS.compactionBuffer, ProviderTransform.maxOutputTokens(model))`. Consistent reserve calculation applies across all branches (including `context_limit`, `limit.input`, and standard models) floored at `maxOutputTokens`. When `usable <= 0`, `isOverflow()` returns `false` to prevent infinite auto-compaction loops.
 
 ### `summary_max_tokens` config — summary budget is now configurable
 
