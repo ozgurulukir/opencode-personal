@@ -225,7 +225,7 @@ export interface Interface {
     tokens: MessageV2.Assistant["tokens"]
     model: Provider.Model
   }) => Effect.Effect<boolean>
-  readonly prune: (input: { sessionID: SessionID }) => Effect.Effect<void>
+  readonly prune: (input: { sessionID: SessionID }) => Effect.Effect<number>
   readonly process: (input: {
     parentID: MessageID
     messages: MessageV2.WithParts[]
@@ -351,13 +351,13 @@ export const layer: Layer.Layer<
     const prune = Effect.fn("SessionCompaction.prune")(function* (input: { sessionID: SessionID }) {
       const cfg = yield* config.get()
       const cc = ContextBudget.compactionConfig(cfg)
-      if (!cc.prune) return
+      if (!cc.prune) return 0
       log.info("pruning")
 
       const msgs = yield* session
         .messages({ sessionID: input.sessionID })
         .pipe(Effect.catchIf(NotFoundError.isInstance, () => Effect.succeed(undefined)))
-      if (!msgs) return
+      if (!msgs) return 0
 
       let total = 0
       let pruned = 0
@@ -366,7 +366,7 @@ export const layer: Layer.Layer<
 
       messages: for (let msgIndex = msgs.length - 1; msgIndex >= 0; msgIndex--) {
         const msg = msgs[msgIndex]
-        if (msg.info.role === "user") userTurns++
+        if (isRealUserTurn(msg)) userTurns++
         if (userTurns < cc.tailTurns) continue
         if (msg.info.role === "assistant" && msg.info.summary) break messages
         for (let partIndex = msg.parts.length - 1; partIndex >= 0; partIndex--) {
@@ -374,10 +374,14 @@ export const layer: Layer.Layer<
           if (part.type !== "tool") continue
           if (part.state.status !== "completed") continue
           if (cc.pruneProtectedTools.includes(part.tool)) continue
-          // Stop at the first already-compacted part — everything older has
-          // already been considered for pruning in a previous pass.
-          if (part.state.time.compacted) break messages
-          const estimate = Token.estimate(part.state.output)
+          // Skip already-compacted parts; previous passes already cleared them
+          if (part.state.time.compacted) continue
+          let estimate = Token.estimate(part.state.output)
+          if (part.state.attachments?.length) {
+            for (const att of part.state.attachments) {
+              estimate += Token.estimate(att.url ?? "")
+            }
+          }
           total += estimate
           if (total <= cc.pruneProtectTokens) continue
           pruned += estimate
@@ -398,8 +402,10 @@ export const layer: Layer.Layer<
         if (updated.length > 0) {
           yield* session.updateParts(updated)
         }
-        log.info("pruned", { count: toPrune.length })
+        log.info("pruned", { count: toPrune.length, tokens: pruned })
+        return pruned
       }
+      return 0
     })
 
     const processCompaction = Effect.fn("SessionCompaction.process")(function* (input: {
@@ -862,7 +868,7 @@ export async function isOverflow(input: { tokens: MessageV2.Assistant["tokens"];
   return runPromise((svc) => svc.isOverflow(input))
 }
 
-export async function prune(input: { sessionID: SessionID }) {
+export async function prune(input: { sessionID: SessionID }): Promise<number> {
   return runPromise((svc) => svc.prune(input))
 }
 

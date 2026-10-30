@@ -716,6 +716,144 @@ describe("runLoop characterization", () => {
       { git: true, config: cfg },
     ),
   )
+
+  it.live("in a long turn with heavy tool outputs, prune runs synchronously during the turn (#337)", () =>
+    provideTmpdirInstance(
+      () =>
+        Effect.gen(function* () {
+          llm.reset()
+          const prompt = yield* SessionPrompt.Service
+          const sessions = yield* Session.Service
+          const chat = yield* sessions.create({ title: "char-prune-loop", permission: ALLOW_ALL })
+
+          // Seed an older turn with a completed tool part (~12,500 tokens)
+          const u1 = yield* sessions.updateMessage({
+            id: MessageID.ascending(),
+            role: "user",
+            sessionID: chat.id,
+            agent: "build",
+            model: ref,
+            time: { created: Date.now() },
+          })
+          yield* sessions.updatePart({
+            id: PartID.ascending(),
+            messageID: u1.id,
+            sessionID: chat.id,
+            type: "text",
+            text: "turn 1",
+          })
+          const a1 = yield* sessions.updateMessage({
+            id: MessageID.ascending(),
+            role: "assistant",
+            sessionID: chat.id,
+            mode: "build",
+            agent: "build",
+            path: { cwd: "", root: "" },
+            cost: 0,
+            tokens: { output: 0, input: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+            modelID: ref.modelID,
+            providerID: ref.providerID,
+            parentID: u1.id,
+            time: { created: Date.now() },
+            finish: "end_turn",
+          })
+          const oldToolPart = yield* sessions.updatePart({
+            id: PartID.ascending(),
+            messageID: a1.id,
+            sessionID: chat.id,
+            type: "tool",
+            callID: crypto.randomUUID(),
+            tool: "bash",
+            state: {
+              status: "completed",
+              input: {},
+              output: "x".repeat(50_000),
+              title: "done",
+              metadata: {},
+              time: { start: Date.now(), end: Date.now() },
+            },
+          })
+
+          // Seed user turns u2 and u3 so that when prompt.prompt() adds turn 4,
+          // oldToolPart (in turn 1) has 2 subsequent real user turns (turn 3 and turn 4)
+          // and is outside tail_turns (tail_turns: 2) during the loop!
+          const u2 = yield* sessions.updateMessage({
+            id: MessageID.ascending(),
+            role: "user",
+            sessionID: chat.id,
+            agent: "build",
+            model: ref,
+            time: { created: Date.now() },
+          })
+          yield* sessions.updatePart({
+            id: PartID.ascending(),
+            messageID: u2.id,
+            sessionID: chat.id,
+            type: "text",
+            text: "turn 2",
+          })
+          const u3 = yield* sessions.updateMessage({
+            id: MessageID.ascending(),
+            role: "user",
+            sessionID: chat.id,
+            agent: "build",
+            model: ref,
+            time: { created: Date.now() },
+          })
+          yield* sessions.updatePart({
+            id: PartID.ascending(),
+            messageID: u3.id,
+            sessionID: chat.id,
+            type: "text",
+            text: "turn 3",
+          })
+
+          // Step 1: LLM emits a tool call
+          llm.push(replyToolCall("_characterization_unknown", {}))
+          // Step 2: During this LLM call (step 2 of the same turn), verify that
+          // oldToolPart ALREADY has time.compacted set BEFORE the turn finishes!
+          let compactedBeforeStep2 = false
+          llm.push(() =>
+            Stream.unwrap(
+              Effect.gen(function* () {
+                const currentMsgs = yield* sessions.messages({ sessionID: chat.id })
+                const t = currentMsgs
+                  .flatMap((m) => m.parts)
+                  .find((p): p is MessageV2.ToolPart => p.type === "tool" && p.id === oldToolPart.id)
+                compactedBeforeStep2 = t?.state.status === "completed" && typeof t.state.time.compacted === "number"
+                return replyText("finished")
+              }),
+            ),
+          )
+
+          // Prompt turn 4: has tool execution so the loop re-enters for step 2
+          yield* prompt.prompt({
+            sessionID: chat.id,
+            agent: "build",
+            parts: [{ type: "text", text: "turn 4 with tool" }],
+          })
+
+          // Old tool part must have received time.compacted synchronously BEFORE step 2 ran!
+          expect(compactedBeforeStep2).toBe(true)
+          const msgs = yield* sessions.messages({ sessionID: chat.id })
+          const tool = msgs
+            .flatMap((m) => m.parts)
+            .find((p): p is MessageV2.ToolPart => p.type === "tool" && p.id === oldToolPart.id)
+          expect(tool).toBeDefined()
+          if (tool?.state.status === "completed") {
+            expect(tool.state.time.compacted).toBeNumber()
+          }
+          expect(llm.calls).toBe(2)
+        }),
+      {
+        git: true,
+        config: {
+          ...cfg,
+          compaction: { prune: true, tail_turns: 2, prune_protect_tokens: 0, prune_minimum_tokens: 1 },
+        },
+      },
+    ),
+  )
 })
 
 // ID generators use the ascending factories from session/schema

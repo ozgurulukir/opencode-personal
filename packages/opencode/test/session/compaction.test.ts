@@ -993,6 +993,260 @@ describe("session.compaction.prune", () => {
       },
     ),
   )
+
+  it.live(
+    "an image-heavy tool result counts toward the prune estimate and is pruned (#338)",
+    provideTmpdirInstance(
+      (dir) =>
+        Effect.gen(function* () {
+          const compact = yield* SessionCompaction.Service
+          const ssn = yield* SessionNs.Service
+          const info = yield* ssn.create({})
+          const a = yield* ssn.updateMessage({
+            id: MessageID.ascending(),
+            role: "user",
+            sessionID: info.id,
+            agent: "build",
+            model: ref,
+            time: { created: Date.now() },
+          })
+          yield* ssn.updatePart({
+            id: PartID.ascending(),
+            messageID: a.id,
+            sessionID: info.id,
+            type: "text",
+            text: "first",
+          })
+          const b: MessageV2.Assistant = {
+            id: MessageID.ascending(),
+            role: "assistant",
+            sessionID: info.id,
+            mode: "build",
+            agent: "build",
+            path: { cwd: dir, root: dir },
+            cost: 0,
+            tokens: { output: 0, input: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+            modelID: ref.modelID,
+            providerID: ref.providerID,
+            parentID: a.id,
+            time: { created: Date.now() },
+            finish: "end_turn",
+          }
+          yield* ssn.updateMessage(b)
+          yield* ssn.updatePart({
+            id: PartID.ascending(),
+            messageID: b.id,
+            sessionID: info.id,
+            type: "tool",
+            callID: crypto.randomUUID(),
+            tool: "screenshot",
+            state: {
+              status: "completed",
+              input: {},
+              output: "screenshot captured",
+              title: "done",
+              metadata: {},
+              time: { start: Date.now(), end: Date.now() },
+              attachments: [
+                {
+                  id: PartID.ascending(),
+                  messageID: b.id,
+                  sessionID: info.id,
+                  type: "file",
+                  mime: "image/png",
+                  url: "data:image/png;base64," + "A".repeat(80_000),
+                },
+              ],
+            },
+          })
+          for (const text of ["second", "third"]) {
+            const msg = yield* ssn.updateMessage({
+              id: MessageID.ascending(),
+              role: "user",
+              sessionID: info.id,
+              agent: "build",
+              model: ref,
+              time: { created: Date.now() },
+            })
+            yield* ssn.updatePart({
+              id: PartID.ascending(),
+              messageID: msg.id,
+              sessionID: info.id,
+              type: "text",
+              text,
+            })
+          }
+
+          const prunedTokens = yield* compact.prune({ sessionID: info.id })
+          expect(prunedTokens).toBeGreaterThan(1000)
+
+          const msgs = yield* ssn.messages({ sessionID: info.id })
+          const part = msgs.flatMap((msg) => msg.parts).find((part) => part.type === "tool")
+          expect(part?.type).toBe("tool")
+          if (part?.type === "tool" && part.state.status === "completed") {
+            expect(part.state.time.compacted).toBeNumber()
+          }
+        }),
+      {
+        config: {
+          compaction: { prune: true, prune_protect_tokens: 0, prune_minimum_tokens: 1000 },
+        },
+      },
+    ),
+  )
+
+  it.live(
+    "after an auto-compaction, tail_turns real turns are still protected from pruning (#338)",
+    provideTmpdirInstance(
+      (dir) =>
+        Effect.gen(function* () {
+          const compact = yield* SessionCompaction.Service
+          const ssn = yield* SessionNs.Service
+          const info = yield* ssn.create({})
+          const u1 = yield* ssn.updateMessage({
+            id: MessageID.ascending(),
+            role: "user",
+            sessionID: info.id,
+            agent: "build",
+            model: ref,
+            time: { created: Date.now() },
+          })
+          yield* ssn.updatePart({
+            id: PartID.ascending(),
+            messageID: u1.id,
+            sessionID: info.id,
+            type: "text",
+            text: "real turn 1",
+          })
+          const b: MessageV2.Assistant = {
+            id: MessageID.ascending(),
+            role: "assistant",
+            sessionID: info.id,
+            mode: "build",
+            agent: "build",
+            path: { cwd: dir, root: dir },
+            cost: 0,
+            tokens: { output: 0, input: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+            modelID: ref.modelID,
+            providerID: ref.providerID,
+            parentID: u1.id,
+            time: { created: Date.now() },
+            finish: "end_turn",
+          }
+          yield* ssn.updateMessage(b)
+          yield* ssn.updatePart({
+            id: PartID.ascending(),
+            messageID: b.id,
+            sessionID: info.id,
+            type: "tool",
+            callID: crypto.randomUUID(),
+            tool: "bash",
+            state: {
+              status: "completed",
+              input: {},
+              output: "x".repeat(100_000),
+              title: "done",
+              metadata: {},
+              time: { start: Date.now(), end: Date.now() },
+            },
+          })
+
+          const u2 = yield* ssn.updateMessage({
+            id: MessageID.ascending(),
+            role: "user",
+            sessionID: info.id,
+            agent: "build",
+            model: ref,
+            time: { created: Date.now() },
+          })
+          yield* ssn.updatePart({
+            id: PartID.ascending(),
+            messageID: u2.id,
+            sessionID: info.id,
+            type: "text",
+            text: "real turn 2",
+          })
+
+          // Synthetic auto-compaction and continue messages
+          const compMsg = yield* ssn.updateMessage({
+            id: MessageID.ascending(),
+            role: "user",
+            sessionID: info.id,
+            agent: "build",
+            model: ref,
+            time: { created: Date.now() },
+          })
+          yield* ssn.updatePart({
+            id: PartID.ascending(),
+            messageID: compMsg.id,
+            sessionID: info.id,
+            type: "compaction",
+            auto: true,
+          })
+
+          const contMsg = yield* ssn.updateMessage({
+            id: MessageID.ascending(),
+            role: "user",
+            sessionID: info.id,
+            agent: "build",
+            model: ref,
+            time: { created: Date.now() },
+          })
+          yield* ssn.updatePart({
+            id: PartID.ascending(),
+            messageID: contMsg.id,
+            sessionID: info.id,
+            type: "text",
+            text: "Continue...",
+            metadata: { compaction_continue: true },
+          })
+
+          // Only 1 real user turn (u2) exists after u1; tail_turns is 2.
+          // Synthetic compMsg and contMsg must NOT count toward tail_turns!
+          let pruned = yield* compact.prune({ sessionID: info.id })
+          expect(pruned).toBe(0)
+
+          let msgs = yield* ssn.messages({ sessionID: info.id })
+          let toolPart = msgs.flatMap((m) => m.parts).find((p) => p.type === "tool")
+          expect(toolPart?.type).toBe("tool")
+          if (toolPart?.type === "tool" && toolPart.state.status === "completed") {
+            expect(toolPart.state.time.compacted).toBeUndefined()
+          }
+
+          // Add a second real user turn (u3)
+          const u3 = yield* ssn.updateMessage({
+            id: MessageID.ascending(),
+            role: "user",
+            sessionID: info.id,
+            agent: "build",
+            model: ref,
+            time: { created: Date.now() },
+          })
+          yield* ssn.updatePart({
+            id: PartID.ascending(),
+            messageID: u3.id,
+            sessionID: info.id,
+            type: "text",
+            text: "real turn 3",
+          })
+
+          // Now 2 real turns exist (u2 and u3), so u1 is eligible for pruning
+          pruned = yield* compact.prune({ sessionID: info.id })
+          expect(pruned).toBeGreaterThan(0)
+
+          msgs = yield* ssn.messages({ sessionID: info.id })
+          toolPart = msgs.flatMap((m) => m.parts).find((p) => p.type === "tool")
+          if (toolPart?.type === "tool" && toolPart.state.status === "completed") {
+            expect(toolPart.state.time.compacted).toBeNumber()
+          }
+        }),
+      {
+        config: {
+          compaction: { prune: true, tail_turns: 2, prune_protect_tokens: 0, prune_minimum_tokens: 1 },
+        },
+      },
+    ),
+  )
 })
 
 describe("session.compaction.process", () => {

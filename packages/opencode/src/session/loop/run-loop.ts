@@ -217,14 +217,23 @@ export const runLoop: (deps: RunLoopDeps, sessionID: SessionID) => Effect.Effect
         })
       })
 
-    if (
-      lastFinished &&
-      lastFinished.summary !== true &&
-      !isCurrentTurnContinue &&
-      (yield* deps.compaction.isOverflow({ tokens: lastFinished.tokens, model }))
-    ) {
-      yield* createAutoCompaction()
-      continue
+    if (lastFinished && lastFinished.summary !== true && !isCurrentTurnContinue) {
+      const pruned = yield* deps.compaction
+        .prune({ sessionID })
+        .pipe(Effect.catch(() => Effect.succeed(0)))
+      if (pruned > 0) {
+        lastFinished.tokens = {
+          ...lastFinished.tokens,
+          input: Math.max(0, lastFinished.tokens.input - pruned),
+          ...(lastFinished.tokens.total !== undefined
+            ? { total: Math.max(0, lastFinished.tokens.total - pruned) }
+            : {}),
+        }
+      }
+      if (yield* deps.compaction.isOverflow({ tokens: lastFinished.tokens, model })) {
+        yield* createAutoCompaction()
+        continue
+      }
     }
 
     const agent = yield* deps.agents.get(lastUser.agent)
@@ -409,6 +418,6 @@ export const runLoop: (deps: RunLoopDeps, sessionID: SessionID) => Effect.Effect
     continue
   }
 
-  yield* deps.compaction.prune({ sessionID }).pipe(Effect.ignore, Effect.forkIn(deps.scope))
+  yield* deps.compaction.prune({ sessionID }).pipe(Effect.ignore)
   return yield* lastAssistant({ sessions: deps.sessions }, sessionID)
 })
