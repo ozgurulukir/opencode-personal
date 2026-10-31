@@ -100,6 +100,24 @@ describe("CompactionTrigger.shouldCompactAfterTurn", () => {
     expect(withoutLimit).toBe(true)
   })
 
+  test("includes cache.read in the token count", () => {
+    // usable = 100K - 32K = 68K; 60K + 5K = 65K stays under, +3K cache.read hits it
+    const model = createModel({ context: 100_000, output: 32_000 })
+    const withoutCache = { input: 60_000, output: 5_000, reasoning: 0, cache: { read: 0, write: 0 } }
+    expect(shouldCompactAfterTurn({ cfg: {}, model, tokens: withoutCache, summary: false, continueTurn: false })).toBe(
+      false,
+    )
+    const withCache = { input: 60_000, output: 5_000, reasoning: 0, cache: { read: 3_000, write: 0 } }
+    expect(shouldCompactAfterTurn({ cfg: {}, model, tokens: withCache, summary: false, continueTurn: false })).toBe(true)
+  })
+
+  test("limit.input model stays quiet just below the boundary", () => {
+    // usable = limit.input - output = 200K - 32K = 168K; 165K total stays under
+    const model = createModel({ context: 200_000, input: 200_000, output: 32_000 })
+    const justBelow = { input: 150_000, output: 10_000, reasoning: 0, cache: { read: 5_000, write: 0 } }
+    expect(shouldCompactAfterTurn({ cfg: {}, model, tokens: justBelow, summary: false, continueTurn: false })).toBe(false)
+  })
+
   test("returns false when model context limit is 0 and no context_limit is set", () => {
     const model = createModel({ context: 0, output: 32_000 })
     expect(shouldCompactAfterTurn({ cfg: {}, model, tokens, summary: false, continueTurn: false })).toBe(false)

@@ -220,7 +220,14 @@ export const runLoop: (deps: RunLoopDeps, sessionID: SessionID) => Effect.Effect
       if (lastFinished.summary !== true) {
         const pruned = yield* deps.compaction
           .prune({ sessionID })
-          .pipe(Effect.catch(() => Effect.succeed(0)))
+          .pipe(
+            Effect.tapError((error) =>
+              slog
+                .warn("compaction prune failed; proceeding with unpruned token counts", { error: String(error) })
+                .pipe(Effect.as(undefined)),
+            ),
+            Effect.catch(() => Effect.succeed(0)),
+          )
         if (pruned > 0) {
           lastFinished.tokens = CompactionTrigger.adjustTokensAfterPrune(lastFinished.tokens, pruned)
         }
