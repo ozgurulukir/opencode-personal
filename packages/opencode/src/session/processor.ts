@@ -10,8 +10,7 @@ import * as Session from "./session"
 import { LLM } from "./llm"
 import { MessageV2 } from "./message-v2"
 import { Image } from "@/image/image"
-import { isOverflow } from "./overflow"
-import { compactionConfig } from "./context-budget"
+import { compactionConfig, isOverflow } from "./context-budget"
 import { PartID } from "./schema"
 import type { SessionID } from "./schema"
 import { SessionRetry } from "./retry"
@@ -552,7 +551,7 @@ export const layer: Layer.Layer<
               .pipe(Effect.ignore, Effect.forkIn(scope))
             if (
               !ctx.assistantMessage.summary &&
-              isOverflow({ cfg: yield* config.get(), tokens: usage.tokens, model: ctx.model })
+              isOverflow(yield* config.get(), usage.tokens, ctx.model)
             ) {
               ctx.needsCompaction = true
               ctx.compactionReason = "threshold"

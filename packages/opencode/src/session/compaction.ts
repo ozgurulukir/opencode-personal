@@ -16,10 +16,8 @@ import { ModelID, ProviderID } from "@/provider/schema"
 import { Effect, Layer, Context, Schema, Option } from "effect"
 import * as DateTime from "effect/DateTime"
 import { InstanceState } from "@/effect/instance-state"
-import { isOverflow as overflow } from "./overflow"
 import * as ContextBudget from "./context-budget"
 import * as Todo from "./todo"
-import { makeRuntime } from "@/effect/run-service"
 import { serviceUse } from "@/effect/service-use"
 import { SyncEvent } from "@/sync"
 import { SessionEvent } from "@/v2/session-event"
@@ -35,12 +33,6 @@ export const Event = {
   ),
 }
 
-export const PRUNE_MINIMUM = ContextBudget.DEFAULTS.pruneMinimumTokens
-export const PRUNE_PROTECT = ContextBudget.DEFAULTS.pruneProtectTokens
-const TOOL_OUTPUT_MAX_CHARS = ContextBudget.DEFAULTS.toolOutputMaxChars
-const DEFAULT_TAIL_TURNS = ContextBudget.DEFAULTS.defaultTailTurns
-const MIN_PRESERVE_RECENT_TOKENS = ContextBudget.DEFAULTS.minPreserveRecentTokens
-const MAX_PRESERVE_RECENT_TOKENS = ContextBudget.DEFAULTS.maxPreserveRecentTokens
 const SUMMARY_TEMPLATE = `Output exactly the Markdown structure shown inside <template> and keep the section order unchanged. Do not include the <template> tags in your response.
 <template>
 ## Goal
@@ -277,7 +269,7 @@ export const layer: Layer.Layer<
       tokens: MessageV2.Assistant["tokens"]
       model: Provider.Model
     }) {
-      return overflow({ cfg: yield* config.get(), tokens: input.tokens, model: input.model })
+      return ContextBudget.isOverflow(yield* config.get(), input.tokens, input.model)
     })
 
     const estimate = Effect.fn("SessionCompaction.estimate")(function* (input: {
@@ -863,15 +855,5 @@ export const defaultLayer = Layer.suspend(() =>
     Layer.provide(SyncEvent.defaultLayer),
   ),
 )
-
-const { runPromise } = makeRuntime(Service, defaultLayer)
-
-export async function isOverflow(input: { tokens: MessageV2.Assistant["tokens"]; model: Provider.Model }) {
-  return runPromise((svc) => svc.isOverflow(input))
-}
-
-export async function prune(input: { sessionID: SessionID }): Promise<number> {
-  return runPromise((svc) => svc.prune(input))
-}
 
 export * as SessionCompaction from "./compaction"
