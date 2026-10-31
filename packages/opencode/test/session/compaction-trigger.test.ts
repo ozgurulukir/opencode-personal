@@ -55,7 +55,7 @@ describe("CompactionTrigger.shouldCompactAfterTurn", () => {
   const tokens = { input: 75_000, output: 5_000, reasoning: 0, cache: { read: 0, write: 0 } }
 
   test("returns true when used tokens exceed the usable window", () => {
-    // 75K >= 100K - 32K = 68K
+    // used = 75K input + 5K output = 80K >= 100K - 32K = 68K
     const model = createModel({ context: 100_000, output: 32_000 })
     expect(shouldCompactAfterTurn({ cfg: {}, model, tokens, summary: false, continueTurn: false })).toBe(true)
   })
@@ -79,19 +79,19 @@ describe("CompactionTrigger.shouldCompactAfterTurn", () => {
   test("symmetry — limit.input model triggers identically to an equivalent model without it", () => {
     const withInputLimit = createModel({ context: 200_000, input: 200_000, output: 32_000 })
     const withoutInputLimit = createModel({ context: 200_000, output: 32_000 })
-    // 170K total — above context-output (168K), below the input limit (200K)
-    const at170K = { input: 166_000, output: 10_000, reasoning: 0, cache: { read: 5_000, write: 0 } }
+    // 181K total (166K input + 5K cache.read + 10K output) — above context-output (168K), below the input limit (200K)
+    const at181K = { input: 166_000, output: 10_000, reasoning: 0, cache: { read: 5_000, write: 0 } }
     const withLimit = shouldCompactAfterTurn({
       cfg: {},
       model: withInputLimit,
-      tokens: at170K,
+      tokens: at181K,
       summary: false,
       continueTurn: false,
     })
     const withoutLimit = shouldCompactAfterTurn({
       cfg: {},
       model: withoutInputLimit,
-      tokens: at170K,
+      tokens: at181K,
       summary: false,
       continueTurn: false,
     })

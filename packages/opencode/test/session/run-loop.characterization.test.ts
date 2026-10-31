@@ -739,10 +739,11 @@ describe("runLoop characterization", () => {
             // 2. Compaction summary
             llm.push(replyText("summary 1"))
             // 3. The continue turn answers well within budget and the loop exits.
-            //    The run-loop threshold guard must NOT fire here even though the
-            //    pre-compaction overflow assistant is still the latest finished
-            //    assistant after the filterCompacted reorder — the current turn
-            //    is the compaction-continue message.
+            //    The threshold guard must NOT fire here: the continue guard and
+            //    the summary gate jointly prevent it (on the continue iteration,
+            //    lastFinished is the summary assistant whose id exceeds every
+            //    retained message, so a removed guard alone is masked — the
+            //    combined outcome is what this test pins).
             llm.push(replyText("all good now"))
 
             const result = yield* prompt.prompt({
@@ -752,9 +753,8 @@ describe("runLoop characterization", () => {
             })
 
             // Exactly three LLM calls: overflow turn, summary, continue turn.
-            // A 4th call would mean the threshold guard re-fired on the continue
-            // turn (the double-compaction bug class fixed by latest()/the
-            // isCurrentTurnContinue guard) or the circuit breaker died.
+            // A 4th call would mean a spurious re-trigger on the continue turn
+            // (the double-compaction bug class) or runaway task processing.
             expect(llm.calls).toBe(3)
             const textPart = result.parts.find((p) => p.type === "text")
             expect(textPart?.type === "text" && textPart.text).toBe("all good now")
