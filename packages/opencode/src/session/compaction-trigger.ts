@@ -54,9 +54,10 @@ export function shouldCompactAfterTurn(input: {
  * Warn-once diagnostic relocated from the shared budget module (which stays
  * dependency-pure for the SDK). `isOverflow` collapses "no overflow" and
  * "broken budget" into the same `false`; surface the broken-budget case when
- * the trigger actually consults it. The early-return guards mirror
- * `isOverflow`'s so the warning fires in exactly the cases the old in-module
- * warn did.
+ * the trigger actually consults it. The context guards mirror `isOverflow`'s
+ * so the warning fires where the old in-module warn did — except it is
+ * suppressed when auto-compaction is off (`cc.auto`), where "auto-compaction
+ * disabled" would only echo the user's own setting.
  */
 function warnZeroBudget(cfg: Config.Info, model: Provider.Model) {
   const cc = ContextBudget.compactionConfig(cfg)
