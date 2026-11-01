@@ -327,7 +327,7 @@ export const layer: Layer.Layer<
       }
     })
 
-    // goes backwards through parts until there are PRUNE_PROTECT tokens worth of tool
+    // goes backwards through parts until there are cc.pruneProtectTokens worth of tool
     // calls, then erases output of older tool calls to free context space
     const prune = Effect.fn("SessionCompaction.prune")(function* (input: { sessionID: SessionID }) {
       const cfg = yield* config.get()
