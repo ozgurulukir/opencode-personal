@@ -487,7 +487,7 @@ export function Prompt(props: PromptProps) {
   const usage = createMemo(() => {
     if (!props.sessionID) return
     const msg = sync.data.messages[props.sessionID] ?? []
-    const usage = latestAssistantUsage(msg, sync.data.provider)
+    const usage = latestAssistantUsage(msg, sync.data.provider, sync.data.config)
     if (!usage) return
     const pct = usage.percent != null ? `${usage.percent}%` : undefined
     const cost = totalAssistantCost(msg)

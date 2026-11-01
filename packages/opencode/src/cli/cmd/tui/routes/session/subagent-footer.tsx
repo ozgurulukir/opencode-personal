@@ -33,7 +33,7 @@ export function SubagentFooter() {
 
   const usage = createMemo(() => {
     const msg = messages()
-    const usage = latestAssistantUsage(msg, sync.data.provider)
+    const usage = latestAssistantUsage(msg, sync.data.provider, sync.data.config)
     if (!usage) return
 
     const pct = usage.percent != null ? `${usage.percent}%` : undefined

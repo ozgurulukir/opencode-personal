@@ -1,8 +1,41 @@
-import type { Config } from "@/config/config"
 import { ProviderTransform } from "@/provider/transform"
-import type { Provider } from "@/provider/provider"
 import { Log } from "@opencode-ai/core/util/log"
-import type { MessageV2 } from "./message-v2"
+
+// Structural slices so the TUI context meter (which holds SDK-shaped config
+// and public provider models, not the server-internal types) can reuse the
+// exact budget math the compaction trigger uses. Config.Info and the internal
+// Provider.Model satisfy these structurally.
+export type CompactionSettingsInput = {
+  compaction?: {
+    auto?: boolean
+    prune?: boolean
+    tail_turns?: number
+    preserve_recent_tokens?: number
+    reserved?: number
+    prune_minimum_tokens?: number
+    prune_protect_tokens?: number
+    tool_output_max_chars?: number
+    min_preserve_recent_tokens?: number
+    max_preserve_recent_tokens?: number
+    prune_protected_tools?: Array<string>
+    summary_max_tokens?: number
+    autocontinue?: boolean
+    context_limit?: number
+  }
+}
+
+export type BudgetModel = {
+  id?: string
+  limit: { context: number; input?: number; output?: number }
+}
+
+export type BudgetTokens = {
+  total?: number
+  input: number
+  output: number
+  reasoning?: number
+  cache: { read: number; write: number }
+}
 
 const log = Log.create({ service: "session.context-budget" })
 const warnedModels = new Set<string>()
@@ -18,7 +51,7 @@ export const DEFAULTS = {
   maxSummaryTokens: 8_000,
 } as const
 
-export function compactionConfig(cfg: Config.Info) {
+export function compactionConfig(cfg: CompactionSettingsInput) {
   return {
     auto: cfg.compaction?.auto !== false,
     prune: cfg.compaction?.prune !== false,
@@ -38,13 +71,13 @@ export function compactionConfig(cfg: Config.Info) {
   }
 }
 
-export function usable(cfg: Config.Info, model: Provider.Model) {
+export function usable(cfg: CompactionSettingsInput, model: BudgetModel) {
   return usableWith(cfg, model, compactionConfig(cfg))
 }
 
 function usableWith(
-  cfg: Config.Info,
-  model: Provider.Model,
+  cfg: CompactionSettingsInput,
+  model: BudgetModel,
   cc: ReturnType<typeof compactionConfig>,
 ) {
   const context = model.limit.context
@@ -67,11 +100,11 @@ function usableWith(
 
 export { usableWith }
 
-export function used(tokens: MessageV2.Assistant["tokens"]) {
+export function used(tokens: BudgetTokens) {
   return tokens.total || tokens.input + tokens.output + tokens.cache.read + tokens.cache.write
 }
 
-export function isOverflow(cfg: Config.Info, tokens: MessageV2.Assistant["tokens"], model: Provider.Model) {
+export function isOverflow(cfg: CompactionSettingsInput, tokens: BudgetTokens, model: BudgetModel) {
   const cc = compactionConfig(cfg)
   if (!cc.auto) return false
   // When contextLimit is set, it replaces model.limit.context as the threshold base.
@@ -80,10 +113,11 @@ export function isOverflow(cfg: Config.Info, tokens: MessageV2.Assistant["tokens
 
   const u = usable(cfg, model)
   if (u <= 0) {
-    if (!warnedModels.has(model.id)) {
-      warnedModels.add(model.id)
+    const key = model.id ?? "unknown"
+    if (!warnedModels.has(key)) {
+      warnedModels.add(key)
       log.warn("Usable context window is zero or negative; auto-compaction disabled for model", {
-        model: model.id,
+        model: key,
         context: model.limit.context,
       })
     }
