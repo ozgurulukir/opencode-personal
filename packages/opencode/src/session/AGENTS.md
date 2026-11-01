@@ -143,6 +143,14 @@ When filtering parts with `p is CompactionPart | SubtaskPart`, both types must b
 
 **Auto-specific vs shared**: `auto`, `reserved`, and `autocontinue` only affect auto-compaction (`isOverflow` and auto-continue). Manual `/compact` bypasses `auto` and `autocontinue`, though `usableWith()` (which reads `context_limit` and `reserved`) is also used to size the preserved tail budget (`preserveRecentBudget`) and summarizer input ceiling during both auto and manual compaction. `prune`, `tail_turns`, `summary_max_tokens`, `prune_protected_tools`, and `tool_output_max_chars` affect both auto and manual compaction.
 
+### `overflow.ts` deleted — ContextBudget is the only budget interface
+
+`session/overflow.ts` was a 1:1 argument-reshape pass-through (its `usable` had zero callers); both former importers (`compaction.ts`, `processor.ts`) now call `ContextBudget.isOverflow(cfg, tokens, model)` directly. Dead exports `PRUNE_MINIMUM`/`PRUNE_PROTECT` and the module-level `SessionCompaction.isOverflow`/`.prune` async wrappers (zero callers; tests use the service members) are gone too.
+
+### `Event.Compacted` has no in-tree consumer by design
+
+`compaction.ts` `Event.Compacted` (`"session.compacted"`) is published on success but nothing in `src/` subscribes: the TUI runs on `Compaction.*` sync events. It is NOT dead — the SDK v2 event union carries it (`packages/sdk/js/src/v2/gen/types.gen.ts`) and plugins observe all bus events via `bus.subscribeAll()` (`plugin/index.ts`). Deleting it would break the plugin-facing surface; don't remove it without a plugin deprecation path.
+
 ## Pre-existing flaky tests in this module
 
 - `session.system > skills output is sorted by name and stable across calls` — was failing deterministically (Expected: > 495, Received: 188): the test stub returned an unsorted list including an invalid skill while asserting the real `available()` contract. Fixed in the test (stub now emulates `available()`: filter warnings + sort). Not order-dependent.
