@@ -2,16 +2,21 @@ import type { Config } from "@/config/config"
 import type { Provider } from "@/provider/provider"
 import type { MessageID } from "./schema"
 import { MessageV2 } from "./message-v2"
-import * as ContextBudget from "./context-budget"
+import * as ContextBudget from "@opencode-ai/sdk/v2/context-budget"
+import { Log } from "@opencode-ai/core/util/log"
 
 export type CompactionReason = "threshold" | "provider-rejected"
 
+const log = Log.create({ service: "session.compaction-trigger" })
+const warnedModels = new Set<string>()
+
 /**
  * Compaction trigger policy — the single authority for "should this turn
- * auto-compact". Pure functions, no Effects and no IO, so the decision is
- * testable directly instead of being re-implemented in tests or inlined
- * across the run loop and the stream processor. Call sites adapt their own
- * context onto these inputs.
+ * auto-compact". No Effects; the only side effect is the warn-once
+ * zero-budget diagnostic (module-level `warnedModels` + `Log`), so the
+ * decision itself stays testable directly instead of being re-implemented in
+ * tests or inlined across the run loop and the stream processor. Call sites
+ * adapt their own context onto these inputs.
  */
 
 /**
@@ -40,7 +45,32 @@ export function shouldCompactAfterTurn(input: {
 }): boolean {
   if (input.summary) return false
   if (input.continueTurn) return false
-  return ContextBudget.isOverflow(input.cfg, input.tokens, input.model)
+  const overflow = ContextBudget.isOverflow(input.cfg, input.tokens, input.model)
+  if (!overflow) warnZeroBudget(input.cfg, input.model)
+  return overflow
+}
+
+/**
+ * Warn-once diagnostic relocated from the shared budget module (which stays
+ * dependency-pure for the SDK). `isOverflow` collapses "no overflow" and
+ * "broken budget" into the same `false`; surface the broken-budget case when
+ * the trigger actually consults it. The context guards mirror `isOverflow`'s
+ * so the warning fires where the old in-module warn did — except it is
+ * suppressed when auto-compaction is off (`cc.auto`), where "auto-compaction
+ * disabled" would only echo the user's own setting.
+ */
+function warnZeroBudget(cfg: Config.Info, model: Provider.Model) {
+  const cc = ContextBudget.compactionConfig(cfg)
+  if (!cc.auto) return
+  if (model.limit.context === 0 && !cc.contextLimit) return
+  if (ContextBudget.usable(cfg, model) > 0) return
+  const key = model.id ?? "unknown"
+  if (warnedModels.has(key)) return
+  warnedModels.add(key)
+  log.warn("Usable context window is zero or negative; auto-compaction disabled for model", {
+    model: key,
+    context: model.limit.context,
+  })
 }
 
 /** Reflects pruned token counts on the finished turn before the overflow check. */

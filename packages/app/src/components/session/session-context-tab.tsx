@@ -150,7 +150,7 @@ export function SessionContextTab() {
       }),
   )
 
-  const metrics = createMemo(() => getSessionContextMetrics(messages(), providers.all()))
+  const metrics = createMemo(() => getSessionContextMetrics(messages(), providers.all(), sync.data.config))
   const ctx = createMemo(() => metrics().context)
   const formatter = createMemo(() => createSessionContextFormatter(language.intl()))
 

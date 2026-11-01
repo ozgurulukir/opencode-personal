@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import type { Message } from "@opencode-ai/sdk/v2/client"
+import { isOverflow } from "@opencode-ai/sdk/v2/context-budget"
 import { getSessionContextMetrics } from "./session-context-metrics"
 
 const assistant = (
@@ -42,7 +43,7 @@ describe("getSessionContextMetrics", () => {
     const messages = [
       user("u1"),
       assistant("a1", { input: 0, output: 0, reasoning: 0, read: 0, write: 0 }, 0.5),
-      assistant("a2", { input: 300, output: 100, reasoning: 50, read: 25, write: 25 }, 1.25),
+      assistant("a2", { input: 60_000, output: 10_000, reasoning: 9_000, read: 4_000, write: 1_000 }, 1.25),
     ]
     const providers = [
       {
@@ -51,7 +52,7 @@ describe("getSessionContextMetrics", () => {
         models: {
           "gpt-4.1": {
             name: "GPT-4.1",
-            limit: { context: 1000 },
+            limit: { context: 200_000, output: 32_000 },
           },
         },
       },
@@ -61,7 +62,7 @@ describe("getSessionContextMetrics", () => {
 
     expect(metrics.totalCost).toBe(1.75)
     expect(metrics.context?.message.id).toBe("a2")
-    expect(metrics.context?.total).toBe(500)
+    expect(metrics.context?.total).toBe(84_000)
     expect(metrics.context?.usage).toBe(50)
     expect(metrics.context?.providerLabel).toBe("OpenAI")
     expect(metrics.context?.modelLabel).toBe("GPT-4.1")
@@ -97,5 +98,88 @@ describe("getSessionContextMetrics", () => {
 
     expect(metrics.totalCost).toBe(0)
     expect(metrics.context).toBeUndefined()
+  })
+
+  test("usage divides by the compaction budget, not the raw context window", () => {
+    // 200K context with a 32K output reserve -> 168K usable; 168K tokens
+    // reads 100% (the old raw-window formula would have reported 84%).
+    const messages = [assistant("a1", { input: 100_000, output: 20_000, reasoning: 30_000, read: 16_000, write: 2_000 }, 0.5)]
+    const providers = [
+      { id: "openai", models: { "gpt-4.1": { name: "GPT-4.1", limit: { context: 200_000, output: 32_000 } } } },
+    ]
+
+    const metrics = getSessionContextMetrics(messages, providers)
+
+    expect(metrics.context?.total).toBe(168_000)
+    expect(metrics.context?.usage).toBe(100)
+  })
+
+  test("compaction.context_limit replaces the model window in the denominator", () => {
+    const messages = [assistant("a1", { input: 60_000, output: 6_000, reasoning: 0, read: 2_000, write: 0 }, 0.5)]
+    const providers = [
+      { id: "openai", models: { "gpt-4.1": { name: "GPT-4.1", limit: { context: 200_000, output: 32_000 } } } },
+    ]
+
+    const metrics = getSessionContextMetrics(messages, providers, { compaction: { context_limit: 100_000 } })
+
+    expect(metrics.context?.usage).toBe(100) // 68_000 tokens over the 68_000 usable window
+  })
+
+  test("unknown context window yields null usage", () => {
+    const messages = [assistant("a1", { input: 500, output: 100, reasoning: 0, read: 0, write: 0 }, 0.1)]
+    const providers = [{ id: "openai", models: { "gpt-4.1": { name: "GPT-4.1", limit: { context: 0 } } } }]
+
+    const metrics = getSessionContextMetrics(messages, providers)
+
+    expect(metrics.context?.usage).toBeNull()
+  })
+
+  test("context smaller than the output reserve yields null usage", () => {
+    // usable = max(0, 30_000 - 32_000) = 0 — the trigger can never fire for
+    // this model, so there is no meaningful percent to show.
+    const messages = [assistant("a1", { input: 200, output: 100, reasoning: 0, read: 0, write: 0 }, 0.1)]
+    const providers = [
+      { id: "openai", models: { "gpt-4.1": { name: "GPT-4.1", limit: { context: 30_000, output: 32_000 } } } },
+    ]
+
+    const metrics = getSessionContextMetrics(messages, providers)
+
+    expect(metrics.context?.usage).toBeNull()
+  })
+
+  test("usage can exceed 100 when tokens pass the budget", () => {
+    const messages = [assistant("a1", { input: 200_000, output: 40_000, reasoning: 60_000, read: 32_000, write: 4_000 }, 0.5)]
+    const providers = [
+      { id: "openai", models: { "gpt-4.1": { name: "GPT-4.1", limit: { context: 200_000, output: 32_000 } } } },
+    ]
+
+    const metrics = getSessionContextMetrics(messages, providers)
+
+    expect(metrics.context?.total).toBe(336_000)
+    expect(metrics.context?.usage).toBe(200) // 336_000 over the 168_000 budget
+  })
+
+  test("app parity: meter percent agrees with the compaction trigger", () => {
+    // Mirrors the TUI suite's "display percent agrees with the compaction
+    // trigger" cases (context-usage.shared.test.ts): the meter divides by the
+    // same usable() the trigger compares against. Rounding is one-sided:
+    // overflow => percent >= 100, no overflow => percent <= 100.
+    const cases = [167_999, 168_000, 168_001, 336_000]
+    const providers = [
+      { id: "openai", models: { "gpt-4.1": { name: "GPT-4.1", limit: { context: 200_000, output: 32_000 } } } },
+    ]
+
+    for (const tokens of cases) {
+      const messages = [assistant("a1", { input: tokens - 1, output: 1, reasoning: 0, read: 0, write: 0 }, 0.5)]
+      const percent = getSessionContextMetrics(messages, providers).context?.usage
+      const overflow = isOverflow(
+        {},
+        { input: tokens, output: 0, cache: { read: 0, write: 0 } },
+        { id: "gpt-4.1", limit: { context: 200_000, output: 32_000 } },
+      )
+      expect(percent).not.toBeNull()
+      if (overflow) expect(percent!).toBeGreaterThanOrEqual(100)
+      else expect(percent!).toBeLessThanOrEqual(100)
+    }
   })
 })

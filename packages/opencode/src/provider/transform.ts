@@ -6,7 +6,7 @@ import type { Model } from "./model"
 import type * as ModelsDev from "./models"
 import type * as Auth from "@/auth"
 import { iife } from "@/util/iife"
-import { Flag } from "@opencode-ai/core/flag/flag"
+import { maxOutputTokens as sharedMaxOutputTokens } from "@opencode-ai/sdk/v2/context-budget"
 import { TransformSanitize } from "./transform/sanitize"
 import { TransformAnthropic } from "./transform/anthropic"
 import { TransformBedrock } from "./transform/bedrock"
@@ -25,7 +25,9 @@ function mimeToModality(mime: string): Modality | undefined {
   return undefined
 }
 
-export const OUTPUT_TOKEN_MAX = Flag.OPENCODE_EXPERIMENTAL_OUTPUT_TOKEN_MAX || 32_000
+// The cap (and its experimental env override) lives in the shared
+// context-budget module so server and client meters floor output identically.
+export { OUTPUT_TOKEN_MAX } from "@opencode-ai/sdk/v2/context-budget"
 
 export type SystemPromptDelivery =
   | { type: "messages" }
@@ -1073,10 +1075,10 @@ export function providerOptions(model: Model, options: { [x: string]: any }) {
   return { [key]: options }
 }
 
-// Structural param: the TUI context meter passes the public provider model
-// shape, which carries the same `limit.output` field.
+// Delegates to the shared context-budget module so server request shaping and
+// the client meters floor output with one implementation.
 export function maxOutputTokens(model: { limit: { output?: number } }): number {
-  return Math.min(model.limit.output ?? 0, OUTPUT_TOKEN_MAX) || OUTPUT_TOKEN_MAX
+  return sharedMaxOutputTokens(model)
 }
 
 export function supportsMaxOutputTokens(model: Pick<Model, "api">): boolean {
