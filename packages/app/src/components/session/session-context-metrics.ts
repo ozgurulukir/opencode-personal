@@ -1,3 +1,4 @@
+import { usable, type CompactionSettingsInput } from "@opencode-ai/sdk/v2/context-budget"
 import type { AssistantMessage, Message } from "@opencode-ai/sdk/v2/client"
 
 type Provider = {
@@ -10,6 +11,8 @@ type Model = {
   name?: string
   limit: {
     context: number
+    input?: number
+    output?: number
   }
 }
 
@@ -47,7 +50,7 @@ const lastAssistantWithTokens = (messages: Message[]) => {
   }
 }
 
-const build = (messages: Message[] = [], providers: Provider[] = []): Metrics => {
+const build = (messages: Message[] = [], providers: Provider[] = [], config?: CompactionSettingsInput): Metrics => {
   const totalCost = messages.reduce((sum, msg) => sum + (msg.role === "assistant" ? msg.cost : 0), 0)
   const message = lastAssistantWithTokens(messages)
   if (!message) return { totalCost, context: undefined }
@@ -56,6 +59,9 @@ const build = (messages: Message[] = [], providers: Provider[] = []): Metrics =>
   const model = provider?.models[message.modelID]
   const limit = model?.limit.context
   const total = tokenTotal(message)
+  // The denominator is the auto-compaction trigger's usable window (reserve
+  // and context_limit honored) — 100% must mean compaction is imminent.
+  const budget = model ? usable(config ?? {}, model) : 0
 
   return {
     totalCost,
@@ -72,11 +78,15 @@ const build = (messages: Message[] = [], providers: Provider[] = []): Metrics =>
       cacheRead: message.tokens.cache.read,
       cacheWrite: message.tokens.cache.write,
       total,
-      usage: limit ? Math.round((total / limit) * 100) : null,
+      usage: budget > 0 ? Math.round((total / budget) * 100) : null,
     },
   }
 }
 
-export function getSessionContextMetrics(messages: Message[] = [], providers: Provider[] = []) {
-  return build(messages, providers)
+/**
+ * `config` threads the server's compaction settings into the budget;
+ * omitted means the trigger's DEFAULTS apply.
+ */
+export function getSessionContextMetrics(messages: Message[] = [], providers: Provider[] = [], config?: CompactionSettingsInput) {
+  return build(messages, providers, config)
 }
