@@ -1073,8 +1073,10 @@ export function providerOptions(model: Model, options: { [x: string]: any }) {
   return { [key]: options }
 }
 
-export function maxOutputTokens(model: Model): number {
-  return Math.min(model.limit.output, OUTPUT_TOKEN_MAX) || OUTPUT_TOKEN_MAX
+// Structural param: the TUI context meter passes the public provider model
+// shape, which carries the same `limit.output` field.
+export function maxOutputTokens(model: { limit: { output?: number } }): number {
+  return Math.min(model.limit.output ?? 0, OUTPUT_TOKEN_MAX) || OUTPUT_TOKEN_MAX
 }
 
 export function supportsMaxOutputTokens(model: Pick<Model, "api">): boolean {

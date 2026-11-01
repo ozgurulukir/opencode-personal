@@ -1,9 +1,10 @@
 import { describe, expect, test } from "bun:test"
-import { latestAssistantUsage, totalAssistantCost, type UsageProvider } from "../../../../src/cli/cmd/tui/context-usage.shared"
+import { latestAssistantUsage, totalAssistantCost, type UsageConfig, type UsageProvider } from "../../../../src/cli/cmd/tui/context-usage.shared"
+import { isOverflow } from "../../../../src/session/context-budget"
 import type { SessionMessage, SessionMessageAssistant, SessionMessageUser } from "@opencode-ai/sdk/v2"
 
 // The TUI message store (`sync.data.messages`) is ordered NEWEST-FIRST: the
-// server returns `desc(time_created), desc(id)` and live events prepend with
+// server returns `desc(id)` (ULIDs, so id order is time order) and live events prepend with
 // `unshift`. Regression guard: the context meters (footer, sidebar,
 // subagent-footer) must report the LATEST completed assistant turn. A prior
 // bug used `findLast`, which walks from the end and picked the OLDEST
@@ -34,10 +35,13 @@ function user(text: string): SessionMessageUser {
   }
 }
 
+// 200K context / 32K output: reserved = max(20K default, 32K output) = 32K,
+// usable = 168K. 100% on the meter == the auto-compaction threshold.
 const provider: UsageProvider = {
   id: "anthropic",
-  models: { "claude-3-5-sonnet": { limit: { context: 200000 } } },
+  models: { "claude-3-5-sonnet": { limit: { context: 200000, output: 32000 } } },
 }
+const usable = 168000
 
 describe("latestAssistantUsage", () => {
   test("returns undefined when there are no messages", () => {
@@ -59,7 +63,7 @@ describe("latestAssistantUsage", () => {
       }),
     ]
     const result = latestAssistantUsage(messages, [provider])
-    expect(result).toEqual({ tokens: 100 + 50 + 10 + 20 + 5, percent: Math.round((185 / 200000) * 100) })
+    expect(result).toEqual({ tokens: 100 + 50 + 20 + 5, percent: 0 })
   })
 
   test("picks the LATEST completed assistant in a newest-first list (the regression)", () => {
@@ -78,8 +82,9 @@ describe("latestAssistantUsage", () => {
     ]
     const result = latestAssistantUsage(messages, [provider])
     // Must reflect `newest`, not `oldest`. `findLast` would return `oldest`
-    // (19 tokens) — this assertion fails under the old broken implementation.
-    expect(result?.tokens).toBe(1000 + 500 + 100 + 200 + 50)
+    // (18 tokens — reasoning excluded like the trigger's used()) — this
+    // assertion fails under the old broken implementation.
+    expect(result?.tokens).toBe(1000 + 500 + 200 + 50)
   })
 
   test("returns the latest assistant even when a newer user message sits on top", () => {
@@ -91,6 +96,32 @@ describe("latestAssistantUsage", () => {
       }),
     ]
     expect(latestAssistantUsage(messages, [provider])?.tokens).toBe(50)
+  })
+
+  test("numerator excludes reasoning, matching ContextBudget.used()", () => {
+    const withReasoning = [assistant({ tokens: { input: 100, output: 50, reasoning: 999, cache: { read: 0, write: 0 } } })]
+    expect(latestAssistantUsage(withReasoning, [provider])?.tokens).toBe(150)
+  })
+
+  test("percent is measured against the usable budget, not the raw context window", () => {
+    const half = usable / 2
+    const messages = [assistant({ tokens: { input: half - 1, output: 1, reasoning: 0, cache: { read: 0, write: 0 } } })]
+    // 84K/168K = 50%, whereas the old raw-window math showed 84K/200K = 42%.
+    expect(latestAssistantUsage(messages, [provider])?.percent).toBe(50)
+  })
+
+  test("compaction.context_limit moves the displayed percent with the trigger threshold", () => {
+    const config: UsageConfig = { compaction: { context_limit: 100000 } }
+    // usable = 100000 - 32000 = 68000; 34000 tokens = 50% (old display: 17% of the raw window).
+    const messages = [assistant({ tokens: { input: 33999, output: 1, reasoning: 0, cache: { read: 0, write: 0 } } })]
+    expect(latestAssistantUsage(messages, [provider], config)?.percent).toBe(50)
+  })
+
+  test("compaction.reserved is honored as the headroom", () => {
+    const config: UsageConfig = { compaction: { reserved: 40000 } }
+    // usable = 200000 - 40000 = 160000; 80000 tokens = 50%.
+    const messages = [assistant({ tokens: { input: 79999, output: 1, reasoning: 0, cache: { read: 0, write: 0 } } })]
+    expect(latestAssistantUsage(messages, [provider], config)?.percent).toBe(50)
   })
 
   test("percent is null when the model is unknown", () => {
@@ -112,6 +143,38 @@ describe("latestAssistantUsage", () => {
   })
 })
 
+describe("display percent agrees with the compaction trigger", () => {
+  const cases: Array<{ used: number; limit?: number }> = [
+    { used: usable - 1 },
+    { used: usable },
+    { used: usable + 1 },
+    { used: usable * 2 },
+    { used: 1 },
+    { used: 34000, limit: 100000 },
+    { used: 68000, limit: 100000 },
+  ]
+
+  for (const { used: tokens, limit } of cases) {
+    test(`${tokens} tokens${limit ? ` with context_limit ${limit}` : ""}: percent >= 100 iff isOverflow`, () => {
+      const config: UsageConfig | undefined = limit ? { compaction: { context_limit: limit } } : undefined
+      const messages: SessionMessage[] = [
+        assistant({ tokens: { input: tokens - 1, output: 1, reasoning: 0, cache: { read: 0, write: 0 } } }),
+      ]
+      const percent = latestAssistantUsage(messages, [provider], config)?.percent
+      const overflow = isOverflow(config ?? {}, { input: tokens, output: 0, cache: { read: 0, write: 0 } }, {
+        id: "claude-3-5-sonnet",
+        limit: { context: 200000, output: 32000 },
+      })
+      expect(percent).not.toBeNull()
+      // Display percent rounds to the nearest integer, so it can read 100%
+      // marginally below the exact threshold. The guaranteed invariant is
+      // one-sided: overflow ⇒ meter reads >= 100%, no overflow ⇒ <= 100%.
+      if (overflow) expect(percent!).toBeGreaterThanOrEqual(100)
+      else expect(percent!).toBeLessThanOrEqual(100)
+    })
+  }
+})
+
 describe("totalAssistantCost", () => {
   test("sums assistant costs only, ignores user messages", () => {
     const messages = [
@@ -126,4 +189,3 @@ describe("totalAssistantCost", () => {
     expect(totalAssistantCost([user("hello")])).toBe(0)
   })
 })
-
