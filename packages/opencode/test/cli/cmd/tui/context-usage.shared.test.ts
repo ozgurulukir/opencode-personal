@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { latestAssistantUsage, totalAssistantCost, type UsageConfig, type UsageProvider } from "../../../../src/cli/cmd/tui/context-usage.shared"
-import { isOverflow } from "../../../../src/session/context-budget"
+import { isOverflow, used as budgetUsed } from "../../../../src/session/context-budget"
 import type { SessionMessage, SessionMessageAssistant, SessionMessageUser } from "@opencode-ai/sdk/v2"
 
 // The TUI message store (`sync.data.messages`) is ordered NEWEST-FIRST: the
@@ -63,7 +63,7 @@ describe("latestAssistantUsage", () => {
       }),
     ]
     const result = latestAssistantUsage(messages, [provider])
-    expect(result).toEqual({ tokens: 100 + 50 + 20 + 5, percent: 0 })
+    expect(result).toEqual({ tokens: 100 + 50 + 10 + 20 + 5, percent: 0 })
   })
 
   test("picks the LATEST completed assistant in a newest-first list (the regression)", () => {
@@ -82,9 +82,8 @@ describe("latestAssistantUsage", () => {
     ]
     const result = latestAssistantUsage(messages, [provider])
     // Must reflect `newest`, not `oldest`. `findLast` would return `oldest`
-    // (18 tokens — reasoning excluded like the trigger's used()) — this
-    // assertion fails under the old broken implementation.
-    expect(result?.tokens).toBe(1000 + 500 + 200 + 50)
+    // (19 tokens) — this assertion fails under the old broken implementation.
+    expect(result?.tokens).toBe(1000 + 500 + 100 + 200 + 50)
   })
 
   test("returns the latest assistant even when a newer user message sits on top", () => {
@@ -98,9 +97,9 @@ describe("latestAssistantUsage", () => {
     expect(latestAssistantUsage(messages, [provider])?.tokens).toBe(50)
   })
 
-  test("numerator excludes reasoning, matching ContextBudget.used()", () => {
+  test("numerator reconstructs the provider total (reasoning included, like the trigger)", () => {
     const withReasoning = [assistant({ tokens: { input: 100, output: 50, reasoning: 999, cache: { read: 0, write: 0 } } })]
-    expect(latestAssistantUsage(withReasoning, [provider])?.tokens).toBe(150)
+    expect(latestAssistantUsage(withReasoning, [provider])?.tokens).toBe(100 + 50 + 999)
   })
 
   test("percent is measured against the usable budget, not the raw context window", () => {
@@ -173,6 +172,31 @@ describe("display percent agrees with the compaction trigger", () => {
       else expect(percent!).toBeLessThanOrEqual(100)
     })
   }
+
+  test("numerator equals the trigger's total-based usage for the same turn (live-stream path)", () => {
+    // The live MessageV2 turn carries `total` (getUsage populates it from the
+    // provider), so the trigger's numerator is the total — which includes
+    // reasoning. The display holds the V2 message shape (no `total`) and must
+    // reconstruct that same number from the components.
+    const base = { input: 80_000, output: 4_000, reasoning: 10_000, cache: { read: 60_000, write: 2_000 } }
+    const total = 80_000 + 4_000 + 10_000 + 60_000 + 2_000
+    const display = latestAssistantUsage([assistant({ tokens: base })], [provider])
+    const trigger = budgetUsed({ ...base, total })
+    expect(display?.tokens).toBe(trigger)
+    expect(display?.tokens).toBe(156_000)
+  })
+
+  test("reasoning-heavy turn: the meter reads 100% exactly when the trigger fires", () => {
+    // Regression guard for the excluded-reasoning divergence: with reasoning
+    // dropped from the numerator, a turn whose total reaches the usable
+    // window showed ~88% on the meter while compaction fired.
+    const tokens = { input: 146_000, output: 2_000, reasoning: 20_000, cache: { read: 0, write: 0 } }
+    const display = latestAssistantUsage([assistant({ tokens })], [provider])
+    expect(display?.percent).toBeGreaterThanOrEqual(100)
+    expect(
+      isOverflow({}, { ...tokens, total: 168_000 }, { id: "claude-3-5-sonnet", limit: { context: 200_000, output: 32_000 } }),
+    ).toBe(true)
+  })
 })
 
 describe("totalAssistantCost", () => {
