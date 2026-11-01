@@ -717,6 +717,52 @@ describe("runLoop characterization", () => {
     ),
   )
 
+  it.live(
+    "continue turn after auto-compaction runs as a normal turn without re-triggering compaction",
+    () =>
+      provideTmpdirInstance(
+        () =>
+          Effect.gen(function* () {
+            llm.reset()
+            const prompt = yield* SessionPrompt.Service
+            const sessions = yield* Session.Service
+            const chat = yield* sessions.create({ title: "char-continue-guard", permission: ALLOW_ALL })
+
+            const overflowUsage = {
+              ...usage,
+              inputTokens: 95_000,
+              totalTokens: 95_001,
+            }
+
+            // 1. Initial user prompt overflows -> auto-compaction #1
+            llm.push(replyText("step 1 overflows", overflowUsage))
+            // 2. Compaction summary
+            llm.push(replyText("summary 1"))
+            // 3. The continue turn answers well within budget and the loop exits.
+            //    The threshold guard must NOT fire here: the continue guard and
+            //    the summary gate jointly prevent it (on the continue iteration,
+            //    lastFinished is the summary assistant whose id exceeds every
+            //    retained message, so a removed guard alone is masked — the
+            //    combined outcome is what this test pins).
+            llm.push(replyText("all good now"))
+
+            const result = yield* prompt.prompt({
+              sessionID: chat.id,
+              agent: "build",
+              parts: [{ type: "text", text: "trigger compaction once" }],
+            })
+
+            // Exactly three LLM calls: overflow turn, summary, continue turn.
+            // A 4th call would mean a spurious re-trigger on the continue turn
+            // (the double-compaction bug class) or runaway task processing.
+            expect(llm.calls).toBe(3)
+            const textPart = result.parts.find((p) => p.type === "text")
+            expect(textPart?.type === "text" && textPart.text).toBe("all good now")
+          }),
+        { git: true, config: cfg },
+      ),
+  )
+
   it.live("in a long turn with heavy tool outputs, prune runs synchronously during the turn (#337)", () =>
     provideTmpdirInstance(
       () =>

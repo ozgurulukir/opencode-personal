@@ -10,7 +10,8 @@ import * as Session from "./session"
 import { LLM } from "./llm"
 import { MessageV2 } from "./message-v2"
 import { Image } from "@/image/image"
-import { compactionConfig, isOverflow } from "./context-budget"
+import { compactionConfig } from "./context-budget"
+import { shouldCompactAfterTurn, type CompactionReason } from "./compaction-trigger"
 import { PartID } from "./schema"
 import type { SessionID } from "./schema"
 import { SessionRetry } from "./retry"
@@ -33,8 +34,6 @@ const log = Log.create({ service: "session.processor" })
 export type Result = "compact" | "stop" | "continue"
 
 export type Event = LLM.Event
-
-export type CompactionReason = "threshold" | "provider-rejected"
 
 export interface Handle {
   readonly message: MessageV2.Assistant
@@ -550,8 +549,13 @@ export const layer: Layer.Layer<
               })
               .pipe(Effect.ignore, Effect.forkIn(scope))
             if (
-              !ctx.assistantMessage.summary &&
-              isOverflow(yield* config.get(), usage.tokens, ctx.model)
+              shouldCompactAfterTurn({
+                cfg: yield* config.get(),
+                model: ctx.model,
+                tokens: usage.tokens,
+                summary: ctx.assistantMessage.summary === true,
+                continueTurn: false,
+              })
             ) {
               ctx.needsCompaction = true
               ctx.compactionReason = "threshold"

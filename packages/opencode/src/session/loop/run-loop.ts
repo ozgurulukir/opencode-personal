@@ -19,6 +19,7 @@ import { Permission } from "@/permission"
 import { SessionStatus } from "../status"
 import { SessionProcessor } from "../processor"
 import { SessionCompaction } from "../compaction"
+import * as CompactionTrigger from "../compaction-trigger"
 import { SessionSummary } from "../summary"
 import { Instruction } from "../instruction"
 import { SystemPrompt } from "../system"
@@ -188,9 +189,7 @@ export const runLoop: (deps: RunLoopDeps, sessionID: SessionID) => Effect.Effect
       continue
     }
 
-    const lastUserMsg = msgs.findLast((m) => m.info.id === lastUser.id)
-    const isCurrentTurnContinue =
-      lastUserMsg?.parts.some((p) => p.type === "text" && p.metadata?.compaction_continue) ?? false
+    const isCurrentTurnContinue = CompactionTrigger.isCurrentTurnContinue(msgs, lastUser.id)
 
     if (!isCurrentTurnContinue && tasks.length === 0) {
       consecutiveAutoCompactions = 0
@@ -198,10 +197,8 @@ export const runLoop: (deps: RunLoopDeps, sessionID: SessionID) => Effect.Effect
 
     const createAutoCompaction = (overflow?: boolean) =>
       Effect.gen(function* () {
-        if (consecutiveAutoCompactions >= 2) {
-          const error = new NamedError.Unknown({
-            message: "Context still exceeds the limit after compaction. Raise compaction.context_limit or lower reserved.",
-          })
+        if (CompactionTrigger.breakerTripped(consecutiveAutoCompactions)) {
+          const error = new NamedError.Unknown({ message: CompactionTrigger.BREAKER_MESSAGE })
           yield* deps.bus.publish(Session.Event.Error, { sessionID, error: error.toObject() })
           throw error
         }
@@ -217,20 +214,34 @@ export const runLoop: (deps: RunLoopDeps, sessionID: SessionID) => Effect.Effect
         })
       })
 
-    if (lastFinished && lastFinished.summary !== true && !isCurrentTurnContinue) {
-      const pruned = yield* deps.compaction
-        .prune({ sessionID })
-        .pipe(Effect.catch(() => Effect.succeed(0)))
-      if (pruned > 0) {
-        lastFinished.tokens = {
-          ...lastFinished.tokens,
-          input: Math.max(0, lastFinished.tokens.input - pruned),
-          ...(lastFinished.tokens.total !== undefined
-            ? { total: Math.max(0, lastFinished.tokens.total - pruned) }
-            : {}),
+    if (lastFinished && !isCurrentTurnContinue) {
+      // Prune only for regular finished turns — a summary turn's output IS
+      // the compaction, there is nothing to prune underneath it.
+      if (lastFinished.summary !== true) {
+        const pruned = yield* deps.compaction
+          .prune({ sessionID })
+          .pipe(
+            Effect.tapError((error) =>
+              slog
+                .warn("compaction prune failed; proceeding with unpruned token counts", { error: String(error) })
+                .pipe(Effect.as(undefined)),
+            ),
+            Effect.catch(() => Effect.succeed(0)),
+          )
+        if (pruned > 0) {
+          lastFinished.tokens = CompactionTrigger.adjustTokensAfterPrune(lastFinished.tokens, pruned)
         }
       }
-      if (yield* deps.compaction.isOverflow({ tokens: lastFinished.tokens, model })) {
+      const cfg = yield* deps.config.get()
+      if (
+        CompactionTrigger.shouldCompactAfterTurn({
+          cfg,
+          model,
+          tokens: lastFinished.tokens,
+          summary: lastFinished.summary === true,
+          continueTurn: isCurrentTurnContinue,
+        })
+      ) {
         yield* createAutoCompaction()
         continue
       }

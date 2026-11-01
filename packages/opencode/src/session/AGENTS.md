@@ -18,7 +18,7 @@ Delta selection uses anchored regex in a fixed order: `gpt-4`/`o1`/`o3` → beas
 
 ## `system.ts:skills()` — auto-match via semantic search
 
-`SystemPrompt.skills()` now accepts optional `userMessage` and `autoMatchOpts` parameters. When `skills.autoMatch` is enabled in config, `run-loop.ts:runLoop` reads the config, extracts the last user message text, and passes both to `skills()`. The method then calls `skill.matchBySemantics()` instead of `skill.available()`, returning only the top-N matching skills. The config is read at the call site (`run-loop.ts:325-333`), not inside `skills()`, to keep the `Interface` methods' Effect `R = never` (avoiding `Config.Service` requirement on the interface).
+`SystemPrompt.skills()` now accepts optional `userMessage` and `autoMatchOpts` parameters. When `skills.autoMatch` is enabled in config, `run-loop.ts:runLoop` reads the config, extracts the last user message text, and passes both to `skills()`. The method then calls `skill.matchBySemantics()` instead of `skill.available()`, returning only the top-N matching skills. The config is read at the call site (`run-loop.ts:331-339`), not inside `skills()`, to keep the `Interface` methods' Effect `R = never` (avoiding `Config.Service` requirement on the interface).
 
 ## `merge-options.ts` — hot LLM path, cast is intentional
 
@@ -75,7 +75,7 @@ The TUI compaction view listens ONLY to `session.next.compaction.started/delta/e
 
 ### `isOverflow` headroom bug when `limit.input` is set
 
-`context-budget.ts:usableWith()` — when `model.limit.input` is set, the function previously used `limit.input - min(compactionBuffer, maxOutputTokens)`, which reserved only 20K headroom for output. For models with 32K+ output limits, compaction triggered too late. The fix: always subtract `maxOutputTokens` from `limit.input` (or `reserved` if user-configured). Regression tests at `compaction.test.ts:514-585` document the expected behavior. Related issues: #10634, #8089, #11086, #12621.
+`context-budget.ts:usableWith()` — when `model.limit.input` is set, the function previously used `limit.input - min(compactionBuffer, maxOutputTokens)`, which reserved only 20K headroom for output. For models with 32K+ output limits, compaction triggered too late. The fix: always subtract `maxOutputTokens` from `limit.input` (or `reserved` if user-configured). Regression tests at `test/session/compaction-trigger.test.ts` (limit.input headroom + symmetry) document the expected behavior. Related issues: #10634, #8089, #11086, #12621.
 
 ### `filterCompacted` reorders messages — array position is not chronological
 
@@ -93,17 +93,23 @@ Before `latest()` was added, `session/loop/run-loop.ts:runLoop` picked `lastFini
 
 When filtering parts with `p is CompactionPart | SubtaskPart`, both types must be imported from `message.schema`. Missing `SubtaskPart` causes `TS2304: Cannot find name 'SubtaskPart'` at the type guard site.
 
+### Compaction trigger policy — `session/compaction-trigger.ts`
+
+The "should this turn auto-compact" policy is a pure module, not inline orchestrator code: `shouldCompactAfterTurn` (summary gate + continue-turn gate + `ContextBudget.isOverflow`), `isCurrentTurnContinue`, `adjustTokensAfterPrune`, and the circuit breaker (`BREAKER_LIMIT`/`BREAKER_MESSAGE`/`breakerTripped`). Call sites: the run-loop threshold site (`session/loop/run-loop.ts:217-248`, which also owns the prune-then-recheck orchestration) and the processor `finish-step` probe. The compaction service no longer exposes `isOverflow` — call `ContextBudget.isOverflow(cfg, tokens, model)` directly or go through the trigger predicate. The `CompactionReason` taxonomy (`"threshold" | "provider-rejected"`) is defined here; `processor.ts` imports it. Unit coverage: `test/session/compaction-trigger.test.ts`; loop-level: the "continue turn after auto-compaction" characterization test in `test/session/run-loop.characterization.test.ts`. Both call sites now read config for turns the old code short-circuited (summary `lastFinished` at the run-loop site; summary assistant at the processor probe) — the predicate's gates return false before any budget math, and `config.get()` is a pure read, so this is behavior-neutral.
+
+Known display divergence (deferred): `cli/cmd/tui/context-usage.shared.ts` computes context percent against raw `model.limit.context` and sums tokens including `reasoning`, while the trigger measures `ContextBudget.used` against `usable()`. Aligning them needs config in the TUI, but the sidebar reads `TuiPluginApi.state`, which does not expose it — wiring only the internal sync-based sites would make sidebar and footer disagree. Revisit when `TuiPluginApi.state` carries config.
+
 ### `compaction_continue` metadata guard scope
 
-`session/loop/run-loop.ts:191-197,220-237` — the double-compaction guard scopes only to the active user turn (`isCurrentTurnContinue`), checking if `lastUser` contains `compaction_continue` metadata rather than searching all messages in history. This prevents immediate re-compaction loops after an auto-compaction continue turn while ensuring future auto-compactions in the same session are not blocked once new user interactions occur.
+The double-compaction guard lives in `session/compaction-trigger.ts` (`isCurrentTurnContinue`), consumed by the run-loop threshold site (`run-loop.ts:192,217-248`). It scopes only to the active user turn, checking if `lastUser` carries `compaction_continue` metadata rather than searching all messages in history. This prevents immediate re-compaction loops after an auto-compaction continue turn while ensuring future auto-compactions in the same session are not blocked once new user interactions occur.
 
 ### `processCompaction` history computation is order-dependent
 
-`compaction.ts:535` — `history` excludes the current compaction marker only when it is the last message (`messages.at(-1)?.info.id === input.parentID`). After `filterCompacted` reorder, the marker may not be last, but this is safe because the current compaction hasn't produced a summary yet so `completedCompactions` won't match it. The dependency on message ordering is undocumented — do not change the condition without understanding this invariant.
+`compaction.ts:510` — `history` excludes the current compaction marker only when it is the last message (`messages.at(-1)?.info.id === input.parentID`). After `filterCompacted` reorder, the marker may not be last, but this is safe because the current compaction hasn't produced a summary yet so `completedCompactions` won't match it. The dependency on message ordering is undocumented — do not change the condition without understanding this invariant.
 
 ### `PRUNE_PROTECTED_TOOLS` is now configurable
 
-`compaction.ts:376` — was hardcoded to `["skill"]`, now reads from `cc.pruneProtectedTools` (config key `compaction.prune_protected_tools`, default `["skill"]`). Add tools like `"task"` to protect subagent results from pruning.
+`compaction.ts:357` — was hardcoded to `["skill"]`, now reads from `cc.pruneProtectedTools` (config key `compaction.prune_protected_tools`, default `["skill"]`). Add tools like `"task"` to protect subagent results from pruning.
 
 ### `reserved` unified across all branches with `maxOutputTokens` floor
 
@@ -111,23 +117,23 @@ When filtering parts with `p is CompactionPart | SubtaskPart`, both types must b
 
 ### `summary_max_tokens` config — summary budget is now configurable
 
-`compaction.ts:158 (summaryBudget)` — the compaction summary length was previously unbounded (model decided). Now: `cc.summaryMaxTokens ?? min(maxOutputTokens, maxSummaryTokens)`. Config key `compaction.summary_max_tokens` overrides; default caps at `min(model output limit, 8000)`. The `buildPrompt` function (`compaction.ts:129`) appends `Target length: under N tokens.` to the template when a budget is set, and `maxSummaryTokens` is also passed as `maxOutputTokens` to `processor.process` (`compaction.ts:563-568,644`).
+`compaction.ts:150 (summaryBudget)` — the compaction summary length was previously unbounded (model decided). Now: `cc.summaryMaxTokens ?? min(maxOutputTokens, maxSummaryTokens)`. Config key `compaction.summary_max_tokens` overrides; default caps at `min(model output limit, 8000)`. The `buildPrompt` function (`compaction.ts:121`) appends `Target length: under N tokens.` to the template when a budget is set, and `maxSummaryTokens` is also passed as `maxOutputTokens` to `processor.process` (`compaction.ts:542,613`).
 
 ### `autocontinue` only fires on auto compaction
 
-`compaction.ts:674` — the synthetic "Continue" message after compaction is gated by `input.auto`. Manual `/compact` does NOT inject a continue message. The config key `compaction.autocontinue` (default `true`) and the plugin hook `experimental.compaction.autocontinue` both control this — config must be `true` AND plugin must return `{ enabled: true }` for the continue message to appear.
+`compaction.ts:683` — the synthetic "Continue" message after compaction is gated by `input.auto`. Manual `/compact` does NOT inject a continue message. The config key `compaction.autocontinue` (default `true`) and the plugin hook `experimental.compaction.autocontinue` both control this — config must be `true` AND plugin must return `{ enabled: true }` for the continue message to appear.
 
 ### Continue message includes pending todos & metadata preservation
 
-`compaction.ts:706-783` — when `Todo.Service` is available (via `Effect.serviceOption`), the continue message appends a "Pending todos:" block (`todoBlock` at `compaction.ts:731-750`) with `[H]`/`[M]`/`[L]` priority badges and `[IN PROGRESS]` status badges for active tasks (`status === "in_progress"`). The service is optional — if not provided, the continue message omits the todo block silently. Additionally, `continueMsg` automatically inherits and preserves `tools`, `format`, and `system` metadata from `userMessage`. Both proactive and reactive compactions (`run-loop.ts:199-218`, `createAutoCompaction`) pass these fields into `compaction.create`, keeping subagent tool restrictions and output formats active across all auto-compaction turns.
+`compaction.ts:687-764` — when `Todo.Service` is available (via `Effect.serviceOption`), the continue message appends a "Pending todos:" block (`todoBlock` at `compaction.ts:712-731`) with `[H]`/`[M]`/`[L]` priority badges and `[IN PROGRESS]` status badges for active tasks (`status === "in_progress"`). The service is optional — if not provided, the continue message omits the todo block silently. Additionally, `continueMsg` automatically inherits and preserves `tools`, `format`, and `system` metadata from `userMessage`. Both proactive and reactive compactions (`run-loop.ts:199-218`, `createAutoCompaction`) pass these fields into `compaction.create`, keeping subagent tool restrictions and output formats active across all auto-compaction turns.
 
 ### `summaryBudget` uses model output limit, not a hardcoded ratio
 
-`compaction.ts:158` — unlike `preserveRecentBudget` which uses `usable * 0.25`, the summary budget is `cc.summaryMaxTokens ?? min(maxOutputTokens, maxSummaryTokens)`. No hardcoded ratio: the model's `maxOutputTokens` is the natural cap (the compaction agent can't output more than that anyway), and `maxSummaryTokens` (8000) is a practical ceiling.
+`compaction.ts:150` — unlike `preserveRecentBudget` which uses `usable * 0.25`, the summary budget is `cc.summaryMaxTokens ?? min(maxOutputTokens, maxSummaryTokens)`. No hardcoded ratio: the model's `maxOutputTokens` is the natural cap (the compaction agent can't output more than that anyway), and `maxSummaryTokens` (8000) is a practical ceiling.
 
 ### `SUMMARY_TEMPLATE` — tool call shorthand and file roles
 
-`compaction.ts:44-83` — the template guides the model to use `tool_name(key_arg)` shorthand (e.g., `read(src/auth.ts)`, `bash(npm test)`) and annotate file paths with roles (`read | written | created | deleted`). These patterns improve summary quality by preserving tool call history and file operation context that would otherwise be lost in natural-language rephrasing.
+`compaction.ts:36-75` — the template guides the model to use `tool_name(key_arg)` shorthand (e.g., `read(src/auth.ts)`, `bash(npm test)`) and annotate file paths with roles (`read | written | created | deleted`). These patterns improve summary quality by preserving tool call history and file operation context that would otherwise be lost in natural-language rephrasing.
 
 ### `buildPrompt` token budget hint
 

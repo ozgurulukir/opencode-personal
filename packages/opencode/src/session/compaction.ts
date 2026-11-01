@@ -213,10 +213,6 @@ export function splitTurn(input: {
 }
 
 export interface Interface {
-  readonly isOverflow: (input: {
-    tokens: MessageV2.Assistant["tokens"]
-    model: Provider.Model
-  }) => Effect.Effect<boolean>
   readonly prune: (input: { sessionID: SessionID }) => Effect.Effect<number>
   readonly process: (input: {
     parentID: MessageID
@@ -264,13 +260,6 @@ export const layer: Layer.Layer<
     const provider = yield* Provider.Service
     const sync = yield* SyncEvent.Service
     const todo = yield* Effect.serviceOption(Todo.Service)
-
-    const isOverflow = Effect.fn("SessionCompaction.isOverflow")(function* (input: {
-      tokens: MessageV2.Assistant["tokens"]
-      model: Provider.Model
-    }) {
-      return ContextBudget.isOverflow(yield* config.get(), input.tokens, input.model)
-    })
 
     const estimate = Effect.fn("SessionCompaction.estimate")(function* (input: {
       messages: MessageV2.WithParts[]
@@ -338,7 +327,7 @@ export const layer: Layer.Layer<
       }
     })
 
-    // goes backwards through parts until there are PRUNE_PROTECT tokens worth of tool
+    // goes backwards through parts until there are cc.pruneProtectTokens worth of tool
     // calls, then erases output of older tool calls to free context space
     const prune = Effect.fn("SessionCompaction.prune")(function* (input: { sessionID: SessionID }) {
       const cfg = yield* config.get()
@@ -835,7 +824,6 @@ export const layer: Layer.Layer<
     })
 
     return Service.of({
-      isOverflow,
       prune,
       process: processCompaction,
       create,
