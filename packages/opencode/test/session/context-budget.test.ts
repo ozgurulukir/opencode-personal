@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import type { Config } from "@/config/config"
 import type { Provider } from "@/provider/provider"
-import { compactionConfig, isOverflow, usableWith, DEFAULTS } from "../../src/session/context-budget"
+import { compactionConfig, isOverflow, usableWith, DEFAULTS } from "@opencode-ai/sdk/v2/context-budget"
 
 function createModel(opts: {
   context: number

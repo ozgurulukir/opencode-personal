@@ -1,5 +1,5 @@
 import type { SessionMessage, SessionMessageAssistant } from "@opencode-ai/sdk/v2"
-import { usable as budgetUsable, type BudgetModel } from "@/session/context-budget"
+import { usable as budgetUsable, type BudgetModel } from "@opencode-ai/sdk/v2/context-budget"
 
 export type UsageProvider = {
   id: string

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { latestAssistantUsage, totalAssistantCost, type UsageConfig, type UsageProvider } from "../../../../src/cli/cmd/tui/context-usage.shared"
-import { isOverflow, used as budgetUsed } from "../../../../src/session/context-budget"
+import { isOverflow, used as budgetUsed } from "@opencode-ai/sdk/v2/context-budget"
 import type { SessionMessage, SessionMessageAssistant, SessionMessageUser } from "@opencode-ai/sdk/v2"
 
 // The TUI message store (`sync.data.messages`) is ordered NEWEST-FIRST: the

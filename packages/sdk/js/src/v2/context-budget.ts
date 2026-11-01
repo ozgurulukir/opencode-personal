@@ -1,10 +1,9 @@
-import { ProviderTransform } from "@/provider/transform"
-import { Log } from "@opencode-ai/core/util/log"
-
-// Structural slices so the TUI context meter (which holds SDK-shaped config
-// and public provider models, not the server-internal types) can reuse the
-// exact budget math the compaction trigger uses. Config.Info and the internal
-// Provider.Model satisfy these structurally.
+// Structural slices so server, TUI, and app share one budget implementation:
+// the TUI and app hold SDK-shaped config and public provider models (not the
+// server-internal types), and Config.Info / the internal Provider.Model
+// satisfy these structurally. Hosted in the SDK so the compaction trigger and
+// every context meter consume the same math instead of re-deriving it (the
+// #351 drift class).
 export type CompactionSettingsInput = {
   compaction?: {
     auto?: boolean
@@ -37,8 +36,20 @@ export type BudgetTokens = {
   cache: { read: number; write: number }
 }
 
-const log = Log.create({ service: "session.context-budget" })
-const warnedModels = new Set<string>()
+// Output-token cap shared with the server's request shaping. Mirrors the
+// server's Flag read (`number()` in `@opencode-ai/core/flag/flag`: positive
+// integer env override) inline so this module stays dependency-free; the
+// `typeof process` guard keeps browser bundles on the default.
+const parsedOutputTokenMax =
+  typeof process === "undefined" ? NaN : Number(process.env.OPENCODE_EXPERIMENTAL_OUTPUT_TOKEN_MAX)
+const hasOutputTokenOverride = Number.isInteger(parsedOutputTokenMax) && parsedOutputTokenMax > 0
+export const OUTPUT_TOKEN_MAX = hasOutputTokenOverride ? parsedOutputTokenMax : 32_000
+
+// Structural param: the TUI context meter passes the public provider model
+// shape, which carries the same `limit.output` field.
+export function maxOutputTokens(model: { limit: { output?: number } }): number {
+  return Math.min(model.limit.output ?? 0, OUTPUT_TOKEN_MAX) || OUTPUT_TOKEN_MAX
+}
 
 export const DEFAULTS = {
   compactionBuffer: 20_000,
@@ -83,10 +94,7 @@ function usableWith(
   const context = model.limit.context
   if (!cc.contextLimit && context === 0) return 0
 
-  const reserved = Math.max(
-    cc.reserved ?? DEFAULTS.compactionBuffer,
-    ProviderTransform.maxOutputTokens(model),
-  )
+  const reserved = Math.max(cc.reserved ?? DEFAULTS.compactionBuffer, maxOutputTokens(model))
 
   const effectiveContext = context > 0 ? context : Infinity
   const effectiveInput = model.limit.input ?? Infinity
@@ -112,17 +120,10 @@ export function isOverflow(cfg: CompactionSettingsInput, tokens: BudgetTokens, m
   if (!cc.contextLimit && model.limit.context === 0) return false
 
   const u = usable(cfg, model)
-  if (u <= 0) {
-    const key = model.id ?? "unknown"
-    if (!warnedModels.has(key)) {
-      warnedModels.add(key)
-      log.warn("Usable context window is zero or negative; auto-compaction disabled for model", {
-        model: key,
-        context: model.limit.context,
-      })
-    }
-    return false
-  }
+  // A zero/negative budget means the model can never overflow. The warn-once
+  // diagnostic for this case lives at the trigger site
+  // (compaction-trigger.ts) so this module stays dependency-free.
+  if (u <= 0) return false
 
   return used(tokens) >= u
 }
