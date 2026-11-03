@@ -68,7 +68,7 @@ describe("Glob.scanSync", () => {
 
   test("finds nested files with globstar", () => {
     const results = Glob.scanSync("**/*.ts", { cwd: dir })
-    expect(results.sort()).toEqual(["a.ts", "sub/c.ts"])
+    expect(results.sort()).toEqual(["a.ts", join("sub", "c.ts")])
   })
 
   test("returns absolute paths when absolute option is set", () => {
