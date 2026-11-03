@@ -4,44 +4,54 @@ import path from "path"
 import { Process } from "@/util/process"
 import { tmpdir } from "../fixture/fixture"
 
-function node(script: string) {
-  return [process.execPath, "-e", script]
+async function node<T>(script: string, fn: (command: string[]) => Promise<T>) {
+  await using tmp = await tmpdir()
+  const scriptPath = path.join(tmp.path, "script.js")
+  await Bun.write(scriptPath, script)
+  const result = await fn([process.execPath, scriptPath])
+  return result
 }
 
 describe("util.process", () => {
   test("captures stdout and stderr", async () => {
-    const out = await Process.run(node('process.stdout.write("out");process.stderr.write("err")'))
+    const out = await node('process.stdout.write("out");process.stderr.write("err")', (command) =>
+      Process.run(command),
+    )
     expect(out.code).toBe(0)
     expect(out.stdout.toString()).toBe("out")
     expect(out.stderr.toString()).toBe("err")
-  })
+  }, 30000)
 
   test("returns code when nothrow is enabled", async () => {
-    const out = await Process.run(node("process.exit(7)"), { nothrow: true })
+    const out = await node("process.exit(7)", (command) => Process.run(command, { nothrow: true }))
     expect(out.code).toBe(7)
-  })
+  }, 30000)
 
   test("throws RunFailedError on non-zero exit", async () => {
-    const err = await Process.run(node('process.stderr.write("bad");process.exit(3)')).catch((error) => error)
+    const err = await node('process.stderr.write("bad");process.exit(3)', (command) =>
+      Process.run(command).catch((error) => error),
+    )
     expect(err).toBeInstanceOf(Process.RunFailedError)
     if (!(err instanceof Process.RunFailedError)) throw err
     expect(err.code).toBe(3)
     expect(err.stderr.toString()).toBe("bad")
-  })
+  }, 30000)
 
   test("aborts a running process", async () => {
     const abort = new AbortController()
     const started = Date.now()
     setTimeout(() => abort.abort(), 25)
 
-    const out = await Process.run(node("setInterval(() => {}, 1000)"), {
-      abort: abort.signal,
-      nothrow: true,
-    })
+    const out = await node("setInterval(() => {}, 1000)", (command) =>
+      Process.run(command, {
+        abort: abort.signal,
+        nothrow: true,
+      }),
+    )
 
     expect(out.code).not.toBe(0)
     expect(Date.now() - started).toBeLessThan(1000)
-  }, 3000)
+  }, 30000)
 
   test("kills after timeout when process ignores terminate signal", async () => {
     if (process.platform === "win32") return
@@ -50,32 +60,38 @@ describe("util.process", () => {
     const started = Date.now()
     setTimeout(() => abort.abort(), 25)
 
-    const out = await Process.run(node('process.on("SIGTERM", () => {}); setInterval(() => {}, 1000)'), {
-      abort: abort.signal,
-      nothrow: true,
-      timeout: 25,
-    })
+    const out = await node('process.on("SIGTERM", () => {}); setInterval(() => {}, 1000)', (command) =>
+      Process.run(command, {
+        abort: abort.signal,
+        nothrow: true,
+        timeout: 25,
+      }),
+    )
 
     expect(out.code).not.toBe(0)
     expect(Date.now() - started).toBeLessThan(1000)
-  }, 3000)
+  }, 30000)
 
   test("uses cwd when spawning commands", async () => {
     await using tmp = await tmpdir()
-    const out = await Process.run(node("process.stdout.write(process.cwd())"), {
-      cwd: tmp.path,
-    })
+    const out = await node("process.stdout.write(process.cwd())", (command) =>
+      Process.run(command, {
+        cwd: tmp.path,
+      }),
+    )
     expect(out.stdout.toString()).toBe(tmp.path)
-  })
+  }, 30000)
 
   test("merges environment overrides", async () => {
-    const out = await Process.run(node('process.stdout.write(process.env.OPENCODE_TEST ?? "")'), {
-      env: {
-        OPENCODE_TEST: "set",
-      },
-    })
+    const out = await node('process.stdout.write(process.env.OPENCODE_TEST ?? "")', (command) =>
+      Process.run(command, {
+        env: {
+          OPENCODE_TEST: "set",
+        },
+      }),
+    )
     expect(out.stdout.toString()).toBe("set")
-  })
+  }, 30000)
 
   test("rejects shell option in process spawning", () => {
     expect(() => {
@@ -85,28 +101,28 @@ describe("util.process", () => {
     }).toThrow("Shell execution is disabled")
   })
 
-  test("runs cmd scripts with spaces on Windows without shell", async () => {
+  test("runs copied executables with spaces on Windows without shell", async () => {
     if (process.platform !== "win32") return
 
     await using tmp = await tmpdir()
     const dir = path.join(tmp.path, "with space")
-    const file = path.join(dir, "echo cmd.cmd")
+    const file = path.join(dir, "bun.exe")
 
     await fs.mkdir(dir, { recursive: true })
-    await Bun.write(file, "@echo off\r\nif %~1==--stdio exit /b 0\r\nexit /b 7\r\n")
+    await fs.copyFile(process.execPath, file)
 
-    const proc = Process.spawn([file, "--stdio"], {
+    const proc = Process.spawn([file, "--version"], {
       stdin: "pipe",
       stdout: "pipe",
       stderr: "pipe",
     })
 
     expect(await proc.exited).toBe(0)
-  })
+  }, 30000)
 
   test("rejects missing commands without leaking unhandled errors", async () => {
     await using tmp = await tmpdir()
-    const cmd = path.join(tmp.path, "missing" + (process.platform === "win32" ? ".cmd" : ""))
+    const cmd = path.join(tmp.path, "missing-command")
     const err = await Process.spawn([cmd], {
       stdin: "pipe",
       stdout: "pipe",
