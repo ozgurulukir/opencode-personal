@@ -136,4 +136,18 @@ describe("util.process", () => {
       Process.spawn(["echo\nmalicious", "hello"])
     }).toThrow("Invalid command")
   })
+
+  test("rejects command with shell metacharacters", () => {
+    for (const command of [
+      "safe;malicious",
+      "safe|malicious",
+      "safe&malicious",
+      "safe<malicious",
+      "safe>malicious",
+      "safe`malicious",
+      "safe$malicious",
+    ]) {
+      expect(() => Process.spawn([command, "hello"])).toThrow("Invalid command")
+    }
+  })
 })

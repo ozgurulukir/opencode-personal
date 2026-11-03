@@ -56,7 +56,7 @@ export type Child = ChildProcess & { exited: Promise<number> }
 
 export function spawn(cmd: string[], opts: Options = {}): Child {
   if (cmd.length === 0) throw new Error("Command is required")
-  if (/[\0\r\n]/.test(cmd[0])) throw new Error(`Invalid command: ${cmd[0]}`)
+  if (/[\0\r\n;|<>&`$]/.test(cmd[0])) throw new Error(`Invalid command: ${cmd[0]}`)
   opts.abort?.throwIfAborted()
 
   const baseOpts = {
