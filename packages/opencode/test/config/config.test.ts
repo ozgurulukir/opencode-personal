@@ -197,7 +197,7 @@ test("updates config and preserves empty shell sentinel", async () => {
     fn: async () => {
       await save({ shell: "" })
 
-      const writtenConfig = await Filesystem.readJson<{ shell?: string }>(path.join(tmp.path, "opencode.json"))
+      const writtenConfig = await Filesystem.readJson<{ shell?: string }>(path.join(tmp.path, "config.json"))
       expect(writtenConfig.shell).toBe("")
     },
   })
