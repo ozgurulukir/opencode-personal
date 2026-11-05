@@ -54,10 +54,64 @@ function mergeConfig(target: Info, source: Info): Info {
   return mergeDeep(target, source) as Info
 }
 
+function concatUnique<T>(a?: readonly T[] | T[], b?: readonly T[] | T[]): T[] | undefined {
+  if (!a && !b) return undefined
+  if (!a) return b ? Array.from(new Set(b)) : undefined
+  if (!b) return a ? Array.from(new Set(a)) : undefined
+  return Array.from(new Set([...a, ...b]))
+}
+
 function mergeConfigConcatArrays(target: Info, source: Info): Info {
   const merged = mergeConfig(target, source)
-  if (target.instructions && source.instructions) {
-    merged.instructions = Array.from(new Set([...target.instructions, ...source.instructions]))
+  if (target.instructions || source.instructions) {
+    merged.instructions = concatUnique(target.instructions, source.instructions)
+  }
+  if (target.disabled_providers || source.disabled_providers) {
+    merged.disabled_providers = concatUnique(target.disabled_providers, source.disabled_providers)
+  }
+  if (target.enabled_providers || source.enabled_providers) {
+    merged.enabled_providers = concatUnique(target.enabled_providers, source.enabled_providers)
+  }
+  if (target.skills || source.skills) {
+    const paths = concatUnique(target.skills?.paths, source.skills?.paths)
+    const urls = concatUnique(target.skills?.urls, source.skills?.urls)
+    if (paths || urls) {
+      merged.skills = {
+        ...merged.skills,
+        ...(paths ? { paths } : {}),
+        ...(urls ? { urls } : {}),
+      }
+    }
+  }
+  if (target.watcher?.ignore || source.watcher?.ignore) {
+    const ignore = concatUnique(target.watcher?.ignore, source.watcher?.ignore)
+    if (ignore) {
+      merged.watcher = { ...merged.watcher, ignore }
+    }
+  }
+  if (target.server?.cors || source.server?.cors) {
+    const cors = concatUnique(target.server?.cors, source.server?.cors)
+    if (cors) {
+      merged.server = { ...merged.server, cors }
+    }
+  }
+  if (target.compaction?.prune_protected_tools || source.compaction?.prune_protected_tools) {
+    const prune_protected_tools = concatUnique(
+      target.compaction?.prune_protected_tools,
+      source.compaction?.prune_protected_tools,
+    )
+    if (prune_protected_tools) {
+      merged.compaction = { ...merged.compaction, prune_protected_tools }
+    }
+  }
+  if (target.experimental?.primary_tools || source.experimental?.primary_tools) {
+    const primary_tools = concatUnique(
+      target.experimental?.primary_tools,
+      source.experimental?.primary_tools,
+    )
+    if (primary_tools) {
+      merged.experimental = { ...merged.experimental, primary_tools }
+    }
   }
   return merged
 }
@@ -618,6 +672,45 @@ export const layer = Layer.effect(
           }
         }
 
+        const activeAccount = Option.getOrUndefined(
+          yield* accountSvc.active().pipe(Effect.catch(() => Effect.succeed(Option.none()))),
+        )
+        if (activeAccount?.active_org_id) {
+          const accountID = activeAccount.id
+          const orgID = activeAccount.active_org_id
+          const url = activeAccount.url
+          yield* Effect.gen(function* () {
+            const [configOpt, tokenOpt] = yield* Effect.all(
+              [accountSvc.config(accountID, orgID), accountSvc.token(accountID)],
+              { concurrency: 2 },
+            )
+            if (Option.isSome(tokenOpt)) {
+              process.env["OPENCODE_CONSOLE_TOKEN"] = tokenOpt.value
+              yield* env.set("OPENCODE_CONSOLE_TOKEN", tokenOpt.value)
+            }
+
+            if (Option.isSome(configOpt)) {
+              const source = `${url}/api/config`
+              const next = yield* loadConfig(JSON.stringify(configOpt.value), {
+                dir: path.dirname(source),
+                source,
+              })
+              for (const providerID of Object.keys(next.provider ?? {})) {
+                consoleManagedProviders.add(providerID)
+              }
+              yield* merge(source, next, "global")
+            }
+          }).pipe(
+            Effect.withSpan("Config.loadActiveOrgConfig"),
+            Effect.catch((err) => {
+              log.debug("failed to fetch remote account config", {
+                error: err instanceof Error ? err.message : String(err),
+              })
+              return Effect.void
+            }),
+          )
+        }
+
         const global = yield* getGlobal()
         yield* merge(Global.Path.config, global, "global")
 
@@ -698,45 +791,6 @@ export const layer = Layer.effect(
           })
           yield* merge(source, next, "local")
           log.debug("loaded custom config from OPENCODE_CONFIG_CONTENT")
-        }
-
-        const activeAccount = Option.getOrUndefined(
-          yield* accountSvc.active().pipe(Effect.catch(() => Effect.succeed(Option.none()))),
-        )
-        if (activeAccount?.active_org_id) {
-          const accountID = activeAccount.id
-          const orgID = activeAccount.active_org_id
-          const url = activeAccount.url
-          yield* Effect.gen(function* () {
-            const [configOpt, tokenOpt] = yield* Effect.all(
-              [accountSvc.config(accountID, orgID), accountSvc.token(accountID)],
-              { concurrency: 2 },
-            )
-            if (Option.isSome(tokenOpt)) {
-              process.env["OPENCODE_CONSOLE_TOKEN"] = tokenOpt.value
-              yield* env.set("OPENCODE_CONSOLE_TOKEN", tokenOpt.value)
-            }
-
-            if (Option.isSome(configOpt)) {
-              const source = `${url}/api/config`
-              const next = yield* loadConfig(JSON.stringify(configOpt.value), {
-                dir: path.dirname(source),
-                source,
-              })
-              for (const providerID of Object.keys(next.provider ?? {})) {
-                consoleManagedProviders.add(providerID)
-              }
-              yield* merge(source, next, "global")
-            }
-          }).pipe(
-            Effect.withSpan("Config.loadActiveOrgConfig"),
-            Effect.catch((err) => {
-              log.debug("failed to fetch remote account config", {
-                error: err instanceof Error ? err.message : String(err),
-              })
-              return Effect.void
-            }),
-          )
         }
 
         const managedDir = ConfigManaged.managedConfigDir()

@@ -1,4 +1,6 @@
 import { Config } from "@/config/config"
+import * as Log from "@opencode-ai/core/util/log"
+const log = Log.create({ service: "agent" })
 import z from "zod"
 import { Provider } from "@/provider/provider"
 import { ModelID, ProviderID } from "../provider/schema"
@@ -410,10 +412,13 @@ export const layer = Layer.effect(
           const c = yield* config.get()
           if (c.default_agent) {
             const agent = agents[c.default_agent]
-            if (!agent) throw new Error(`default agent "${c.default_agent}" not found`)
-            if (agent.mode === "subagent") throw new Error(`default agent "${c.default_agent}" is a subagent`)
-            if (agent.hidden === true) throw new Error(`default agent "${c.default_agent}" is hidden`)
-            return agent.name
+            if (agent && agent.mode !== "subagent" && agent.hidden !== true) {
+              return agent.name
+            }
+            log.warn(`default agent "${c.default_agent}" is invalid or a hidden subagent, falling back to build`)
+          }
+          if (agents["build"] && agents["build"].mode !== "subagent" && agents["build"].hidden !== true) {
+            return "build"
           }
           const visible = Object.values(agents).find((a) => a.mode !== "subagent" && a.hidden !== true)
           if (!visible) throw new Error("no primary visible agent found")
