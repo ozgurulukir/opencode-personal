@@ -368,8 +368,10 @@ export async function handleToolPartUpdate(
   }
 }
 
-// Replay path for V2 shell messages: the projected shell carries the command
-// and final output directly (the assistant has no bash tool item in V2).
+// Replay path for V2 shell messages: rows returned by messages() are
+// `!`-shell records (shell mode creates no V2 tool events). Tool-side bash
+// shell rows are filtered out of messages() by read-side callID dedupe; their
+// bash tool item lives on the assistant and is replayed via handleToolPartUpdate.
 export async function handleShellMessage(
   connection: AgentSideConnection,
   sessionId: string,

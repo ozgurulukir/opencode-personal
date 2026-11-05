@@ -91,6 +91,11 @@ export function reduceMessageEvent(messages: SessionMessage[], event: MessageSyn
       break
     }
     case "session.next.shell.started": {
+      // Tool-side bash already has a tool item with this callID on the active
+      // assistant — unshifting a shell record would render the call twice.
+      // `!` shell (no matching tool item) keeps unshifting as before; the
+      // later shell.ended then no-ops via activeShell finding no record.
+      if (latestTool(activeAssistant(messages), event.properties.callID)) break
       messages.unshift({
         id: event.id,
         type: "shell",
@@ -156,7 +161,11 @@ export function reduceMessageEvent(messages: SessionMessage[], event: MessageSyn
       break
     }
     case "session.next.tool.input.started": {
-      activeAssistant(messages)?.content.push({
+      // Secondary dedupe: a retryable provider failure can re-emit this for a
+      // callID that already has a tool item — keep exactly one.
+      const assistant = activeAssistant(messages)
+      if (assistant && latestTool(assistant, event.properties.callID)) break
+      assistant?.content.push({
         type: "tool",
         id: event.properties.callID,
         name: event.properties.name,

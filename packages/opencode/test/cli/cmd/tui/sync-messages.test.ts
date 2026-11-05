@@ -449,6 +449,93 @@ describe("reduceMessageEvent", () => {
     expect(shell.time.completed).toBe(now + 1)
   })
 
+  // Phase 1 characterization: the callID dedupe guard must only fire when the
+  // active assistant actually carries a tool item for that callID. An active
+  // assistant WITHOUT the tool item (e.g. `!` shell during a step) keeps the
+  // shell record — the predicate's negative case must survive the fix.
+  it("shell.started creates a shell record when the active assistant has no matching tool item", () => {
+    const messages: SessionMessage[] = []
+    reduceMessageEvent(messages, ev("evt_1", "session.next.step.started", {
+      sessionID: "ses_1",
+      timestamp: now,
+      agent: "build",
+      model: { id: "m", providerID: "p", variant: "default" },
+    }))
+    reduceMessageEvent(messages, ev("evt_2", "session.next.shell.started", {
+      sessionID: "ses_1",
+      timestamp: now + 1,
+      callID: "call_1",
+      command: "ls",
+    }))
+    expect(messages.filter((m) => m.type === "shell")).toHaveLength(1)
+    reduceMessageEvent(messages, ev("evt_3", "session.next.shell.ended", {
+      sessionID: "ses_1",
+      timestamp: now + 2,
+      callID: "call_1",
+      output: "files",
+    }))
+    const shell = messages.find((m) => m.type === "shell")
+    if (shell?.type !== "shell") throw new Error("expected shell")
+    expect(shell.output).toBe("files")
+    expect(shell.time.completed).toBe(now + 2)
+  })
+
+  // Phase 2 bug test: tool-side bash — the tool item exists before
+  // Shell.Started arrives, so the live reducer must skip the unshift (the
+  // duplicate `# Shell` record is the bug this locks out).
+  it("tool item then shell.started with same callID leaves no shell record", () => {
+    const messages: SessionMessage[] = []
+    reduceMessageEvent(messages, ev("evt_1", "session.next.step.started", {
+      sessionID: "ses_1",
+      timestamp: now,
+      agent: "build",
+      model: { id: "m", providerID: "p", variant: "default" },
+    }))
+    reduceMessageEvent(messages, ev("evt_2", "session.next.tool.input.started", {
+      sessionID: "ses_1",
+      timestamp: now + 1,
+      callID: "call_1",
+      name: "bash",
+    }))
+    reduceMessageEvent(messages, ev("evt_3", "session.next.shell.started", {
+      sessionID: "ses_1",
+      timestamp: now + 2,
+      callID: "call_1",
+      command: "ls",
+    }))
+    expect(messages.filter((m) => m.type === "shell")).toHaveLength(0)
+    const assistant = messages.find((m) => m.type === "assistant")
+    if (assistant?.type !== "assistant") throw new Error("expected assistant")
+    expect(assistant.content.filter((c) => c.type === "tool" && c.id === "call_1")).toHaveLength(1)
+  })
+
+  // Phase 2 secondary: a re-emitted tool.input.started for a live callID must
+  // not push a second pending tool item.
+  it("repeated tool.input.started with same callID yields one tool item", () => {
+    const messages: SessionMessage[] = []
+    reduceMessageEvent(messages, ev("evt_1", "session.next.step.started", {
+      sessionID: "ses_1",
+      timestamp: now,
+      agent: "build",
+      model: { id: "m", providerID: "p", variant: "default" },
+    }))
+    reduceMessageEvent(messages, ev("evt_2", "session.next.tool.input.started", {
+      sessionID: "ses_1",
+      timestamp: now + 1,
+      callID: "call_1",
+      name: "bash",
+    }))
+    reduceMessageEvent(messages, ev("evt_3", "session.next.tool.input.started", {
+      sessionID: "ses_1",
+      timestamp: now + 2,
+      callID: "call_1",
+      name: "bash",
+    }))
+    const assistant = messages.find((m) => m.type === "assistant")
+    if (assistant?.type !== "assistant") throw new Error("expected assistant")
+    expect(assistant.content.filter((c) => c.type === "tool" && c.id === "call_1")).toHaveLength(1)
+  })
+
   // Server-side revert cleanup deletes rows (V1 `msg_*` ids) before clearing
   // the marker, but the live store never consumes `message.removed` — its
   // `evt_*` rows can't match. The reducer must ignore removals and rely on

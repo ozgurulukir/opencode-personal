@@ -107,6 +107,12 @@ export function update<Result>(adapter: Adapter<Result>, event: SessionEvent.Eve
     return undefined
   }
 
+  // Existence guard over the plain (non-draft) `currentAssistant`: `latestTool`
+  // is typed against the immer draft, which a readonly `content` array does
+  // not assign to. Used by the shell.started / tool.input.started dedupe.
+  const hasTool = (assistant: SessionMessage.Assistant | undefined, callID: string) =>
+    assistant?.content.some((item) => item.type === "tool" && item.id === callID) ?? false
+
   const latestText = (assistant: DraftAssistant | undefined) => {
     if (!assistant?.content) return undefined
     // ⚡ Bolt Optimization: Using backward loop instead of .findLast() to avoid GC pressure and O(N) traversal overhead
@@ -184,6 +190,11 @@ export function update<Result>(adapter: Adapter<Result>, event: SessionEvent.Eve
       )
     },
     "session.next.shell.started": (event) => {
+      // Tool-side bash projects its tool item before Shell.Started fires
+      // (tool-input-start → tool-call → executor → Shell.Started), so a
+      // matching tool item means this row would duplicate the assistant's
+      // bash block. `!` shell (no tool item) keeps appending as before.
+      if (hasTool(currentAssistant, event.data.callID)) return
       adapter.appendMessage(
         new SessionMessage.Shell({
           id: event.id,
@@ -285,6 +296,9 @@ export function update<Result>(adapter: Adapter<Result>, event: SessionEvent.Eve
       }
     },
     "session.next.tool.input.started": (event) => {
+      // Secondary dedupe: a retryable provider failure can re-emit
+      // tool.input.started for a callID that already has a tool item.
+      if (hasTool(currentAssistant, event.data.callID)) return
       if (currentAssistant) {
         adapter.updateAssistant(
           produce(currentAssistant, (draft) => {

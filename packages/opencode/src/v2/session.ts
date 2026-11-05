@@ -482,26 +482,102 @@ export const layer = Layer.effect(
         // Query the adjacent rows in reverse, then flip them back into the requested order below.
         if (direction === "previous" && order === "asc") order = "desc"
         if (direction === "previous" && order === "desc") order = "asc"
-        const boundary = input.cursor
-          ? order === "asc"
-            ? gt(SessionMessageTable.id, input.cursor.id)
-            : lt(SessionMessageTable.id, input.cursor.id)
-          : undefined
-        const where = boundary
-          ? and(eq(SessionMessageTable.session_id, input.sessionID), boundary)
-          : eq(SessionMessageTable.session_id, input.sessionID)
 
-        const rows = Database.use((db) => {
-          const query = db
-            .select()
-            .from(SessionMessageTable)
-            .where(where)
-            .orderBy(order === "asc" ? asc(SessionMessageTable.id) : desc(SessionMessageTable.id))
-          const rows = input.limit === undefined ? query.all() : query.limit(input.limit).all()
-          return direction === "previous" ? rows.toReversed() : rows
-        })
+        // Session-wide tool-callID set: built lazily on the first shell row
+        // encountered and shared across every refill fetch. A shell row whose
+        // callID matches an assistant tool item is a tool-side bash duplicate
+        // (hidden by this read filter); a `!` shell has no matching tool item
+        // and stays. Session-wide — not page-local — because the app pages 200
+        // rows desc and the adjacent assistant/shell pair can straddle a page
+        // boundary. The assistant walk reads raw JSON (no schema decode) and
+        // is fail-open: an unparsable legacy row contributes nothing, so its
+        // shell rows keep today's behavior.
+        let toolCallIDs: Set<string> | undefined
+        const dropShell = (row: typeof SessionMessageTable.$inferSelect) => {
+          if (row.type !== "shell") return false
+          if (!toolCallIDs) {
+            toolCallIDs = new Set<string>()
+            const assistants = Database.use((db) =>
+              db
+                .select({ data: sql<string>`${SessionMessageTable.data}` })
+                .from(SessionMessageTable)
+                .where(
+                  and(eq(SessionMessageTable.session_id, input.sessionID), eq(SessionMessageTable.type, "assistant")),
+                )
+                .all(),
+            )
+            for (const entry of assistants) {
+              let parsed: unknown
+              try {
+                parsed = JSON.parse(entry.data)
+              } catch {
+                continue
+              }
+              if (typeof parsed !== "object" || parsed === null) continue
+              const content = (parsed as { content?: unknown }).content
+              if (!Array.isArray(content)) continue
+              for (const item of content) {
+                if (typeof item !== "object" || item === null) continue
+                if ((item as { type?: unknown }).type !== "tool") continue
+                const id = (item as { id?: unknown }).id
+                if (typeof id === "string") toolCallIDs.add(id)
+              }
+            }
+          }
+          const data: unknown = row.data
+          if (typeof data !== "object" || data === null) return false
+          const callID = (data as { callID?: unknown }).callID
+          return typeof callID === "string" && toolCallIDs.has(callID)
+        }
+
+        const fetchRaw = (after: SessionMessage.ID | undefined, limit: number | undefined) =>
+          Database.use((db) => {
+            const boundary = after
+              ? order === "asc"
+                ? gt(SessionMessageTable.id, after)
+                : lt(SessionMessageTable.id, after)
+              : undefined
+            const where = boundary
+              ? and(eq(SessionMessageTable.session_id, input.sessionID), boundary)
+              : eq(SessionMessageTable.session_id, input.sessionID)
+            const query = db
+              .select()
+              .from(SessionMessageTable)
+              .where(where)
+              .orderBy(order === "asc" ? asc(SessionMessageTable.id) : desc(SessionMessageTable.id))
+            return limit === undefined ? query.all() : query.limit(limit).all()
+          })
+
+        // Refill-to-limit: fetch raw rows sequentially in fetch order, drop
+        // duplicate shell rows, and keep fetching until `limit` items are kept
+        // or raw rows run out. Fetching exactly `remaining` raw rows means the
+        // quota is filled only at the final row of a chunk, so examination
+        // halts exactly at the quota-filling row (nothing unjudged is ever
+        // skipped) and the boundary advances past the LAST raw row examined —
+        // never the last kept item, which would re-scan dropped rows. A
+        // non-exhausted call therefore returns exactly `limit` items (the app
+        // derives `complete = items.length < limit` from page size) and an
+        // exhausted call returns short. `limit === undefined` (TUI fetch-all)
+        // takes the single-fetch path with no quota.
+        const kept: (typeof SessionMessageTable.$inferSelect)[] = []
+        let after = input.cursor?.id
+        for (;;) {
+          const remaining = input.limit === undefined ? undefined : input.limit - kept.length
+          const chunk = fetchRaw(after, remaining)
+          for (const row of chunk) {
+            if (!dropShell(row)) kept.push(row)
+            if (remaining !== undefined && kept.length === input.limit) break
+          }
+          if (remaining === undefined || kept.length === input.limit) break
+          // Short chunk ⇒ no raw rows remain beyond the boundary.
+          if (chunk.length < remaining) break
+          const last = chunk[chunk.length - 1]
+          if (!last) break
+          after = last.id
+        }
+
         const defaults = legacyMessageDefaults(input.sessionID)
-        return rows.map((row) => decode(row, defaults))
+        return (direction === "previous" ? kept.toReversed() : kept).map((row) => decode(row, defaults))
       }),
       context: Effect.fn("V2Session.context")(function* (sessionID) {
         const rows = Database.use((db) => {

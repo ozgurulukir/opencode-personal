@@ -394,6 +394,12 @@ function handleSynthetic(input: MessageHandlerInput, event: MessageEvent) {
 
 function handleShellStarted(input: MessageHandlerInput, event: MessageEvent) {
   const props = event.properties as { sessionID: string; timestamp: number; callID: string; command: string }
+  // Tool-side bash: the active step assistant already carries a bash tool
+  // part with this callID — building the synthetic wrapper would render the
+  // call twice. No active assistant (or no matching part) = `!` shell → keep
+  // the wrapper behavior below.
+  const existing = activeAssistantParts(input, props.sessionID)
+  if (existing && findToolPart(existing.parts, props.callID)) return
   const created = eventTime(props.timestamp)
   const user = latestUser(input.store.message[props.sessionID])
   const agent = user?.agent ?? "build"
@@ -439,6 +445,15 @@ function handleShellEnded(input: MessageHandlerInput, event: MessageEvent) {
   const completed = eventTime(props.timestamp)
   const active = activeAssistantParts(input, props.sessionID)
   if (!active) return
+  // Only the synthetic shell-wrapper assistant (id `${wrapperID}:assistant`,
+  // created by handleShellStarted — the sole producer of that suffix) may be
+  // completed by shell.ended. Tool-side shell.ended must not touch the real
+  // step assistant: it would pre-complete the bash part past tool.success's
+  // `status === "running"` check (dropping exit/truncated/description
+  // metadata) and stamp time.completed, starving handleStepEnded and
+  // stranding sibling tool parts. The "tool part exists" trick cannot be used
+  // here — a `!` shell's wrapper DOES have a tool part at ended time.
+  if (!active.assistant.id.endsWith(":assistant")) return
   input.setStore("part", active.assistant.id, produce((draft) => {
     const match = findToolPart(draft, props.callID)
     if (match?.state.status !== "running") return
@@ -578,7 +593,9 @@ function findToolPart(parts: Part[] | undefined, callID: string) {
 function handleToolInputStarted(input: MessageHandlerInput, event: MessageEvent) {
   const props = event.properties as { sessionID: string; timestamp: number; callID: string; name: string }
   const active = activeAssistantParts(input, props.sessionID)
-  if (!active) return
+  // Secondary dedupe: a retryable provider failure can re-emit this for a
+  // callID that already has a part — keep exactly one.
+  if (!active || findToolPart(active.parts, props.callID)) return
   insertPart(
     input,
     toolPart({

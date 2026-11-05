@@ -530,6 +530,284 @@ describe("v2.session", () => {
     }),
   )
 
+  // Phase 1 characterization: the read-side shell filter must keep tool-less
+  // shell rows (the `!` shell history case) — only shell rows whose callID
+  // matches an assistant tool item get dropped.
+  it.instance("messages() returns a shell row when no assistant tool shares its callID", () =>
+    Effect.gen(function* () {
+      const session = yield* SessionV2.Service
+      const info = yield* session.create({ agent: "build" })
+      const created = Date.now()
+
+      Database.use((db) => {
+        db.insert(SessionMessageTable)
+          .values([
+            {
+              id: SessionMessage.ID.create(),
+              session_id: info.id,
+              type: "assistant",
+              time_created: created,
+              data: {
+                time: { created },
+                agent: "build",
+                model: { id: "test-model", providerID: "test", variant: "default" },
+                content: [
+                  {
+                    type: "tool",
+                    id: "call_z",
+                    name: "write",
+                    state: { status: "completed", input: {}, structured: {}, content: [] },
+                    time: { created },
+                  },
+                ],
+              } as (typeof SessionMessageTable.$inferInsert)["data"],
+            },
+            {
+              id: SessionMessage.ID.create(),
+              session_id: info.id,
+              type: "shell",
+              time_created: created,
+              data: {
+                callID: "call_x",
+                command: "ls",
+                output: "",
+                time: { created },
+              } as (typeof SessionMessageTable.$inferInsert)["data"],
+            },
+          ])
+          .run()
+      })
+
+      const messages = yield* session.messages({ sessionID: info.id })
+      expect(messages.some((message) => message.type === "shell")).toBe(true)
+      expect(messages.some((message) => message.type === "assistant")).toBe(true)
+    }),
+  )
+
+  // ── Phase 2: messages() shell filter + refill-to-limit ──
+  // Seeds use hand-crafted evt_ ids whose lexicographic order equals their
+  // intended timeline order (Identifier.create is zero-padded).
+
+  const evtID = (millis: number) => SessionMessage.ID.make(Identifier.create("evt", "ascending", millis))
+
+  const seedMessages = (
+    sessionID: SessionID,
+    rows: { id: SessionMessage.ID; type: "assistant" | "shell" | "user"; timeCreated: number; data: unknown }[],
+  ) => {
+    Database.use((db) => {
+      db.insert(SessionMessageTable)
+        .values(
+          rows.map((row) => ({
+            id: row.id,
+            session_id: sessionID,
+            type: row.type,
+            time_created: row.timeCreated,
+            data: row.data as (typeof SessionMessageTable.$inferInsert)["data"],
+          })),
+        )
+        .run()
+    })
+  }
+
+  const assistantWithTool = (created: number, toolID: string) => ({
+    time: { created },
+    agent: "build",
+    model: { id: "test-model", providerID: "test", variant: "default" },
+    content: [
+      {
+        type: "tool",
+        id: toolID,
+        name: "bash",
+        state: { status: "running", input: {}, structured: {}, content: [] },
+        time: { created },
+      },
+    ],
+  })
+
+  const shellData = (created: number, callID: string) => ({ callID, command: "ls", output: "", time: { created } })
+  const userData = (created: number) => ({ text: "m", files: [], agents: [], time: { created } })
+
+  it.instance("messages() drops a shell row whose callID matches an assistant tool item", () =>
+    Effect.gen(function* () {
+      const session = yield* SessionV2.Service
+      const info = yield* session.create({ agent: "build" })
+      seedMessages(info.id, [
+        { id: evtID(1_700_000_001_000), type: "assistant", timeCreated: 1000, data: assistantWithTool(1000, "call_x") },
+        { id: evtID(1_700_000_002_000), type: "shell", timeCreated: 2000, data: shellData(2000, "call_x") },
+      ])
+
+      const messages = yield* session.messages({ sessionID: info.id })
+      expect(messages.some((message) => message.type === "shell")).toBe(false)
+      expect(messages.some((message) => message.type === "assistant")).toBe(true)
+    }),
+  )
+
+  it.instance("messages() keeps a ULID-callID shell row alongside unrelated tools", () =>
+    Effect.gen(function* () {
+      const session = yield* SessionV2.Service
+      const info = yield* session.create({ agent: "build" })
+      seedMessages(info.id, [
+        { id: evtID(1_700_000_001_000), type: "assistant", timeCreated: 1000, data: assistantWithTool(1000, "call_z") },
+        {
+          id: evtID(1_700_000_002_000),
+          type: "shell",
+          timeCreated: 2000,
+          data: shellData(2000, "01J0000000000000000000000"),
+        },
+      ])
+
+      const messages = yield* session.messages({ sessionID: info.id })
+      expect(messages.some((message) => message.type === "shell")).toBe(true)
+      expect(messages.some((message) => message.type === "assistant")).toBe(true)
+    }),
+  )
+
+  it.instance("messages() drops a shell row even when its matching assistant is on another page", () =>
+    Effect.gen(function* () {
+      const session = yield* SessionV2.Service
+      const info = yield* session.create({ agent: "build" })
+      seedMessages(info.id, [
+        { id: evtID(1_700_000_000_500), type: "user", timeCreated: 500, data: userData(500) },
+        { id: evtID(1_700_000_001_000), type: "assistant", timeCreated: 1000, data: assistantWithTool(1000, "call_x") },
+        { id: evtID(1_700_000_002_000), type: "shell", timeCreated: 2000, data: shellData(2000, "call_x") },
+      ])
+
+      // The raw page (desc, limit 1) is the shell row; the session-wide
+      // pre-scan drops it (the matching assistant lives on the next page) and
+      // refill backfills from the next raw row. An empty page would be wrong —
+      // the refill must surface the assistant.
+      const page = yield* session.messages({ sessionID: info.id, limit: 1, order: "desc" })
+      expect(page).toHaveLength(1)
+      expect(page.some((message) => message.type === "shell")).toBe(false)
+      expect(page.some((message) => message.type === "assistant")).toBe(true)
+    }),
+  )
+
+  it.instance("a full raw page containing a dropped shell row still returns limit items when older rows exist", () =>
+    Effect.gen(function* () {
+      const session = yield* SessionV2.Service
+      const info = yield* session.create({ agent: "build" })
+      const newest = evtID(1_700_000_005_000)
+      const shell = evtID(1_700_000_004_000)
+      const assistant = evtID(1_700_000_003_000)
+      seedMessages(info.id, [
+        { id: newest, type: "user", timeCreated: 5000, data: userData(5000) },
+        { id: shell, type: "shell", timeCreated: 4000, data: shellData(4000, "call_z") },
+        { id: assistant, type: "assistant", timeCreated: 3000, data: assistantWithTool(3000, "call_z") },
+        { id: evtID(1_700_000_002_000), type: "user", timeCreated: 2000, data: userData(2000) },
+        { id: evtID(1_700_000_001_000), type: "user", timeCreated: 1000, data: userData(1000) },
+      ])
+
+      // Raw page 1 = [newest, shell]; the shell is dropped (its callID matches
+      // the assistant's tool item), so refill must backfill to exactly `limit`
+      // — otherwise `complete = items.length < limit` (sync.tsx:332) would halt
+      // history loading at the first shell-bearing page.
+      const page = yield* session.messages({ sessionID: info.id, limit: 2, order: "desc" })
+      expect(page).toHaveLength(2)
+      expect(page.some((message) => message.type === "shell")).toBe(false)
+      expect(page.map((message) => message.id)).toEqual([newest, assistant])
+    }),
+  )
+
+  it.instance("the final partial page still returns short", () =>
+    Effect.gen(function* () {
+      const session = yield* SessionV2.Service
+      const info = yield* session.create({ agent: "build" })
+      const user1000 = evtID(1_700_000_001_000)
+      seedMessages(info.id, [
+        { id: evtID(1_700_000_004_000), type: "shell", timeCreated: 4000, data: shellData(4000, "call_x") },
+        { id: evtID(1_700_000_003_000), type: "assistant", timeCreated: 3000, data: assistantWithTool(3000, "call_x") },
+        { id: evtID(1_700_000_002_000), type: "user", timeCreated: 2000, data: userData(2000) },
+        { id: user1000, type: "user", timeCreated: 1000, data: userData(1000) },
+      ])
+
+      const page1 = yield* session.messages({ sessionID: info.id, limit: 2, order: "desc" })
+      expect(page1).toHaveLength(2)
+      const last = page1.at(-1)
+      if (!last) throw new Error("expected a non-empty first page")
+      // Fetch past the last older row: raw exhaustion keeps returning short so
+      // `complete` correctly flips to true.
+      const page2 = yield* session.messages({
+        sessionID: info.id,
+        limit: 2,
+        order: "desc",
+        cursor: { id: last.id, direction: "next" },
+      })
+      expect(page2.length).toBeLessThan(2)
+      expect(page2.map((message) => message.id)).toEqual([user1000])
+    }),
+  )
+
+  it.instance('direction:"previous" refill is symmetric', () =>
+    Effect.gen(function* () {
+      const session = yield* SessionV2.Service
+      const info = yield* session.create({ agent: "build" })
+      // Identifier.create embeds a random ULID tail — create each id ONCE and
+      // reuse it (a second create of the same value yields a different id).
+      const assistant1000 = evtID(1_700_000_001_000)
+      const user2000 = evtID(1_700_000_002_000)
+      const user3000 = evtID(1_700_000_003_000)
+      seedMessages(info.id, [
+        { id: evtID(1_700_000_000_500), type: "user", timeCreated: 500, data: userData(500) },
+        { id: assistant1000, type: "assistant", timeCreated: 1000, data: assistantWithTool(1000, "call_x") },
+        { id: evtID(1_700_000_001_500), type: "shell", timeCreated: 1500, data: shellData(1500, "call_x") },
+        { id: user2000, type: "user", timeCreated: 2000, data: userData(2000) },
+        { id: user3000, type: "user", timeCreated: 3000, data: userData(3000) },
+      ])
+
+      // Internal fetch order flips to asc: raw page = [shell, user2000] →
+      // shell dropped → refill adds user3000 → flip back to the requested desc
+      // order after the loop.
+      const page = yield* session.messages({
+        sessionID: info.id,
+        limit: 2,
+        order: "desc",
+        cursor: { id: assistant1000, direction: "previous" },
+      })
+      expect(page).toHaveLength(2)
+      expect(page.some((message) => message.type === "shell")).toBe(false)
+      expect(page.map((message) => message.id)).toEqual([user3000, user2000])
+    }),
+  )
+
+  it.instance("cursor anchors on the last raw row examined after a refilled page", () =>
+    Effect.gen(function* () {
+      const session = yield* SessionV2.Service
+      const info = yield* session.create({ agent: "build" })
+      const newest = evtID(1_700_000_005_000)
+      const shell = evtID(1_700_000_004_000)
+      const assistant = evtID(1_700_000_003_000)
+      const user2000 = evtID(1_700_000_002_000)
+      const user1000 = evtID(1_700_000_001_000)
+      seedMessages(info.id, [
+        { id: newest, type: "user", timeCreated: 5000, data: userData(5000) },
+        { id: shell, type: "shell", timeCreated: 4000, data: shellData(4000, "call_z") },
+        { id: assistant, type: "assistant", timeCreated: 3000, data: assistantWithTool(3000, "call_z") },
+        { id: user2000, type: "user", timeCreated: 2000, data: userData(2000) },
+        { id: user1000, type: "user", timeCreated: 1000, data: userData(1000) },
+      ])
+
+      // Halt-on-quota: chunk 1 examines [newest, shell] (shell dropped),
+      // chunk 2 examines [assistant] which fills the quota → the last raw row
+      // examined IS the last returned item, so the handler's `messages.at(-1)`
+      // cursor encoding needs no change.
+      const page1 = yield* session.messages({ sessionID: info.id, limit: 2, order: "desc" })
+      const last = page1.at(-1)
+      if (!last) throw new Error("expected a refilled first page")
+      expect(last.id).toBe(assistant)
+
+      // The follow-up fetch continues exactly after the examined boundary:
+      // nothing unjudged is skipped and the dropped shell row is not re-scanned.
+      const page2 = yield* session.messages({
+        sessionID: info.id,
+        limit: 2,
+        order: "desc",
+        cursor: { id: last.id, direction: "next" },
+      })
+      expect(page2.map((message) => message.id)).toEqual([user2000, user1000])
+    }),
+  )
+
   // Characterization for the V2 id-only ordering contract. Rows are seeded with
   // hand-crafted evt_ ids whose lexicographic order is the opposite of their
   // time_created column, so any surviving (time_created, id) ordering shows up.

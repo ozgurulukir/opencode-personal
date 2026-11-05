@@ -540,6 +540,371 @@ describe("applyDirectoryEvent", () => {
     expect(assistant?.role === "assistant" && assistant.time.completed).toBe(3)
   })
 
+  // Phase 2 regression (a): tool-side bash — the step assistant already carries
+  // the bash tool part when Shell.Started/Ended fire. shell.started must not
+  // build a wrapper, shell.ended must not touch the real step assistant
+  // (pre-completing the part would starve tool.success's running check at :650),
+  // and tool.success must own completion with the structured metadata.
+  test("tool-side bash: shell.started/ended are ignored and tool.success owns the part", () => {
+    const sessionID = "ses_1"
+    const [store, setStore] = createStore(baseState())
+
+    applyDirectoryEvent({
+      event: promptedEvent("evt_1", sessionID, "run it"),
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+    applyDirectoryEvent({
+      event: {
+        id: "evt_2",
+        type: "session.next.step.started",
+        properties: { sessionID, timestamp: 2, agent: "assistant", model: { id: "gpt", providerID: "openai" } },
+      },
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+    applyDirectoryEvent({
+      event: {
+        type: "session.next.tool.input.started",
+        properties: { sessionID, timestamp: 3, callID: "call_x", name: "bash" },
+      },
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+
+    applyDirectoryEvent({
+      event: {
+        id: "evt_3",
+        type: "session.next.shell.started",
+        properties: { sessionID, timestamp: 4, callID: "call_x", command: "ls" },
+      },
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+    const ids = store.message[sessionID]?.map((x) => x.id) ?? []
+    expect(ids).not.toContain("evt_3")
+    expect(ids).not.toContain("evt_3:assistant")
+    expect(store.part["evt_3"]).toBeUndefined()
+    expect(store.part["evt_3:assistant"]).toBeUndefined()
+
+    applyDirectoryEvent({
+      event: {
+        id: "evt_4",
+        type: "session.next.shell.ended",
+        properties: { sessionID, timestamp: 5, callID: "call_x", output: "out" },
+      },
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+    const tool = store.part["evt_2"]?.[0]
+    expect(tool).toMatchObject({ type: "tool", callID: "call_x", state: { status: "pending" } })
+    const stepAssistant = store.message[sessionID]?.find((x) => x.id === "evt_2")
+    expect(stepAssistant?.role === "assistant" && stepAssistant.time.completed).toBeUndefined()
+
+    applyDirectoryEvent({
+      event: {
+        type: "session.next.tool.called",
+        properties: { sessionID, timestamp: 6, callID: "call_x", input: { command: "ls" } },
+      },
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+    applyDirectoryEvent({
+      event: {
+        type: "session.next.tool.success",
+        properties: {
+          sessionID,
+          timestamp: 7,
+          callID: "call_x",
+          structured: { output: "out", exit: 0, description: "ls", truncated: false },
+          content: [{ type: "text", text: "out" }],
+        },
+      },
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+    const done = store.part["evt_2"]?.[0]
+    expect(done).toMatchObject({
+      state: {
+        status: "completed",
+        output: "out",
+        metadata: { output: "out", exit: 0, description: "ls", truncated: false },
+      },
+    })
+  })
+
+  // Phase 2 regression (b): shell.ended must not stamp time.completed on the
+  // real step assistant — handleStepEnded depends on it being undefined
+  // (activeAssistant requires time.completed === undefined).
+  test("step.ended still applies finish/cost/tokens after tool-side shell events", () => {
+    const sessionID = "ses_1"
+    const [store, setStore] = createStore(baseState())
+
+    applyDirectoryEvent({
+      event: promptedEvent("evt_1", sessionID, "run it"),
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+    applyDirectoryEvent({
+      event: {
+        id: "evt_2",
+        type: "session.next.step.started",
+        properties: { sessionID, timestamp: 2, agent: "assistant", model: { id: "gpt", providerID: "openai" } },
+      },
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+    applyDirectoryEvent({
+      event: {
+        type: "session.next.tool.input.started",
+        properties: { sessionID, timestamp: 3, callID: "call_x", name: "bash" },
+      },
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+    applyDirectoryEvent({
+      event: {
+        id: "evt_3",
+        type: "session.next.shell.started",
+        properties: { sessionID, timestamp: 4, callID: "call_x", command: "ls" },
+      },
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+    expect(store.message[sessionID]?.map((x) => x.id)).not.toContain("evt_3:assistant")
+    applyDirectoryEvent({
+      event: {
+        id: "evt_4",
+        type: "session.next.shell.ended",
+        properties: { sessionID, timestamp: 5, callID: "call_x", output: "out" },
+      },
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+    applyDirectoryEvent({
+      event: {
+        id: "evt_5",
+        type: "session.next.step.ended",
+        properties: {
+          sessionID,
+          timestamp: 6,
+          finish: "stop",
+          cost: 0.5,
+          tokens: { input: 1, output: 2, reasoning: 0, cache: { read: 0, write: 0 } },
+        },
+      },
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+
+    const assistant = store.message[sessionID]?.find((x) => x.id === "evt_2")
+    expect(assistant).toMatchObject({
+      time: { completed: 6 },
+      finish: "stop",
+      cost: 0.5,
+      tokens: { input: 1, output: 2, reasoning: 0, cache: { read: 0, write: 0 } },
+    })
+  })
+
+  // Phase 2 regression (c): a sibling tool in the same step must keep updating
+  // after tool-side shell events — shell.ended must not strand
+  // activeAssistantParts by completing the real step assistant.
+  test("sibling tool call_y still updates after tool-side shell events", () => {
+    const sessionID = "ses_1"
+    const [store, setStore] = createStore(baseState())
+
+    applyDirectoryEvent({
+      event: promptedEvent("evt_1", sessionID, "run it"),
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+    applyDirectoryEvent({
+      event: {
+        id: "evt_2",
+        type: "session.next.step.started",
+        properties: { sessionID, timestamp: 2, agent: "assistant", model: { id: "gpt", providerID: "openai" } },
+      },
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+    for (const callID of ["call_x", "call_y"]) {
+      applyDirectoryEvent({
+        event: {
+          type: "session.next.tool.input.started",
+          properties: { sessionID, timestamp: 3, callID, name: "bash" },
+        },
+        store,
+        setStore,
+        push() {},
+        directory: "/tmp",
+        loadLsp() {},
+      })
+    }
+    applyDirectoryEvent({
+      event: {
+        type: "session.next.tool.called",
+        properties: { sessionID, timestamp: 4, callID: "call_x", input: { command: "ls" } },
+      },
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+    applyDirectoryEvent({
+      event: {
+        type: "session.next.tool.called",
+        properties: { sessionID, timestamp: 4, callID: "call_y", input: { command: "pwd" } },
+      },
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+    applyDirectoryEvent({
+      event: {
+        id: "evt_3",
+        type: "session.next.shell.started",
+        properties: { sessionID, timestamp: 5, callID: "call_x", command: "ls" },
+      },
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+    expect(store.message[sessionID]?.map((x) => x.id)).not.toContain("evt_3:assistant")
+    applyDirectoryEvent({
+      event: {
+        id: "evt_4",
+        type: "session.next.shell.ended",
+        properties: { sessionID, timestamp: 6, callID: "call_x", output: "out" },
+      },
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+    const parts = store.part["evt_2"] ?? []
+    const bash = parts.find(
+      (p): p is Extract<Part, { type: "tool" }> => p.type === "tool" && p.callID === "call_x",
+    )
+    expect(bash?.state.status).toBe("running")
+
+    applyDirectoryEvent({
+      event: {
+        type: "session.next.tool.success",
+        properties: {
+          sessionID,
+          timestamp: 7,
+          callID: "call_y",
+          structured: { exit: 0 },
+          content: [{ type: "text", text: "/tmp" }],
+        },
+      },
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+    const sibling = parts.find(
+      (p): p is Extract<Part, { type: "tool" }> => p.type === "tool" && p.callID === "call_y",
+    )
+    expect(sibling).toMatchObject({ state: { status: "completed", metadata: { exit: 0 } } })
+  })
+
+  // Phase 2 secondary: a re-emitted tool.input.started for a live callID must
+  // not insert a second part (deterministic part IDs are keyed by index).
+  test("tool.input.started with an existing callID inserts one part", () => {
+    const sessionID = "ses_1"
+    const [store, setStore] = createStore(baseState())
+
+    applyDirectoryEvent({
+      event: promptedEvent("evt_1", sessionID, "run it"),
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+    applyDirectoryEvent({
+      event: {
+        id: "evt_2",
+        type: "session.next.step.started",
+        properties: { sessionID, timestamp: 2, agent: "assistant", model: { id: "gpt", providerID: "openai" } },
+      },
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+    for (const timestamp of [3, 4]) {
+      applyDirectoryEvent({
+        event: {
+          type: "session.next.tool.input.started",
+          properties: { sessionID, timestamp, callID: "call_x", name: "bash" },
+        },
+        store,
+        setStore,
+        push() {},
+        directory: "/tmp",
+        loadLsp() {},
+      })
+    }
+
+    const tools = (store.part["evt_2"] ?? []).filter((p) => p.type === "tool" && p.callID === "call_x")
+    expect(tools).toHaveLength(1)
+  })
+
   test("step events drive the assistant lifecycle", () => {
     const sessionID = "ses_1"
     const [store, setStore] = createStore(baseState())

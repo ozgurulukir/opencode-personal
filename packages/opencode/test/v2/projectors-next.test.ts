@@ -8,6 +8,7 @@ import { SessionMessage } from "@/v2/session-message"
 import { Modelv2 } from "@/v2/model"
 import { SessionEvent } from "@/v2/session-event"
 import { SessionMessageTable } from "@/session/session.sql"
+import type { SessionID } from "@/session/schema"
 import { EventSequenceTable } from "@/sync/event.sql"
 import { EventID } from "@/sync/schema"
 import { Database, eq } from "@/storage/db"
@@ -245,6 +246,70 @@ describe("projectors-next poisoned read-model resilience", () => {
         } finally {
           warns.mockRestore()
         }
+      }),
+    ),
+  )
+})
+
+// Phase 2 integration: the write-side callID guard lives in the shared
+// SessionMessageUpdater, so a tool-side bash (tool item projected first)
+// must project NO shell row through the sqlite projector, while a tool-less
+// shell (`!` shell) must keep projecting its row.
+describe("projectors-next shell callID dedupe", () => {
+  const testModel = {
+    id: Modelv2.ID.make("test-model"),
+    providerID: Modelv2.ProviderID.make("test-provider"),
+    variant: Modelv2.VariantID.make("default"),
+  }
+
+  const shellRows = (sessionID: SessionID) =>
+    Database.use((db) =>
+      db
+        .select()
+        .from(SessionMessageTable)
+        .where(eq(SessionMessageTable.session_id, sessionID))
+        .all()
+        .filter((item) => item.type === "shell"),
+    )
+
+  effectIt.live(
+    "shell.started after a tool item projects no shell row; shell.started alone does",
+    provideTmpdirInstance(() =>
+      Effect.gen(function* () {
+        Flag.OPENCODE_EXPERIMENTAL_WORKSPACES = true
+        const sessions = yield* Session.Service
+        const sync = yield* SyncEvent.Service
+        const ts = DateTime.makeUnsafe(Date.now())
+
+        const toolSide = yield* sessions.create({ title: "tool-side bash" })
+        yield* sync.run(SessionEvent.Step.Started.Sync, {
+          sessionID: toolSide.id,
+          timestamp: ts,
+          agent: "build",
+          model: testModel,
+        })
+        yield* sync.run(SessionEvent.Tool.Input.Started.Sync, {
+          sessionID: toolSide.id,
+          timestamp: ts,
+          callID: "call_x",
+          name: "bash",
+        })
+        yield* sync.run(SessionEvent.Shell.Started.Sync, {
+          sessionID: toolSide.id,
+          timestamp: ts,
+          callID: "call_x",
+          command: "ls",
+        })
+        expect(shellRows(toolSide.id)).toHaveLength(0)
+
+        const bare = yield* sessions.create({ title: "! shell" })
+        yield* sync.run(SessionEvent.Shell.Started.Sync, {
+          sessionID: bare.id,
+          timestamp: ts,
+          callID: "call_y",
+          command: "pwd",
+        })
+        expect(shellRows(bare.id)).toHaveLength(1)
       }),
     ),
   )

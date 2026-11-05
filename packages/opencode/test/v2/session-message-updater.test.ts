@@ -384,6 +384,152 @@ test("prompted event with subtask stores subtask on user message", () => {
   })
 })
 
+// Phase 1 characterization: a shell.started with no matching assistant tool
+// item (the `!` shell contract, or a tool-less shell event) must keep appending
+// a shell message, and shell.ended must fill its output by callID. This is the
+// negative case of the callID dedupe guard — it must survive the fix.
+test("shell.started without a matching tool item appends a shell message", () => {
+  const state: SessionMessageUpdater.MemoryState = { messages: [] }
+  const sessionID = SessionID.make("session")
+  const callID = "01J0000000000000000000000"
+
+  SessionMessageUpdater.update(SessionMessageUpdater.memory(state), {
+    id: EventV2.ID.create(),
+    type: "session.next.step.started",
+    data: {
+      sessionID,
+      timestamp: DateTime.makeUnsafe(1),
+      agent: "build",
+      model: {
+        id: Modelv2.ID.make("model"),
+        providerID: Modelv2.ProviderID.make("provider"),
+        variant: Modelv2.VariantID.make("default"),
+      },
+    },
+  } satisfies SessionEvent.Event)
+
+  SessionMessageUpdater.update(SessionMessageUpdater.memory(state), {
+    id: EventV2.ID.create(),
+    type: "session.next.shell.started",
+    data: {
+      sessionID,
+      timestamp: DateTime.makeUnsafe(2),
+      callID,
+      command: "ls",
+    },
+  } satisfies SessionEvent.Event)
+
+  const shells = state.messages.filter((message) => message.type === "shell")
+  expect(shells).toHaveLength(1)
+  expect(shells[0]).toMatchObject({ callID, command: "ls", output: "" })
+
+  SessionMessageUpdater.update(SessionMessageUpdater.memory(state), {
+    id: EventV2.ID.create(),
+    type: "session.next.shell.ended",
+    data: {
+      sessionID,
+      timestamp: DateTime.makeUnsafe(3),
+      callID,
+      output: "files",
+    },
+  } satisfies SessionEvent.Event)
+
+  const shell = state.messages.find((message) => message.type === "shell")
+  expect(shell).toMatchObject({ callID, output: "files" })
+  if (shell?.type !== "shell") return
+  expect(shell.time.completed).toEqual(DateTime.makeUnsafe(3))
+})
+
+// Phase 2 bug test: tool-side bash emits Shell.Started after the tool item is
+// already projected — the write-side guard must not create a duplicate row.
+test("shell.started after tool.input.started with the same callID does not append a shell message", () => {
+  const state: SessionMessageUpdater.MemoryState = { messages: [] }
+  const sessionID = SessionID.make("session")
+  const callID = "call_x"
+
+  SessionMessageUpdater.update(SessionMessageUpdater.memory(state), {
+    id: EventV2.ID.create(),
+    type: "session.next.step.started",
+    data: {
+      sessionID,
+      timestamp: DateTime.makeUnsafe(1),
+      agent: "build",
+      model: {
+        id: Modelv2.ID.make("model"),
+        providerID: Modelv2.ProviderID.make("provider"),
+        variant: Modelv2.VariantID.make("default"),
+      },
+    },
+  } satisfies SessionEvent.Event)
+
+  SessionMessageUpdater.update(SessionMessageUpdater.memory(state), {
+    id: EventV2.ID.create(),
+    type: "session.next.tool.input.started",
+    data: {
+      sessionID,
+      timestamp: DateTime.makeUnsafe(2),
+      callID,
+      name: "bash",
+    },
+  } satisfies SessionEvent.Event)
+
+  SessionMessageUpdater.update(SessionMessageUpdater.memory(state), {
+    id: EventV2.ID.create(),
+    type: "session.next.shell.started",
+    data: {
+      sessionID,
+      timestamp: DateTime.makeUnsafe(3),
+      callID,
+      command: "ls",
+    },
+  } satisfies SessionEvent.Event)
+
+  expect(state.messages.filter((message) => message.type === "shell")).toHaveLength(0)
+  const assistant = state.messages.find((message) => message.type === "assistant")
+  if (assistant?.type !== "assistant") throw new Error("expected assistant")
+  expect(assistant.content.filter((item) => item.type === "tool" && item.id === callID)).toHaveLength(1)
+})
+
+// Phase 2 secondary: a retryable provider failure can re-emit tool.input.started
+// for a callID that already has a tool item — must not push a second one.
+test("tool.input.started with an already-present callID does not push a second tool item", () => {
+  const state: SessionMessageUpdater.MemoryState = { messages: [] }
+  const sessionID = SessionID.make("session")
+  const callID = "call_x"
+
+  SessionMessageUpdater.update(SessionMessageUpdater.memory(state), {
+    id: EventV2.ID.create(),
+    type: "session.next.step.started",
+    data: {
+      sessionID,
+      timestamp: DateTime.makeUnsafe(1),
+      agent: "build",
+      model: {
+        id: Modelv2.ID.make("model"),
+        providerID: Modelv2.ProviderID.make("provider"),
+        variant: Modelv2.VariantID.make("default"),
+      },
+    },
+  } satisfies SessionEvent.Event)
+
+  for (const timestamp of [2, 3]) {
+    SessionMessageUpdater.update(SessionMessageUpdater.memory(state), {
+      id: EventV2.ID.create(),
+      type: "session.next.tool.input.started",
+      data: {
+        sessionID,
+        timestamp: DateTime.makeUnsafe(timestamp),
+        callID,
+        name: "bash",
+      },
+    } satisfies SessionEvent.Event)
+  }
+
+  const assistant = state.messages.find((message) => message.type === "assistant")
+  if (assistant?.type !== "assistant") throw new Error("expected assistant")
+  expect(assistant.content.filter((item) => item.type === "tool" && item.id === callID)).toHaveLength(1)
+})
+
 test("compaction ended with failed status projects to message", () => {
   const state: SessionMessageUpdater.MemoryState = { messages: [] }
   const sessionID = SessionID.make("session")
