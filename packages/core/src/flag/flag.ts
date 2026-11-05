@@ -38,12 +38,9 @@ export const Flag = {
   OPENCODE_AUTO_SHARE: truthy("OPENCODE_AUTO_SHARE"),
   OPENCODE_AUTO_HEAP_SNAPSHOT: truthy("OPENCODE_AUTO_HEAP_SNAPSHOT"),
   OPENCODE_GIT_BASH_PATH: process.env["OPENCODE_GIT_BASH_PATH"],
-  OPENCODE_CONFIG: process.env["OPENCODE_CONFIG"],
-  OPENCODE_CONFIG_CONTENT: process.env["OPENCODE_CONFIG_CONTENT"],
   OPENCODE_DISABLE_PRUNE: truthy("OPENCODE_DISABLE_PRUNE"),
   OPENCODE_DISABLE_TERMINAL_TITLE: truthy("OPENCODE_DISABLE_TERMINAL_TITLE"),
   OPENCODE_SHOW_TTFD: truthy("OPENCODE_SHOW_TTFD"),
-  OPENCODE_PERMISSION: process.env["OPENCODE_PERMISSION"],
   OPENCODE_DISABLE_DEFAULT_PLUGINS: truthy("OPENCODE_DISABLE_DEFAULT_PLUGINS"),
   OPENCODE_DISABLE_LSP_DOWNLOAD: truthy("OPENCODE_DISABLE_LSP_DOWNLOAD"),
   OPENCODE_ENABLE_EXPERIMENTAL_MODELS: truthy("OPENCODE_ENABLE_EXPERIMENTAL_MODELS"),
@@ -96,6 +93,27 @@ export const Flag = {
 
   // Evaluated at access time (not module load) because tests, the CLI, and
   // external tooling set these env vars at runtime.
+  get OPENCODE_CONFIG() {
+    return process.env["OPENCODE_CONFIG"]
+  },
+  set OPENCODE_CONFIG(value: string | undefined) {
+    if (value === undefined) delete process.env["OPENCODE_CONFIG"]
+    else process.env["OPENCODE_CONFIG"] = value
+  },
+  get OPENCODE_CONFIG_CONTENT() {
+    return process.env["OPENCODE_CONFIG_CONTENT"]
+  },
+  set OPENCODE_CONFIG_CONTENT(value: string | undefined) {
+    if (value === undefined) delete process.env["OPENCODE_CONFIG_CONTENT"]
+    else process.env["OPENCODE_CONFIG_CONTENT"] = value
+  },
+  get OPENCODE_PERMISSION() {
+    return process.env["OPENCODE_PERMISSION"]
+  },
+  set OPENCODE_PERMISSION(value: string | undefined) {
+    if (value === undefined) delete process.env["OPENCODE_PERMISSION"]
+    else process.env["OPENCODE_PERMISSION"] = value
+  },
   get OPENCODE_DISABLE_PROJECT_CONFIG() {
     return truthy("OPENCODE_DISABLE_PROJECT_CONFIG")
   },
