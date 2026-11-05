@@ -14,7 +14,7 @@ export const files = Effect.fn("ConfigPaths.projectFiles")(function* (
 ) {
   const afs = yield* AppFileSystem.Service
   return (yield* afs.up({
-    targets: [`${name}.jsonc`, `${name}.json`],
+    targets: [`${name}.jsonc`, `${name}.json`, ...(name === "opencode" ? ["config.json"] : [])],
     start: directory,
     stop: worktree,
   })).toReversed()
