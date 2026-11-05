@@ -32,9 +32,32 @@ function dir(input: ParseSource) {
 /** Apply {env:VAR} and {file:path} substitutions to config text. */
 export async function substitute(input: SubstituteInput) {
   const missing = input.missing ?? "error"
-  let text = input.text.replace(/\{env:([^}]+)\}/g, (_, varName) => {
-    return process.env[varName] || ""
-  })
+  let text = input.text
+  const envMatches = Array.from(text.matchAll(/\{env:([^}]+)\}/g))
+  if (envMatches.length) {
+    let out = ""
+    let cursor = 0
+    for (const match of envMatches) {
+      const token = match[0]
+      const varName = match[1]
+      const index = match.index!
+      out += text.slice(cursor, index)
+
+      const lineStart = text.lastIndexOf("\n", index - 1) + 1
+      const prefix = text.slice(lineStart, index).trimStart()
+      if (prefix.startsWith("//")) {
+        out += token
+        cursor = index + token.length
+        continue
+      }
+
+      const val = process.env[varName] || ""
+      out += JSON.stringify(val).slice(1, -1)
+      cursor = index + token.length
+    }
+    out += text.slice(cursor)
+    text = out
+  }
 
   const fileMatches = Array.from(text.matchAll(/\{file:[^}]+\}/g))
   if (!fileMatches.length) return text

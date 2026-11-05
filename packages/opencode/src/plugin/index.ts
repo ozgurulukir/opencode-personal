@@ -236,7 +236,7 @@ export const layer = Layer.effect(
         // Notify plugins of current config
         for (const hook of hooks) {
           yield* Effect.tryPromise({
-            try: () => Promise.resolve((hook as any).config?.(cfg)),
+            try: () => Promise.resolve((hook as any).config?.(Object.freeze({ ...cfg }))),
             catch: (err) => {
               log.error("plugin config hook failed", { error: err })
             },

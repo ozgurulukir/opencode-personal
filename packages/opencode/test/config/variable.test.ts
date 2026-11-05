@@ -62,4 +62,29 @@ describe("ConfigVariable.substitute", () => {
       }),
     ).rejects.toThrow()
   })
+  test("escapes quotes and special characters in env variables", async () => {
+    process.env.TEST_SPECIAL_VAR = 'hello "quoted" and \\slash'
+    const result = await substitute({
+      type: "virtual",
+      source: "test",
+      dir: "/dummy",
+      text: '{"msg": "{env:TEST_SPECIAL_VAR}"}',
+    })
+    expect(result).toBe('{"msg": "hello \\\"quoted\\\" and \\\\slash"}')
+    expect(JSON.parse(result)).toEqual({ msg: 'hello "quoted" and \\slash' })
+    delete process.env.TEST_SPECIAL_VAR
+  })
+
+  test("ignores env references on commented lines", async () => {
+    process.env.TEST_COMMENT_VAR = "not-ignored"
+    const result = await substitute({
+      type: "virtual",
+      source: "test",
+      dir: "/dummy",
+      text: "// {env:TEST_COMMENT_VAR}\nvalid: {env:TEST_COMMENT_VAR}",
+    })
+    expect(result).toContain("// {env:TEST_COMMENT_VAR}")
+    expect(result).toContain("valid: not-ignored")
+    delete process.env.TEST_COMMENT_VAR
+  })
 })
