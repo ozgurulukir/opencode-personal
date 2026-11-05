@@ -75,9 +75,23 @@ export const has = <A, E, R>(self: InstanceState<A, E, R>) =>
     return yield* ScopedCache.has(self.cache, yield* directory)
   })
 
+export const invalidateAll = <A, E, R>(self: InstanceState<A, E, R>) =>
+  ScopedCache.invalidateAll(self.cache)
+
 export const invalidate = <A, E, R>(self: InstanceState<A, E, R>) =>
   Effect.gen(function* () {
-    return yield* ScopedCache.invalidate(self.cache, yield* directory)
+    const ref = yield* InstanceRef
+    if (ref?.directory) {
+      return yield* ScopedCache.invalidate(self.cache, ref.directory)
+    }
+    try {
+      return yield* ScopedCache.invalidate(self.cache, Instance.directory)
+    } catch (err) {
+      if (err instanceof LocalContext.NotFound) {
+        return yield* ScopedCache.invalidateAll(self.cache)
+      }
+      throw err
+    }
   })
 
 export * as InstanceState from "./instance-state"

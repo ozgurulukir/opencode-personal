@@ -197,7 +197,7 @@ test("updates config and preserves empty shell sentinel", async () => {
     fn: async () => {
       await save({ shell: "" })
 
-      const writtenConfig = await Filesystem.readJson<{ shell?: string }>(path.join(tmp.path, "config.json"))
+      const writtenConfig = await Filesystem.readJson<{ shell?: string }>(path.join(tmp.path, "opencode.json"))
       expect(writtenConfig.shell).toBe("")
     },
   })
@@ -941,7 +941,7 @@ test("updates config and writes to file", async () => {
       const newConfig = { model: "updated/model" }
       await save(newConfig as any)
 
-      const writtenConfig = await Filesystem.readJson<{ model: string }>(path.join(tmp.path, "config.json"))
+      const writtenConfig = await Filesystem.readJson<{ model: string }>(path.join(tmp.path, "opencode.json"))
       expect(writtenConfig.model).toBe("updated/model")
     },
   })
@@ -2566,4 +2566,49 @@ test("parseManagedPlist handles empty config", async () => {
     "test:mobileconfig",
   )
   expect(config.$schema).toBe("https://opencode.ai/config.json")
+})
+test("save updates opencode.jsonc and preserves comments", async () => {
+  await using tmp = await tmpdir({
+    init: async (dir) => {
+      await Filesystem.write(
+        path.join(dir, "opencode.jsonc"),
+        `{\n  // User custom setting\n  "model": "original/model"\n}\n`,
+      )
+    },
+  })
+  await WithInstance.provide({
+    directory: tmp.path,
+    fn: async () => {
+      await save({ username: "john" })
+      const text = await Filesystem.readText(path.join(tmp.path, "opencode.jsonc"))
+      expect(text).toContain("// User custom setting")
+      expect(text).toContain('"username": "john"')
+      expect(text).toContain('"model": "original/model"')
+      const loaded = await load()
+      expect(loaded.username).toBe("john")
+      expect(loaded.model).toBe("original/model")
+    },
+  })
+})
+
+test("save immediately invalidates instance state cache", async () => {
+  await using tmp = await tmpdir({
+    init: async (dir) => {
+      await writeConfig(dir, {
+        $schema: "https://opencode.ai/config.json",
+        username: "initial-user",
+      })
+    },
+  })
+  await WithInstance.provide({
+    directory: tmp.path,
+    fn: async () => {
+      const before = await load()
+      expect(before.username).toBe("initial-user")
+
+      await save({ username: "updated-user" })
+      const after = await load()
+      expect(after.username).toBe("updated-user")
+    },
+  })
 })

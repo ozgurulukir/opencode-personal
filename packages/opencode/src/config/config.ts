@@ -369,7 +369,7 @@ export interface Interface {
   readonly get: () => Effect.Effect<Info>
   readonly getGlobal: () => Effect.Effect<Info>
   readonly getConsoleState: () => Effect.Effect<ConsoleState>
-  readonly update: (config: Info) => Effect.Effect<void>
+  readonly update: (config: Info) => Effect.Effect<{ info: Info; changed: boolean }>
   readonly updateGlobal: (config: Info) => Effect.Effect<{ info: Info; changed: boolean }>
   readonly invalidate: () => Effect.Effect<void>
   readonly directories: () => Effect.Effect<string[]>
@@ -377,6 +377,20 @@ export interface Interface {
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/Config") {}
+
+function projectConfigFile(dir: string): string {
+  const candidates = [
+    path.join(dir, "opencode.jsonc"),
+    path.join(dir, "opencode.json"),
+    path.join(dir, ".opencode", "opencode.jsonc"),
+    path.join(dir, ".opencode", "opencode.json"),
+    path.join(dir, "config.json"),
+  ]
+  for (const file of candidates) {
+    if (existsSync(file)) return file
+  }
+  return path.join(dir, "opencode.json")
+}
 
 function globalConfigFile() {
   const candidates = ["opencode.jsonc", "opencode.json", "config.json"].map((file) =>
@@ -816,15 +830,39 @@ export const layer = Layer.effect(
 
     const update = Effect.fn("Config.update")(function* (config: Info) {
       const dir = yield* InstanceState.directory
-      const file = path.join(dir, "config.json")
-      const existing = yield* loadFile(file)
-      yield* fs
-        .writeFileString(file, JSON.stringify(mergeDeep(writable(existing), writable(config)), null, 2))
-        .pipe(Effect.orDie)
+      const file = projectConfigFile(dir)
+      const before = (yield* readConfigFile(file)) ?? "{}"
+      const patch = writable(config)
+
+      let next: Info
+      let changed: boolean
+      if (!file.endsWith(".jsonc")) {
+        const existing =
+          before.trim() === "" || before.trim() === "{}"
+            ? ({} as Info)
+            : ConfigParse.effectSchema(Info, ConfigParse.jsonc(before, file), file)
+        const merged = mergeDeep(writable(existing), patch)
+        if (!merged.$schema) {
+          merged.$schema = "https://ozgurulukir.github.io/opencode-personal/config.json"
+        }
+        const serialized = JSON.stringify(merged, null, 2)
+        changed = serialized !== before
+        if (changed) yield* fs.writeFileString(file, serialized).pipe(Effect.orDie)
+        next = merged
+      } else {
+        const updated = patchJsonc(before, patch)
+        next = ConfigParse.effectSchema(Info, ConfigParse.jsonc(updated, file), file)
+        changed = updated !== before
+        if (changed) yield* fs.writeFileString(file, updated).pipe(Effect.orDie)
+      }
+
+      if (changed) yield* invalidate()
+      return { info: next, changed }
     })
 
     const invalidate = Effect.fn("Config.invalidate")(function* () {
       yield* invalidateGlobal
+      yield* InstanceState.invalidate(state)
     })
 
     const updateGlobal = Effect.fn("Config.updateGlobal")(function* (config: Info) {
