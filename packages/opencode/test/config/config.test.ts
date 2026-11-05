@@ -2567,6 +2567,7 @@ test("parseManagedPlist handles empty config", async () => {
   )
   expect(config.$schema).toBe("https://opencode.ai/config.json")
 })
+
 test("save updates opencode.jsonc and preserves comments", async () => {
   await using tmp = await tmpdir({
     init: async (dir) => {
@@ -2612,3 +2613,95 @@ test("save immediately invalidates instance state cache", async () => {
     },
   })
 })
+
+test("merges and deduplicates array fields across global and local configs", async () => {
+  await using globalTmp = await tmpdir()
+  await using localTmp = await tmpdir({
+    init: async (dir) => {
+      await writeConfig(dir, {
+        $schema: "https://opencode.ai/config.json",
+        disabled_providers: ["duplicate-disabled", "local-disabled"],
+        skills: { paths: ["local-skill-path"] },
+        server: { cors: ["https://local.example.com"] },
+      })
+    },
+  })
+
+  const prev = Global.Path.config
+  ;(Global.Path as { config: string }).config = globalTmp.path
+  try {
+    await writeConfig(globalTmp.path, {
+      $schema: "https://opencode.ai/config.json",
+      disabled_providers: ["duplicate-disabled", "global-disabled"],
+      skills: { paths: ["global-skill-path"] },
+      server: { cors: ["https://global.example.com"] },
+    })
+
+    await WithInstance.provide({
+      directory: localTmp.path,
+      fn: async () => {
+        const cfg = await load()
+        expect(cfg.disabled_providers).toEqual(["duplicate-disabled", "global-disabled", "local-disabled"])
+        expect(cfg.skills?.paths).toEqual(["global-skill-path", "local-skill-path"])
+        expect(cfg.server?.cors).toEqual(["https://global.example.com", "https://local.example.com"])
+      },
+    })
+  } finally {
+    ;(Global.Path as { config: string }).config = prev
+  }
+})
+
+test("project config overrides remote console account config", async () => {
+  const fakeAccount = Layer.mock(Account.Service)({
+    active: () =>
+      Effect.succeed(
+        Option.some({
+          id: AccountID.make("acc_1"),
+          email: "test@example.com",
+          active_org_id: OrgID.make("org_1"),
+          url: "https://console.example.com",
+          workspaces: [],
+        }),
+      ),
+    activeOrg: () => Effect.succeed(Option.none()),
+    config: () =>
+      Effect.succeed(
+        Option.some({
+          model: "org/default-model",
+          username: "org-user",
+        }),
+      ),
+    token: () => Effect.succeed(Option.some(AccessToken.make("fake-token"))),
+  })
+
+  const customLayer = Config.layer.pipe(
+    Layer.provide(testFlock),
+    Layer.provide(AppFileSystem.defaultLayer),
+    Layer.provide(Env.defaultLayer),
+    Layer.provide(emptyAuth),
+    Layer.provide(fakeAccount),
+    Layer.provideMerge(infra),
+    Layer.provide(noopNpm),
+  )
+
+  await using tmp = await tmpdir({
+    init: async (dir) => {
+      await writeConfig(dir, {
+        $schema: "https://opencode.ai/config.json",
+        model: "project/custom-model",
+      })
+    },
+  })
+
+  await WithInstance.provide({
+    directory: tmp.path,
+    fn: async () => {
+      const cfg = await Effect.runPromise(
+        Config.Service.use((svc) => svc.get()).pipe(Effect.scoped, Effect.provide(customLayer)),
+      )
+      expect(cfg.model).toBe("project/custom-model")
+      expect(cfg.username).toBe("org-user")
+    },
+  })
+})
+

@@ -659,13 +659,13 @@ export const layer = Layer.effect(
           Object.entries(config),
           ([key, mcp]) =>
             Effect.gen(function* () {
-              if (!isMcpConfigured(mcp)) {
-                log.error("Ignoring MCP config entry without type", { key })
+              if (mcp && typeof mcp === "object" && mcp.enabled === false) {
+                s.status[key] = { status: "disabled" }
                 return
               }
 
-              if (mcp.enabled === false) {
-                s.status[key] = { status: "disabled" }
+              if (!isMcpConfigured(mcp)) {
+                log.error("Ignoring MCP config entry without type", { key })
                 return
               }
 
