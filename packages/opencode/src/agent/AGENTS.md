@@ -14,7 +14,7 @@
 
 ## `prompt()` must merge, not overwrite, session permission
 
-`session/loop/tools.ts:83,118` converts `input.tools` to permission rules and **must use `Permission.merge(session.permission ?? [], permissions)`**, not overwrite (`session.permission = permissions`). Overwriting destroys parent denies set by `subagentSessionPermission`, making Plan Mode's `edit: { "*": "deny" }` ineffective at runtime (the #26514 fix). Tests that stub `prompt()` (e.g., `v2/session.test.ts`) don't catch this — only a real `prompt()` call triggers the overwrite path.
+`prompt()` converts `input.tools` to permission rules via `toolsToPermissions` at `session/prompt.ts:215-223` (primary_tools keys stripped at `:216-218`, `Permission.dedupe(Permission.merge(...))` at `:222`) and **must use `Permission.merge(session.permission ?? [], permissions)`**, not overwrite (`session.permission = permissions`). Overwriting destroys parent denies set by `subagentSessionPermission`, making Plan Mode's `edit: { "*": "deny" }` ineffective at runtime (the #26514 fix). Tests that stub `prompt()` (e.g., `v2/session.test.ts`) don't catch this — only a real `prompt()` call triggers the overwrite path.
 
 ## `prompt.ts` has two `ctx.ask` wiring points with different ruleset composition
 
