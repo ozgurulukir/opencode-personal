@@ -9,6 +9,7 @@ import type { SessionPrompt } from "../../src/session/prompt"
 import { MessageID, PartID, SessionID } from "../../src/session/schema"
 import { ModelID, ProviderID } from "../../src/provider/schema"
 import { TaskTool, type TaskPromptOps } from "../../src/tool/task"
+import { FALLBACK_DENY } from "../../src/agent/subagent-permissions"
 import { Truncate } from "@/tool/truncate"
 import { Instance } from "../../src/project/instance"
 import { ToolRegistry } from "@/tool/registry"
@@ -209,7 +210,7 @@ describe("tool.task", () => {
   it.instance("execute resumes an existing task session from task_id", () =>
     Effect.gen(function* () {
       const sessions = yield* Session.Service
-      const { chat, assistant } = yield* seed()
+      const { chat, assistant } = yield* seed("Pinned", "build")
       const child = yield* sessions.create({ parentID: chat.id, title: "Existing child" })
       const tool = yield* TaskTool
       const def = yield* tool.init()
@@ -246,7 +247,7 @@ describe("tool.task", () => {
 
   it.instance("execute asks by default and skips checks when bypassed", () =>
     Effect.gen(function* () {
-      const { chat, assistant } = yield* seed()
+      const { chat, assistant } = yield* seed("Pinned", "build")
       const tool = yield* TaskTool
       const def = yield* tool.init()
       const calls: unknown[] = []
@@ -292,7 +293,7 @@ describe("tool.task", () => {
 
   it.instance("execute cancels child session when abort signal fires", () =>
     Effect.gen(function* () {
-      const { chat, assistant } = yield* seed()
+      const { chat, assistant } = yield* seed("Pinned", "build")
       const tool = yield* TaskTool
       const def = yield* tool.init()
       const ready = defer<SessionPrompt.PromptInput>()
@@ -342,7 +343,7 @@ describe("tool.task", () => {
 
   it.instance("execute runs cancel inside instance context (bridged), no context-found defect", () =>
     Effect.gen(function* () {
-      const { chat, assistant } = yield* seed()
+      const { chat, assistant } = yield* seed("Pinned", "build")
       const tool = yield* TaskTool
       const def = yield* tool.init()
       const ready = defer<SessionPrompt.PromptInput>()
@@ -398,7 +399,7 @@ describe("tool.task", () => {
 
   it.instance("execute fails when task_id does not exist", () =>
     Effect.gen(function* () {
-      const { chat, assistant } = yield* seed()
+      const { chat, assistant } = yield* seed("Pinned", "build")
       const tool = yield* TaskTool
       const def = yield* tool.init()
       const promptOps = stubOps({ text: "created" })
@@ -431,7 +432,7 @@ describe("tool.task", () => {
   it.instance("execute creates a child when task_id is omitted", () =>
     Effect.gen(function* () {
       const sessions = yield* Session.Service
-      const { chat, assistant } = yield* seed()
+      const { chat, assistant } = yield* seed("Pinned", "build")
       const tool = yield* TaskTool
       const def = yield* tool.init()
       let seen: SessionPrompt.PromptInput | undefined
@@ -466,7 +467,7 @@ describe("tool.task", () => {
   it.instance("execute succeeds and defaults title when description is omitted", () =>
     Effect.gen(function* () {
       const sessions = yield* Session.Service
-      const { chat, assistant } = yield* seed()
+      const { chat, assistant } = yield* seed("Pinned", "build")
       const tool = yield* TaskTool
       const def = yield* tool.init()
       const promptOps = stubOps({ text: "ok" })
@@ -500,7 +501,7 @@ describe("tool.task", () => {
     () =>
       Effect.gen(function* () {
         const sessions = yield* Session.Service
-        const { chat, assistant } = yield* seed()
+        const { chat, assistant } = yield* seed("Pinned", "build")
         const tool = yield* TaskTool
         const def = yield* tool.init()
         let seen: SessionPrompt.PromptInput | undefined
@@ -526,9 +527,39 @@ describe("tool.task", () => {
 
         const child = yield* sessions.get(result.metadata.sessionId)
         expect(child.parentID).toBe(chat.id)
+        // Finding 8 collateral: parent is seeded with agent "build" (not null)
+        // so parentAgent is the live build agent. build's deny ruleset
+        // (question/plan_enter/plan_exit/repo_clone/repo_overview from agent
+        // defaults) is deny-filtered onto the child after the derived
+        // todowrite deny; primary_tools allows still append last.
         expect(child.permission).toEqual([
           {
             permission: "todowrite",
+            pattern: "*",
+            action: "deny",
+          },
+          {
+            permission: "question",
+            pattern: "*",
+            action: "deny",
+          },
+          {
+            permission: "plan_enter",
+            pattern: "*",
+            action: "deny",
+          },
+          {
+            permission: "plan_exit",
+            pattern: "*",
+            action: "deny",
+          },
+          {
+            permission: "repo_clone",
+            pattern: "*",
+            action: "deny",
+          },
+          {
+            permission: "repo_overview",
             pattern: "*",
             action: "deny",
           },
@@ -569,7 +600,7 @@ describe("tool.task", () => {
   it.instance("execute rejects task_id that does not belong to this session", () =>
     Effect.gen(function* () {
       const sessions = yield* Session.Service
-      const { chat, assistant } = yield* seed()
+      const { chat, assistant } = yield* seed("Pinned", "build")
       const other = yield* sessions.create({ title: "Other session" })
       const tool = yield* TaskTool
       const def = yield* tool.init()
@@ -650,7 +681,7 @@ describe("tool.task", () => {
     "bypassAgentCheck still enforces deny rules from permissionRuleset",
     () =>
       Effect.gen(function* () {
-        const { chat, assistant } = yield* seed()
+        const { chat, assistant } = yield* seed("Pinned", "build")
         const tool = yield* TaskTool
         const def = yield* tool.init()
         const promptOps = stubOps({ text: "should not reach" })
@@ -705,7 +736,7 @@ describe("tool.task", () => {
 
   it.instance("execute dies for invalid subagent_type (characterization)", () =>
     Effect.gen(function* () {
-      const { chat, assistant } = yield* seed()
+      const { chat, assistant } = yield* seed("Pinned", "build")
       const tool = yield* TaskTool
       const def = yield* tool.init()
 
@@ -745,7 +776,7 @@ describe("tool.task", () => {
   it.instance("execute rejects subagent when max nesting depth is exceeded", () =>
     Effect.gen(function* () {
       const sessions = yield* Session.Service
-      const { chat, assistant } = yield* seed()
+      const { chat, assistant } = yield* seed("Pinned", "build")
       const tool = yield* TaskTool
       const def = yield* tool.init()
       const promptOps = stubOps({ text: "done" })
@@ -783,6 +814,80 @@ describe("tool.task", () => {
 
       expect(result.ok).toBe(false)
       expect(result.error).toContain("Maximum subagent nesting levels")
+    }),
+  )
+
+  it.instance('execute returns "Subagent produced no output parts." when the prompt produces no text', () =>
+    Effect.gen(function* () {
+      const { chat, assistant } = yield* seed("Pinned", "build")
+      const tool = yield* TaskTool
+      const def = yield* tool.init()
+      const promptOps: TaskPromptOps = {
+        cancel: () => Effect.void,
+        resolvePromptParts: (template) => Effect.succeed([{ type: "text" as const, text: template }]),
+        // No parts at all → the output-extraction branch picks the
+        // "no output parts" fallback instead of a text response.
+        prompt: (input) => Effect.sync(() => ({ ...reply(input, "unused"), parts: [] })),
+      }
+
+      const result = yield* def.execute(
+        {
+          description: "inspect bug",
+          prompt: "look into the cache key path",
+          subagent_type: "general",
+        },
+        {
+          sessionID: chat.id,
+          messageID: assistant.id,
+          agent: "build",
+          abort: new AbortController().signal,
+          extra: { promptOps },
+          messages: [],
+          metadata: () => Effect.void,
+          ask: () => Effect.void,
+        },
+      )
+
+      expect(result.output).toContain("Subagent produced no output parts.")
+    }),
+  )
+
+  it.instance("execute applies fallback deny rules when parent session agent is null", () =>
+    Effect.gen(function* () {
+      const sessions = yield* Session.Service
+      // seed() without an agent → the session row's agent field stays null.
+      const { chat, assistant } = yield* seed()
+      const parent = yield* sessions.get(chat.id)
+      // Premise: parent agent is null (fix 8 / finding 8 applies fallback).
+      expect(parent.agent ?? null).toBeNull()
+
+      const tool = yield* TaskTool
+      const def = yield* tool.init()
+      const result = yield* def.execute(
+        {
+          description: "inspect bug",
+          prompt: "look into the cache key path",
+          subagent_type: "general",
+        },
+        {
+          sessionID: chat.id,
+          messageID: assistant.id,
+          agent: "build",
+          abort: new AbortController().signal,
+          extra: { promptOps: stubOps({ text: "done" }) },
+          messages: [],
+          metadata: () => Effect.void,
+          ask: () => Effect.void,
+        },
+      )
+
+      const child = yield* sessions.get(result.metadata.sessionId)
+      expect(child.permission).toBeDefined()
+      // Fix 8 (AD-2): null agent = unknown provenance → fail-closed.
+      // All 5 FALLBACK_DENY rules must be present on the child session.
+      for (const rule of FALLBACK_DENY) {
+        expect(child.permission, `missing fallback rule ${rule.permission}:${rule.action}`).toContainEqual(rule)
+      }
     }),
   )
 })

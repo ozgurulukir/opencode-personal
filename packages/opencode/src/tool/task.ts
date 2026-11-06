@@ -4,7 +4,12 @@ import { Session } from "@/session/session"
 import { SessionID, MessageID } from "../session/schema"
 import { MessageV2 } from "../session/message-v2"
 import { Agent } from "../agent/agent"
-import { subagentSessionPermission, subagentToolRestrictions, MAX_SUBAGENT_NESTING_LEVELS } from "../agent/subagent-permissions"
+import {
+  subagentSessionPermission,
+  subagentToolRestrictions,
+  resolveParentAgent,
+  checkNesting,
+} from "../agent/subagent-permissions"
 import type { SessionPrompt } from "../session/prompt"
 import { Config } from "@/config/config"
 import { Cause, Effect, Exit, Schema } from "effect"
@@ -88,50 +93,20 @@ export const TaskTool = Tool.define(
         return yield* Effect.fail(new Error(`task_id ${taskID} does not belong to this session`))
       }
       const parent = yield* sessions.get(ctx.sessionID)
-      const parentAgent = parent.agent
-        ? yield* agent.get(parent.agent).pipe(
-            Effect.map((a) =>
-              a ??
-              ({
-                permission: [
-                  { permission: "edit", pattern: "*", action: "deny" },
-                  { permission: "write", pattern: "*", action: "deny" },
-                  { permission: "bash", pattern: "*", action: "deny" },
-                  { permission: "task", pattern: "*", action: "deny" },
-                  { permission: "todowrite", pattern: "*", action: "deny" },
-                ],
-              } as Agent.Info),
-            ),
-            Effect.catchCause((cause) =>
-              Effect.gen(function* () {
-                log.warn("parent agent not found, applying fallback deny rules", {
-                  parentAgent: parent.agent,
-                  cause: Cause.squash(cause),
-                })
-                return {
-                  permission: [
-                    { permission: "edit", pattern: "*", action: "deny" },
-                    { permission: "write", pattern: "*", action: "deny" },
-                    { permission: "bash", pattern: "*", action: "deny" },
-                    { permission: "task", pattern: "*", action: "deny" },
-                    { permission: "todowrite", pattern: "*", action: "deny" },
-                  ],
-                } as Agent.Info
-              }),
-            ),
-          )
-        : undefined
+      // Fix 4 + fix 8: pass parent.agent un-gated — resolveParentAgent
+      // applies FALLBACK_DENY (with warn) for null/undefined/missing agents
+      // (AD-2 fail-closed).
+      const parentAgent = yield* resolveParentAgent({
+        name: parent.agent,
+        get: (name) => agent.get(name),
+      })
 
-      for (let depth = 0, currentParentID: SessionID | undefined = ctx.sessionID; currentParentID; ) {
-        depth++
-        if (depth >= MAX_SUBAGENT_NESTING_LEVELS) {
-          return yield* Effect.fail(
-            new Error(`Maximum subagent nesting levels (${MAX_SUBAGENT_NESTING_LEVELS}) exceeded`),
-          )
-        }
-        const ancestor: Session.Info = yield* sessions.get(currentParentID)
-        currentParentID = ancestor.parentID
-      }
+      yield* checkNesting({
+        startID: ctx.sessionID,
+        // orDie: a missing ancestor mid-walk is a data-integrity defect
+        // (matches the previous execute-boundary orDie on sessions.get).
+        get: (id) => sessions.get(id).pipe(Effect.orDie),
+      })
 
       const nextSession =
         session ??
@@ -221,7 +196,13 @@ export const TaskTool = Tool.define(
           Effect.gen(function* () {
             if (Exit.hasInterrupts(exit) && !cancelled) {
               cancelled = true
-              yield* cancel
+              // Fix 5: match V2 release-handler parity — cancel errors are
+              // logged and suppressed so cleanup never defects.
+              yield* cancel.pipe(
+                Effect.catch((error) =>
+                  Effect.sync(() => log.warn("subagent cancel failed", { error: String(error) })),
+                ),
+              )
             }
           }).pipe(
             Effect.ensuring(
