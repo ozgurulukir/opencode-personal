@@ -376,8 +376,12 @@ it.live("legacy prompt tools append literal permission rules and persist session
         parts: [{ type: "text", text: "hello" }],
       })
       const saved = yield* sessions.get(chat.id)
+      // Permission.dedupe keeps the LAST rule per (permission, pattern) after
+      // the merge, so the session's original write deny collapses into the
+      // tools-derived allow. evaluate() already preferred that allow via
+      // findLast, so effective precedence is unchanged; parent denies for keys
+      // NOT re-declared in the tools map still survive the merge.
       expect(saved.permission).toEqual([
-        { permission: "write", pattern: "*", action: "deny" },
         { permission: "write", pattern: "*", action: "allow" },
         { permission: "patch", pattern: "*", action: "deny" },
         { permission: "mcp_*", pattern: "*", action: "allow" },

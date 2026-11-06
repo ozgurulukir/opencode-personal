@@ -212,9 +212,14 @@ export const engineLayer = Layer.effect(
         )
         yield* sessions.touch(input.sessionID)
 
-        const permissions = Permission.fromConfig(toolsToPermissions(input.tools))
+        const cfg = yield* config.get()
+        const primary = new Set(cfg.experimental?.primary_tools ?? [])
+        const derived = Object.fromEntries(
+          Object.entries(toolsToPermissions(input.tools)).filter(([tool]) => !primary.has(tool)),
+        )
+        const permissions = Permission.fromConfig(derived)
         if (permissions.length > 0) {
-          session.permission = Permission.merge(session.permission ?? [], permissions)
+          session.permission = Permission.dedupe(Permission.merge(session.permission ?? [], permissions))
           yield* sessions.setPermission({ sessionID: session.id, permission: session.permission })
         }
 
@@ -329,7 +334,7 @@ export const PromptInput = Schema.Struct({
   noReply: Schema.optional(Schema.Boolean),
   tools: Schema.optional(Schema.Record(Schema.String, Schema.Boolean)).annotate({
     description:
-      "@deprecated tools and permissions have been merged, you can set permissions on the session itself now",
+      "Merged into `session.permission` at `prompt()` (tools→permission denies, primary_tools keys excluded) and persisted on the user message (`create-user-message.ts`), where `llm.ts` uses it to hide `{tool:false}` entries from the LLM tool map. Load-bearing for subagent tool restrictions — do not remove.",
   }),
   format: Schema.optional(MessageV2.Format),
   system: Schema.optional(Schema.String),
