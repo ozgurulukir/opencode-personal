@@ -14,6 +14,7 @@ import {
   type ScrollbackSurface,
 } from "@opentui/core"
 import { entryBody, entryCanStream, entryDone, entryFlags } from "./entry.body"
+import * as Log from "@opencode-ai/core/util/log"
 import { withRunSpan } from "./otel"
 import { entryColor, entryLook, entrySyntax } from "./scrollback.shared"
 import { entryWriter, sameEntryGroup, separatorRows, spacerWriter } from "./scrollback.writer"
@@ -23,6 +24,9 @@ import type { RunDiffStyle, RunEntryBody, StreamCommit } from "./types"
 type ActiveBody = Exclude<RunEntryBody, { type: "none" | "structured" }>
 
 type ActiveEntry = {
+  // Warn-once flag: set when the streaming row-fallback commits rows without
+  // block-level accounting, so degraded streaming is visible instead of silently absorbed.
+  fallbackWarned: boolean
   body: ActiveBody
   commit: StreamCommit
   surface: ScrollbackSurface
@@ -176,6 +180,7 @@ export class RunScrollbackStream {
       pendingSpacerRows: rows || (!this.rendered && this.wrote ? 1 : 0),
       rendered: false,
       lastSettledContent: "",
+    fallbackWarned: false,
     }
   }
 
@@ -306,6 +311,11 @@ export class RunScrollbackStream {
     // Force-commit the full surface height so the trailing content reaches
     // scrollback before the surface is torn down.
     if (done && active.surface.height > active.committedRows) {
+      Log.Default.warn("scrollback: force-committed full surface on finish", {
+        committed: active.committedRows,
+        height: active.surface.height,
+        contentLength: active.content.length,
+      })
       this.flushPendingSpacer(active)
       active.surface.commitRows(0, active.surface.height, { trailingNewline })
       active.committedBlocks = renderable._blockStates.length
@@ -321,6 +331,13 @@ export class RunScrollbackStream {
     // to stabilize. Advance committedBlocks to _stableBlockCount so the
     // next successful commitMarkdownBlocks call doesn't re-commit these rows.
     if (!done && contentChanged && active.surface.height > active.committedRows) {
+      if (!active.fallbackWarned) {
+        Log.Default.warn("scrollback: streaming row-fallback engaged", {
+          committed: active.committedRows,
+          height: active.surface.height,
+        })
+        active.fallbackWarned = true
+      }
       this.flushPendingSpacer(active)
       const targetRows = Math.max(active.committedRows, active.surface.height - 1)
       if (targetRows > active.committedRows) {
