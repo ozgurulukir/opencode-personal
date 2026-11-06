@@ -21,6 +21,7 @@ import { useEvent } from "@tui/context/event"
 import { SplitBorder } from "@tui/component/border"
 import { Spinner } from "@tui/component/spinner"
 import { ThemedDiff } from "@tui/component/diff-block"
+import { AssistantMarkdown } from "@tui/component/assistant-markdown"
 import { selectedForeground, useTheme } from "@tui/context/theme"
 import { BoxRenderable, ScrollBoxRenderable, addDefaultParsers, TextAttributes, RGBA } from "@opentui/core"
 import { Prompt, type PromptRef } from "@tui/component/prompt"
@@ -70,7 +71,6 @@ import { DialogForkFromTimeline } from "./dialog-fork-from-timeline"
 import { DialogSessionRename } from "../../component/dialog-session-rename"
 import { Sidebar } from "./sidebar"
 import { SubagentFooter } from "./subagent-footer.tsx"
-import { Flag } from "@opencode-ai/core/flag/flag"
 import { LANGUAGE_EXTENSIONS } from "@/lsp/language"
 import parsers from "../../../../../../parsers-config.ts"
 import * as Clipboard from "../../util/clipboard"
@@ -1228,29 +1228,7 @@ export function Session() {
                               <Show when={compaction.summary}>
                                 {(summary) => (
                                   <box paddingLeft={3} paddingTop={1}>
-                                    <Switch>
-                                      <Match when={Flag.OPENCODE_EXPERIMENTAL_MARKDOWN}>
-                                        <markdown
-                                          syntaxStyle={syntax()}
-                                          streaming={true}
-                                          content={summary().trim()}
-                                          conceal={conceal()}
-                                          fg={theme.markdownText}
-                                          bg={theme.background}
-                                        />
-                                      </Match>
-                                      <Match when={!Flag.OPENCODE_EXPERIMENTAL_MARKDOWN}>
-                                        <code
-                                          filetype="markdown"
-                                          drawUnstyledText={false}
-                                          streaming={true}
-                                          syntaxStyle={syntax()}
-                                          content={summary().trim()}
-                                          conceal={conceal()}
-                                          fg={theme.text}
-                                        />
-                                      </Match>
-                                    </Switch>
+                                    <AssistantMarkdown content={summary().trim()} conceal={conceal()} syntax={syntax()} />
                                   </box>
                                 )}
                               </Show>
@@ -1593,33 +1571,11 @@ function ReasoningPart(props: { last: boolean; part: ReasoningPart; message: Ses
 
 function TextPart(props: { last: boolean; part: TextPart; message: SessionMessageAssistant; sessionID: string }) {
   const ctx = use()
-  const { theme, syntax } = useTheme()
+  const { syntax } = useTheme()
   return (
     <Show when={props.part.text.trim()}>
       <box id={"text-" + props.part.id} paddingLeft={3} marginTop={1} flexShrink={0}>
-        <Switch>
-          <Match when={Flag.OPENCODE_EXPERIMENTAL_MARKDOWN}>
-            <markdown
-              syntaxStyle={syntax()}
-              streaming={true}
-              content={props.part.text.trim()}
-              conceal={ctx.conceal()}
-              fg={theme.markdownText}
-              bg={theme.background}
-            />
-          </Match>
-          <Match when={!Flag.OPENCODE_EXPERIMENTAL_MARKDOWN}>
-            <code
-              filetype="markdown"
-              drawUnstyledText={false}
-              streaming={true}
-              syntaxStyle={syntax()}
-              content={props.part.text.trim()}
-              conceal={ctx.conceal()}
-              fg={theme.text}
-            />
-          </Match>
-        </Switch>
+        <AssistantMarkdown content={props.part.text.trim()} conceal={ctx.conceal()} syntax={syntax()} />
       </box>
     </Show>
   )
