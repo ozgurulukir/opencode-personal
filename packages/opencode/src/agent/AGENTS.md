@@ -6,23 +6,23 @@
 
 ## primary_tools — allow in permission, false in tools
 
-`primary_tools` are simultaneously `allow`ed in the session permission (`subagentSessionPermission`) and `false`d in the tools list (`subagentToolRestrictions`). This is intentional: session permission `allow` means slash-command invocations don't block, but tools list `false` means the LLM can't call them directly. Primary tools are for the primary agent only; indirect access via slash commands is permitted.
+`primary_tools` are simultaneously `allow`ed in the session permission (`subagentSessionPermission`) and `false`d in the tools list (`subagentToolRestrictions`). This is intentional: session permission `allow` means slash-command invocations don't block, but tools list `false` means the LLM can't call them directly. Primary tools are for the primary agent only; indirect access via slash commands is permitted. This intent now holds at runtime: `prompt()` excludes `primary_tools` keys from the tools→permission merge (`session/prompt.ts:216-218`, dedupe at `:222`) so these allows are not killed after the first prompt.
 
-## `deriveSubagentSessionPermission` — deny-only forwarding, dedupe last-wins
+## `deriveSubagentSessionPermission` — full parent-session spread, parent-agent deny-filtered, dedupe last-wins
 
-`deriveSubagentSessionPermission` forwards **only deny rules and external_directory rules** from the parent, NOT allow or ask rules. This is least-privilege by design — parent allows don't automatically grant subagent access. `Permission.dedupe()` collapses duplicate `(permission, pattern)` entries keeping the last occurrence (last match wins in `evaluate`), so parent agent denies (listed last) take priority over parent session denies for the same key.
+`deriveSubagentSessionPermission` spreads the **FULL** `parentSessionPermission` (`agent/subagent-permissions.ts:42`) — parent session allows/asks/directory rules are forwarded as-is. Only the parent-**agent** contribution is deny-filtered (`subagent-permissions.ts:40`: `parentAgent.permission.filter(rule => rule.action === "deny")`); parent agent allows/asks do not automatically grant subagent access, while agent-level denies (e.g. Plan Mode) ride along last. Default `task`/`todowrite` denies are appended when the subagent's own ruleset lacks them. `Permission.dedupe()` collapses duplicate `(permission, pattern)` entries keeping the last occurrence (last match wins in `evaluate`), so parent agent denies (listed last) take priority over parent session denies for the same key.
 
 ## `prompt()` must merge, not overwrite, session permission
 
-`session/loop/tools.ts:79,103` converts `input.tools` to permission rules and **must use `Permission.merge(session.permission ?? [], permissions)`**, not overwrite (`session.permission = permissions`). Overwriting destroys parent denies set by `subagentSessionPermission`, making Plan Mode's `edit: { "*": "deny" }` ineffective at runtime (the #26514 fix). Tests that stub `prompt()` (e.g., `v2/session.test.ts`) don't catch this — only a real `prompt()` call triggers the overwrite path.
+`session/loop/tools.ts:83,118` converts `input.tools` to permission rules and **must use `Permission.merge(session.permission ?? [], permissions)`**, not overwrite (`session.permission = permissions`). Overwriting destroys parent denies set by `subagentSessionPermission`, making Plan Mode's `edit: { "*": "deny" }` ineffective at runtime (the #26514 fix). Tests that stub `prompt()` (e.g., `v2/session.test.ts`) don't catch this — only a real `prompt()` call triggers the overwrite path.
 
 ## `prompt.ts` has two `ctx.ask` wiring points with different ruleset composition
 
-**Normal tool execution** (`session/loop/tools.ts:79`): `ruleset: Permission.merge(input.agent.permission, input.session.permission ?? [])` — merges the CURRENT session's agent permission with the current session's permission.
+**Normal tool execution** (`session/loop/tools.ts:118`): `ruleset: Permission.merge(input.agent.permission, input.session.permission ?? [])` — merges the CURRENT session's agent permission with the current session's permission.
 
-**Subagent task execution** (`session/loop/subtask.ts:132`): `ruleset: Permission.merge(taskAgent.permission, session.permission ?? [])` — merges the SUBAGENT's agent permission with the **PARENT** session's permission, NOT the subagent session's permission. The subagent session's permission (from `subagentSessionPermission`) is already baked into `taskAgent.permission` via the permission derivation at session creation time, so re-merging it here would double-apply deny rules.
+**Subagent task execution** (`session/loop/subtask.ts:112`): `ruleset: Permission.merge(parentAgent?.permission ?? [], session.permission ?? [])` — merges the **parent's** agent permission (resolved at `subtask.ts:102`) with the **PARENT** session's permission, NOT the subagent session's permission. `taskAgent` at `subtask.ts:103-110` is an existence-check only (it throws `Unknown` when the named agent is missing) — agents are never mutated, and the child's derived permission lives on the session row via `subagentSessionPermission`, not on any agent object. Command subtasks set `bypassAgentCheck: true` (`subtask.ts:123`), bypassing the spawn ask while deny evaluation still applies.
 
-This distinction matters when debugging permission prompts inside subagents: the `ruleset` evaluated at `session/loop/subtask.ts:132` does not include the subagent session's `subagentSessionPermission` deny rules — those live on the agent's `permission` field already.
+This distinction matters when debugging permission prompts inside subagents: the `ruleset` evaluated at `session/loop/subtask.ts:112` does not include the subagent session's `subagentSessionPermission` deny rules — those live on the child session row (via `subagentSessionPermission`), not on any agent's `permission` field.
 
 ## Shared helpers between V1 and V2
 

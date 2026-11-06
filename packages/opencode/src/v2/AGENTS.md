@@ -105,17 +105,31 @@ the child loop is driven via the shared engine, and the result is surfaced throu
 the event projection. If a caller needs the structured return value, it should read the
 synthetic message from the parent's `messages()`.
 
-## V2 subagent() fallback deny rules when parent agent is not found
+## V2 subagent() fallback deny rules when parent agent is not resolvable
 
-When the parent session's agent is not found (e.g., deleted or renamed), `subagent()`
-applies a conservative fallback deny ruleset (`edit`, `write`, `bash`, `task`,
-`todowrite` denied) instead of silently skipping all parent agent deny rules. This
-closes a security hole where Plan Mode's `edit: { "*": "deny" }` would be bypassed if
-the parent agent was missing. The V2 fallback set is identical to V1
-(`tool/task.ts`): denying `task`/`todowrite` too prevents a missing parent from
-silently widening the subagent's tool surface to recursive subagents and TodoWrite.
-The fallback is applied via `Effect.catchCause` in `v2/session.ts` and matches V1
-behavior.
+When the parent session's agent cannot be resolved, `subagent()` applies a
+conservative fallback deny ruleset (`FALLBACK_DENY`: `edit`, `write`, `bash`, `task`,
+`todowrite` denied — `agent/subagent-permissions.ts:16-22`) instead of silently
+skipping all parent agent deny rules. This closes a security hole where Plan Mode's
+`edit: { "*": "deny" }` would be bypassed if the parent agent was missing. Denying
+`task`/`todowrite` too prevents a missing parent from silently widening the
+subagent's tool surface to recursive subagents and TodoWrite. The fallback is
+applied by the shared `resolveParentAgent()` helper (`subagent-permissions.ts:104-137`),
+which logs a warning in the null-agent (`:112`), not-found (`:121`), and defect
+(`:129`) branches — a null `parent.agent` now applies fallback too (fix 8), matching
+V1 `tool/task.ts`, which uses the same helper.
+
+## V2 subagent() is API-surface-only and deny-gated (no user ask yet)
+
+As of 2026-11-06, `subagent()` has zero production callers — it is API-surface-only.
+Before any child prompt/create, it runs a deny pre-check (fix 1):
+`Permission.evaluate("task", input.agent, ruleset)` at `v2/session.ts:724`, where
+`ruleset = Permission.merge(gateAgent?.permission ?? [], parent.permission ?? [])`
+(`v2/session.ts:722-723`) — the parent's LIVE agent permission when resolvable plus
+the parent session rules, deliberately NOT `resolveParentAgent`'s `FALLBACK_DENY`
+(the fallback carries `task:*`, which would refuse every spawn from an agent-less
+parent). No user ask runs until a caller supplies tool-call context (message/call
+IDs) to route the permission prompt; the deny pre-check is unconditional.
 
 ## V2 subagent() max nesting depth
 
@@ -143,15 +157,18 @@ distinguish between "had parts but none were text" and "completely empty output.
 
 `Effect.acquireUseRelease`'s release handler runs during cleanup. If `cancelChild`
 fails there, the defect propagates uncaught. Wrap `yield* cancelChild` in
-`Effect.catch` to log and suppress cleanup errors, matching the V1 TaskTool pattern
-(`tool/task.ts:173`).
+`Effect.catch` to log and suppress cleanup errors (V2 release wrap:
+`v2/session.ts:854-860`), matching the V1 TaskTool pattern (`tool/task.ts:199-206`,
+`log.warn` at `:203`; the onAbort site is `tool/task.ts:148`, not the release
+handler).
 
 ## V2 subagent() accepts `description` for child session titles
 
 The V2 `subagent()` interface now includes `description?: string`. The child session
-title is `${input.description ?? "Subagent"} @${input.agent}`, matching the V1
-TaskTool's title format (`tool/task.ts:138`). This makes subagent sessions identifiable
-in the session list.
+title is `${input.description ?? "Subagent"} (@${input.agent} subagent)`
+(`v2/session.ts:763`, post fix 10), matching the V1 TaskTool's title format
+`` `${description} (@${agent} subagent)` `` (`tool/task.ts:115`). This makes
+subagent sessions identifiable in the session list.
 
 ## V2 `messages()` order is safe for `find()` — no compaction reordering
 
