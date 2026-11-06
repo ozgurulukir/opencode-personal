@@ -1257,6 +1257,36 @@ describe("v2.session", () => {
     }),
   )
 
+  it.instance("subagent fails when task permission denies the agent type", () =>
+    Effect.gen(function* () {
+      const session = yield* SessionV2.Service
+      // Gap (d) / fix 1: parent session rules deny spawning "general" via the
+      // task permission. Deny pre-check must fail before any child prompt runs.
+      const parent = yield* session.create({
+        agent: "build",
+        permission: [{ permission: "task", pattern: "general", action: "deny" }],
+      })
+      const promptsBefore = promptStub.calls.prompt.length
+
+      const result = yield* session
+        .subagent({
+          parentID: parent.id,
+          agent: "general",
+          prompt: { text: "should not spawn" },
+        })
+        .pipe(
+          Effect.map(() => ({ error: undefined as string | undefined })),
+          Effect.catch((error) =>
+            Effect.succeed({ error: error instanceof Error ? error.message : String(error) }),
+          ),
+        )
+
+      expect(result.error).toContain("Permission denied")
+      // No spawn occurred: the stub prompt must not have been called.
+      expect(promptStub.calls.prompt.length).toBe(promptsBefore)
+    }),
+  )
+
   it.instance("subagent rejects when max nesting depth is exceeded", () =>
     Effect.gen(function* () {
       const session = yield* SessionV2.Service
@@ -1306,6 +1336,61 @@ describe("v2.session", () => {
           read: false,
         })
       }),
+    {
+      config: {
+        experimental: {
+          primary_tools: ["bash", "read"],
+        },
+      },
+    },
+  )
+
+  it.instance("subagent shapes child permission with parent rules, derived denies, and primary allows last", () =>
+    Effect.gen(function* () {
+      const session = yield* SessionV2.Service
+      // Parent session rules (allow + ask + deny) + parent agent = "build",
+      // whose ruleset carries the default-agent deny rules.
+      const parent = yield* session.create({
+        agent: "build",
+        permission: [
+          { permission: "read", pattern: "*", action: "allow" },
+          { permission: "edit", pattern: "*", action: "ask" },
+          { permission: "bash", pattern: "*", action: "deny" },
+        ],
+      })
+
+      yield* session.subagent({
+        parentID: parent.id,
+        agent: "general",
+        prompt: { text: "do something" },
+      })
+
+      const lastCall = promptStub.calls.prompt.at(-1) as any
+      const child = yield* session.get(lastCall.sessionID)
+
+      // Full derivation output (last-match-wins order):
+      // 1. EVERY parent session rule (full forwarding, not deny-only)
+      // 2. derived todowrite/task denies (general lacks the allows)
+      // 3. parent-agent (build) deny rules — the default-agent deny set
+      // 4. primary_tools allows appended LAST by subagentSessionPermission
+      expect(child.permission).toEqual([
+        { permission: "read", pattern: "*", action: "allow" },
+        { permission: "edit", pattern: "*", action: "ask" },
+        { permission: "bash", pattern: "*", action: "deny" },
+        { permission: "todowrite", pattern: "*", action: "deny" },
+        { permission: "task", pattern: "*", action: "deny" },
+        // build = defaults deny set (question/plan_enter/plan_exit/repo_clone/
+        // repo_overview); build's later question/plan_exit allows are NOT
+        // denies, so the filtered contribution keeps the defaults' denies.
+        { permission: "question", pattern: "*", action: "deny" },
+        { permission: "plan_enter", pattern: "*", action: "deny" },
+        { permission: "plan_exit", pattern: "*", action: "deny" },
+        { permission: "repo_clone", pattern: "*", action: "deny" },
+        { permission: "repo_overview", pattern: "*", action: "deny" },
+        { permission: "bash", pattern: "*", action: "allow" },
+        { permission: "read", pattern: "*", action: "allow" },
+      ])
+    }),
     {
       config: {
         experimental: {

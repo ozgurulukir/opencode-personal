@@ -305,7 +305,6 @@ export const runLoop: (deps: RunLoopDeps, sessionID: SessionID) => Effect.Effect
               agent,
               session,
               model,
-              tools: lastUser.tools,
               processor: handle,
               bypassAgentCheck,
               messages: msgs,

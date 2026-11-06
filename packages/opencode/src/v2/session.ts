@@ -26,7 +26,8 @@ import { Permission } from "@/permission"
 import {
   subagentSessionPermission,
   subagentToolRestrictions,
-  MAX_SUBAGENT_NESTING_LEVELS,
+  resolveParentAgent,
+  checkNesting,
 } from "@/agent/subagent-permissions"
 import { NotFoundError as StorageNotFoundError } from "@/storage/storage"
 import { SessionRevert } from "@/session/revert"
@@ -695,6 +696,40 @@ export const layer = Layer.effect(
         const cfgInfo = yield* cfg.get()
         const parent = yield* result.get(input.parentID)
 
+        // Fix 4 + fix 8: pass parent.agent un-gated — resolveParentAgent
+        // applies FALLBACK_DENY (with warn) for null/undefined/missing agents
+        // (AD-2 fail-closed). Used for CHILD permission derivation below.
+        const parentAgent = yield* resolveParentAgent({
+          name: parent.agent,
+          get: (name) => agents.get(name),
+        })
+
+        // Fix 1 (AD-3): deny pre-check before agent resolution and before any
+        // child prompt/create — mirrors V1 task.ts:50-60 ordering.
+        // Ruleset = parent's LIVE agent permission (when resolvable) + parent
+        // session rules — deliberately NOT resolveParentAgent's fallback:
+        // FALLBACK_DENY carries task:* which would refuse every spawn from an
+        // agent-less parent, while V1's gate reads the loop's live agent
+        // permission (session/loop/tools.ts:84) and lets the spawn proceed
+        // (fallback applies to child permission only). No tool-call context
+        // exists to route an ask (AskInput.tool is schema-optional but
+        // TUI/run routing keys on tool.{messageID,callID} —
+        // session-data/utils.ts:157, subagent-data.ts:445 — and subagent()
+        // has no message/call identity); deny pre-check runs unconditionally;
+        // an ask must be wired when a caller (HTTP/ACP) supplies message/call
+        // identity. Do NOT capture Permission.Service for an ask until a real
+        // caller exists.
+        const gateAgent = parent.agent ? yield* agents.get(parent.agent) : undefined
+        const ruleset = Permission.merge(gateAgent?.permission ?? [], parent.permission ?? [])
+        const rule = Permission.evaluate("task", input.agent, ruleset)
+        if (rule.action === "deny") {
+          return yield* Effect.fail(
+            new Error(
+              `Permission denied: task tool cannot spawn subagent "${input.agent}" — denied by permission rules`,
+            ),
+          )
+        }
+
         const subagent = yield* agents.get(input.agent)
         if (!subagent) {
           // Die (not fail) because an invalid agent name is a programming error
@@ -703,40 +738,6 @@ export const layer = Layer.effect(
           // NotFoundError in the return type is for the parent session lookup.
           return yield* Effect.die(new Error(`Unknown agent type: ${input.agent} is not a valid agent type`))
         }
-        const parentAgent = parent.agent
-          ? yield* agents.get(parent.agent).pipe(
-              Effect.map(
-                (a) =>
-                  a ??
-                  ({
-                    permission: [
-                      { permission: "edit", pattern: "*", action: "deny" },
-                      { permission: "write", pattern: "*", action: "deny" },
-                      { permission: "bash", pattern: "*", action: "deny" },
-                      { permission: "task", pattern: "*", action: "deny" },
-                      { permission: "todowrite", pattern: "*", action: "deny" },
-                    ],
-                  } as Agent.Info),
-              ),
-              Effect.catchCause((cause) =>
-                Effect.sync(() => {
-                  log.warn("parent agent not found, applying fallback deny rules", {
-                    parentAgent: parent.agent,
-                    cause: Cause.squash(cause),
-                  })
-                  return {
-                    permission: [
-                      { permission: "edit", pattern: "*", action: "deny" },
-                      { permission: "write", pattern: "*", action: "deny" },
-                      { permission: "bash", pattern: "*", action: "deny" },
-                      { permission: "task", pattern: "*", action: "deny" },
-                      { permission: "todowrite", pattern: "*", action: "deny" },
-                    ],
-                  } as Agent.Info
-                }),
-              ),
-            )
-          : undefined
 
         const permission = subagentSessionPermission({
           parentSessionPermission: parent.permission ?? [],
@@ -745,23 +746,21 @@ export const layer = Layer.effect(
           primaryTools: cfgInfo.experimental?.primary_tools,
         })
 
-        for (let depth = 0, currentParentID: SessionID | undefined = input.parentID; currentParentID;) {
-          depth++
-          if (depth >= MAX_SUBAGENT_NESTING_LEVELS) {
-            return yield* Effect.fail(
-              new Error(`Maximum subagent nesting levels (${MAX_SUBAGENT_NESTING_LEVELS}) exceeded`),
-            )
-          }
-          const ancestor: Info = yield* result.get(currentParentID)
-          currentParentID = ancestor.parentID
-        }
+        yield* checkNesting({
+          startID: input.parentID,
+          // orDie: a missing ancestor mid-walk is a data-integrity defect.
+          get: (id) => result.get(id).pipe(Effect.orDie),
+        })
 
         const session = yield* result.create({
           agent: input.agent,
           model: input.model,
           parentID: input.parentID,
           workspaceID: parent.workspaceID,
-          title: `${input.description ?? "Subagent"} @${input.agent}`,
+          // Fix 10: match V1 task.ts title format so consumer regexes match
+          // (subagent-footer.tsx /@(\w+) subagent/, message-timeline.tsx
+          // /\s+\(@[^)]+ subagent\)$/).
+          title: `${input.description ?? "Subagent"} (@${input.agent} subagent)`,
           permission,
         })
 
@@ -783,10 +782,13 @@ export const layer = Layer.effect(
           cancelled = true
           bridge.promise(cancelChild).catch((error) => log.warn("subagent cancel failed", { error: String(error) }))
         }
-        if (input.abort) input.abort.addEventListener("abort", onAbort)
 
         yield* Effect.acquireUseRelease(
-          Effect.sync(() => {}),
+          // Fix 9: register the abort listener inside acquire (mirrors V1
+          // task.ts:180-182) so it cannot leak if acquire never runs.
+          Effect.sync(() => {
+            input.abort?.addEventListener("abort", onAbort)
+          }),
           () =>
             Effect.gen(function* () {
               yield* result.prompt({

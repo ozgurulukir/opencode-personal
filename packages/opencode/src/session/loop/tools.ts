@@ -59,7 +59,6 @@ export const resolveTools = Effect.fn("SessionPrompt.resolveTools")(function* (
     agent: Agent.Info
     model: Provider.Model
     session: Session.Info
-    tools?: Record<string, boolean>
     processor: Pick<SessionProcessor.Handle, "message" | "updateToolCall" | "completeToolCall">
     bypassAgentCheck: boolean
     messages: MessageV2.WithParts[]
