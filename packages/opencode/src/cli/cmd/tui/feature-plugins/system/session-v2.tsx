@@ -4,6 +4,7 @@ import { useSyncV2 } from "@tui/context/sync"
 import { SplitBorder } from "@tui/component/border"
 import { Spinner } from "@tui/component/spinner"
 import { ThemedDiff } from "@tui/component/diff-block"
+import { AssistantMarkdown } from "@tui/component/assistant-markdown"
 import { useTheme } from "@tui/context/theme"
 import { useLocal } from "@tui/context/local"
 import { useRenderer, useTerminalDimensions, type JSX } from "@opentui/solid"
@@ -257,15 +258,7 @@ function CompactionMessage(props: { message: SessionMessageCompaction }) {
       <Show when={props.message.summary}>
         {(summary) => (
           <box paddingLeft={3} paddingTop={1}>
-            <code
-              filetype="markdown"
-              drawUnstyledText={false}
-              streaming={false}
-              syntaxStyle={syntax()}
-              content={summary().trim()}
-              conceal={true}
-              fg={theme.text}
-            />
+            <AssistantMarkdown content={summary().trim()} streaming={false} conceal={true} syntax={syntax()} />
           </box>
         )}
       </Show>
@@ -379,19 +372,10 @@ function AssistantMessage(props: {
 }
 
 function AssistantText(props: { part: SessionMessageAssistantText; syntax: SyntaxStyle }) {
-  const { theme } = useTheme()
   return (
     <Show when={props.part.text.trim()}>
       <box paddingLeft={3} marginTop={1} flexShrink={0} id="text">
-        <code
-          filetype="markdown"
-          drawUnstyledText={false}
-          streaming={true}
-          syntaxStyle={props.syntax}
-          content={props.part.text.trim()}
-          conceal={true}
-          fg={theme.text}
-        />
+        <AssistantMarkdown content={props.part.text.trim()} conceal={true} syntax={props.syntax} />
       </box>
     </Show>
   )
