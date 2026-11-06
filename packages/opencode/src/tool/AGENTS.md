@@ -103,7 +103,7 @@ The SSRF guard in `webfetch.ts` resolves DNS before the HTTP request, but the HT
 
 ## Tool registration is invisible to code-graph tools
 
-Tools wire into the registry via `yield* ToolName` in `tool/registry.ts` (~140-151) — a generator yield, not a CALLS edge — so GitNexus/codebase-memory impact analysis on tool symbols returns 0 callers / risk UNKNOWN. Confirm consumers via text search: `tool/registry.ts` (registration + `describeTask`/`describeSkill` special cases at 376-377), `cli/cmd/run/tool.types.ts` (type map), `cli/cmd/run/tool.rules.ts` (TUI rendering).
+Tools wire into the registry via `yield* ToolName` in `tool/registry.ts` (~140-151) — a generator yield, not a CALLS edge — so GitNexus/codebase-memory impact analysis on tool symbols returns 0 callers / risk UNKNOWN. Confirm consumers via text search: `tool/registry.ts` (registration + `describeTask`/`describeSkill` definition at `tool/registry.ts:342-355`), `cli/cmd/run/tool.types.ts` (type map), `cli/cmd/run/tool.rules.ts` (TUI rendering).
 
 ## Tool parameter changes need no SDK regen
 
@@ -111,7 +111,7 @@ A tool's `Parameters` schema ships to the LLM as a runtime JSON schema — it ne
 
 ## Task/skill tool descriptions are assembled from two sources
 
-The LLM-visible description = the tool's static description (`task.txt`/`skill.txt` via `Tool.define`) joined with the dynamic catalog built by `describeTask`/`describeSkill` (`tool/registry.ts:374-380`). Changing how a tool is invoked may require updating both the `.txt` file and the registry builder.
+The LLM-visible description = the tool's static description (`task.txt`/`skill.txt` via `Tool.define`) joined with the dynamic catalog built by `describeTask`/`describeSkill` (`tool/registry.ts:384-385`, invocation). Changing how a tool is invoked may require updating both the `.txt` file and the registry builder.
 
 ## LLM shell tool order + exit semantics
 
