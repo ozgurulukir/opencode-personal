@@ -58,6 +58,18 @@ import type {
   StreamCommit,
 } from "./types"
 
+import * as Log from "@opencode-ai/core/util/log"
+import { errorMessage, safeCatch } from "@/util/error"
+
+// Stream teardown after an abort is expected to reject; only surface
+// non-abort teardown failures, which used to be swallowed silently.
+function ignoreAbort(context: string) {
+  return (error: unknown) => {
+    if (error instanceof Error && (error.name === "AbortError" || /\babort/i.test(error.message))) return
+    Log.Default.warn(`[${context}]`, { error: errorMessage(error) })
+  }
+}
+
 type Trace = {
   write(type: string, data?: unknown): void
 }
@@ -421,12 +433,12 @@ function createLayer(input: StreamInput) {
             ),
             (events) =>
               Effect.sync(() => {
-                void events.stream.return(undefined).catch(() => {})
+                void events.stream.return(undefined).catch(ignoreAbort("stream.teardown"))
               }),
           ),
         )
         closeStream = () => {
-          void events.stream.return(undefined).catch(() => {})
+          void events.stream.return(undefined).catch(ignoreAbort("stream.teardown"))
         }
         input.trace?.write("recv.subscribe", {
           sessionID: input.sessionID,
@@ -879,7 +891,7 @@ const reconnect = Effect.fn("RunStreamTransport.reconnect")(function* () {
               input.sdk.global.event({ signal: abort.signal }),
             )
             closeStream = () => {
-              void newEvents.stream.return(undefined).catch(() => {})
+              void newEvents.stream.return(undefined).catch(ignoreAbort("stream.teardown"))
             }
             yield* loop(newEvents.stream)
           })
@@ -1153,7 +1165,7 @@ export async function createSessionTransport(input: StreamInput): Promise<Sessio
   return {
     runPromptTurn: (next) => runtime.runPromise((svc) => svc.runPromptTurn(next)),
     selectSubagent: (sessionID) => {
-      void runtime.runPromise((svc) => svc.selectSubagent(sessionID)).catch(() => {})
+      void runtime.runPromise((svc) => svc.selectSubagent(sessionID)).catch((error) => safeCatch("subagent.select", error))
     },
     close: () => runtime.runPromise((svc) => svc.close()),
   }
