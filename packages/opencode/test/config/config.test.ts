@@ -984,7 +984,7 @@ test("injects $schema on project update but not on global update", async () => {
 })
 
 test("updateGlobal handles empty and empty-object global config files without crashing", async () => {
-  for (const content of ["", "{}"]) {
+  for (const content of ["", "{}", "  \n"]) {
     for (const filename of ["opencode.json", "opencode.jsonc"]) {
       await using globalTmp = await tmpdir({
         init: async (dir) => {

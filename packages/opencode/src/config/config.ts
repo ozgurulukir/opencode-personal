@@ -528,7 +528,8 @@ export const layer = Layer.effect(
     const loadFile = Effect.fnUntraced(function* (filepath: string) {
       log.info("loading", { path: filepath })
       const text = yield* readConfigFile(filepath)
-      if (!text) return {} as Info
+      // Whitespace-only files parse to undefined and crash effectSchema — treat them as empty.
+      if (!text?.trim()) return {} as Info
       return yield* loadConfig(text, { path: filepath })
     })
 
