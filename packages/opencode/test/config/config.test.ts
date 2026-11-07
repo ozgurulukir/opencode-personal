@@ -947,6 +947,69 @@ test("updates config and writes to file", async () => {
   })
 })
 
+test("injects $schema on project update but not on global update", async () => {
+  await using tmp = await tmpdir()
+  await WithInstance.provide({
+    directory: tmp.path,
+    fn: async () => {
+      await save({ model: "updated/model" } as any)
+
+      const writtenConfig = await Filesystem.readJson<{ $schema?: string }>(path.join(tmp.path, "opencode.json"))
+      expect(writtenConfig.$schema).toBe("https://ozgurulukir.github.io/opencode-personal/config.json")
+    },
+  })
+
+  await using globalTmp = await tmpdir({
+    init: async (dir) => {
+      await writeConfig(dir, { model: "a/b" }, "opencode.json")
+    },
+  })
+  const prev = Global.Path.config
+  ;(Global.Path as { config: string }).config = globalTmp.path
+  await clear(true)
+
+  try {
+    await saveGlobal({ shell: "bash" })
+
+    const writtenConfig = await Filesystem.readJson<{ $schema?: string; shell?: string; model?: string }>(
+      path.join(globalTmp.path, "opencode.json"),
+    )
+    expect(writtenConfig.$schema).toBeUndefined()
+    expect(writtenConfig.shell).toBe("bash")
+    expect(writtenConfig.model).toBe("a/b")
+  } finally {
+    ;(Global.Path as { config: string }).config = prev
+    await clear(true)
+  }
+})
+
+test("updateGlobal handles empty and empty-object global config files without crashing", async () => {
+  for (const content of ["", "{}"]) {
+    for (const filename of ["opencode.json", "opencode.jsonc"]) {
+      await using globalTmp = await tmpdir({
+        init: async (dir) => {
+          await Filesystem.write(path.join(dir, filename), content)
+        },
+      })
+      const prev = Global.Path.config
+      ;(Global.Path as { config: string }).config = globalTmp.path
+      await clear(true)
+
+      try {
+        const info = await saveGlobal({ model: "updated/model" })
+        expect(info.model).toBe("updated/model")
+
+        const file = path.join(globalTmp.path, filename)
+        const writtenConfig = await Filesystem.readJson<{ model?: string }>(file)
+        expect(writtenConfig.model).toBe("updated/model")
+      } finally {
+        ;(Global.Path as { config: string }).config = prev
+        await clear(true)
+      }
+    }
+  }
+})
+
 test("gets config directories", async () => {
   await using tmp = await tmpdir()
   await WithInstance.provide({
