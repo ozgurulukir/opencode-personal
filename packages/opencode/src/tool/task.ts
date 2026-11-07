@@ -9,15 +9,13 @@ import {
   subagentToolRestrictions,
   resolveParentAgent,
   checkNesting,
+  taskDenyGateFromRuleset,
 } from "../agent/subagent-permissions"
+import { subagentAbortGuard, subagentResultText, subagentTitle } from "../agent/subagent-spawn"
 import type { SessionPrompt } from "../session/prompt"
 import { Config } from "@/config/config"
-import { Cause, Effect, Exit, Schema } from "effect"
-import { Permission } from "../permission"
-import * as Log from "@opencode-ai/core/util/log"
+import { Cause, Effect, Schema } from "effect"
 import { EffectBridge } from "@/effect/bridge"
-
-const log = Log.create({ service: "tool.task" })
 
 export interface TaskPromptOps {
   cancel(sessionID: SessionID): Effect.Effect<void>
@@ -54,14 +52,15 @@ export const TaskTool = Tool.define(
 
       // Check permission ruleset for deny even when bypassAgentCheck is true.
       // bypassAgentCheck only skips the user-facing ask dialog, not deny enforcement.
-      const ruleset = ctx.extra?.permissionRuleset ?? []
-      const rule = Permission.evaluate(id, params.subagent_type, ruleset)
-      if (rule.action === "deny") {
-        return yield* Effect.fail(
-          new Error(
-            `Permission denied: task tool cannot spawn subagent "${params.subagent_type}" — denied by permission rules`,
-          ),
-        )
+      // ctx.extra carries the pre-merged ruleset (loop agent permission +
+      // session permission, assembled at session/loop/tools.ts:83) — evaluated
+      // through the shared gate (agent/subagent-permissions.ts).
+      const gate = taskDenyGateFromRuleset({
+        permissionRuleset: ctx.extra?.permissionRuleset,
+        subagentType: params.subagent_type,
+      })
+      if (gate.denied) {
+        return yield* Effect.fail(new Error(gate.message))
       }
 
       if (!ctx.extra?.bypassAgentCheck) {
@@ -112,7 +111,7 @@ export const TaskTool = Tool.define(
         session ??
         (yield* sessions.create({
           parentID: ctx.sessionID,
-          title: description + ` (@${next.name} subagent)`,
+          title: subagentTitle(description, next.name),
           permission: subagentSessionPermission({
             parentSessionPermission: parent.permission ?? [],
             parentAgent,
@@ -143,18 +142,10 @@ export const TaskTool = Tool.define(
       const messageID = MessageID.ascending()
       const cancel = ops.cancel(nextSession.id)
       const bridge = yield* EffectBridge.make()
-      let cancelled = false
-
-      function onAbort() {
-        if (cancelled) return
-        cancelled = true
-        bridge.promise(cancel).catch((error) => log.warn("subagent cancel failed", { error: String(error) }))
-      }
+      const guard = subagentAbortGuard({ abort: ctx.abort, cancel, bridge })
 
       return yield* Effect.acquireUseRelease(
-        Effect.sync(() => {
-          ctx.abort.addEventListener("abort", onAbort)
-        }),
+        guard.acquire,
         () =>
           Effect.gen(function* () {
             const parts = yield* ops.resolvePromptParts(params.prompt)
@@ -183,34 +174,12 @@ export const TaskTool = Tool.define(
                 `task_id: ${nextSession.id} (for resuming to continue this task if needed)`,
                 "",
                 "<task_result>",
-                (() => {
-                  if (result.parts.length === 0) return "Subagent produced no output parts."
-                  const text = result.parts.findLast((item) => item.type === "text")?.text
-                  return text || "Subagent completed without producing a text response."
-                })(),
+                subagentResultText(result.parts),
                 "</task_result>",
               ].join("\n"),
             }
           }),
-        (_, exit) =>
-          Effect.gen(function* () {
-            if (Exit.hasInterrupts(exit) && !cancelled) {
-              cancelled = true
-              // Fix 5: match V2 release-handler parity — cancel errors are
-              // logged and suppressed so cleanup never defects.
-              yield* cancel.pipe(
-                Effect.catch((error) =>
-                  Effect.sync(() => log.warn("subagent cancel failed", { error: String(error) })),
-                ),
-              )
-            }
-          }).pipe(
-            Effect.ensuring(
-              Effect.sync(() => {
-                ctx.abort.removeEventListener("abort", onAbort)
-              }),
-            ),
-          ),
+        (_, exit) => guard.release(exit),
       )
     })
 

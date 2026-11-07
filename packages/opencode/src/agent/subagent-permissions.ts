@@ -22,6 +22,58 @@ export const FALLBACK_DENY: Permission.Ruleset = [
 ]
 
 /**
+ * Deny gate evaluated BEFORE a subagent spawn (before agent resolution and any
+ * child session creation). Single source for the check previously inlined in
+ * V1 (`tool/task.ts`) and V2 (`v2/session.ts`).
+ *
+ * Semantics match the call sites byte-for-behavior: the merged ruleset is
+ * evaluated with `Permission.evaluate("task", subagentType, ...)` (last match
+ * wins) and a matching `deny` rule blocks the spawn — including the exact
+ * "Permission denied: task tool cannot spawn subagent ..." message both V1
+ * and V2 tests match on. Rules are merged agent-first, session-second, so a
+ * session-level rule overrides an agent-level rule on the same key.
+ *
+ * CRITICAL: `gateAgentPermission` must be the gate agent's RAW permission (V1:
+ * the loop's live agent permission from `session/loop/tools.ts`; V2: the
+ * parent's live agent permission re-resolved for the gate) — NEVER
+ * `resolveParentAgent`'s output. The `FALLBACK_DENY` exclusion is deliberate
+ * (see v2/AGENTS.md): the fallback carries `task:*`, which would refuse every
+ * spawn from an agent-less parent, while the fallback legitimately applies to
+ * CHILD permission derivation only.
+ */
+export function taskDenyGate(input: {
+  gateAgentPermission?: Permission.Ruleset
+  parentSessionPermission?: Permission.Ruleset
+  subagentType: string
+}): { denied: boolean; message?: string } {
+  return taskDenyGateFromRuleset({
+    permissionRuleset: Permission.merge(input.gateAgentPermission ?? [], input.parentSessionPermission ?? []),
+    subagentType: input.subagentType,
+  })
+}
+
+/**
+ * Pre-merged-ruleset entry point for `taskDenyGate`. V1's `ctx.extra`
+ * (`session/loop/tools.ts` / `session/loop/subtask.ts`) assembles a single
+ * merged ruleset (agent permission + session permission, in that order), so
+ * TaskTool evaluates the gate through this variant; V2 uses the raw-input
+ * `taskDenyGate`. Behavior is identical.
+ */
+export function taskDenyGateFromRuleset(input: {
+  permissionRuleset?: Permission.Ruleset
+  subagentType: string
+}): { denied: boolean; message?: string } {
+  const rule = Permission.evaluate("task", input.subagentType, input.permissionRuleset ?? [])
+  if (rule.action === "deny") {
+    return {
+      denied: true,
+      message: `Permission denied: task tool cannot spawn subagent "${input.subagentType}" — denied by permission rules`,
+    }
+  }
+  return { denied: false }
+}
+
+/**
  * Build the `permission` ruleset for a subagent's session when it's spawned
  * via the task tool. Combines:
  *
@@ -32,7 +84,7 @@ export const FALLBACK_DENY: Permission.Ruleset = [
  */
 export function deriveSubagentSessionPermission(input: {
   parentSessionPermission: Permission.Ruleset
-  parentAgent: Agent.Info | undefined
+  parentAgent: { permission: Permission.Ruleset } | undefined
   subagent: Agent.Info
 }): Permission.Ruleset {
   const canTask = input.subagent.permission.some((rule) => rule.permission === "task" && rule.action === "allow")
@@ -58,7 +110,7 @@ export function deriveSubagentSessionPermission(input: {
  */
 export function subagentSessionPermission(input: {
   parentSessionPermission: Permission.Ruleset
-  parentAgent: Agent.Info | undefined
+  parentAgent: { permission: Permission.Ruleset } | undefined
   subagent: Agent.Info
   primaryTools?: string[]
 }): Permission.Ruleset {
@@ -100,11 +152,18 @@ export function subagentToolRestrictions(input: {
  * - lookup returns undefined → warn (`reason: "not-found"`) + `FALLBACK_DENY`
  *   (fix 3).
  * - lookup defects → warn with squashed cause + `FALLBACK_DENY`.
+ *
+ * Returns only `{ permission }` (a structural supertype of `Agent.Info`) —
+ * consumers only read the parent agent's deny rules, and the fallback branches
+ * have no agent identity to fabricate. The returned ruleset feeds CHILD
+ * permission derivation (`subagentSessionPermission`); it must NOT feed the
+ * spawn deny gate (`taskDenyGate`) — FALLBACK_DENY carries `task:*`, which
+ * would refuse every spawn from an agent-less parent.
  */
 export function resolveParentAgent(input: {
   name: string | null | undefined
   get: (name: string) => Effect.Effect<Agent.Info | undefined>
-}): Effect.Effect<Agent.Info | undefined> {
+}): Effect.Effect<{ permission: Permission.Ruleset } | undefined> {
   const name = input.name
   if (!name) {
     // Fix 8 (AD-2): null/unknown provenance fails closed — same treatment
@@ -113,7 +172,7 @@ export function resolveParentAgent(input: {
       parentAgent: name ?? null,
       reason: "null-agent",
     })
-    return Effect.succeed({ permission: FALLBACK_DENY } as Agent.Info)
+    return Effect.succeed({ permission: FALLBACK_DENY })
   }
   return input.get(name).pipe(
     Effect.map((found) => {
@@ -122,7 +181,7 @@ export function resolveParentAgent(input: {
         parentAgent: name,
         reason: "not-found",
       })
-      return { permission: FALLBACK_DENY } as Agent.Info
+      return { permission: FALLBACK_DENY }
     }),
     Effect.catchCause((cause) =>
       Effect.sync(() => {
@@ -130,7 +189,7 @@ export function resolveParentAgent(input: {
           parentAgent: name,
           cause: Cause.squash(cause),
         })
-        return { permission: FALLBACK_DENY } as Agent.Info
+        return { permission: FALLBACK_DENY }
       }),
     ),
   )

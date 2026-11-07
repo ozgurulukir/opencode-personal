@@ -4,7 +4,7 @@ import { ModelID, ProviderID } from "@/provider/schema"
 import { WorkspaceID } from "@/control-plane/schema"
 import { and, asc, desc, eq, gt, gte, inArray, isNull, like, lt, or, sql, type SQL } from "@/storage/db"
 import * as Database from "@/storage/db"
-import { Cause, Context, DateTime, Effect, Exit, Layer, Option, Schema, Scope, Stream } from "effect"
+import { Cause, Context, DateTime, Effect, Layer, Option, Schema, Scope, Stream } from "effect"
 import { LEGACY_MESSAGE_ID, SessionMessage } from "./session-message"
 import { legacyMessageID, matchLegacyMessage, stripLegacyMessageID } from "./legacy-message-id.shared"
 import type { Prompt } from "./session-prompt"
@@ -28,7 +28,9 @@ import {
   subagentToolRestrictions,
   resolveParentAgent,
   checkNesting,
+  taskDenyGate,
 } from "@/agent/subagent-permissions"
+import { subagentAbortGuard, subagentResultText, subagentTitle } from "@/agent/subagent-spawn"
 import { NotFoundError as StorageNotFoundError } from "@/storage/storage"
 import { SessionRevert } from "@/session/revert"
 import { Command } from "@/command"
@@ -705,29 +707,24 @@ export const layer = Layer.effect(
         })
 
         // Fix 1 (AD-3): deny pre-check before agent resolution and before any
-        // child prompt/create — mirrors V1 task.ts:50-60 ordering.
-        // Ruleset = parent's LIVE agent permission (when resolvable) + parent
-        // session rules — deliberately NOT resolveParentAgent's fallback:
-        // FALLBACK_DENY carries task:* which would refuse every spawn from an
-        // agent-less parent, while V1's gate reads the loop's live agent
-        // permission (session/loop/tools.ts:84) and lets the spawn proceed
-        // (fallback applies to child permission only). No tool-call context
-        // exists to route an ask (AskInput.tool is schema-optional but
-        // TUI/run routing keys on tool.{messageID,callID} —
-        // session-data/utils.ts:157, subagent-data.ts:445 — and subagent()
-        // has no message/call identity); deny pre-check runs unconditionally;
-        // an ask must be wired when a caller (HTTP/ACP) supplies message/call
-        // identity. Do NOT capture Permission.Service for an ask until a real
-        // caller exists.
+        // child prompt/create — mirrors V1 task.ts ordering. Gate ruleset =
+        // parent's LIVE agent permission (when resolvable) + parent session
+        // rules via the shared taskDenyGate (raw-input semantics documented
+        // there). No tool-call context exists to route an ask (AskInput.tool
+        // is schema-optional but TUI/run routing keys on
+        // tool.{messageID,callID} — session-data/utils.ts:157,
+        // subagent-data.ts:445 — and subagent() has no message/call identity);
+        // deny pre-check runs unconditionally; an ask must be wired when a
+        // caller (HTTP/ACP) supplies message/call identity. Do NOT capture
+        // Permission.Service for an ask until a real caller exists.
         const gateAgent = parent.agent ? yield* agents.get(parent.agent) : undefined
-        const ruleset = Permission.merge(gateAgent?.permission ?? [], parent.permission ?? [])
-        const rule = Permission.evaluate("task", input.agent, ruleset)
-        if (rule.action === "deny") {
-          return yield* Effect.fail(
-            new Error(
-              `Permission denied: task tool cannot spawn subagent "${input.agent}" — denied by permission rules`,
-            ),
-          )
+        const gate = taskDenyGate({
+          gateAgentPermission: gateAgent?.permission,
+          parentSessionPermission: parent.permission ?? [],
+          subagentType: input.agent,
+        })
+        if (gate.denied) {
+          return yield* Effect.fail(new Error(gate.message))
         }
 
         const subagent = yield* agents.get(input.agent)
@@ -759,8 +756,8 @@ export const layer = Layer.effect(
           workspaceID: parent.workspaceID,
           // Fix 10: match V1 task.ts title format so consumer regexes match
           // (subagent-footer.tsx /@(\w+) subagent/, message-timeline.tsx
-          // /\s+\(@[^)]+ subagent\)$/).
-          title: `${input.description ?? "Subagent"} (@${input.agent} subagent)`,
+          // /\s+\(@[^)]+ subagent\)$/). Format pinned by subagentTitle().
+          title: subagentTitle(input.description ?? "Subagent", input.agent),
           permission,
         })
 
@@ -776,19 +773,12 @@ export const layer = Layer.effect(
         const engine = yield* requireV1(promptEngine, "SessionPromptEngine")
         const cancelChild = engine.cancel(session.id)
         const bridge = yield* EffectBridge.make()
-        let cancelled = false
-        const onAbort = () => {
-          if (cancelled) return
-          cancelled = true
-          bridge.promise(cancelChild).catch((error) => log.warn("subagent cancel failed", { error: String(error) }))
-        }
+        const guard = subagentAbortGuard({ abort: input.abort, cancel: cancelChild, bridge })
 
         yield* Effect.acquireUseRelease(
           // Fix 9: register the abort listener inside acquire (mirrors V1
-          // task.ts:180-182) so it cannot leak if acquire never runs.
-          Effect.sync(() => {
-            input.abort?.addEventListener("abort", onAbort)
-          }),
+          // task.ts) so it cannot leak if acquire never runs.
+          guard.acquire,
           () =>
             Effect.gen(function* () {
               yield* result.prompt({
@@ -807,6 +797,9 @@ export const layer = Layer.effect(
               // V2 messages() returns DB rows ordered by id DESC; find() gives
               // the chronologically latest assistant. No compaction reordering
               // in V2, so array position matches id order (MessageID is monotonic).
+              // No assistant → generic no-text fallback (not subagentResultText's
+              // "no parts" fallback — that one means "assistant existed but was
+              // empty", preserved inside subagentResultText).
               const assistant = messages.find((msg) => msg.type === "assistant")
               if (!assistant || assistant.type !== "assistant") {
                 yield* sync.run(SessionEvent.Synthetic.Sync, {
@@ -816,20 +809,10 @@ export const layer = Layer.effect(
                 })
                 return
               }
-              if (assistant.content.length === 0) {
-                yield* sync.run(SessionEvent.Synthetic.Sync, {
-                  sessionID: input.parentID,
-                  timestamp: DateTime.makeUnsafe(Date.now()),
-                  text: "Subagent produced no output parts.",
-                })
-                return
-              }
-              const textPart = assistant.content.findLast((part) => part.type === "text")
-              const text = textPart?.text || "Subagent completed without producing a text response."
               yield* sync.run(SessionEvent.Synthetic.Sync, {
                 sessionID: input.parentID,
                 timestamp: DateTime.makeUnsafe(Date.now()),
-                text,
+                text: subagentResultText(assistant.content),
               })
             }).pipe(
               Effect.catchCause((cause) =>
@@ -848,18 +831,7 @@ export const layer = Layer.effect(
                 }),
               ),
             ),
-          (_, exit) =>
-            Effect.gen(function* () {
-              if (input.abort) input.abort.removeEventListener("abort", onAbort)
-              if (Exit.hasInterrupts(exit) && !cancelled) {
-                cancelled = true
-                yield* cancelChild.pipe(
-                  Effect.catch((error) =>
-                    Effect.sync(() => log.warn("subagent cancel failed", { error: String(error) })),
-                  ),
-                )
-              }
-            }),
+          (_, exit) => guard.release(exit),
         )
       }),
       compact: Effect.fn("V2Session.compact")(function* (sessionID) {

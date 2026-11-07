@@ -114,21 +114,22 @@ skipping all parent agent deny rules. This closes a security hole where Plan Mod
 `edit: { "*": "deny" }` would be bypassed if the parent agent was missing. Denying
 `task`/`todowrite` too prevents a missing parent from silently widening the
 subagent's tool surface to recursive subagents and TodoWrite. The fallback is
-applied by the shared `resolveParentAgent()` helper (`subagent-permissions.ts:104-137`),
-which logs a warning in the null-agent (`:112`), not-found (`:121`), and defect
-(`:129`) branches — a null `parent.agent` now applies fallback too (fix 8), matching
-V1 `tool/task.ts`, which uses the same helper.
+applied by the shared `resolveParentAgent()` helper (`subagent-permissions.ts:163`),
+which logs a warning in the null-agent, not-found, and defect branches — a null
+`parent.agent` now applies fallback too (fix 8), matching V1 `tool/task.ts`,
+which uses the same helper. It returns only `{ permission }` (a structural
+supertype of `Agent.Info`); the output feeds child permission derivation only.
 
 ## V2 subagent() is API-surface-only and deny-gated (no user ask yet)
 
 As of 2026-11-06, `subagent()` has zero production callers — it is API-surface-only.
-Before any child prompt/create, it runs a deny pre-check (fix 1):
-`Permission.evaluate("task", input.agent, ruleset)` at `v2/session.ts:724`, where
-`ruleset = Permission.merge(gateAgent?.permission ?? [], parent.permission ?? [])`
-(`v2/session.ts:722-723`) — the parent's LIVE agent permission when resolvable plus
-the parent session rules, deliberately NOT `resolveParentAgent`'s `FALLBACK_DENY`
-(the fallback carries `task:*`, which would refuse every spawn from an agent-less
-parent). No user ask runs until a caller supplies tool-call context (message/call
+Before any child prompt/create, it runs a deny pre-check (fix 1) through the shared
+`taskDenyGate()` helper (`agent/subagent-permissions.ts`), called with the parent's
+LIVE agent permission when resolvable plus the parent session rules — deliberately
+NOT `resolveParentAgent`'s `FALLBACK_DENY` (the fallback carries `task:*`, which
+would refuse every spawn from an agent-less parent). V1's gate evaluates the same
+policy via `taskDenyGateFromRuleset()` on the pre-merged `ctx.extra.permissionRuleset`.
+No user ask runs until a caller supplies tool-call context (message/call
 IDs) to route the permission prompt; the deny pre-check is unconditional.
 
 ## V2 subagent() max nesting depth
@@ -152,22 +153,29 @@ When the subagent's final assistant message has zero content parts, post a disti
 synthetic message ("Subagent produced no output parts.") instead of falling back to
 the generic "completed without producing a text response." This helps the parent LLM
 distinguish between "had parts but none were text" and "completely empty output."
+Both fallbacks and the `findLast` text-part extraction live in the shared
+`subagentResultText()` (`agent/subagent-spawn.ts`); the no-assistant-message case
+stays inline in `subagent()` and posts the generic no-text fallback (it is not an
+empty-parts case).
 
 ## V2 subagent() release handler must catch `cancelChild` errors
 
 `Effect.acquireUseRelease`'s release handler runs during cleanup. If `cancelChild`
-fails there, the defect propagates uncaught. Wrap `yield* cancelChild` in
-`Effect.catch` to log and suppress cleanup errors (V2 release wrap:
-`v2/session.ts:854-860`), matching the V1 TaskTool pattern (`tool/task.ts:199-206`,
-`log.warn` at `:203`; the onAbort site is `tool/task.ts:148`, not the release
-handler).
+fails there, the defect propagates uncaught. The abort guard, idempotent `onAbort`
+cancel, and the log-and-suppress `Effect.catch` release wrap are shared by V1 and
+V2 via `subagentAbortGuard()` (`agent/subagent-spawn.ts`) — both call sites pass
+their own `cancel` effect and `EffectBridge`. Do not reintroduce an unguarded
+`yield* cancelChild` in a release handler.
 
 ## V2 subagent() accepts `description` for child session titles
 
 The V2 `subagent()` interface now includes `description?: string`. The child session
-title is `${input.description ?? "Subagent"} (@${input.agent} subagent)`
-(`v2/session.ts:763`, post fix 10), matching the V1 TaskTool's title format
-`` `${description} (@${agent} subagent)` `` (`tool/task.ts:115`). This makes
+title is built by the shared `subagentTitle()` (`agent/subagent-spawn.ts`) as
+`${description} (@${agent} subagent)` (post fix 10), matching the V1 TaskTool's
+title format. The format is pinned by consumer regexes (`subagent-footer.tsx`,
+`message-timeline.tsx`) — do not change it there. Description defaulting is NOT
+unified: V2 uses `input.description ?? "Subagent"`, V1 uses
+`params.description || params.prompt.slice(0, 50)`. This makes
 subagent sessions identifiable in the session list.
 
 ## V2 `messages()` order is safe for `find()` — no compaction reordering
