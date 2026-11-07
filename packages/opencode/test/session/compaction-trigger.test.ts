@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test"
 import type { Config } from "@/config/config"
 import type { Provider } from "@/provider/provider"
+import * as Log from "@opencode-ai/core/util/log"
+import { overflowDetail } from "@opencode-ai/sdk/v2/context-budget"
 import { MessageV2 } from "../../src/session/message-v2"
 import type { MessageID, SessionID } from "../../src/session/schema"
 import {
@@ -12,9 +14,9 @@ import {
   shouldCompactAfterTurn,
 } from "../../src/session/compaction-trigger"
 
-function createModel(opts: { context: number; output: number; input?: number }): Provider.Model {
+function createModel(opts: { context: number; output: number; input?: number; id?: string }): Provider.Model {
   return {
-    id: "test-model",
+    id: opts.id ?? "test-model",
     providerID: "test",
     name: "Test",
     limit: {
@@ -143,6 +145,87 @@ describe("CompactionTrigger.shouldCompactAfterTurn", () => {
   test("never triggers for continue turns, even when overflowing", () => {
     const model = createModel({ context: 100_000, output: 32_000 })
     expect(shouldCompactAfterTurn({ cfg: {}, model, tokens, summary: false, continueTurn: true })).toBe(false)
+  })
+})
+
+// `warnZeroBudget` is private; its only side effect is the warn on the
+// module's cached logger, reachable through `Log._internal.loggers`
+// (exported for testing). Swapping the method intercepts real warn output
+// without mocking the module under test.
+function interceptTriggerWarn(): { warnings: string[]; restore: () => void } {
+  const logger = Log._internal.loggers.get("session.compaction-trigger")
+  if (!logger) throw new Error("compaction-trigger logger not registered")
+  const warnings: string[] = []
+  const original = logger.warn
+  logger.warn = (message?: unknown, extra?: Record<string, unknown>) => {
+    warnings.push(JSON.stringify({ message, extra }))
+  }
+  return {
+    warnings,
+    restore: () => {
+      logger.warn = original
+    },
+  }
+}
+
+describe("CompactionTrigger reason-derived warn decision", () => {
+  const tokens = { input: 75_000, output: 5_000, reasoning: 0, cache: { read: 0, write: 0 } }
+
+  test("auto-off suppresses the zero-budget warning — reason 'auto-off'", () => {
+    // context 0 would be zero-context if auto were on — proves the auto gate wins
+    const model = createModel({ context: 0, output: 32_000 })
+    const cfg = { compaction: { auto: false } } as Config.Info
+    expect(overflowDetail(cfg, tokens, model)).toEqual({ overflow: false, reason: "auto-off" })
+    const { warnings, restore } = interceptTriggerWarn()
+    try {
+      expect(shouldCompactAfterTurn({ cfg, model, tokens, summary: false, continueTurn: false })).toBe(false)
+      expect(warnings).toHaveLength(0)
+    } finally {
+      restore()
+    }
+  })
+
+  test("zero-context suppresses the warning — reason 'zero-context'", () => {
+    const model = createModel({ context: 0, output: 32_000 })
+    expect(overflowDetail({}, tokens, model)).toEqual({ overflow: false, reason: "zero-context" })
+    const { warnings, restore } = interceptTriggerWarn()
+    try {
+      expect(shouldCompactAfterTurn({ cfg: {}, model, tokens, summary: false, continueTurn: false })).toBe(false)
+      expect(warnings).toHaveLength(0)
+    } finally {
+      restore()
+    }
+  })
+
+  test("zero-usable fires the warn-once diagnostic exactly once per model — reason 'zero-usable'", () => {
+    // unique model id: the warnedModels set is module state shared with the
+    // other tests in this file, which already warn "test-model"
+    const model = createModel({ context: 16_000, output: 0, id: "warn-once-model" })
+    expect(overflowDetail({}, tokens, model)).toEqual({ overflow: false, reason: "zero-usable" })
+    const { warnings, restore } = interceptTriggerWarn()
+    try {
+      expect(shouldCompactAfterTurn({ cfg: {}, model, tokens, summary: false, continueTurn: false })).toBe(false)
+      expect(warnings).toHaveLength(1)
+      expect(warnings[0]).toContain("Usable context window is zero or negative")
+      expect(warnings[0]).toContain("warn-once-model")
+      // second turn on the same model does not repeat the warning
+      expect(shouldCompactAfterTurn({ cfg: {}, model, tokens, summary: false, continueTurn: false })).toBe(false)
+      expect(warnings).toHaveLength(1)
+    } finally {
+      restore()
+    }
+  })
+
+  test("healthy under-budget turn does not warn — reason 'under-budget'", () => {
+    const model = createModel({ context: 200_000, output: 32_000 })
+    expect(overflowDetail({}, tokens, model)).toEqual({ overflow: false, reason: "under-budget" })
+    const { warnings, restore } = interceptTriggerWarn()
+    try {
+      expect(shouldCompactAfterTurn({ cfg: {}, model, tokens, summary: false, continueTurn: false })).toBe(false)
+      expect(warnings).toHaveLength(0)
+    } finally {
+      restore()
+    }
   })
 })
 

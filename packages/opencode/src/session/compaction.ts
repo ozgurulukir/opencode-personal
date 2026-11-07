@@ -3,7 +3,6 @@ import { Bus } from "@/bus"
 import * as Session from "./session"
 import { SessionID, MessageID, PartID } from "./schema"
 import { Provider } from "@/provider/provider"
-import { ProviderTransform } from "@/provider/transform"
 import { MessageV2 } from "./message-v2"
 import { Token } from "@/util/token"
 import * as Log from "@opencode-ai/core/util/log"
@@ -21,6 +20,7 @@ import * as Todo from "./todo"
 import { serviceUse } from "@/effect/service-use"
 import { SyncEvent } from "@/sync"
 import { SessionEvent } from "@/v2/session-event"
+import * as CompactionTrigger from "./compaction-trigger"
 
 const log = Log.create({ service: "session.compaction" })
 
@@ -132,29 +132,10 @@ function buildPrompt(input: { previousSummary?: string; context: string[]; maxTo
   return [anchor, SUMMARY_TEMPLATE + budget, ...input.context].join("\n\n")
 }
 
-function preserveRecentBudget(input: { cfg: Config.Info; model: Provider.Model }) {
-  const cc = ContextBudget.compactionConfig(input.cfg)
-  const windowScaledMax = Math.max(
-    cc.maxPreserveRecentTokens,
-    Math.floor(ContextBudget.usableWith(input.cfg, input.model, cc) * 0.25),
-  )
-  return (
-    cc.preserveRecentTokens ??
-    Math.min(
-      windowScaledMax,
-      Math.max(cc.minPreserveRecentTokens, Math.floor(ContextBudget.usableWith(input.cfg, input.model, cc) * 0.25)),
-    )
-  )
-}
-
-function summaryBudget(model: Provider.Model, cc: ReturnType<typeof ContextBudget.compactionConfig>) {
-  return cc.summaryMaxTokens ?? Math.min(ProviderTransform.maxOutputTokens(model), cc.maxSummaryTokens)
-}
-
 export function isRealUserTurn(msg: MessageV2.WithParts): msg is MessageV2.WithParts & { info: MessageV2.User } {
   if (msg.info.role !== "user") return false
   if (msg.parts.some((part) => part.type === "compaction")) return false
-  if (msg.parts.some((part) => part.type === "text" && part.metadata?.compaction_continue)) return false
+  if (msg.parts.some(CompactionTrigger.isCompactionContinuePart)) return false
   return true
 }
 
@@ -281,7 +262,7 @@ export const layer: Layer.Layer<
     }) {
       const limit = ContextBudget.compactionConfig(input.cfg).tailTurns
       if (limit <= 0) return { head: input.messages, tail_start_id: undefined }
-      const budget = preserveRecentBudget({ cfg: input.cfg, model: input.model })
+      const budget = ContextBudget.preserveRecentBudget({ cfg: input.cfg, model: input.model })
       const all = turns(input.messages)
       if (!all.length) return { head: input.messages, tail_start_id: undefined }
       const recent = all.slice(-limit)
@@ -524,7 +505,7 @@ export const layer: Layer.Layer<
         }
         log.info("compaction selected", {
           tail_start_id: selected.tail_start_id,
-          budget: preserveRecentBudget({ cfg, model }),
+          budget: ContextBudget.preserveRecentBudget({ cfg, model }),
           overflow: input.overflow === true,
         })
         // Allow plugins to inject context or replace compaction prompt.
@@ -534,7 +515,7 @@ export const layer: Layer.Layer<
           { context: [], prompt: undefined },
         )
         const cc = ContextBudget.compactionConfig(cfg)
-        const maxSummaryTokens = summaryBudget(model, cc)
+        const maxSummaryTokens = ContextBudget.summaryBudget(model, cc)
         const nextPrompt = compacting.prompt
           ?? buildPrompt({
               previousSummary,
@@ -748,7 +729,7 @@ export const layer: Layer.Layer<
                 // Internal marker for auto-compaction followups so provider plugins
                 // can distinguish them from manual post-compaction user prompts.
                 // This is not a stable plugin contract and may change or disappear.
-                metadata: { compaction_continue: true },
+                metadata: CompactionTrigger.COMPACTION_CONTINUE_METADATA,
                 synthetic: true,
                 text,
                 time: {

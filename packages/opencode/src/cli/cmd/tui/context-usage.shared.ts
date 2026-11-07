@@ -1,5 +1,10 @@
 import type { SessionMessage, SessionMessageAssistant } from "@opencode-ai/sdk/v2"
-import { usable as budgetUsable, type BudgetModel } from "@opencode-ai/sdk/v2/context-budget"
+import {
+  usable as budgetUsable,
+  usagePercent as budgetUsagePercent,
+  usedFromBreakdown as budgetUsed,
+  type BudgetModel,
+} from "@opencode-ai/sdk/v2/context-budget"
 
 export type UsageProvider = {
   id: string
@@ -46,19 +51,13 @@ export function latestAssistantUsage(
   // providers that omit `total` the trigger falls back to this sum minus
   // reasoning — the meter then over-reports by reasoning tokens, the safe
   // direction (it may warn early but never hides imminent compaction).
-  const tokens =
-    (latest.tokens.input ?? 0) +
-    (latest.tokens.output ?? 0) +
-    (latest.tokens.reasoning ?? 0) +
-    (latest.tokens.cache?.read ?? 0) +
-    (latest.tokens.cache?.write ?? 0)
+  const tokens = budgetUsed(latest.tokens)
   if (tokens <= 0) return
 
   const model = providers.find((item) => item.id === latest.model.providerID)?.models[latest.model.id]
   if (!model) return { tokens, percent: null }
 
-  const usable = budgetUsable(config ?? {}, model)
-  const percent = usable > 0 ? Math.round((tokens / usable) * 100) : null
+  const percent = budgetUsagePercent(latest.tokens, budgetUsable(config ?? {}, model))
 
   return { tokens, percent }
 }

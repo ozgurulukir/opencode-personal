@@ -108,22 +108,93 @@ function usableWith(
 
 export { usableWith }
 
+// Tail-preservation budget for compaction selection: the user-configured
+// `preserve_recent_tokens` if set, otherwise a quarter of the usable window
+// clamped between the min/max guardrails.
+export function preserveRecentBudget(input: { cfg: CompactionSettingsInput; model: BudgetModel }): number {
+  const cc = compactionConfig(input.cfg)
+  const windowScaledMax = Math.max(
+    cc.maxPreserveRecentTokens,
+    Math.floor(usableWith(input.cfg, input.model, cc) * 0.25),
+  )
+  return (
+    cc.preserveRecentTokens ??
+    Math.min(
+      windowScaledMax,
+      Math.max(cc.minPreserveRecentTokens, Math.floor(usableWith(input.cfg, input.model, cc) * 0.25)),
+    )
+  )
+}
+
+// Output budget for the summarizer model: the configured override wins,
+// otherwise the model's output cap floored by the practical 8K ceiling.
+export function summaryBudget(model: BudgetModel, cc: ReturnType<typeof compactionConfig>): number {
+  return cc.summaryMaxTokens ?? Math.min(maxOutputTokens(model), cc.maxSummaryTokens)
+}
+
 export function used(tokens: BudgetTokens) {
   return tokens.total || tokens.input + tokens.output + tokens.cache.read + tokens.cache.write
 }
 
-export function isOverflow(cfg: CompactionSettingsInput, tokens: BudgetTokens, model: BudgetModel) {
+/**
+ * Numerator for context-usage meters that receive decomposed token counts
+ * (no provider `total`). Deliberately diverges from `used()`: `used()` excludes
+ * `reasoning` in its no-total fallback because the server's `getUsage` already
+ * subtracts reasoning from `output` (`output = rawOutput - reasoning`), while
+ * callers of this function pass tokens where `output` still excludes reasoning,
+ * so reasoning must be added back for the sum to equal the provider total.
+ */
+export type TokenBreakdown = {
+  input?: number
+  output?: number
+  reasoning?: number
+  cache?: { read?: number; write?: number }
+}
+
+export function usedFromBreakdown(tokens: TokenBreakdown): number {
+  return (
+    (tokens.input ?? 0) +
+    (tokens.output ?? 0) +
+    (tokens.reasoning ?? 0) +
+    (tokens.cache?.read ?? 0) +
+    (tokens.cache?.write ?? 0)
+  )
+}
+
+export function usagePercent(tokens: TokenBreakdown, usable: number): number | null {
+  if (usable <= 0) return null
+  return Math.round((usedFromBreakdown(tokens) / usable) * 100)
+}
+
+export type OverflowDetail = {
+  overflow: boolean
+  reason: "threshold" | "auto-off" | "zero-context" | "zero-usable" | "under-budget"
+}
+
+/**
+ * `isOverflow` with a reason attached. Branch order mirrors the historical
+ * `isOverflow` guards exactly (auto gate first), so the `overflow` boolean is
+ * identical for all inputs. Callers that only need the boolean keep using
+ * `isOverflow`; the diagnostic consumer (compaction trigger's warn-once
+ * zero-budget path) derives its decision from `reason`.
+ */
+export function overflowDetail(cfg: CompactionSettingsInput, tokens: BudgetTokens, model: BudgetModel): OverflowDetail {
   const cc = compactionConfig(cfg)
-  if (!cc.auto) return false
+  if (!cc.auto) return { overflow: false, reason: "auto-off" }
   // When contextLimit is set, it replaces model.limit.context as the threshold base.
   // Skip the model.limit.context === 0 guard — the user explicitly set a limit.
-  if (!cc.contextLimit && model.limit.context === 0) return false
+  if (!cc.contextLimit && model.limit.context === 0) return { overflow: false, reason: "zero-context" }
 
   const u = usable(cfg, model)
   // A zero/negative budget means the model can never overflow. The warn-once
   // diagnostic for this case lives at the trigger site
   // (compaction-trigger.ts) so this module stays dependency-free.
-  if (u <= 0) return false
+  if (u <= 0) return { overflow: false, reason: "zero-usable" }
 
-  return used(tokens) >= u
+  if (used(tokens) >= u) return { overflow: true, reason: "threshold" }
+  return { overflow: false, reason: "under-budget" }
+}
+
+export function isOverflow(cfg: CompactionSettingsInput, tokens: BudgetTokens, model: BudgetModel): boolean {
+  return overflowDetail(cfg, tokens, model).overflow
 }
