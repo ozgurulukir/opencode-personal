@@ -37,7 +37,11 @@ export function subagentAbortGuard(input: {
     input.bridge.promise(input.cancel).catch((error) => log.warn("subagent cancel failed", { error: String(error) }))
   }
   return {
-    acquire: Effect.sync(() => input.abort?.addEventListener("abort", onAbort)),
+    acquire: Effect.sync(() => {
+      // An already-aborted signal never fires the event — run the cancel now.
+      if (input.abort?.aborted) onAbort()
+      else input.abort?.addEventListener("abort", onAbort)
+    }),
     release: (exit) =>
       Effect.gen(function* () {
         input.abort?.removeEventListener("abort", onAbort)
