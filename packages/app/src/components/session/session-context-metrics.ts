@@ -1,4 +1,9 @@
-import { usable, type CompactionSettingsInput } from "@opencode-ai/sdk/v2/context-budget"
+import {
+  usable,
+  usagePercent,
+  usedFromBreakdown,
+  type CompactionSettingsInput,
+} from "@opencode-ai/sdk/v2/context-budget"
 import type { AssistantMessage, Message } from "@opencode-ai/sdk/v2/client"
 
 type Provider = {
@@ -37,15 +42,11 @@ type Metrics = {
   context: Context | undefined
 }
 
-const tokenTotal = (msg: AssistantMessage) => {
-  return msg.tokens.input + msg.tokens.output + msg.tokens.reasoning + msg.tokens.cache.read + msg.tokens.cache.write
-}
-
 const lastAssistantWithTokens = (messages: Message[]) => {
   for (let i = messages.length - 1; i >= 0; i--) {
     const msg = messages[i]
     if (msg.role !== "assistant") continue
-    if (tokenTotal(msg) <= 0) continue
+    if (usedFromBreakdown(msg.tokens) <= 0) continue
     return msg
   }
 }
@@ -58,7 +59,7 @@ const build = (messages: Message[] = [], providers: Provider[] = [], config?: Co
   const provider = providers.find((item) => item.id === message.providerID)
   const model = provider?.models[message.modelID]
   const limit = model?.limit.context
-  const total = tokenTotal(message)
+  const total = usedFromBreakdown(message.tokens)
   // The denominator is the auto-compaction trigger's usable window (reserve
   // and context_limit honored) — 100% must mean compaction is imminent.
   const budget = model ? usable(config ?? {}, model) : 0
@@ -78,7 +79,7 @@ const build = (messages: Message[] = [], providers: Provider[] = [], config?: Co
       cacheRead: message.tokens.cache.read,
       cacheWrite: message.tokens.cache.write,
       total,
-      usage: budget > 0 ? Math.round((total / budget) * 100) : null,
+      usage: usagePercent(message.tokens, budget),
     },
   }
 }

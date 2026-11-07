@@ -20,6 +20,26 @@ const warnedModels = new Set<string>()
  */
 
 /**
+ * Marker metadata the completed auto-compaction writes on its synthetic
+ * "Continue" user text part. Single source of truth for both the writer
+ * (compaction.ts) and the readers (the guards below) — the double-compaction
+ * bug class was caused by these drifting apart. Deliberately structural: the
+ * part's `synthetic` flag (checked separately by e.g. the copilot plugin
+ * reader) and other part details are NOT part of this contract.
+ */
+export const COMPACTION_CONTINUE_METADATA = { compaction_continue: true } as const
+
+/**
+ * Whether a part is the synthetic "Continue" marker a completed
+ * auto-compaction injects. Kept structural (not `MessageV2`-typed) so both
+ * server-side guards and SDK-shaped consumers can reuse it; the synthetic
+ * check is a separate concern left to each reader.
+ */
+export function isCompactionContinuePart(p: { type: string; metadata?: { compaction_continue?: boolean } }): boolean {
+  return p.type === "text" && p.metadata?.compaction_continue === true
+}
+
+/**
  * Whether the current turn is the synthetic "Continue" message a completed
  * auto-compaction injects. The threshold site skips such turns so a
  * just-finished compaction cannot immediately re-trigger (the
@@ -27,14 +47,14 @@ const warnedModels = new Set<string>()
  */
 export function isCurrentTurnContinue(msgs: MessageV2.WithParts[], userID: MessageID): boolean {
   const userMsg = msgs.findLast((m) => m.info.id === userID)
-  return userMsg?.parts.some((p) => p.type === "text" && p.metadata?.compaction_continue) ?? false
+  return userMsg?.parts.some(isCompactionContinuePart) ?? false
 }
 
 /**
  * Auto-compaction decision for a finished assistant turn. Summary turns
  * never trigger (their output IS the compaction), continue turns are guarded
  * against re-triggering, and the budget math itself (auto gate, reserved
- * floor, zero-context guards) lives in `ContextBudget.isOverflow`.
+ * floor, zero-context guards) lives in `ContextBudget.overflowDetail`.
  */
 export function shouldCompactAfterTurn(input: {
   cfg: Config.Info
@@ -45,25 +65,21 @@ export function shouldCompactAfterTurn(input: {
 }): boolean {
   if (input.summary) return false
   if (input.continueTurn) return false
-  const overflow = ContextBudget.isOverflow(input.cfg, input.tokens, input.model)
-  if (!overflow) warnZeroBudget(input.cfg, input.model)
-  return overflow
+  const detail = ContextBudget.overflowDetail(input.cfg, input.tokens, input.model)
+  if (!detail.overflow) warnZeroBudget(detail, input.model)
+  return detail.overflow
 }
 
 /**
  * Warn-once diagnostic relocated from the shared budget module (which stays
- * dependency-pure for the SDK). `isOverflow` collapses "no overflow" and
- * "broken budget" into the same `false`; surface the broken-budget case when
- * the trigger actually consults it. The context guards mirror `isOverflow`'s
- * so the warning fires where the old in-module warn did — except it is
- * suppressed when auto-compaction is off (`cc.auto`), where "auto-compaction
- * disabled" would only echo the user's own setting.
+ * dependency-pure for the SDK). `overflowDetail`'s reason replaces the guards
+ * this function used to re-implement: warn only when the reason is
+ * "zero-usable" — auto-off ("auto-compaction disabled" would only echo the
+ * user's own setting) and zero-context (nothing is broken) stay silent, and a
+ * healthy budget ("under-budget" / "threshold") is not a diagnostic.
  */
-function warnZeroBudget(cfg: Config.Info, model: Provider.Model) {
-  const cc = ContextBudget.compactionConfig(cfg)
-  if (!cc.auto) return
-  if (model.limit.context === 0 && !cc.contextLimit) return
-  if (ContextBudget.usable(cfg, model) > 0) return
+function warnZeroBudget(detail: ContextBudget.OverflowDetail, model: Provider.Model) {
+  if (detail.reason !== "zero-usable") return
   const key = model.id ?? "unknown"
   if (warnedModels.has(key)) return
   warnedModels.add(key)
