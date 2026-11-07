@@ -10,7 +10,7 @@
 
 ## `deriveSubagentSessionPermission` — full parent-session spread, parent-agent deny-filtered, dedupe last-wins
 
-`deriveSubagentSessionPermission` spreads the **FULL** `parentSessionPermission` (`agent/subagent-permissions.ts:42`) — parent session allows/asks/directory rules are forwarded as-is. Only the parent-**agent** contribution is deny-filtered (`subagent-permissions.ts:40`: `parentAgent.permission.filter(rule => rule.action === "deny")`); parent agent allows/asks do not automatically grant subagent access, while agent-level denies (e.g. Plan Mode) ride along last. Default `task`/`todowrite` denies are appended when the subagent's own ruleset lacks them. `Permission.dedupe()` collapses duplicate `(permission, pattern)` entries keeping the last occurrence (last match wins in `evaluate`), so parent agent denies (listed last) take priority over parent session denies for the same key.
+`deriveSubagentSessionPermission` spreads the **FULL** `parentSessionPermission` (`agent/subagent-permissions.ts:94`) — parent session allows/asks/directory rules are forwarded as-is. Only the parent-**agent** contribution is deny-filtered (`subagent-permissions.ts:92`: `parentAgent.permission.filter(rule => rule.action === "deny")`); parent agent allows/asks do not automatically grant subagent access, while agent-level denies (e.g. Plan Mode) ride along last. Default `task`/`todowrite` denies are appended when the subagent's own ruleset lacks them. `Permission.dedupe()` collapses duplicate `(permission, pattern)` entries keeping the last occurrence (last match wins in `evaluate`), so parent agent denies (listed last) take priority over parent session denies for the same key.
 
 ## `prompt()` must merge, not overwrite, session permission
 
@@ -26,7 +26,20 @@ This distinction matters when debugging permission prompts inside subagents: the
 
 ## Shared helpers between V1 and V2
 
-`subagentSessionPermission()` and `subagentToolRestrictions()` in `agent/subagent-permissions.ts` are shared between V1 `tool/task.ts` (TaskTool) and V2 `v2/session.ts` (subagent method). Both must use these helpers to maintain parity — any change to subagent permission derivation or tool restriction logic must go through these functions, not be inlined.
+Two shared modules hold the V1/V2 subagent parity surface — both must be used by V1 `tool/task.ts` (TaskTool) and V2 `v2/session.ts` (subagent method); do not inline their logic at a call site.
+
+`agent/subagent-permissions.ts` — permission derivation and spawn gating:
+
+- `subagentSessionPermission()` / `subagentToolRestrictions()`: child ruleset derivation and tools-map restrictions.
+- `resolveParentAgent()`: parent-agent resolution with `FALLBACK_DENY` on null/not-found/defect. Returns only `{ permission }` (a structural supertype of `Agent.Info`) — consumers read nothing else. Its output feeds CHILD permission derivation only.
+- `checkNesting()`: depth walk before spawn.
+- `taskDenyGate()` / `taskDenyGateFromRuleset()`: the pre-spawn deny check (deny rule on `task` × subagent type blocks the spawn, exact shared "Permission denied: task tool cannot spawn subagent ..." message). CRITICAL: `gateAgentPermission` must be the gate agent's RAW live permission (V1: the loop's agent permission from `session/loop/tools.ts`; V2: the parent's live agent permission re-resolved for the gate) — NEVER `resolveParentAgent`'s output. `FALLBACK_DENY` carries `task:*`, which would refuse every spawn from an agent-less parent; the fallback applies to child permission only. V1's `ctx.extra.permissionRuleset` is pre-merged (loop agent + session rules), so TaskTool goes through `taskDenyGateFromRuleset`; V2 uses the raw-input `taskDenyGate`.
+
+`agent/subagent-spawn.ts` — spawn choreography:
+
+- `subagentAbortGuard()`: bridge + idempotent `onAbort` cancel + release handler (listener removal, interrupt-cancel with log-and-suppress `Effect.catch`). The `acquireUseRelease` USE-block is NOT shared — V1 propagates prompt errors while V2 posts `SessionEvent.Synthetic`, and that error-policy difference is deliberate.
+- `subagentResultText()`: final-text extraction with the two pinned fallbacks ("Subagent produced no output parts." for empty parts, "Subagent completed without producing a text response." for no text part).
+- `subagentTitle()`: `` `${description} (@${agent} subagent)` `` — format pinned by consumer regexes (`subagent-footer.tsx`, `message-timeline.tsx`). Description defaulting is NOT unified: V1 `params.description || params.prompt.slice(0, 50)`, V2 `input.description ?? "Subagent"`.
 
 ## Permission requests from nested subagents
 

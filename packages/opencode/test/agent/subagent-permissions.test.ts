@@ -8,6 +8,8 @@ import {
   resolveParentAgent,
   subagentSessionPermission,
   subagentToolRestrictions,
+  taskDenyGate,
+  taskDenyGateFromRuleset,
 } from "../../src/agent/subagent-permissions"
 import { Permission } from "../../src/permission"
 import { SessionID } from "../../src/session/schema"
@@ -173,6 +175,90 @@ describe("resolveParentAgent", () => {
     expect(fromUndefined?.permission).toEqual(FALLBACK_DENY)
     const warn = warns.find((entry) => entry.data?.reason === "null-agent")
     expect(warn?.message).toBe("parent agent not found, applying fallback deny rules")
+  })
+})
+
+describe("taskDenyGate", () => {
+  // Byte-identical to the message V1 (`tool/task.ts`) and V2 (`v2/session.ts`)
+  // inlined before consolidation — tests on both sides match on it.
+  const deniedMessage = (type: string) =>
+    `Permission denied: task tool cannot spawn subagent "${type}" — denied by permission rules`
+
+  test("deny rule on the gate agent denies the spawn with the exact shared message", () => {
+    const out = taskDenyGate({
+      gateAgentPermission: [{ permission: "task", pattern: "*", action: "deny" }],
+      subagentType: "general",
+    })
+    expect(out.denied).toBe(true)
+    expect(out.message).toBe(deniedMessage("general"))
+  })
+
+  test("deny wins over an earlier allow (last match wins, matching Permission.evaluate)", () => {
+    const out = taskDenyGate({
+      gateAgentPermission: [
+        { permission: "task", pattern: "*", action: "allow" },
+        { permission: "task", pattern: "*", action: "deny" },
+      ],
+      subagentType: "general",
+    })
+    expect(out.denied).toBe(true)
+  })
+
+  test("allow rule passes the gate", () => {
+    const out = taskDenyGate({
+      gateAgentPermission: [{ permission: "task", pattern: "*", action: "allow" }],
+      subagentType: "general",
+    })
+    expect(out).toEqual({ denied: false })
+  })
+
+  test("undefined permissions pass (no rules → evaluate defaults to ask, not deny)", () => {
+    expect(taskDenyGate({ subagentType: "general" })).toEqual({ denied: false })
+    expect(taskDenyGate({ gateAgentPermission: undefined, parentSessionPermission: undefined, subagentType: "x" })).toEqual({
+      denied: false,
+    })
+  })
+
+  test("deny pattern matches on the subagent type via wildcard", () => {
+    const denied = taskDenyGate({
+      parentSessionPermission: [{ permission: "task", pattern: "dangerous-*", action: "deny" }],
+      subagentType: "dangerous-agent",
+    })
+    expect(denied.denied).toBe(true)
+    expect(denied.message).toBe(deniedMessage("dangerous-agent"))
+
+    // Non-matching pattern does not deny
+    expect(
+      taskDenyGate({
+        parentSessionPermission: [{ permission: "task", pattern: "dangerous-*", action: "deny" }],
+        subagentType: "general",
+      }).denied,
+    ).toBe(false)
+  })
+
+  test("session-level rule overrides agent-level rule on the same key (merge order: agent first, session last)", () => {
+    // Locks the merge order replicated from the call sites:
+    // merge(gateAgent, session) with findLast evaluation.
+    const out = taskDenyGate({
+      gateAgentPermission: [{ permission: "task", pattern: "*", action: "deny" }],
+      parentSessionPermission: [{ permission: "task", pattern: "*", action: "allow" }],
+      subagentType: "general",
+    })
+    expect(out.denied).toBe(false)
+  })
+
+  test("taskDenyGateFromRuleset matches the raw-input gate on the pre-merged ruleset", () => {
+    const ruleset: Permission.Ruleset = [
+      { permission: "task", pattern: "*", action: "allow" },
+      { permission: "task", pattern: "blocked-*", action: "deny" },
+    ]
+    // Pre-merged path (V1 ctx.extra) agrees with the raw-input path (V2) on
+    // the same merged ruleset.
+    const merged = Permission.merge(ruleset, [])
+    expect(taskDenyGateFromRuleset({ permissionRuleset: ruleset, subagentType: "blocked-agent" }).denied).toBe(true)
+    expect(taskDenyGateFromRuleset({ permissionRuleset: merged, subagentType: "general" }).denied).toBe(false)
+    // Missing ruleset behaves like the old `?? []` in task.ts
+    expect(taskDenyGateFromRuleset({ subagentType: "general" }).denied).toBe(false)
   })
 })
 
