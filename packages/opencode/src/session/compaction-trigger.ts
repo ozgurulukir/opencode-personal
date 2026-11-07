@@ -27,7 +27,7 @@ const warnedModels = new Set<string>()
  * part's `synthetic` flag (checked separately by e.g. the copilot plugin
  * reader) and other part details are NOT part of this contract.
  */
-export const COMPACTION_CONTINUE_METADATA = { compaction_continue: true } as const
+export const COMPACTION_CONTINUE_METADATA = Object.freeze({ compaction_continue: true })
 
 /**
  * Whether a part is the synthetic "Continue" marker a completed
