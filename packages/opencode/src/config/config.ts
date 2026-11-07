@@ -528,7 +528,8 @@ export const layer = Layer.effect(
     const loadFile = Effect.fnUntraced(function* (filepath: string) {
       log.info("loading", { path: filepath })
       const text = yield* readConfigFile(filepath)
-      if (!text) return {} as Info
+      // Whitespace-only files parse to undefined and crash effectSchema — treat them as empty.
+      if (!text?.trim()) return {} as Info
       return yield* loadConfig(text, { path: filepath })
     })
 
@@ -882,22 +883,28 @@ export const layer = Layer.effect(
       )
     })
 
-    const update = Effect.fn("Config.update")(function* (config: Info) {
-      const dir = yield* InstanceState.directory
-      const file = projectConfigFile(dir)
-      const before = (yield* readConfigFile(file)) ?? "{}"
-      const patch = writable(config)
+    const invalidate = Effect.fn("Config.invalidate")(function* () {
+      yield* invalidateGlobal
+      yield* InstanceState.invalidate(state)
+    })
+
+    // Shared write path for update/updateGlobal: read → normalize empty file → merge → serialize → changed-detect → write → invalidate.
+    // Empty files are treated as "{}" — otherwise "" feeds ConfigParse.jsonc and crashes on undefined.
+    const writeConfigFile = Effect.fn("Config.writeConfigFile")(function* (
+      file: string,
+      patch: Info,
+      options: { schema?: string } = {},
+    ) {
+      let before = (yield* readConfigFile(file)) ?? "{}"
+      if (before.trim() === "" || before.trim() === "{}") before = "{}"
 
       let next: Info
       let changed: boolean
       if (!file.endsWith(".jsonc")) {
-        const existing =
-          before.trim() === "" || before.trim() === "{}"
-            ? ({} as Info)
-            : ConfigParse.effectSchema(Info, ConfigParse.jsonc(before, file), file)
+        const existing = ConfigParse.effectSchema(Info, ConfigParse.jsonc(before, file), file)
         const merged = mergeDeep(writable(existing), patch)
-        if (!merged.$schema) {
-          merged.$schema = "https://ozgurulukir.github.io/opencode-personal/config.json"
+        if (options.schema && !merged.$schema) {
+          merged.$schema = options.schema
         }
         const serialized = JSON.stringify(merged, null, 2)
         changed = serialized !== before
@@ -914,34 +921,17 @@ export const layer = Layer.effect(
       return { info: next, changed }
     })
 
-    const invalidate = Effect.fn("Config.invalidate")(function* () {
-      yield* invalidateGlobal
-      yield* InstanceState.invalidate(state)
+    const update = Effect.fn("Config.update")(function* (config: Info) {
+      const dir = yield* InstanceState.directory
+      const file = projectConfigFile(dir)
+      return yield* writeConfigFile(file, writable(config), {
+        schema: "https://ozgurulukir.github.io/opencode-personal/config.json",
+      })
     })
 
     const updateGlobal = Effect.fn("Config.updateGlobal")(function* (config: Info) {
       const file = globalConfigFile()
-      const before = (yield* readConfigFile(file)) ?? "{}"
-      const patch = writableGlobal(config)
-
-      let next: Info
-      let changed: boolean
-      if (!file.endsWith(".jsonc")) {
-        const existing = ConfigParse.effectSchema(Info, ConfigParse.jsonc(before, file), file)
-        const merged = mergeDeep(writable(existing), patch)
-        const serialized = JSON.stringify(merged, null, 2)
-        changed = serialized !== before
-        if (changed) yield* fs.writeFileString(file, serialized).pipe(Effect.orDie)
-        next = merged
-      } else {
-        const updated = patchJsonc(before, patch)
-        next = ConfigParse.effectSchema(Info, ConfigParse.jsonc(updated, file), file)
-        changed = updated !== before
-        if (changed) yield* fs.writeFileString(file, updated).pipe(Effect.orDie)
-      }
-
-      if (changed) yield* invalidate()
-      return { info: next, changed }
+      return yield* writeConfigFile(file, writableGlobal(config))
     })
 
     return Service.of({
