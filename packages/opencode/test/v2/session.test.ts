@@ -1492,6 +1492,71 @@ describe("v2.session", () => {
       expect(true).toBe(true)
     }),
   )
+
+  it.instance("subagent resumes an existing child session via taskID and refreshes its permissions", () =>
+    Effect.gen(function* () {
+      const session = yield* SessionV2.Service
+      const parent = yield* session.create({ agent: "build" })
+      const child = yield* session.create({
+        parentID: parent.id,
+        agent: "explore",
+        permission: [{ permission: "bash", pattern: "*", action: "allow" }],
+      })
+
+      // Update parent permission to deny bash and switch parent to plan mode
+      yield* session.update({
+        sessionID: parent.id,
+        permission: [{ permission: "bash", pattern: "*", action: "deny" }],
+      })
+      yield* session.switchAgent({
+        sessionID: parent.id,
+        agent: "plan",
+      })
+
+      const promptsBefore = promptStub.calls.prompt.length
+      yield* session.subagent({
+        parentID: parent.id,
+        taskID: child.id,
+        agent: "general",
+        prompt: { text: "continue in existing child" },
+      })
+
+      expect(promptStub.calls.prompt.length).toBe(promptsBefore + 1)
+      const lastCall = promptStub.calls.prompt.at(-1) as any
+      expect(lastCall.sessionID).toBe(child.id)
+
+      const kids = yield* session.children(parent.id)
+      expect(kids).toHaveLength(1)
+      expect(kids[0]?.id).toBe(child.id)
+      expect(kids[0]?.agent).toBe("general")
+      expect(kids[0]?.permission).toContainEqual({ permission: "bash", pattern: "*", action: "deny" })
+      expect(kids[0]?.permission).toContainEqual({ permission: "edit", pattern: "*", action: "deny" })
+    }),
+  )
+
+  it.instance("subagent rejects taskID that does not belong to parentID", () =>
+    Effect.gen(function* () {
+      const session = yield* SessionV2.Service
+      const parent = yield* session.create({ agent: "build" })
+      const other = yield* session.create({ agent: "build" })
+
+      const result = yield* session
+        .subagent({
+          parentID: parent.id,
+          taskID: other.id,
+          agent: "general",
+          prompt: { text: "wrong parent" },
+        })
+        .pipe(
+          Effect.map(() => ({ error: undefined as string | undefined })),
+          Effect.catch((error) =>
+            Effect.succeed({ error: error instanceof Error ? error.message : String(error) }),
+          ),
+        )
+
+      expect(result.error).toContain("does not belong to this session")
+    }),
+  )
 })
 
 describe("v2.session.error-path", () => {

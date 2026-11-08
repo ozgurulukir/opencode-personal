@@ -13,6 +13,7 @@ import { FALLBACK_DENY } from "../../src/agent/subagent-permissions"
 import { Truncate } from "@/tool/truncate"
 import { Instance } from "../../src/project/instance"
 import { ToolRegistry } from "@/tool/registry"
+import { Skill } from "@/skill"
 import { SearchService } from "@/search/search"
 import { EmbeddingService } from "@/search/embedding"
 import { disposeAllInstances } from "../fixture/fixture"
@@ -888,6 +889,95 @@ describe("tool.task", () => {
       for (const rule of FALLBACK_DENY) {
         expect(child.permission, `missing fallback rule ${rule.permission}:${rule.action}`).toContainEqual(rule)
       }
+    }),
+  )
+
+  it.instance(
+    "description excludes hidden subagents even when mode is subagent or all",
+    () =>
+      Effect.gen(function* () {
+        const agent = yield* Agent.Service
+        const build = yield* agent.get("build")
+        const registry = yield* ToolRegistry.Service
+        const description =
+          (yield* registry.tools({ ...ref, agent: build })).find((tool) => tool.id === TaskTool.id)?.description ?? ""
+
+        expect(description).toContain("- visible-sub: Visible subagent")
+        expect(description).not.toContain("hidden-sub")
+        expect(description).not.toContain("hidden-all")
+      }),
+    {
+      config: {
+        agent: {
+          "visible-sub": {
+            description: "Visible subagent",
+            mode: "subagent",
+          },
+          "hidden-sub": {
+            description: "Hidden subagent",
+            mode: "subagent",
+            hidden: true,
+          },
+          "hidden-all": {
+            description: "Hidden all-mode agent",
+            mode: "all",
+            hidden: true,
+          },
+        },
+      },
+    },
+  )
+
+  it.instance("execute refreshes child session permissions and agent when resuming via task_id", () =>
+    Effect.gen(function* () {
+      const sessions = yield* Session.Service
+      const { chat, assistant } = yield* seed("Pinned", "build")
+      // Child initially created with empty/allow permissions before parent switched to plan or added denies
+      const child = yield* sessions.create({
+        parentID: chat.id,
+        title: "Existing child",
+        agent: "explore",
+        permission: [{ permission: "edit", pattern: "*", action: "allow" }],
+      })
+
+      // Parent session subsequently acquires a bash deny and switches to plan agent (which denies edit)
+      yield* sessions.setPermission({
+        sessionID: chat.id,
+        permission: [{ permission: "bash", pattern: "*", action: "deny" }],
+      })
+      yield* sessions.setAgent({
+        sessionID: chat.id,
+        agent: "plan",
+      })
+
+      const tool = yield* TaskTool
+      const def = yield* tool.init()
+      const promptOps = stubOps({ text: "resumed" })
+
+      yield* def.execute(
+        {
+          description: "resume task",
+          prompt: "continue work",
+          subagent_type: "general",
+          task_id: child.id,
+        },
+        {
+          sessionID: chat.id,
+          messageID: assistant.id,
+          agent: "plan",
+          abort: new AbortController().signal,
+          extra: { promptOps, bypassAgentCheck: true },
+          messages: [],
+          metadata: () => Effect.void,
+          ask: () => Effect.void,
+        },
+      )
+
+      const updatedChild = yield* sessions.get(child.id)
+      expect(updatedChild.agent).toBe("general")
+      // Parent session's bash deny AND parent agent (plan) edit deny must now be enforced on the resumed child
+      expect(updatedChild.permission).toContainEqual({ permission: "bash", pattern: "*", action: "deny" })
+      expect(updatedChild.permission).toContainEqual({ permission: "edit", pattern: "*", action: "deny" })
     }),
   )
 })

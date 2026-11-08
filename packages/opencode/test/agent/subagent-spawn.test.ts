@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { Effect, Exit } from "effect"
 import type { EffectBridge } from "../../src/effect/bridge"
-import { subagentAbortGuard, subagentResultText, subagentTitle } from "../../src/agent/subagent-spawn"
+import { parseSubagentTitle, subagentAbortGuard, subagentResultText, subagentTitle } from "../../src/agent/subagent-spawn"
 
 describe("subagentResultText", () => {
   // Fallback strings are byte-identical to the ones previously inlined in V1
@@ -46,6 +46,26 @@ describe("subagentTitle", () => {
     expect(title).toBe("inspect bug (@general subagent)")
     expect(/@(\w+) subagent/.exec(title)?.[1]).toBe("general")
     expect(/\s+\(@[^)]+ subagent\)$/.test(title)).toBe(true)
+  })
+
+  test("parseSubagentTitle extracts simple, hyphenated, and custom agent names", () => {
+    expect(parseSubagentTitle(subagentTitle("inspect bug", "general"))).toEqual({
+      description: "inspect bug",
+      agent: "general",
+    })
+    expect(parseSubagentTitle(subagentTitle("review PR", "code-reviewer"))).toEqual({
+      description: "review PR",
+      agent: "code-reviewer",
+    })
+    expect(parseSubagentTitle(subagentTitle("nested (parens) task", "my.custom_agent-v2"))).toEqual({
+      description: "nested (parens) task",
+      agent: "my.custom_agent-v2",
+    })
+  })
+
+  test("parseSubagentTitle returns undefined for non-subagent titles", () => {
+    expect(parseSubagentTitle("Plain session title")).toBeUndefined()
+    expect(parseSubagentTitle("")).toBeUndefined()
   })
 })
 

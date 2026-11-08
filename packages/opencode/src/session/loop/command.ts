@@ -123,6 +123,7 @@ export const command = Effect.fn("SessionPrompt.command")(function* (deps: Comma
           model: { providerID: taskModel.providerID, modelID: taskModel.modelID },
           prompt: templateParts.find((y) => y.type === "text")?.text ?? "",
         },
+        ...(input.parts ?? []),
       ]
     : [...templateParts, ...(input.parts ?? [])]
 

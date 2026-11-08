@@ -49,7 +49,7 @@ When replacing per-item loops with batch writes, use the new `Session.updatePart
 
 ## Subagent permission wiring — two distinct `ctx.ask` merge strategies
 
-Normal tools merge `agent.permission + session.permission`. But subagent task's own ask (`session/loop/subtask.ts:112`) merges `parentAgent.permission` (resolved at `:102`) + session.permission (not subagent session's permission). Command subtasks set `bypassAgentCheck: true` (`subtask.ts:123`), bypassing the spawn ask while deny evaluation still applies. This means a subagent's "always allow" does NOT inherit from its own session — it inherits from the parent. Don't assume subagent permissions are self-contained.
+Normal tools merge `agent.permission + session.permission`. But subagent task's own ask (`session/loop/subtask.ts:148`) merges `parentAgent.permission` (resolved at `:138`) + session.permission (not subagent session's permission). Command subtasks set `bypassAgentCheck: true` (`subtask.ts:159`), bypassing the spawn ask while deny evaluation still applies. This means a subagent's "always allow" does NOT inherit from its own session — it inherits from the parent. Don't assume subagent permissions are self-contained.
 
 ## Effect Schema cross-file identity — keep schemas in the consuming module
 

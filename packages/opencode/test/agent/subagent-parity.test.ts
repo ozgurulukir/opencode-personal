@@ -389,6 +389,12 @@ describe("subagent V1/V2 parity", () => {
         expect(titleV1).toMatch(/\(@\w+ subagent\)$/)
         expect(titleV2).toMatch(/\(@\w+ subagent\)$/)
 
+        // 4. Child session agent and workspaceID parity across V1/V2.
+        expect(childV1.agent).toBe("general")
+        expect(childV1.agent).toBe(childV2.agent)
+        expect(childV1.workspaceID).toBe(parentV1.workspaceID)
+        expect(childV2.workspaceID).toBe(parentV2.workspaceID)
+
         // Spot-check the shared derivation actually carried the fixtures:
         // parent session rules first, derived todowrite/task denies,
         // parent-agent (strict) deny rules (incl. defaults inherited by

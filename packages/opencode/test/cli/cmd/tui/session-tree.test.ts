@@ -1,11 +1,17 @@
 import { describe, expect, test } from "bun:test"
-import { collectSessionDescendants } from "../../../../src/cli/cmd/tui/util/session-tree"
+import {
+  collectSessionDescendants,
+  firstChildSession,
+  nextSiblingSession,
+  sortChildSessions,
+} from "../../../../src/cli/cmd/tui/util/session-tree"
 
-type TreeSession = { id: string; parentID?: string | null }
+type TreeSession = { id: string; parentID?: string | null; time?: { created: number } }
 
-const session = (id: string, parentID?: string | null): TreeSession => ({
+const session = (id: string, parentID?: string | null, created = 0): TreeSession => ({
   id,
   parentID: parentID === undefined ? undefined : parentID,
+  time: { created },
 })
 
 // A minimal helper replicating the TUI `children` memo (src/.../session/index.tsx)
@@ -121,5 +127,52 @@ describe("collectSessionDescendants", () => {
     // moveFirstChild/moveChild navigate between DIRECT children only.
     const nav = navigationTargets(sessions, "root").sort()
     expect(nav).toEqual(["child1", "child2"])
+  })
+})
+
+describe("child and sibling session navigation", () => {
+  test("sortChildSessions orders direct children chronologically (oldest-first) with id tiebreaker", () => {
+    const sessions = [
+      session("root", undefined, 100),
+      // Descending ULID-style IDs where newest has lexicographically smaller ID
+      session("ses_001_newest", "root", 300),
+      session("ses_002_middle", "root", 200),
+      session("ses_003_oldest", "root", 150),
+    ]
+    const children = sortChildSessions(sessions, "root")
+    expect(children.map((x) => x.id)).toEqual(["ses_003_oldest", "ses_002_middle", "ses_001_newest"])
+  })
+
+  test("firstChildSession finds direct child from root AND from a child session that has grandchildren", () => {
+    const sessions = [
+      session("root", undefined, 100),
+      session("child1", "root", 200),
+      session("child2", "root", 300),
+      session("grandchild1", "child1", 400),
+      session("grandchild2", "child1", 500),
+    ]
+    expect(firstChildSession(sessions, "root")?.id).toBe("child1")
+    // Viewing child1 and pressing session.child.first navigates into grandchild1 (not child1 itself!)
+    expect(firstChildSession(sessions, "child1")?.id).toBe("grandchild1")
+    // Viewing child2 (no grandchildren) returns undefined
+    expect(firstChildSession(sessions, "child2")).toBeUndefined()
+  })
+
+  test("nextSiblingSession cycles forward (+1) and backward (-1) in chronological order", () => {
+    const sessions = [
+      session("root", undefined, 100),
+      session("ses_001_third", "root", 300),
+      session("ses_002_second", "root", 200),
+      session("ses_003_first", "root", 150),
+    ]
+    // Forward (+1): first -> second -> third -> first (wraps)
+    expect(nextSiblingSession(sessions, "ses_003_first", 1)?.id).toBe("ses_002_second")
+    expect(nextSiblingSession(sessions, "ses_002_second", 1)?.id).toBe("ses_001_third")
+    expect(nextSiblingSession(sessions, "ses_001_third", 1)?.id).toBe("ses_003_first")
+
+    // Backward (-1): first -> third (wraps) -> second -> first
+    expect(nextSiblingSession(sessions, "ses_003_first", -1)?.id).toBe("ses_001_third")
+    expect(nextSiblingSession(sessions, "ses_001_third", -1)?.id).toBe("ses_002_second")
+    expect(nextSiblingSession(sessions, "ses_002_second", -1)?.id).toBe("ses_003_first")
   })
 })

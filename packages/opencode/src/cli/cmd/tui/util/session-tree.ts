@@ -33,3 +33,57 @@ export function collectSessionDescendants(
   }
   return seen
 }
+
+export type NavigableSession = {
+  id: string
+  parentID?: string | null
+  time?: { created: number }
+}
+
+/**
+ * Returns direct children of `parentID` sorted chronologically (oldest-first)
+ * with a deterministic `id` tiebreaker. Because `SessionID` is descending
+ * (newest session has the smallest lexicographical ID), sorting by `id` alone
+ * would invert chronological order compared to `SubagentFooter`.
+ */
+export function sortChildSessions<T extends NavigableSession>(sessions: ReadonlyArray<T>, parentID: string): T[] {
+  return sessions
+    .filter((x) => x.parentID === parentID)
+    .toSorted((a, b) => {
+      const diff = (a.time?.created ?? 0) - (b.time?.created ?? 0)
+      if (diff !== 0) return diff
+      return a.id < b.id ? -1 : a.id > b.id ? 1 : 0
+    })
+}
+
+/**
+ * First direct child of `sessionID` (chronologically oldest), enabling
+ * navigation from a root session to its first child AND from a child session
+ * into its first grandchild.
+ */
+export function firstChildSession<T extends NavigableSession>(
+  sessions: ReadonlyArray<T>,
+  sessionID: string,
+): T | undefined {
+  return sortChildSessions(sessions, sessionID)[0]
+}
+
+/**
+ * Next (+1) or previous (-1) sibling of `sessionID` among sessions sharing
+ * the same `parentID`, ordered chronologically (matching `SubagentFooter`'s
+ * `1 of N` index) and wrapping around at the ends.
+ */
+export function nextSiblingSession<T extends NavigableSession>(
+  sessions: ReadonlyArray<T>,
+  sessionID: string,
+  direction: 1 | -1,
+): T | undefined {
+  const current = sessions.find((x) => x.id === sessionID)
+  if (!current?.parentID) return undefined
+  const siblings = sortChildSessions(sessions, current.parentID)
+  if (siblings.length === 0) return undefined
+  const idx = siblings.findIndex((x) => x.id === sessionID)
+  if (idx === -1) return siblings[0]
+  const next = (idx + direction + siblings.length) % siblings.length
+  return siblings[next]
+}

@@ -149,6 +149,7 @@ export interface Interface {
   readonly subagent: (input: {
     id?: EventV2.ID
     parentID: SessionID
+    taskID?: SessionID
     prompt: Prompt
     agent: string
     description?: string
@@ -749,17 +750,41 @@ export const layer = Layer.effect(
           get: (id) => result.get(id).pipe(Effect.orDie),
         })
 
-        const session = yield* result.create({
-          agent: input.agent,
-          model: input.model,
-          parentID: input.parentID,
-          workspaceID: parent.workspaceID,
-          // Fix 10: match V1 task.ts title format so consumer regexes match
-          // (subagent-footer.tsx /@(\w+) subagent/, message-timeline.tsx
-          // /\s+\(@[^)]+ subagent\)$/). Format pinned by subagentTitle().
-          title: subagentTitle(input.description ?? "Subagent", input.agent),
-          permission,
-        })
+        const existing = input.taskID
+          ? yield* result.get(input.taskID).pipe(
+              Effect.catchCause((cause) =>
+                Effect.fail(new Error(`Cannot resume task: session ${input.taskID} not found (${Cause.squash(cause)})`)),
+              ),
+            )
+          : undefined
+        if (existing && existing.parentID !== input.parentID) {
+          return yield* Effect.fail(new Error(`task_id ${input.taskID} does not belong to this session`))
+        }
+
+        if (existing) {
+          const sessions = yield* requireV1(sessionsV1, "Session")
+          yield* sessions.setPermission({ sessionID: existing.id, permission })
+          if (existing.agent !== input.agent) {
+            yield* result.switchAgent({ sessionID: existing.id, agent: input.agent })
+          }
+          if (input.model) {
+            yield* result.switchModel({ sessionID: existing.id, model: input.model })
+          }
+        }
+
+        const session =
+          existing ??
+          (yield* result.create({
+            agent: input.agent,
+            model: input.model,
+            parentID: input.parentID,
+            workspaceID: parent.workspaceID,
+            // Fix 10: match V1 task.ts title format so consumer regexes match
+            // (subagent-footer.tsx, message-timeline.tsx). Format pinned by
+            // subagentTitle().
+            title: subagentTitle(input.description ?? "Subagent", input.agent),
+            permission,
+          }))
 
         const tools = subagentToolRestrictions({
           subagent,
