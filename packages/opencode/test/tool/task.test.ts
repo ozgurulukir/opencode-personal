@@ -853,7 +853,7 @@ describe("tool.task", () => {
     }),
   )
 
-    it.instance("execute applies fallback deny rules when parent session agent is null", () =>
+  it.instance("execute applies fallback deny rules when parent session agent is null", () =>
     Effect.gen(function* () {
       const sessions = yield* Session.Service
       // seed() without an agent → the session row's agent field stays null.
