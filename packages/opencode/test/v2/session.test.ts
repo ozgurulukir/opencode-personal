@@ -1493,44 +1493,83 @@ describe("v2.session", () => {
     }),
   )
 
-  it.instance("subagent resumes an existing child session via taskID and refreshes its permissions", () =>
+  it.instance(
+    "subagent resumes an existing child session via taskID and refreshes its permissions, agent, and model",
+    () =>
+      Effect.gen(function* () {
+        const session = yield* SessionV2.Service
+        const parent = yield* session.create({ agent: "build" })
+        const child = yield* session.create({
+          parentID: parent.id,
+          agent: "explore",
+          permission: [{ permission: "bash", pattern: "*", action: "allow" }],
+          model: {
+            id: ModelID.make("old-model"),
+            providerID: ProviderID.make("test"),
+            variant: Modelv2.VariantID.make("default"),
+          },
+        })
+
+        // Update parent permission to deny bash and switch parent to plan mode
+        yield* session.update({
+          sessionID: parent.id,
+          permission: [{ permission: "bash", pattern: "*", action: "deny" }],
+        })
+        yield* session.switchAgent({
+          sessionID: parent.id,
+          agent: "plan",
+        })
+
+        const promptsBefore = promptStub.calls.prompt.length
+        yield* session.subagent({
+          parentID: parent.id,
+          taskID: child.id,
+          agent: "general",
+          prompt: { text: "continue in existing child" },
+          model: {
+            id: ModelID.make("test-model"),
+            providerID: ProviderID.make("test"),
+            variant: Modelv2.VariantID.make("default"),
+          },
+        })
+
+        expect(promptStub.calls.prompt.length).toBe(promptsBefore + 1)
+        const lastCall = promptStub.calls.prompt.at(-1) as any
+        expect(lastCall.sessionID).toBe(child.id)
+
+        const kids = yield* session.children(parent.id)
+        expect(kids).toHaveLength(1)
+        expect(kids[0]?.id).toBe(child.id)
+        expect(kids[0]?.agent).toBe("general")
+        expect(kids[0]?.permission).toContainEqual({ permission: "bash", pattern: "*", action: "deny" })
+        expect(kids[0]?.permission).toContainEqual({ permission: "edit", pattern: "*", action: "deny" })
+        // Resume applies input.model to the child row via switchModel (issue #384).
+        expect(kids[0]?.model?.id).toBe(ModelID.make("test-model"))
+        expect(kids[0]?.model?.providerID).toBe(ProviderID.make("test"))
+      }),
+  )
+
+  it.instance("subagent resume without input.model leaves the child model unchanged", () =>
     Effect.gen(function* () {
       const session = yield* SessionV2.Service
       const parent = yield* session.create({ agent: "build" })
       const child = yield* session.create({
         parentID: parent.id,
         agent: "explore",
-        permission: [{ permission: "bash", pattern: "*", action: "allow" }],
+        model: {
+          id: ModelID.make("old-model"),
+          providerID: ProviderID.make("test"),
+          variant: Modelv2.VariantID.make("default"),
+        },
       })
-
-      // Update parent permission to deny bash and switch parent to plan mode
-      yield* session.update({
-        sessionID: parent.id,
-        permission: [{ permission: "bash", pattern: "*", action: "deny" }],
-      })
-      yield* session.switchAgent({
-        sessionID: parent.id,
-        agent: "plan",
-      })
-
-      const promptsBefore = promptStub.calls.prompt.length
       yield* session.subagent({
         parentID: parent.id,
         taskID: child.id,
         agent: "general",
-        prompt: { text: "continue in existing child" },
+        prompt: { text: "continue without a model" },
       })
-
-      expect(promptStub.calls.prompt.length).toBe(promptsBefore + 1)
-      const lastCall = promptStub.calls.prompt.at(-1) as any
-      expect(lastCall.sessionID).toBe(child.id)
-
       const kids = yield* session.children(parent.id)
-      expect(kids).toHaveLength(1)
-      expect(kids[0]?.id).toBe(child.id)
-      expect(kids[0]?.agent).toBe("general")
-      expect(kids[0]?.permission).toContainEqual({ permission: "bash", pattern: "*", action: "deny" })
-      expect(kids[0]?.permission).toContainEqual({ permission: "edit", pattern: "*", action: "deny" })
+      expect(kids[0]?.model?.id).toBe(ModelID.make("old-model"))
     }),
   )
 

@@ -767,6 +767,7 @@ export const layer = Layer.effect(
           if (existing.agent !== input.agent) {
             yield* result.switchAgent({ sessionID: existing.id, agent: input.agent })
           }
+          // Resume model re-sync — V1 mirrors this via Session.setModel (issue #384)
           if (input.model) {
             yield* result.switchModel({ sessionID: existing.id, model: input.model })
           }

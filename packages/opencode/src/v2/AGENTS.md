@@ -132,6 +132,19 @@ policy via `taskDenyGateFromRuleset()` on the pre-merged `ctx.extra.permissionRu
 No user ask runs until a caller supplies tool-call context (message/call
 IDs) to route the permission prompt; the deny pre-check is unconditional.
 
+## V2 subagent() resume re-syncs permission, agent, and model
+
+When `taskID` resolves to an existing child session, `subagent()` re-syncs the
+row before prompting: `Session.setPermission` always, `switchAgent` when the
+agent changed, and `switchModel` when `input.model` is supplied (no-op
+otherwise — V2 has no caller-model fallback). V1 `TaskTool` mirrors this via
+`setPermission` / `setAgent` / `setModel` (issue #384); V1 always derives a
+concrete model (`agent.model ?? caller's current model`), so its guard is a
+differs-check rather than a presence check. The residual no-model divergence
+(V1 converges the row to the caller's model; V2 leaves it unchanged) is
+structural and pre-dates resume — V1 `Session.create` also always writes a
+concrete model while V2 `create` writes `input.model` only when supplied.
+
 ## V2 subagent() max nesting depth
 
 `subagent()` enforces a maximum nesting levels of `MAX_SUBAGENT_NESTING_LEVELS = 3` (defined in

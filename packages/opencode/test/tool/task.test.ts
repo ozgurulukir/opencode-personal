@@ -928,7 +928,7 @@ describe("tool.task", () => {
     },
   )
 
-  it.instance("execute refreshes child session permissions and agent when resuming via task_id", () =>
+  it.instance("execute refreshes child session permissions, agent, and model when resuming via task_id", () =>
     Effect.gen(function* () {
       const sessions = yield* Session.Service
       const { chat, assistant } = yield* seed("Pinned", "build")
@@ -938,6 +938,7 @@ describe("tool.task", () => {
         title: "Existing child",
         agent: "explore",
         permission: [{ permission: "edit", pattern: "*", action: "allow" }],
+        model: { id: ModelID.make("old-model"), providerID: ProviderID.make("test") },
       })
 
       // Parent session subsequently acquires a bash deny and switches to plan agent (which denies edit)
@@ -978,6 +979,11 @@ describe("tool.task", () => {
       // Parent session's bash deny AND parent agent (plan) edit deny must now be enforced on the resumed child
       expect(updatedChild.permission).toContainEqual({ permission: "bash", pattern: "*", action: "deny" })
       expect(updatedChild.permission).toContainEqual({ permission: "edit", pattern: "*", action: "deny" })
+      // Resume re-syncs the model row to the spawn's derived model (issue #384).
+      // `general` defines no agent model, so derivation falls back to the caller
+      // assistant's model (ref = test/test-model, seed() :83-84).
+      expect(updatedChild.model?.id).toBe(ModelID.make("test-model"))
+      expect(updatedChild.model?.providerID).toBe(ProviderID.make("test"))
     }),
   )
 })
