@@ -4,6 +4,8 @@ import { useSync } from "@tui/context/sync"
 import { useTheme } from "@tui/context/theme"
 import { SplitBorder } from "@tui/component/border"
 import { Locale } from "@/util/locale"
+import { parseSubagentTitle } from "@/agent/subagent-spawn"
+import { sortChildSessions } from "../../util/session-tree"
 import { latestAssistantUsage, totalAssistantCost } from "../../context-usage.shared"
 import { useTerminalDimensions } from "@opentui/solid"
 import { useCommandPalette } from "../../context/command-palette"
@@ -18,14 +20,12 @@ export function SubagentFooter() {
   const subagentInfo = createMemo(() => {
     const s = session()
     if (!s) return { label: "Subagent", index: 0, total: 0 }
-    const agentMatch = s.title.match(/@(\w+) subagent/)
-    const label = agentMatch ? Locale.titlecase(agentMatch[1]) : "Subagent"
+    const parsed = parseSubagentTitle(s.title)
+    const label = parsed ? Locale.titlecase(parsed.agent) : "Subagent"
 
     if (!s.parentID) return { label, index: 0, total: 0 }
 
-    const siblings = sync.data.session
-      .filter((x) => x.parentID === s.parentID)
-      .toSorted((a, b) => a.time.created - b.time.created)
+    const siblings = sortChildSessions(sync.data.session, s.parentID)
     const index = siblings.findIndex((x) => x.id === s.id)
 
     return { label, index: index + 1, total: siblings.length }

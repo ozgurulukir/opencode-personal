@@ -20,9 +20,9 @@
 
 **Normal tool execution** (`session/loop/tools.ts:118`): `ruleset: Permission.merge(input.agent.permission, input.session.permission ?? [])` — merges the CURRENT session's agent permission with the current session's permission.
 
-**Subagent task execution** (`session/loop/subtask.ts:112`): `ruleset: Permission.merge(parentAgent?.permission ?? [], session.permission ?? [])` — merges the **parent's** agent permission (resolved at `subtask.ts:102`) with the **PARENT** session's permission, NOT the subagent session's permission. `taskAgent` at `subtask.ts:103-110` is an existence-check only (it throws `Unknown` when the named agent is missing) — agents are never mutated, and the child's derived permission lives on the session row via `subagentSessionPermission`, not on any agent object. Command subtasks set `bypassAgentCheck: true` (`subtask.ts:123`), bypassing the spawn ask while deny evaluation still applies.
+**Subagent task execution** (`session/loop/subtask.ts:148`): `ruleset: Permission.merge(parentAgent?.permission ?? [], session.permission ?? [])` — merges the **parent's** agent permission (resolved at `subtask.ts:138`) with the **PARENT** session's permission, NOT the subagent session's permission. `taskAgent` at `subtask.ts:139-146` is an existence-check only (it throws `Unknown` when the named agent is missing) — agents are never mutated, and the child's derived permission lives on the session row via `subagentSessionPermission`, not on any agent object. Command subtasks set `bypassAgentCheck: true` (`subtask.ts:159`), bypassing the spawn ask while deny evaluation still applies.
 
-This distinction matters when debugging permission prompts inside subagents: the `ruleset` evaluated at `session/loop/subtask.ts:112` does not include the subagent session's `subagentSessionPermission` deny rules — those live on the child session row (via `subagentSessionPermission`), not on any agent's `permission` field.
+This distinction matters when debugging permission prompts inside subagents: the `ruleset` evaluated at `session/loop/subtask.ts:148` does not include the subagent session's `subagentSessionPermission` deny rules — those live on the child session row (via `subagentSessionPermission`), not on any agent's `permission` field.
 
 ## Shared helpers between V1 and V2
 
@@ -39,7 +39,7 @@ Two shared modules hold the V1/V2 subagent parity surface — both must be used 
 
 - `subagentAbortGuard()`: bridge + idempotent `onAbort` cancel + release handler (listener removal, interrupt-cancel with log-and-suppress `Effect.catch`). The `acquireUseRelease` USE-block is NOT shared — V1 propagates prompt errors while V2 posts `SessionEvent.Synthetic`, and that error-policy difference is deliberate.
 - `subagentResultText()`: final-text extraction with the two pinned fallbacks ("Subagent produced no output parts." for empty parts, "Subagent completed without producing a text response." for no text part).
-- `subagentTitle()`: `` `${description} (@${agent} subagent)` `` — format pinned by consumer regexes (`subagent-footer.tsx`, `message-timeline.tsx`). Description defaulting is NOT unified: V1 `params.description || params.prompt.slice(0, 50)`, V2 `input.description ?? "Subagent"`.
+- `subagentTitle()`: `` `${description} (@${agent} subagent)` `` — format pinned by consumer regex (`message-timeline.tsx`) and parsed by `parseSubagentTitle()` (`subagent-footer.tsx`). Description defaulting is NOT unified: V1 `params.description || params.prompt.slice(0, 50)`, V2 `input.description ?? "Subagent"`.
 
 ## Permission requests from nested subagents
 

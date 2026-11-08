@@ -78,13 +78,29 @@ export function subagentResultText(parts: readonly { type: string; text?: string
 }
 
 /**
- * Subagent session title. The format is pinned by consumers that regex-match
- * it (`cli/cmd/tui/routes/session/subagent-footer.tsx`, `app/src/pages/session/
- * message-timeline.tsx` — `/@(\w+) subagent/`) — do not change without updating
- * those. Description defaulting is NOT unified here: V1 uses
+ * Subagent session title. The format is pinned by consumers that parse it via
+ * `parseSubagentTitle` (`cli/cmd/tui/routes/session/subagent-footer.tsx`,
+ * `app/src/pages/session/message-timeline.tsx`) — do not change without
+ * updating those. Description defaulting is NOT unified here: V1 uses
  * `params.description || params.prompt.slice(0, 50)`, V2 uses
  * `input.description ?? "Subagent"`.
  */
 export function subagentTitle(description: string, agent: string): string {
   return `${description} (@${agent} subagent)`
+}
+
+const SUBAGENT_TITLE_SUFFIX = /^(.*?)\s+\(@([^\s)]+) subagent\)$/
+
+/**
+ * Parse a subagent session title produced by `subagentTitle(description, agent)`.
+ * Supports any non-whitespace, non-`)` characters in `agent` (including hyphens,
+ * dots, and underscores in custom agent names).
+ */
+export function parseSubagentTitle(title: string): { description: string; agent: string } | undefined {
+  const match = SUBAGENT_TITLE_SUFFIX.exec(title)
+  if (!match) return undefined
+  return {
+    description: match[1] ?? "",
+    agent: match[2] ?? "",
+  }
 }

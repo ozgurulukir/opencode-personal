@@ -74,7 +74,7 @@ import { SubagentFooter } from "./subagent-footer.tsx"
 import { LANGUAGE_EXTENSIONS } from "@/lsp/language"
 import parsers from "../../../../../../parsers-config.ts"
 import * as Clipboard from "../../util/clipboard"
-import { collectSessionDescendants } from "../../util/session-tree"
+import { collectSessionDescendants, firstChildSession, nextSiblingSession } from "../../util/session-tree"
 import { isDeniedErrorMessage } from "../../util/denied-error.shared"
 import { errorMessage, safeCatch } from "@/util/error"
 import { Toast, useToast } from "../../ui/toast"
@@ -171,12 +171,6 @@ export function Session() {
   const { theme, syntax } = useTheme()
   const promptRef = usePromptRef()
   const session = createMemo(() => sync.session.get(route.sessionID))
-  const children = createMemo(() => {
-    const parentID = session()?.parentID ?? session()?.id
-    return sync.data.session
-      .filter((x) => x.parentID === parentID || x.id === parentID)
-      .toSorted((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
-  })
   // V2 message slice, reversed to oldest-first so the findLast/scan logic and
   // the rendering order keep their V1 semantics. The slice also holds
   // shell/synthetic/compaction/switch records the V1 slice never had; shell
@@ -410,8 +404,9 @@ export function Session() {
   const local = useLocal()
 
   function moveFirstChild() {
-    if (children().length === 1) return
-    const next = children().find((x) => !!x.parentID)
+    const currentID = session()?.id
+    if (!currentID) return
+    const next = firstChildSession(sync.data.session, currentID)
     if (next) {
       navigate({
         type: "session",
@@ -420,18 +415,14 @@ export function Session() {
     }
   }
 
-  function moveChild(direction: number) {
-    if (children().length === 1) return
-
-    const sessions = children().filter((x) => !!x.parentID)
-    let next = sessions.findIndex((x) => x.id === session()?.id) - direction
-
-    if (next >= sessions.length) next = 0
-    if (next < 0) next = sessions.length - 1
-    if (sessions[next]) {
+  function moveChild(direction: 1 | -1) {
+    const currentID = session()?.id
+    if (!currentID) return
+    const next = nextSiblingSession(sync.data.session, currentID, direction)
+    if (next) {
       navigate({
         type: "session",
-        sessionID: sessions[next].id,
+        sessionID: next.id,
       })
     }
   }

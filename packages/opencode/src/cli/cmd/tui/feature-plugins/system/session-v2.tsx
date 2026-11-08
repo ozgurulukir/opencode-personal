@@ -1,5 +1,6 @@
 import type { TuiPlugin, TuiPluginApi } from "@opencode-ai/plugin/tui"
 import type { InternalTuiPlugin } from "../../plugin/internal-types"
+import { useRoute } from "@tui/context/route"
 import { useSyncV2 } from "@tui/context/sync"
 import { SplitBorder } from "@tui/component/border"
 import { Spinner } from "@tui/component/spinner"
@@ -411,12 +412,17 @@ function AssistantReasoning(props: { part: SessionMessageAssistantReasoning; sub
 
 function AssistantTool(props: { part: SessionMessageAssistantTool; sessionID: string }) {
   const input = createMemo(() => toolInputRecord(props.part.state.input))
+  const metadata = createMemo(() => {
+    const structured = props.part.state.status === "pending" ? undefined : props.part.state.structured
+    if (isRecord(structured)) return structured
+    return props.part.provider?.metadata ?? {}
+  })
   const toolprops = {
     get input() {
       return input()
     },
     get metadata() {
-      return props.part.provider?.metadata ?? {}
+      return metadata()
     },
     get output() {
       return props.part.state.status === "pending" ? undefined : toolOutput(props.part.state.content)
@@ -526,6 +532,7 @@ function InlineTool(props: {
   spinner?: boolean
   children: JSX.Element
   part: SessionMessageAssistantTool
+  onClick?: () => void
 }) {
   const { theme } = useTheme()
   const renderer = useRenderer()
@@ -537,6 +544,7 @@ function InlineTool(props: {
   const denied = createMemo(() => isDeniedErrorMessage(error()))
   const fg = createMemo(() => {
     if (error()) return theme.error
+    if (hover()) return theme.text
     if (complete()) return theme.textMuted
     return theme.text
   })
@@ -548,13 +556,16 @@ function InlineTool(props: {
       flexShrink={0}
       flexDirection="row"
       gap={1}
-      backgroundColor={hover() && error() ? theme.backgroundMenu : undefined}
-      onMouseOver={() => error() && setHover(true)}
+      backgroundColor={hover() && (error() || props.onClick) ? theme.backgroundMenu : undefined}
+      onMouseOver={() => (error() || props.onClick) && setHover(true)}
       onMouseOut={() => setHover(false)}
       onMouseUp={() => {
-        if (!error()) return
         if (renderer.getSelection()?.getSelectedText()) return
-        setShowError((prev) => !prev)
+        if (error()) {
+          setShowError((prev) => !prev)
+          return
+        }
+        props.onClick?.()
       }}
       renderBefore={function () {
         const el = this as BoxRenderable
@@ -962,18 +973,67 @@ function Skill(props: ToolProps) {
 }
 
 function Task(props: ToolProps) {
+  const { navigate } = useRoute()
+  const sync = useSyncV2()
+  const childSessionID = createMemo(() => stringValue(props.metadata.sessionId))
+
+  createEffect(() => {
+    const sessionID = childSessionID()
+    if (sessionID && !sync.data.messages[sessionID]?.length) void sync.session.message.sync(sessionID)
+  })
+
+  const messages = createMemo(() => {
+    const sessionID = childSessionID()
+    return sessionID ? (sync.data.messages[sessionID] ?? []) : []
+  })
+
+  const tools = createMemo(() =>
+    messages().flatMap((msg) =>
+      msg.type === "assistant"
+        ? msg.content
+            .filter((item): item is SessionMessageAssistantTool => item.type === "tool")
+            .map((item) => ({ tool: item.name, state: item.state }))
+        : [],
+    ),
+  )
+
+  const current = createMemo(() =>
+    tools().findLast((x) => x.state.status === "running" || x.state.status === "completed"),
+  )
+
+  const isRunning = createMemo(() => props.part.state.status === "running")
+
+  const duration = createMemo(() => {
+    const first = messages().findLast((x) => x.type === "user")?.time.created
+    const assistant = messages().find((x) => x.type === "assistant")?.time.completed
+    if (!first || !assistant) return 0
+    return assistant - first
+  })
+
   const content = createMemo(() => {
     const description = stringValue(props.input.description)
     if (!description) return pendingInput(props.part)
-    return `${Locale.titlecase(stringValue(props.input.subagent_type) ?? "General")} Task — ${description}`
+    const lines = [`${Locale.titlecase(stringValue(props.input.subagent_type) ?? "General")} Task — ${description}`]
+    if (isRunning() && tools().length > 0) {
+      if (current()) lines.push(`↳ ${Locale.titlecase(current()!.tool)}`)
+      else lines.push(`↳ ${tools().length} toolcalls`)
+    }
+    if (props.part.state.status === "completed") {
+      lines.push(`└ ${tools().length} toolcalls · ${Locale.duration(duration())}`)
+    }
+    return lines.join("\n")
   })
   return (
     <InlineTool
       icon="│"
-      spinner={props.part.state.status === "running"}
+      spinner={isRunning()}
       complete={toolComplete(props.part)}
       pending="Delegating..."
       part={props.part}
+      onClick={() => {
+        const sessionID = childSessionID()
+        if (sessionID) navigate({ type: "session", sessionID })
+      }}
     >
       {content()}
     </InlineTool>

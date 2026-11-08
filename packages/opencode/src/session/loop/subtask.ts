@@ -23,6 +23,8 @@ import { SessionID, MessageID, PartID } from "../schema"
 import { getModel } from "./model"
 import { SyncEvent } from "@/sync"
 import { SessionEvent } from "@/v2/session-event"
+import { Modelv2 } from "@/v2/model"
+import { SessionMessage } from "@/v2/session-message"
 
 const log = Log.create({ service: "session.prompt" })
 
@@ -53,7 +55,9 @@ export const handleSubtask = Effect.fn("SessionPrompt.handleSubtask")(function* 
   const ctx = yield* InstanceState.context
   const promptOps = yield* deps.ops()
   const { task: taskTool } = yield* deps.registry.named()
-  const taskModel = task.model ? yield* getModel({ provider: deps.provider, bus: deps.bus }, task.model.providerID, task.model.modelID, sessionID) : model
+  const taskModel = task.model
+    ? yield* getModel({ provider: deps.provider, bus: deps.bus }, task.model.providerID, task.model.modelID, sessionID)
+    : model
   const assistantMessage: MessageV2.Assistant = yield* deps.sessions.updateMessage({
     id: MessageID.ascending(),
     role: "assistant",
@@ -69,6 +73,13 @@ export const handleSubtask = Effect.fn("SessionPrompt.handleSubtask")(function* 
     providerID: taskModel.providerID,
     time: { created: Date.now() },
   })
+  const taskArgs = {
+    prompt: task.prompt,
+    description: task.description,
+    subagent_type: task.agent,
+    command: task.command,
+  }
+  const normalizedInput = SessionMessage.normalizeToolInput(taskArgs)
   let part: MessageV2.ToolPart = yield* deps.sessions.updatePart({
     id: PartID.ascending(),
     messageID: assistantMessage.id,
@@ -78,27 +89,52 @@ export const handleSubtask = Effect.fn("SessionPrompt.handleSubtask")(function* 
     tool: TaskTool.id,
     state: {
       status: "running",
-      input: {
-        prompt: task.prompt,
-        description: task.description,
-        subagent_type: task.agent,
-        command: task.command,
-      },
+      input: taskArgs,
       time: { start: Date.now() },
     },
   })
-  const taskArgs = {
-    prompt: task.prompt,
-    description: task.description,
-    subagent_type: task.agent,
-    command: task.command,
-  }
+  const startTs = DateTime.makeUnsafe(Date.now())
+  yield* deps.sync.run(SessionEvent.Step.Started.Sync, {
+    sessionID,
+    legacyMessageID: assistantMessage.id,
+    agent: assistantMessage.agent,
+    model: {
+      id: Modelv2.ID.make(taskModel.id),
+      providerID: Modelv2.ProviderID.make(taskModel.providerID),
+      variant: Modelv2.VariantID.make(assistantMessage.variant ?? "default"),
+    },
+    timestamp: startTs,
+  })
+  yield* deps.sync.run(SessionEvent.Tool.Input.Started.Sync, {
+    sessionID,
+    callID: part.callID,
+    name: TaskTool.id,
+    timestamp: startTs,
+  })
+  yield* deps.sync.run(SessionEvent.Tool.Input.Ended.Sync, {
+    sessionID,
+    callID: part.callID,
+    text: "",
+    timestamp: startTs,
+  })
+  yield* deps.sync.run(SessionEvent.Tool.Called.Sync, {
+    sessionID,
+    callID: part.callID,
+    tool: TaskTool.id,
+    input: normalizedInput,
+    provider: { executed: false },
+    timestamp: startTs,
+  })
   yield* deps.plugin.trigger(
     "tool.execute.before",
-    { tool: TaskTool.id, sessionID, callID: part.id },
+    { tool: TaskTool.id, sessionID, callID: part.callID },
     { args: taskArgs },
   )
 
+  // Note: `parentRuleset` feeds the spawn deny gate (`taskDenyGateFromRuleset`)
+  // inside TaskTool, so it uses the raw agent permission (`parentAgent?.permission ?? []`).
+  // Child session permissions are derived separately inside TaskTool via `resolveParentAgent`
+  // (which applies FALLBACK_DENY including `task: * -> deny` if the parent agent is missing).
   const parentAgent = yield* deps.agents.get(lastUser.agent)
   const taskAgent = yield* deps.agents.get(task.agent)
   if (!taskAgent) {
@@ -143,6 +179,7 @@ export const handleSubtask = Effect.fn("SessionPrompt.handleSubtask")(function* 
           .ask({
             ...req,
             sessionID,
+            tool: { messageID: assistantMessage.id, callID: part.callID },
             ruleset: parentRuleset,
           })
           .pipe(Effect.orDie),
@@ -157,8 +194,10 @@ export const handleSubtask = Effect.fn("SessionPrompt.handleSubtask")(function* 
       Effect.onInterrupt(() =>
         Effect.gen(function* () {
           taskAbort.abort()
+          const endNow = Date.now()
+          const endTs = DateTime.makeUnsafe(endNow)
           assistantMessage.finish = "tool-calls"
-          assistantMessage.time.completed = Date.now()
+          assistantMessage.time.completed = endNow
           yield* deps.sessions.updateMessage(assistantMessage)
           if (part.state.status === "running") {
             yield* deps.sessions.updatePart({
@@ -166,12 +205,26 @@ export const handleSubtask = Effect.fn("SessionPrompt.handleSubtask")(function* 
               state: {
                 status: "error",
                 error: "Cancelled",
-                time: { start: part.state.time.start, end: Date.now() },
+                time: { start: part.state.time.start, end: endNow },
                 metadata: part.state.metadata,
                 input: part.state.input,
               },
             } satisfies MessageV2.ToolPart)
+            yield* deps.sync.run(SessionEvent.Tool.Failed.Sync, {
+              sessionID,
+              callID: part.callID,
+              error: { type: "unknown", message: "Cancelled" },
+              provider: { executed: false },
+              timestamp: endTs,
+            })
           }
+          yield* deps.sync.run(SessionEvent.Step.Ended.Sync, {
+            sessionID,
+            finish: "tool-calls",
+            cost: assistantMessage.cost,
+            tokens: assistantMessage.tokens,
+            timestamp: endTs,
+          })
         }),
       ),
     )
@@ -185,12 +238,14 @@ export const handleSubtask = Effect.fn("SessionPrompt.handleSubtask")(function* 
 
   yield* deps.plugin.trigger(
     "tool.execute.after",
-    { tool: TaskTool.id, sessionID, callID: part.id, args: taskArgs },
+    { tool: TaskTool.id, sessionID, callID: part.callID, args: taskArgs },
     result,
   )
 
+  const completedNow = Date.now()
+  const completedTs = DateTime.makeUnsafe(completedNow)
   assistantMessage.finish = "tool-calls"
-  assistantMessage.time.completed = Date.now()
+  assistantMessage.time.completed = completedNow
   yield* deps.sessions.updateMessage(assistantMessage)
 
   if (result && part.state.status === "running") {
@@ -203,34 +258,71 @@ export const handleSubtask = Effect.fn("SessionPrompt.handleSubtask")(function* 
         metadata: result.metadata,
         output: result.output,
         attachments,
-        time: { ...part.state.time, end: Date.now() },
+        time: { ...part.state.time, end: completedNow },
       },
     } satisfies MessageV2.ToolPart)
+    yield* deps.sync.run(SessionEvent.Tool.Success.Sync, {
+      sessionID,
+      callID: part.callID,
+      structured: result.metadata,
+      content: [
+        {
+          type: "text",
+          text: result.output,
+        },
+        ...(attachments?.map((item) => ({
+          type: "file" as const,
+          uri: item.url,
+          mime: item.mime,
+          name: item.filename,
+        })) ?? []),
+      ],
+      provider: { executed: false },
+      timestamp: completedTs,
+    })
   }
 
   if (!result) {
+    const errorMessage = error ? `Tool execution failed: ${error.message}` : "Tool execution failed"
     yield* deps.sessions.updatePart({
       ...part,
       state: {
         status: "error",
-        error: error ? `Tool execution failed: ${error.message}` : "Tool execution failed",
+        error: errorMessage,
         time: {
-          start: part.state.status === "running" ? part.state.time.start : Date.now(),
-          end: Date.now(),
+          start: part.state.status === "running" ? part.state.time.start : completedNow,
+          end: completedNow,
         },
         metadata: part.state.status === "pending" ? undefined : part.state.metadata,
         input: part.state.input,
       },
     } satisfies MessageV2.ToolPart)
+    yield* deps.sync.run(SessionEvent.Tool.Failed.Sync, {
+      sessionID,
+      callID: part.callID,
+      error: { type: "unknown", message: errorMessage },
+      provider: { executed: false },
+      timestamp: completedTs,
+    })
   }
+
+  yield* deps.sync.run(SessionEvent.Step.Ended.Sync, {
+    sessionID,
+    finish: "tool-calls",
+    cost: assistantMessage.cost,
+    tokens: assistantMessage.tokens,
+    timestamp: completedTs,
+  })
 
   if (!task.command) return
 
+  const summaryText = "Summarize the task tool output above and continue with your task."
+  const summaryNow = Date.now()
   const summaryUserMsg: MessageV2.User = {
     id: MessageID.ascending(),
     sessionID,
     role: "user",
-    time: { created: Date.now() },
+    time: { created: summaryNow },
     agent: lastUser.agent,
     model: lastUser.model,
   }
@@ -240,7 +332,12 @@ export const handleSubtask = Effect.fn("SessionPrompt.handleSubtask")(function* 
     messageID: summaryUserMsg.id,
     sessionID,
     type: "text",
-    text: "Summarize the task tool output above and continue with your task.",
+    text: summaryText,
     synthetic: true,
   } satisfies MessageV2.TextPart)
+  yield* deps.sync.run(SessionEvent.Synthetic.Sync, {
+    sessionID,
+    timestamp: DateTime.makeUnsafe(summaryNow),
+    text: summaryText,
+  })
 })

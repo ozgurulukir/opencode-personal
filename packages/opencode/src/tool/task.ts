@@ -107,19 +107,6 @@ export const TaskTool = Tool.define(
         get: (id) => sessions.get(id).pipe(Effect.orDie),
       })
 
-      const nextSession =
-        session ??
-        (yield* sessions.create({
-          parentID: ctx.sessionID,
-          title: subagentTitle(description, next.name),
-          permission: subagentSessionPermission({
-            parentSessionPermission: parent.permission ?? [],
-            parentAgent,
-            subagent: next,
-            primaryTools: cfg.experimental?.primary_tools,
-          }),
-        }))
-
       const msg = yield* Effect.sync(() => MessageV2.get({ sessionID: ctx.sessionID, messageID: ctx.messageID }))
       if (msg.info.role !== "assistant") return yield* Effect.fail(new Error("Not an assistant message"))
 
@@ -127,6 +114,34 @@ export const TaskTool = Tool.define(
         modelID: msg.info.modelID,
         providerID: msg.info.providerID,
       }
+
+      const permission = subagentSessionPermission({
+        parentSessionPermission: parent.permission ?? [],
+        parentAgent,
+        subagent: next,
+        primaryTools: cfg.experimental?.primary_tools,
+      })
+
+      if (session) {
+        yield* sessions.setPermission({ sessionID: session.id, permission })
+        if (session.agent !== next.name) {
+          yield* sessions.setAgent({ sessionID: session.id, agent: next.name })
+        }
+      }
+
+      const nextSession =
+        session ??
+        (yield* sessions.create({
+          parentID: ctx.sessionID,
+          workspaceID: parent.workspaceID,
+          agent: next.name,
+          model: {
+            id: model.modelID,
+            providerID: model.providerID,
+          },
+          title: subagentTitle(description, next.name),
+          permission,
+        }))
 
       yield* ctx.metadata({
         title: description,
