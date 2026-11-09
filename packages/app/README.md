@@ -31,19 +31,29 @@ Your app is ready to be deployed!
 
 ## E2E Testing
 
-Playwright starts the Vite dev server automatically via `webServer`, and UI tests expect an opencode backend at `localhost:4096` by default.
+Playwright starts the Vite dev server automatically via `webServer`. The
+opencode transport is **mocked in-process** with Playwright `page.route` (see
+`e2e/mock-api.ts`): REST fixtures plus a two-phase SSE `/global/event` stream
+that delivers a scripted `session.next.prompted` frame after the prompt is
+observed. **No `opencode serve` backend is required.**
 
 ```bash
 bunx playwright install chromium
 bun run test:e2e:local
-bun run test:e2e:local -- --grep "settings"
+bun run test:e2e:local -- --grep "critical path"
 ```
+
+The critical-path spec (`e2e/critical-path.spec.ts`) boots the app, opens a
+session, sends a prompt, and asserts the optimistic bubble resolves to the
+scripted server message. Set `E2E_FAIL_PROMPT_ASYNC=1` to run the negative
+regression check (`prompt_async` returns 500; the spec must fail).
 
 Environment options:
 
-- `PLAYWRIGHT_SERVER_HOST` / `PLAYWRIGHT_SERVER_PORT` (backend address, default: `localhost:4096`)
+- `PLAYWRIGHT_SERVER_HOST` / `PLAYWRIGHT_SERVER_PORT` (mocked backend address, default: `127.0.0.1:4096`)
 - `PLAYWRIGHT_PORT` (Vite dev server port, default: `3000`)
-- `PLAYWRIGHT_BASE_URL` (override base URL, default: `http://localhost:<PLAYWRIGHT_PORT>`)
+- `PLAYWRIGHT_BASE_URL` (override base URL, default: `http://127.0.0.1:<PLAYWRIGHT_PORT>`)
+- `E2E_FAIL_PROMPT_ASYNC` (negative-check flag; unset by default)
 
 ## Deployment
 
