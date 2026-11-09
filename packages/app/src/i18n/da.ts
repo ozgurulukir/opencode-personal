@@ -23,6 +23,8 @@ export const dict = {
 
   "command.sidebar.toggle": "Skift sidebjælke",
   "command.project.open": "Åbn projekt",
+  "command.project.previous": "Forrige projekt",
+  "command.project.next": "Næste projekt",
   "command.provider.connect": "Tilslut udbyder",
   "command.server.switch": "Skift server",
   "command.settings.open": "Åbn indstillinger",
@@ -235,6 +237,8 @@ export const dict = {
   "prompt.mode.shell": "Shell",
   "prompt.mode.normal": "Prompt",
   "prompt.mode.shell.exit": "esc for at afslutte",
+  "session.child.promptDisabled": "Underagent-sessioner kan ikke modtage prompts.",
+  "session.child.backToParent": "Tilbage til hovedsessionen.",
 
   "prompt.example.1": "Ret en TODO i koden",
   "prompt.example.2": "Hvad er teknologistakken for dette projekt?",
@@ -292,6 +296,7 @@ export const dict = {
   "dialog.mcp.title": "MCP'er",
   "dialog.mcp.description": "{{enabled}} af {{total}} aktiveret",
   "dialog.mcp.empty": "Ingen MCP'er konfigureret",
+  "dialog.mcp.toggle": "Skift {{name}} MCP",
 
   "dialog.lsp.empty": "LSP'er registreret automatisk fra filtyper",
   "dialog.plugins.empty": "Plugins konfigureret i opencode.json",
@@ -504,6 +509,8 @@ export const dict = {
   "session.review.noSnapshot":
     "Snapshot-sporing er deaktiveret i konfigurationen, så sessionsændringer er ikke tilgængelige",
   "session.review.noChanges": "Ingen ændringer",
+  "session.review.noUncommittedChanges": "Ingen uflettede ændringer endnu",
+  "session.review.noBranchChanges": "Ingen grenændringer endnu",
   "session.files.selectToOpen": "Vælg en fil at åbne",
   "session.files.all": "Alle filer",
   "session.files.empty": "Ingen filer",
@@ -551,6 +558,7 @@ export const dict = {
   "status.popover.tab.lsp": "LSP",
   "status.popover.tab.plugins": "Plugins",
   "status.popover.action.manageServers": "Administrer servere",
+  "status.popover.server.switch": "Skift til {{name}}",
 
   "session.share.popover.title": "Udgiv på nettet",
   "session.share.popover.description.shared":
@@ -603,6 +611,8 @@ export const dict = {
   "sidebar.project.recentSessions": "Seneste sessioner",
   "sidebar.project.viewAllSessions": "Vis alle sessioner",
   "sidebar.project.clearNotifications": "Ryd notifikationer",
+  "sidebar.empty.title": "Ingen projekter åbnet",
+  "sidebar.empty.description": "Åbn et projekt for at komme i gang",
 
   "app.name.desktop": "OpenCode Desktop",
   "settings.section.desktop": "Desktop",
@@ -614,6 +624,7 @@ export const dict = {
   "settings.desktop.wsl.description": "Kør OpenCode-serveren inde i WSL på Windows.",
 
   "settings.general.section.appearance": "Udseende",
+  "settings.general.section.advanced": "Avanceret",
   "settings.general.section.notifications": "Systemmeddelelser",
   "settings.general.section.updates": "Opdateringer",
   "settings.general.section.sounds": "Lydeffekter",
@@ -622,6 +633,10 @@ export const dict = {
 
   "settings.general.row.language.title": "Sprog",
   "settings.general.row.language.description": "Ændr visningssproget for OpenCode",
+  "settings.general.row.shell.title": "Terminalshell",
+  "settings.general.row.shell.description": "Vælg den shell, der bruges til din terminal. Kompatible shells bruges også til agentens værktøjskald.",
+  "settings.general.row.shell.autoDefault": "Auto (Standard)",
+  "settings.general.row.shell.terminalOnly": "kun terminal",
   "settings.general.row.appearance.title": "Udseende",
   "settings.general.row.appearance.description": "Tilpas hvordan OpenCode ser ud på din enhed",
   "settings.general.row.colorScheme.title": "Farveskema",
@@ -638,6 +653,16 @@ export const dict = {
   "settings.general.row.followup.description": "Vælg om opfølgende forespørgsler skal styre straks eller vente i kø",
   "settings.general.row.followup.option.queue": "Kø",
   "settings.general.row.followup.option.steer": "Styr",
+  "settings.general.row.showFileTree.title": "Filtræ",
+  "settings.general.row.showFileTree.description": "Vis filtræets toggle og panel i desktop-sessioner",
+  "settings.general.row.showNavigation.title": "Navigationskontroller",
+  "settings.general.row.showNavigation.description": "Vis tilbage- og fremad-knapperne i desktops titellinje",
+  "settings.general.row.showSearch.title": "Kommandopalette",
+  "settings.general.row.showSearch.description": "Vis søge- og kommandopalette-knappen i desktops titellinje",
+  "settings.general.row.showTerminal.title": "Terminal",
+  "settings.general.row.showTerminal.description": "Vis terminalknappen i desktops titellinje",
+  "settings.general.row.showStatus.title": "Serverstatus",
+  "settings.general.row.showStatus.description": "Vis serverstatus-knappen i desktops titellinje",
   "settings.general.row.reasoningSummaries.title": "Vis tænkeoversigter",
   "settings.general.row.reasoningSummaries.description": "Vis model tænkeoversigter i tidslinjen",
 
@@ -727,6 +752,7 @@ export const dict = {
   "settings.shortcuts.conflict.description": "{{keybind}} er allerede tildelt til {{titles}}.",
   "settings.shortcuts.unassigned": "Ikke tildelt",
   "settings.shortcuts.pressKeys": "Tryk på taster",
+  "settings.shortcuts.edit": "Rediger genvej {{title}}",
   "settings.shortcuts.search.placeholder": "Søg genveje",
   "settings.shortcuts.search.empty": "Ingen genveje fundet",
 

@@ -23,6 +23,8 @@ export const dict = {
 
   "command.sidebar.toggle": "Alternar barra lateral",
   "command.project.open": "Abrir proyecto",
+  "command.project.previous": "Proyecto anterior",
+  "command.project.next": "Proyecto siguiente",
   "command.provider.connect": "Conectar proveedor",
   "command.server.switch": "Cambiar servidor",
   "command.settings.open": "Abrir ajustes",
@@ -236,6 +238,8 @@ export const dict = {
   "prompt.mode.shell": "Shell",
   "prompt.mode.normal": "Prompt",
   "prompt.mode.shell.exit": "esc para salir",
+  "session.child.promptDisabled": "Las sesiones de sub-agentes no pueden recibir prompts.",
+  "session.child.backToParent": "Volver a la sesión principal.",
 
   "prompt.example.1": "Arreglar un TODO en el código",
   "prompt.example.2": "¿Cuál es el stack tecnológico de este proyecto?",
@@ -293,6 +297,7 @@ export const dict = {
   "dialog.mcp.title": "MCPs",
   "dialog.mcp.description": "{{enabled}} de {{total}} habilitados",
   "dialog.mcp.empty": "No hay MCPs configurados",
+  "dialog.mcp.toggle": "Alternar MCP {{name}}",
 
   "dialog.lsp.empty": "LSPs detectados automáticamente por tipo de archivo",
   "dialog.plugins.empty": "Plugins configurados en opencode.json",
@@ -508,6 +513,8 @@ export const dict = {
   "session.review.noSnapshot":
     "El seguimiento de instantáneas está deshabilitado en la configuración, por lo que los cambios de sesión no están disponibles",
   "session.review.noChanges": "Sin cambios",
+  "session.review.noUncommittedChanges": "Aún no hay cambios no fusionados",
+  "session.review.noBranchChanges": "Aún no hay cambios en la rama",
 
   "session.files.selectToOpen": "Selecciona un archivo para abrir",
   "session.files.all": "Todos los archivos",
@@ -557,6 +564,7 @@ export const dict = {
   "status.popover.tab.lsp": "LSP",
   "status.popover.tab.plugins": "Plugins",
   "status.popover.action.manageServers": "Administrar servidores",
+  "status.popover.server.switch": "Cambiar a {{name}}",
 
   "session.share.popover.title": "Publicar en web",
   "session.share.popover.description.shared":
@@ -610,6 +618,8 @@ export const dict = {
   "sidebar.project.recentSessions": "Sesiones recientes",
   "sidebar.project.viewAllSessions": "Ver todas las sesiones",
   "sidebar.project.clearNotifications": "Borrar notificaciones",
+  "sidebar.empty.title": "No hay proyectos abiertos",
+  "sidebar.empty.description": "Abre un proyecto para empezar",
 
   "app.name.desktop": "OpenCode Desktop",
 
@@ -622,6 +632,7 @@ export const dict = {
   "settings.desktop.wsl.description": "Ejecutar el servidor OpenCode dentro de WSL en Windows.",
 
   "settings.general.section.appearance": "Apariencia",
+  "settings.general.section.advanced": "Avanzado",
   "settings.general.section.notifications": "Notificaciones del sistema",
   "settings.general.section.updates": "Actualizaciones",
   "settings.general.section.sounds": "Efectos de sonido",
@@ -630,6 +641,10 @@ export const dict = {
 
   "settings.general.row.language.title": "Idioma",
   "settings.general.row.language.description": "Cambiar el idioma de visualización para OpenCode",
+  "settings.general.row.shell.title": "Shell de la terminal",
+  "settings.general.row.shell.description": "Elige el shell que se usa en tu terminal. Los shells compatibles también se usan para las llamadas de herramientas del agente.",
+  "settings.general.row.shell.autoDefault": "Auto (Predeterminado)",
+  "settings.general.row.shell.terminalOnly": "solo terminal",
   "settings.general.row.appearance.title": "Apariencia",
   "settings.general.row.appearance.description": "Personaliza cómo se ve OpenCode en tu dispositivo",
   "settings.general.row.colorScheme.title": "Esquema de color",
@@ -647,6 +662,16 @@ export const dict = {
     "Elige si los prompts de seguimiento se dirigen inmediatamente o esperan en una cola",
   "settings.general.row.followup.option.queue": "Cola",
   "settings.general.row.followup.option.steer": "Dirigir",
+  "settings.general.row.showFileTree.title": "Árbol de archivos",
+  "settings.general.row.showFileTree.description": "Mostrar el interruptor y el panel del árbol de archivos en las sesiones de escritorio",
+  "settings.general.row.showNavigation.title": "Controles de navegación",
+  "settings.general.row.showNavigation.description": "Mostrar los botones de volver y avanzar en la barra de título del escritorio",
+  "settings.general.row.showSearch.title": "Paleta de comandos",
+  "settings.general.row.showSearch.description": "Mostrar el botón de búsqueda y la paleta de comandos en la barra de título del escritorio",
+  "settings.general.row.showTerminal.title": "Terminal",
+  "settings.general.row.showTerminal.description": "Mostrar el botón de la terminal en la barra de título del escritorio",
+  "settings.general.row.showStatus.title": "Estado del servidor",
+  "settings.general.row.showStatus.description": "Mostrar el botón de estado del servidor en la barra de título del escritorio",
   "settings.general.row.reasoningSummaries.title": "Mostrar resúmenes de razonamiento",
   "settings.general.row.reasoningSummaries.description":
     "Mostrar resúmenes del razonamiento del modelo en la línea de tiempo",
@@ -740,6 +765,7 @@ export const dict = {
   "settings.shortcuts.conflict.description": "{{keybind}} ya está asignado a {{titles}}.",
   "settings.shortcuts.unassigned": "Sin asignar",
   "settings.shortcuts.pressKeys": "Presiona teclas",
+  "settings.shortcuts.edit": "Editar atajo de {{title}}",
   "settings.shortcuts.search.placeholder": "Buscar atajos",
   "settings.shortcuts.search.empty": "No se encontraron atajos",
 

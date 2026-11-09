@@ -27,6 +27,8 @@ export const dict = {
 
   "command.sidebar.toggle": "Kenar çubuğunu aç/kapat",
   "command.project.open": "Proje aç",
+  "command.project.previous": "Önceki proje",
+  "command.project.next": "Sonraki proje",
   "command.provider.connect": "Sağlayıcı bağla",
   "command.server.switch": "Sunucu değiştir",
   "command.settings.open": "Ayarları aç",
@@ -241,6 +243,8 @@ export const dict = {
   "prompt.mode.shell": "Kabuk",
   "prompt.mode.normal": "Komut",
   "prompt.mode.shell.exit": "çıkmak için esc",
+  "session.child.promptDisabled": "Alt ajan oturumlarına komut gönderilemez.",
+  "session.child.backToParent": "Ana oturuma geri dön.",
 
   "prompt.example.1": "Kod tabanındaki bir TODO'yu düzelt",
   "prompt.example.2": "Bu projenin teknoloji yığını nedir?",
@@ -298,6 +302,7 @@ export const dict = {
   "dialog.mcp.title": "MCP'ler",
   "dialog.mcp.description": "{{total}} içerisinden {{enabled}} etkin",
   "dialog.mcp.empty": "Yapılandırılmış MCP yok",
+  "dialog.mcp.toggle": "{{name}} MCP'yi aç/kapat",
 
   "dialog.lsp.empty": "LSP'ler dosya türlerinden otomatik algılanır",
   "dialog.plugins.empty": "Eklentiler opencode.json içinde yapılandırılır",
@@ -512,6 +517,8 @@ export const dict = {
   "session.review.noSnapshot":
     "Yapılandırmada anlık görüntü takibi devre dışı bırakıldı, bu nedenle oturum değişiklikleri kullanılamıyor",
   "session.review.noChanges": "Değişiklik yok",
+  "session.review.noUncommittedChanges": "Henüz commit edilmemiş değişiklik yok",
+  "session.review.noBranchChanges": "Henüz dal değişikliği yok",
 
   "session.files.selectToOpen": "Açmak için bir dosya seçin",
   "session.files.all": "Tüm dosyalar",
@@ -561,6 +568,7 @@ export const dict = {
   "status.popover.tab.lsp": "LSP",
   "status.popover.tab.plugins": "Eklentiler",
   "status.popover.action.manageServers": "Sunucuları yönet",
+  "status.popover.server.switch": "{{name}}'ye geç",
 
   "session.share.popover.title": "Web'de yayınla",
   "session.share.popover.description.shared": "Bu oturum web'de herkese açıktır. Bağlantıya sahip herkes erişebilir.",
@@ -613,6 +621,8 @@ export const dict = {
   "sidebar.project.recentSessions": "Son oturumlar",
   "sidebar.project.viewAllSessions": "Tüm oturumları görüntüle",
   "sidebar.project.clearNotifications": "Bildirimleri temizle",
+  "sidebar.empty.title": "Açık proje yok",
+  "sidebar.empty.description": "Başlamak için bir proje açın",
 
   "app.name.desktop": "OpenCode Masaüstü",
 
@@ -625,6 +635,7 @@ export const dict = {
   "settings.desktop.wsl.description": "OpenCode sunucusunu Windows'ta WSL içinde çalıştırın.",
 
   "settings.general.section.appearance": "Görünüm",
+  "settings.general.section.advanced": "Gelişmiş",
   "settings.general.section.notifications": "Sistem bildirimleri",
   "settings.general.section.updates": "Güncellemeler",
   "settings.general.section.sounds": "Ses efektleri",
@@ -633,6 +644,11 @@ export const dict = {
 
   "settings.general.row.language.title": "Dil",
   "settings.general.row.language.description": "OpenCode'un görünüm dilini değiştirin",
+  "settings.general.row.shell.title": "Terminal Kabuğu",
+  "settings.general.row.shell.description":
+    "Terminaliniz için kullanılan kabuğu seçin. Uyumlu kabuklar ajan araç çağrıları için de kullanılır.",
+  "settings.general.row.shell.autoDefault": "Otomatik (Varsayılan)",
+  "settings.general.row.shell.terminalOnly": "yalnızca terminal",
   "settings.general.row.appearance.title": "Görünüm",
   "settings.general.row.appearance.description": "OpenCode'un cihazınızdaki görünümünü özelleştirin",
   "settings.general.row.colorScheme.title": "Renk şeması",
@@ -651,6 +667,16 @@ export const dict = {
     "Takip komutlarının hemen yönlendirilmesini mi yoksa sırada beklemesini mi istediğinizi seçin",
   "settings.general.row.followup.option.queue": "Sıra",
   "settings.general.row.followup.option.steer": "Yönlendir",
+  "settings.general.row.showFileTree.title": "Dosya ağacı",
+  "settings.general.row.showFileTree.description": "Masaüstü oturumlarında dosya ağacı düğmesini ve panelini göster",
+  "settings.general.row.showNavigation.title": "Gezinti kontrolleri",
+  "settings.general.row.showNavigation.description": "Masaüstü başlık çubuğunda geri ve ileri düğmelerini göster",
+  "settings.general.row.showSearch.title": "Komut paleti",
+  "settings.general.row.showSearch.description": "Masaüstü başlık çubuğunda arama ve komut paleti düğmesini göster",
+  "settings.general.row.showTerminal.title": "Terminal",
+  "settings.general.row.showTerminal.description": "Masaüstü başlık çubuğunda terminal düğmesini göster",
+  "settings.general.row.showStatus.title": "Sunucu durumu",
+  "settings.general.row.showStatus.description": "Masaüstü başlık çubuğunda sunucu durumu düğmesini göster",
   "settings.general.row.reasoningSummaries.title": "Akıl yürütme özetlerini göster",
   "settings.general.row.reasoningSummaries.description": "Zaman çizelgesinde model akıl yürütme özetlerini görüntüle",
   "settings.general.row.shellToolPartsExpanded.title": "Kabuk araç bileşenlerini genişlet",
@@ -744,6 +770,7 @@ export const dict = {
   "settings.shortcuts.conflict.description": "{{keybind}} zaten {{titles}} için atanmış.",
   "settings.shortcuts.unassigned": "Atanmamış",
   "settings.shortcuts.pressKeys": "Tuşlara basın",
+  "settings.shortcuts.edit": "{{title}} kısayolunu düzenle",
   "settings.shortcuts.search.placeholder": "Kısayol ara",
   "settings.shortcuts.search.empty": "Kısayol bulunamadı",
 

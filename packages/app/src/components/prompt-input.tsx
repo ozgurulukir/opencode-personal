@@ -1356,7 +1356,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
               autocorrect={store.mode === "normal" ? "on" : "off"}
               spellcheck={store.mode === "normal"}
               inputMode="text"
-              // @ts-expect-error
+              // @ts-expect-error - solid-js HTMLAttributes<HTMLDivElement> has no `autocomplete` (only Form/Input/Select/Textarea attrs do); valid on contenteditable per the HTML spec and honored by browsers
               autocomplete="off"
               onInput={handleInput}
               onPaste={handlePaste}
