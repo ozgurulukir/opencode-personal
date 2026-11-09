@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, mock, spyOn, test } from "bun:test"
 import type {
   Message,
   Part,
@@ -1755,5 +1755,139 @@ describe("applyDirectoryEvent", () => {
 
     expect(pushes).toEqual(["/tmp"])
     expect(lspLoads).toBe(1)
+  })
+})
+
+describe("missing event.id", () => {
+  afterEach(() => {
+    mock.restore()
+  })
+
+  // Both prompted cases share the same expectations: the insert is dropped
+  // before any mutation (including resolveOptimistic), so the seeded message
+  // list and part slices stay untouched and the optimistic entry survives.
+  const expectPromptedDropped = (event: { type: string; id?: string; properties: Record<string, unknown> }) => {
+    const sessionID = "ses_1"
+    const [store, setStore] = createStore(baseState({ message: { [sessionID]: [userMessage("evt_1", sessionID)] } }))
+    const resolved: string[] = []
+    const warn = spyOn(console, "warn").mockImplementation(() => {})
+
+    applyDirectoryEvent({
+      event,
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+      resolveOptimistic(sid, text) {
+        resolved.push(`${sid}:${text}`)
+      },
+    })
+
+    expect(store.message[sessionID]?.map((x) => x.id)).toEqual(["evt_1"])
+    expect(store.part).toEqual({})
+    expect(resolved).toEqual([])
+    expect(warn).toHaveBeenCalledTimes(1)
+    expect(warn).toHaveBeenCalledWith(`[event-reducer] ${event.type} missing event.id; dropping insert`)
+  }
+
+  test("session.prompted with missing id drops the insert and keeps the optimistic entry", () => {
+    const prompted = promptedEvent("evt_2", "ses_1", "hello")
+    expectPromptedDropped({ type: prompted.type, properties: prompted.properties })
+  })
+
+  test("session.prompted with empty id drops the insert and keeps the optimistic entry", () => {
+    expectPromptedDropped(promptedEvent("", "ses_1", "hello"))
+  })
+
+  test("session.shell.started with missing id drops the wrapper and assistant insert", () => {
+    const sessionID = "ses_1"
+    const [store, setStore] = createStore(baseState())
+    const warn = spyOn(console, "warn").mockImplementation(() => {})
+    const apply = (event: { type: string; id?: string; properties: Record<string, unknown> }) =>
+      applyDirectoryEvent({ event, store, setStore, push() {}, directory: "/tmp", loadLsp() {} })
+
+    apply(promptedEvent("evt_1", sessionID, "run it"))
+    apply({
+      type: "session.next.shell.started",
+      properties: { sessionID, timestamp: 2, callID: "call_9", command: "ls" },
+    })
+
+    expect(store.message[sessionID]?.map((x) => x.id)).toEqual(["evt_1"])
+    expect(store.part[""]).toBeUndefined()
+    expect(store.part[":assistant"]).toBeUndefined()
+    expect(warn).toHaveBeenCalledTimes(1)
+  })
+
+  test("session.step.started with missing id drops the insert and leaves the active assistant uncompleted", () => {
+    const sessionID = "ses_1"
+    const [store, setStore] = createStore(baseState())
+    const warn = spyOn(console, "warn").mockImplementation(() => {})
+    const apply = (event: { type: string; id?: string; properties: Record<string, unknown> }) =>
+      applyDirectoryEvent({ event, store, setStore, push() {}, directory: "/tmp", loadLsp() {} })
+
+    apply(promptedEvent("evt_1", sessionID, "hello"))
+    apply({
+      id: "evt_2",
+      type: "session.next.step.started",
+      properties: { sessionID, timestamp: 2, agent: "assistant", model: { id: "gpt", providerID: "openai" } },
+    })
+    // Malformed follow-up with a later timestamp: the guard must run before the
+    // completion block, so evt_2 stays open and no id-less assistant appears.
+    apply({
+      type: "session.next.step.started",
+      properties: { sessionID, timestamp: 3, agent: "assistant", model: { id: "gpt", providerID: "openai" } },
+    })
+
+    expect(store.message[sessionID]?.map((x) => x.id)).toEqual(["evt_1", "evt_2"])
+    const assistant = store.message[sessionID]?.find((x) => x.id === "evt_2")
+    expect(assistant?.role === "assistant" && assistant.time.completed).toBeUndefined()
+    expect(warn).toHaveBeenCalledTimes(1)
+  })
+
+  test("session.compaction.started with missing id drops the wrapper insert", () => {
+    const sessionID = "ses_1"
+    const [store, setStore] = createStore(baseState())
+    const warn = spyOn(console, "warn").mockImplementation(() => {})
+    const apply = (event: { type: string; id?: string; properties: Record<string, unknown> }) =>
+      applyDirectoryEvent({ event, store, setStore, push() {}, directory: "/tmp", loadLsp() {} })
+
+    apply(promptedEvent("evt_1", sessionID, "hello"))
+    apply({
+      type: "session.next.compaction.started",
+      properties: { sessionID, timestamp: 2, reason: "auto" },
+    })
+
+    expect(store.message[sessionID]?.map((x) => x.id)).toEqual(["evt_1"])
+    expect(store.part[""]).toBeUndefined()
+    expect(warn).toHaveBeenCalledTimes(1)
+  })
+
+  test("control: the same events with a valid id insert normally and do not warn", () => {
+    const sessionID = "ses_1"
+    const [store, setStore] = createStore(baseState())
+    const warn = spyOn(console, "warn").mockImplementation(() => {})
+    const apply = (event: { type: string; id?: string; properties: Record<string, unknown> }) =>
+      applyDirectoryEvent({ event, store, setStore, push() {}, directory: "/tmp", loadLsp() {} })
+
+    apply(promptedEvent("evt_1", sessionID, "hello"))
+    apply({
+      id: "evt_2",
+      type: "session.next.shell.started",
+      properties: { sessionID, timestamp: 2, callID: "call_9", command: "ls" },
+    })
+    apply({
+      id: "evt_3",
+      type: "session.next.step.started",
+      properties: { sessionID, timestamp: 3, agent: "assistant", model: { id: "gpt", providerID: "openai" } },
+    })
+    apply({
+      id: "evt_4",
+      type: "session.next.compaction.started",
+      properties: { sessionID, timestamp: 4, reason: "auto" },
+    })
+
+    expect(store.message[sessionID]?.map((x) => x.id)).toEqual(["evt_1", "evt_2", "evt_2:assistant", "evt_3", "evt_4"])
+    expect(warn).not.toHaveBeenCalled()
   })
 })
