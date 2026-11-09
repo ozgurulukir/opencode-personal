@@ -128,9 +128,9 @@ function createGlobalSync() {
     setGlobalStore("project", next)
   }
 
-  const setBootStore = ((...input: unknown[]) => {
-    if (input[0] === "project" && Array.isArray(input[1])) {
-      setProjects(input[1] as Project[])
+  const set = ((...input: unknown[]) => {
+    if (input[0] === "project" && (Array.isArray(input[1]) || typeof input[1] === "function")) {
+      setProjects(input[1] as Project[] | ((draft: Project[]) => Project[]))
       return input[1]
     }
     return (setGlobalStore as (...args: unknown[]) => unknown)(...input)
@@ -144,21 +144,13 @@ function createGlobalSync() {
         requestFailedTitle: language.t("common.requestFailed"),
         translate: language.t,
         formatMoreCount: (count) => language.t("common.moreCountSuffix", { count }),
-        setGlobalStore: setBootStore,
+        setGlobalStore: set,
         queryClient,
       })
       bootedAt = Date.now()
       return bootedAt
     },
   }))
-
-  const set = ((...input: unknown[]) => {
-    if (input[0] === "project" && (Array.isArray(input[1]) || typeof input[1] === "function")) {
-      setProjects(input[1] as Project[] | ((draft: Project[]) => Project[]))
-      return input[1]
-    }
-    return (setGlobalStore as (...args: unknown[]) => unknown)(...input)
-  }) as typeof setGlobalStore
 
   const setSessionTodo = (sessionID: string, todos: Todo[] | undefined) => {
     if (!sessionID) return
