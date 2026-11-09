@@ -28,4 +28,4 @@ When constructing a synthetic bash tool part (e.g., from `fromShell()`), match t
 
 ## Translated docs (English + Turkish only)
 
-Docs ship in English (root) and Turkish (`content/docs/tr/`); locale routing (`src/i18n/locales.ts`) declares only `root` + `tr`. `content/docs/tr/skills.mdx` keeps code blocks byte-identical to the English source; only prose is translated. When editing shared code lines, apply the identical change to the English page and its `tr/` mirror; prose changes must be translated.
+Docs ship in English (root) and Turkish (`content/docs/tr/`); only `root` + `tr` locales are configured (`astro.config.mjs`). `content/docs/tr/skills.mdx` keeps code blocks byte-identical to the English source; only prose is translated. When editing shared code lines, apply the identical change to the English page and its `tr/` mirror; prose changes must be translated.
