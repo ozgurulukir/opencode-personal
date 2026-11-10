@@ -1,7 +1,6 @@
 // @ts-check
 import { defineConfig } from "astro/config"
 import starlight from "@astrojs/starlight"
-import solidJs from "@astrojs/solid-js"
 import config from "./config.mjs"
 import { rehypeHeadingIds, unified } from "@astrojs/markdown-remark"
 import rehypeAutolinkHeadings from "rehype-autolink-headings"
@@ -24,7 +23,6 @@ export default defineConfig({
   },
   build: {},
   integrations: [
-    solidJs(),
     starlight({
       title: "OpenCode Personal",
       defaultLocale: "root",
