@@ -107,7 +107,7 @@ describe("createPacedValue", () => {
 
   test("live source with rewritten (non-prefix) text snaps immediately", async () => {
     const [text, setText] = createSignal("first draft")
-    const [live, setLive] = createSignal(true)
+    const [live] = createSignal(true)
     createRoot((dispose) => {
       const value = createPacedValue(text, live)
       // effect hasn't run yet in this microtask context; value is the initial signal value
