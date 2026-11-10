@@ -127,6 +127,15 @@ export const TaskTool = Tool.define(
         if (session.agent !== next.name) {
           yield* sessions.setAgent({ sessionID: session.id, agent: next.name })
         }
+        // Resume re-syncs the model row too — parity with V2 subagent()'s
+        // switchModel (issue #384). Only future prompts read the row; this turn
+        // still passes `model` explicitly (below), which wins in createUserMessage.
+        if (session.model?.id !== model.modelID || session.model?.providerID !== model.providerID) {
+          yield* sessions.setModel({
+            sessionID: session.id,
+            model: { id: model.modelID, providerID: model.providerID },
+          })
+        }
       }
 
       const nextSession =

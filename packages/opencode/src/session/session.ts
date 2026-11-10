@@ -18,6 +18,7 @@ import { lt } from "drizzle-orm"
 import { or } from "drizzle-orm"
 import { SyncEvent } from "../sync"
 import { SessionEvent } from "@/v2/session-event"
+import { Modelv2 } from "@/v2/model"
 import * as DateTime from "effect/DateTime"
 import type { SQL } from "drizzle-orm"
 import { PartTable, SessionTable } from "./session.sql"
@@ -367,6 +368,7 @@ export interface Interface {
   readonly setAgent: (input: { sessionID: SessionID; agent: string }) => Effect.Effect<void>
   readonly setArchived: (input: { sessionID: SessionID; time?: number }) => Effect.Effect<void>
   readonly setPermission: (input: { sessionID: SessionID; permission: Permission.Ruleset }) => Effect.Effect<void>
+  readonly setModel: (input: { sessionID: SessionID; model: Schema.Schema.Type<typeof Model> }) => Effect.Effect<void>
   readonly setRevert: (input: {
     sessionID: SessionID
     revert: Info["revert"]
@@ -683,6 +685,26 @@ export const layer: Layer.Layer<Service, never, Bus.Service | Storage.Service | 
       yield* patch(input.sessionID, { permission: input.permission, time: { updated: Date.now() } })
     })
 
+    // Emits ModelSwitched so the shared projector (session/projectors-next.ts:172)
+    // writes SessionTable.model and the SessionMessageTable timeline entry — the
+    // same mechanism V2 switchModel uses and the same event createUserMessage
+    // emits at prompt time (issue #384). No provider validation here; that stays
+    // at prompt time (session/loop/model.ts:getModel).
+    const setModel = Effect.fn("Session.setModel")(function* (input: {
+      sessionID: SessionID
+      model: Schema.Schema.Type<typeof Model>
+    }) {
+      yield* sync.run(SessionEvent.ModelSwitched.Sync, {
+        sessionID: input.sessionID,
+        timestamp: DateTime.makeUnsafe(Date.now()),
+        model: {
+          id: input.model.id,
+          providerID: input.model.providerID,
+          variant: Modelv2.VariantID.make(input.model.variant ?? "default"),
+        },
+      })
+    })
+
     const setRevert = Effect.fn("Session.setRevert")(function* (input: {
       sessionID: SessionID
       revert: Info["revert"]
@@ -784,6 +806,7 @@ export const layer: Layer.Layer<Service, never, Bus.Service | Storage.Service | 
       setAgent,
       setArchived,
       setPermission,
+      setModel,
       setRevert,
       clearRevert,
       setSummary,
