@@ -23,6 +23,8 @@ export const dict = {
 
   "command.sidebar.toggle": "Переключить боковую панель",
   "command.project.open": "Открыть проект",
+  "command.project.previous": "Предыдущий проект",
+  "command.project.next": "Следующий проект",
   "command.provider.connect": "Подключить провайдера",
   "command.server.switch": "Переключить сервер",
   "command.settings.open": "Открыть настройки",
@@ -236,6 +238,8 @@ export const dict = {
   "prompt.mode.shell": "Оболочка",
   "prompt.mode.normal": "Промпт",
   "prompt.mode.shell.exit": "esc для выхода",
+  "session.child.promptDisabled": "Субагентам нельзя отправлять промпты.",
+  "session.child.backToParent": "Вернуться в основную сессию.",
 
   "prompt.example.1": "Исправить TODO в коде",
   "prompt.example.2": "Какой технологический стек этого проекта?",
@@ -293,6 +297,7 @@ export const dict = {
   "dialog.mcp.title": "MCP",
   "dialog.mcp.description": "{{enabled}} из {{total}} включено",
   "dialog.mcp.empty": "MCP не настроены",
+  "dialog.mcp.toggle": "Переключить MCP {{name}}",
 
   "dialog.lsp.empty": "LSP автоматически обнаружены по типам файлов",
   "dialog.plugins.empty": "Плагины настроены в opencode.json",
@@ -507,6 +512,8 @@ export const dict = {
   "session.review.noVcs": "Система контроля версий Git не обнаружена, изменения не отображаются",
   "session.review.noSnapshot": "Отслеживание снимков отключено в настройках, поэтому изменения сессии недоступны",
   "session.review.noChanges": "Нет изменений",
+  "session.review.noUncommittedChanges": "Незакоммиченных изменений пока нет",
+  "session.review.noBranchChanges": "Изменений в ветке пока нет",
   "session.files.selectToOpen": "Выберите файл, чтобы открыть",
   "session.files.all": "Все файлы",
   "session.files.empty": "Нет файлов",
@@ -554,6 +561,7 @@ export const dict = {
   "status.popover.tab.lsp": "LSP",
   "status.popover.tab.plugins": "Плагины",
   "status.popover.action.manageServers": "Управлять серверами",
+  "status.popover.server.switch": "Переключиться на {{name}}",
 
   "session.share.popover.title": "Опубликовать в интернете",
   "session.share.popover.description.shared":
@@ -608,6 +616,8 @@ export const dict = {
   "sidebar.project.recentSessions": "Недавние сессии",
   "sidebar.project.viewAllSessions": "Посмотреть все сессии",
   "sidebar.project.clearNotifications": "Очистить уведомления",
+  "sidebar.empty.title": "Нет открытых проектов",
+  "sidebar.empty.description": "Откройте проект, чтобы начать",
 
   "app.name.desktop": "OpenCode Desktop",
   "settings.section.desktop": "Приложение",
@@ -619,6 +629,7 @@ export const dict = {
   "settings.desktop.wsl.description": "Запускать сервер OpenCode внутри WSL на Windows.",
 
   "settings.general.section.appearance": "Внешний вид",
+  "settings.general.section.advanced": "Дополнительно",
   "settings.general.section.notifications": "Системные уведомления",
   "settings.general.section.updates": "Обновления",
   "settings.general.section.sounds": "Звуковые эффекты",
@@ -627,6 +638,11 @@ export const dict = {
 
   "settings.general.row.language.title": "Язык",
   "settings.general.row.language.description": "Изменить язык отображения OpenCode",
+  "settings.general.row.shell.title": "Оболочка терминала",
+  "settings.general.row.shell.description":
+    "Выберите оболочку, используемую в терминале. Совместимые оболочки также используются для вызовов инструментов агента.",
+  "settings.general.row.shell.autoDefault": "Авто (по умолчанию)",
+  "settings.general.row.shell.terminalOnly": "только терминал",
   "settings.general.row.appearance.title": "Внешний вид",
   "settings.general.row.appearance.description": "Настройте как OpenCode выглядит на вашем устройстве",
   "settings.general.row.colorScheme.title": "Цветовая схема",
@@ -644,6 +660,16 @@ export const dict = {
     "Выберите, отправлять ли уточняющие вопросы сразу или помещать их в очередь",
   "settings.general.row.followup.option.queue": "Очередь",
   "settings.general.row.followup.option.steer": "Направлять",
+  "settings.general.row.showFileTree.title": "Дерево файлов",
+  "settings.general.row.showFileTree.description": "Показывать переключатель и панель дерева файлов в настольных сессиях",
+  "settings.general.row.showNavigation.title": "Элементы навигации",
+  "settings.general.row.showNavigation.description": "Показывать кнопки «назад» и «вперёд» на заголовке окна",
+  "settings.general.row.showSearch.title": "Командная палитра",
+  "settings.general.row.showSearch.description": "Показывать кнопку поиска и командной палитры на заголовке окна",
+  "settings.general.row.showTerminal.title": "Терминал",
+  "settings.general.row.showTerminal.description": "Показывать кнопку терминала на заголовке окна",
+  "settings.general.row.showStatus.title": "Статус сервера",
+  "settings.general.row.showStatus.description": "Показывать кнопку статуса сервера на заголовке окна",
   "settings.general.row.reasoningSummaries.title": "Показывать сводки рассуждений",
   "settings.general.row.reasoningSummaries.description": "Отображать сводки рассуждений модели в ленте",
 
@@ -735,6 +761,7 @@ export const dict = {
   "settings.shortcuts.conflict.description": "{{keybind}} уже назначено для {{titles}}.",
   "settings.shortcuts.unassigned": "Не назначено",
   "settings.shortcuts.pressKeys": "Нажмите клавиши",
+  "settings.shortcuts.edit": "Изменить сочетание клавиш {{title}}",
   "settings.shortcuts.search.placeholder": "Поиск горячих клавиш",
   "settings.shortcuts.search.empty": "Горячие клавиши не найдены",
 

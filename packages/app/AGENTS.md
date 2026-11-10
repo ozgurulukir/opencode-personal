@@ -33,9 +33,13 @@ message/event adapter used by the app store.
 
 - ALWAYS USE PARALLEL TOOLS WHEN APPLICABLE.
 
+## Type checking
+
+- `bun typecheck` runs `tsgo -b` (incremental; build info at `node_modules/.ts-dist/tsconfig.tsbuildinfo`). After regenerating the SDK (`packages/sdk/js/script/build.ts`) — or whenever type errors look stale or suspiciously absent — delete `*.tsbuildinfo` under `node_modules/.ts-dist/` and re-run `bun typecheck`. The incremental cache can mask errors locally: pre-push passes on this box while a clean checkout fails (echoes the root AGENTS.md SDK-regen rule).
+
 ## i18n
 
-- Use `common.*` namespace for generic UI labels (Clear, Cancel, Open, etc.). Don't reuse domain-specific keys (e.g., `dialog.server.default.clear`) for generic icon buttons — it creates fragile coupling between unrelated components. Adding a new `common.*` key requires updating all 17 locale files; `parity.test.ts` only spot-checks specific keys, not full parity.
+- Use `common.*` namespace for generic UI labels (Clear, Cancel, Open, etc.). Don't reuse domain-specific keys (e.g., `dialog.server.default.clear`) for generic icon buttons — it creates fragile coupling between unrelated components. Adding a new `common.*` key requires updating all 17 locale files; `parity.test.ts` enforces full key-set equality against en for every locale (plus the targeted value checks), so a missing key fails the test.
 
 ## Browser Automation
 

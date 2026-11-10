@@ -23,6 +23,8 @@ export const dict = {
 
   "command.sidebar.toggle": "Prikaži/sakrij bočnu traku",
   "command.project.open": "Otvori projekat",
+  "command.project.previous": "Prethodni projekat",
+  "command.project.next": "Sljedeći projekat",
   "command.provider.connect": "Poveži provajdera",
   "command.server.switch": "Promijeni server",
   "command.settings.open": "Otvori postavke",
@@ -237,6 +239,8 @@ export const dict = {
   "prompt.mode.shell": "Shell",
   "prompt.mode.normal": "Prompt",
   "prompt.mode.shell.exit": "esc za izlaz",
+  "session.child.promptDisabled": "Sesijama pod-agenata nije moguće slati upite.",
+  "session.child.backToParent": "Nazad na glavnu sesiju.",
 
   "prompt.example.1": "Popravi TODO u bazi koda",
   "prompt.example.2": "Koji je tehnološki stack ovog projekta?",
@@ -294,6 +298,7 @@ export const dict = {
   "dialog.mcp.title": "MCP-ovi",
   "dialog.mcp.description": "{{enabled}} od {{total}} omogućeno",
   "dialog.mcp.empty": "Nema konfigurisnih MCP-ova",
+  "dialog.mcp.toggle": "Prikaži/sakrij MCP {{name}}",
 
   "dialog.lsp.empty": "LSP-ovi se automatski otkrivaju prema tipu datoteke",
   "dialog.plugins.empty": "Plugini su konfigurisani u opencode.json",
@@ -507,6 +512,8 @@ export const dict = {
   "session.review.noSnapshot":
     "Praćenje snimaka (snapshot) je onemogućeno u konfiguraciji, pa promjene sesije nisu dostupne",
   "session.review.noChanges": "Nema izmjena",
+  "session.review.noUncommittedChanges": "Još nema neobjedinjenih promjena",
+  "session.review.noBranchChanges": "Još nema promjena na grani",
 
   "session.files.selectToOpen": "Odaberi datoteku za otvaranje",
   "session.files.all": "Sve datoteke",
@@ -556,6 +563,7 @@ export const dict = {
   "status.popover.tab.lsp": "LSP",
   "status.popover.tab.plugins": "Plugini",
   "status.popover.action.manageServers": "Upravljaj serverima",
+  "status.popover.server.switch": "Promijeni na {{name}}",
 
   "session.share.popover.title": "Objavi na webu",
   "session.share.popover.description.shared": "Ova sesija je javna na webu. Dostupna je svima koji imaju link.",
@@ -607,6 +615,8 @@ export const dict = {
   "sidebar.project.recentSessions": "Nedavne sesije",
   "sidebar.project.viewAllSessions": "Prikaži sve sesije",
   "sidebar.project.clearNotifications": "Očisti obavijesti",
+  "sidebar.empty.title": "Nema otvorenih projekata",
+  "sidebar.empty.description": "Otvori projekt da počneš",
 
   "app.name.desktop": "OpenCode Desktop",
 
@@ -619,6 +629,7 @@ export const dict = {
   "settings.desktop.wsl.description": "Pokreni OpenCode server unutar WSL-a na Windowsu.",
 
   "settings.general.section.appearance": "Izgled",
+  "settings.general.section.advanced": "Napredno",
   "settings.general.section.notifications": "Sistemske obavijesti",
   "settings.general.section.updates": "Ažuriranja",
   "settings.general.section.sounds": "Zvučni efekti",
@@ -627,6 +638,10 @@ export const dict = {
 
   "settings.general.row.language.title": "Jezik",
   "settings.general.row.language.description": "Promijeni jezik prikaza u OpenCode-u",
+  "settings.general.row.shell.title": "Shell terminala",
+  "settings.general.row.shell.description": "Odaberi shell koji se koristi za tvoj terminal. Kompatibilni shelli se također koriste za pozive alata agenta.",
+  "settings.general.row.shell.autoDefault": "Automatski (Podrazumijevano)",
+  "settings.general.row.shell.terminalOnly": "samo terminal",
   "settings.general.row.appearance.title": "Izgled",
   "settings.general.row.appearance.description": "Prilagodi kako OpenCode izgleda na tvom uređaju",
   "settings.general.row.colorScheme.title": "Šema boja",
@@ -643,6 +658,16 @@ export const dict = {
   "settings.general.row.followup.description": "Odaberi da li upiti nadovezivanja usmjeravaju odmah ili čekaju u redu",
   "settings.general.row.followup.option.queue": "Red čekanja",
   "settings.general.row.followup.option.steer": "Usmjeri",
+  "settings.general.row.showFileTree.title": "Stablo datoteka",
+  "settings.general.row.showFileTree.description": "Prikaži prekidač i panel stabla datoteka u desktop sesijama",
+  "settings.general.row.showNavigation.title": "Kontrole navigacije",
+  "settings.general.row.showNavigation.description": "Prikaži dugmad za nazad i naprijed u naslovnoj traci desktopa",
+  "settings.general.row.showSearch.title": "Paleta komandi",
+  "settings.general.row.showSearch.description": "Prikaži dugme za pretragu i paletu komandi u naslovnoj traci desktopa",
+  "settings.general.row.showTerminal.title": "Terminal",
+  "settings.general.row.showTerminal.description": "Prikaži dugme terminala u naslovnoj traci desktopa",
+  "settings.general.row.showStatus.title": "Status servera",
+  "settings.general.row.showStatus.description": "Prikaži dugme statusa servera u naslovnoj traci desktopa",
   "settings.general.row.reasoningSummaries.title": "Prikaži sažetke rasuđivanja",
   "settings.general.row.reasoningSummaries.description": "Prikaži sažetke rasuđivanja modela na vremenskoj traci",
 
@@ -733,6 +758,7 @@ export const dict = {
   "settings.shortcuts.conflict.description": "{{keybind}} je već dodijeljeno za {{titles}}.",
   "settings.shortcuts.unassigned": "Nedodijeljeno",
   "settings.shortcuts.pressKeys": "Pritisni tastere",
+  "settings.shortcuts.edit": "Uredi prečicu {{title}}",
   "settings.shortcuts.search.placeholder": "Pretraži prečice",
   "settings.shortcuts.search.empty": "Nema pronađenih prečica",
 

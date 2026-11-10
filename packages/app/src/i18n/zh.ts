@@ -28,6 +28,8 @@ export const dict = {
   "command.sidebar.toggle": "切换侧边栏",
 
   "command.project.open": "打开项目",
+  "command.project.previous": "上一个项目",
+  "command.project.next": "下一个项目",
 
   "command.provider.connect": "连接提供商",
 
@@ -258,6 +260,8 @@ export const dict = {
   "prompt.mode.shell": "Shell",
   "prompt.mode.normal": "Prompt",
   "prompt.mode.shell.exit": "按 esc 退出",
+  "session.child.promptDisabled": "子代理会话无法接收提示。",
+  "session.child.backToParent": "返回主会话。",
   "prompt.example.1": "修复代码库中的一个 TODO",
   "prompt.example.2": "这个项目的技术栈是什么？",
   "prompt.example.3": "修复失败的测试",
@@ -312,6 +316,7 @@ export const dict = {
   "dialog.mcp.title": "MCPs",
   "dialog.mcp.description": "已启用 {{enabled}} / {{total}}",
   "dialog.mcp.empty": "未配置 MCPs",
+  "dialog.mcp.toggle": "切换 {{name}} MCP",
 
   "dialog.lsp.empty": "已从文件类型自动检测到 LSPs",
 
@@ -505,6 +510,8 @@ export const dict = {
   "session.review.noVcs": "未检测到 Git 版本控制系统，无法显示更改",
   "session.review.noSnapshot": "配置中已禁用快照跟踪，因此会话更改不可用",
   "session.review.noChanges": "无更改",
+  "session.review.noUncommittedChanges": "尚无未提交的更改",
+  "session.review.noBranchChanges": "尚无分支更改",
   "session.files.selectToOpen": "选择要打开的文件",
   "session.files.all": "所有文件",
   "session.files.empty": "无文件",
@@ -549,6 +556,7 @@ export const dict = {
   "status.popover.tab.lsp": "LSP",
   "status.popover.tab.plugins": "插件",
   "status.popover.action.manageServers": "管理服务器",
+  "status.popover.server.switch": "切换到 {{name}}",
 
   "session.share.popover.title": "发布到网页",
   "session.share.popover.description.shared": "此会话已在网页上公开。任何拥有链接的人都可以访问。",
@@ -600,6 +608,8 @@ export const dict = {
   "sidebar.project.recentSessions": "最近会话",
   "sidebar.project.viewAllSessions": "查看全部会话",
   "sidebar.project.clearNotifications": "清除通知",
+  "sidebar.empty.title": "没有打开的项目",
+  "sidebar.empty.description": "打开一个项目以开始使用",
 
   "app.name.desktop": "OpenCode Desktop",
 
@@ -614,6 +624,7 @@ export const dict = {
   "settings.desktop.wsl.description": "在 Windows 的 WSL 环境中运行 OpenCode 服务器。",
 
   "settings.general.section.appearance": "外观",
+  "settings.general.section.advanced": "高级",
   "settings.general.section.notifications": "系统通知",
   "settings.general.section.updates": "更新",
   "settings.general.section.sounds": "音效",
@@ -621,6 +632,11 @@ export const dict = {
   "settings.general.section.display": "显示",
   "settings.general.row.language.title": "语言",
   "settings.general.row.language.description": "更改 OpenCode 的显示语言",
+  "settings.general.row.shell.title": "终端 Shell",
+  "settings.general.row.shell.description":
+    "选择终端使用的 shell。兼容的 shell 也用于智能体工具调用。",
+  "settings.general.row.shell.autoDefault": "自动（默认）",
+  "settings.general.row.shell.terminalOnly": "仅终端",
   "settings.general.row.appearance.title": "外观",
   "settings.general.row.appearance.description": "自定义 OpenCode 在你的设备上的外观",
   "settings.general.row.colorScheme.title": "配色方案",
@@ -637,6 +653,16 @@ export const dict = {
   "settings.general.row.followup.description": "选择跟进提示是立即引导还是在队列中等待",
   "settings.general.row.followup.option.queue": "排队",
   "settings.general.row.followup.option.steer": "引导",
+  "settings.general.row.showFileTree.title": "文件树",
+  "settings.general.row.showFileTree.description": "在桌面会话中显示文件树开关和面板",
+  "settings.general.row.showNavigation.title": "导航控件",
+  "settings.general.row.showNavigation.description": "在桌面标题栏中显示后退和前进按钮",
+  "settings.general.row.showSearch.title": "命令面板",
+  "settings.general.row.showSearch.description": "在桌面标题栏中显示搜索和命令面板按钮",
+  "settings.general.row.showTerminal.title": "终端",
+  "settings.general.row.showTerminal.description": "在桌面标题栏中显示终端按钮",
+  "settings.general.row.showStatus.title": "服务器状态",
+  "settings.general.row.showStatus.description": "在桌面标题栏中显示服务器状态按钮",
   "settings.general.row.reasoningSummaries.title": "显示推理摘要",
   "settings.general.row.reasoningSummaries.description": "在时间线中显示模型推理摘要",
   "settings.general.row.shellToolPartsExpanded.title": "展开 shell 工具部分",
@@ -720,6 +746,7 @@ export const dict = {
   "settings.shortcuts.conflict.description": "{{keybind}} 已分配给 {{titles}}。",
   "settings.shortcuts.unassigned": "未设置",
   "settings.shortcuts.pressKeys": "按下按键",
+  "settings.shortcuts.edit": "编辑 {{title}} 快捷键",
   "settings.shortcuts.search.placeholder": "搜索快捷键",
   "settings.shortcuts.search.empty": "未找到快捷键",
   "settings.shortcuts.group.general": "通用",

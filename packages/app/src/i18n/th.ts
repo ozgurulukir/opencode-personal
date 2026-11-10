@@ -23,6 +23,8 @@ export const dict = {
 
   "command.sidebar.toggle": "สลับแถบข้าง",
   "command.project.open": "เปิดโปรเจกต์",
+  "command.project.previous": "โปรเจกต์ก่อนหน้า",
+  "command.project.next": "โปรเจกต์ถัดไป",
   "command.provider.connect": "เชื่อมต่อผู้ให้บริการ",
   "command.server.switch": "สลับเซิร์ฟเวอร์",
   "command.settings.open": "เปิดการตั้งค่า",
@@ -236,6 +238,8 @@ export const dict = {
   "prompt.mode.shell": "เชลล์",
   "prompt.mode.normal": "พรอมต์",
   "prompt.mode.shell.exit": "กด esc เพื่อออก",
+  "session.child.promptDisabled": "เซสชันซับเอเจนต์ไม่สามารถรับพรอมต์ได้",
+  "session.child.backToParent": "กลับไปเซสชันหลัก",
 
   "prompt.example.1": "แก้ไข TODO ในโค้ดเบส",
   "prompt.example.2": "เทคโนโลยีของโปรเจกต์นี้คืออะไร?",
@@ -293,6 +297,7 @@ export const dict = {
   "dialog.mcp.title": "MCPs",
   "dialog.mcp.description": "{{enabled}} จาก {{total}} ที่เปิดใช้งาน",
   "dialog.mcp.empty": "ไม่มี MCP ที่กำหนดค่า",
+  "dialog.mcp.toggle": "สลับ MCP {{name}}",
 
   "dialog.lsp.empty": "LSPs ตรวจจับอัตโนมัติจากประเภทไฟล์",
   "dialog.plugins.empty": "ปลั๊กอินที่กำหนดค่าใน opencode.json",
@@ -502,6 +507,8 @@ export const dict = {
   "session.review.noVcs": "ไม่ตรวจพบระบบควบคุมเวอร์ชัน Git การเปลี่ยนแปลงจะไม่แสดง",
   "session.review.noSnapshot": "การติดตามสแนปชอตถูกปิดใช้งานในการกำหนดค่า ดังนั้นการเปลี่ยนแปลงเซสชันจึงไม่พร้อมใช้งาน",
   "session.review.noChanges": "ไม่มีการเปลี่ยนแปลง",
+  "session.review.noUncommittedChanges": "ยังไม่มีการเปลี่ยนแปลงที่ยังไม่ commit",
+  "session.review.noBranchChanges": "ยังไม่มีการเปลี่ยนแปลงบนสาขา",
 
   "session.files.selectToOpen": "เลือกไฟล์เพื่อเปิด",
   "session.files.empty": "ไม่มีไฟล์",
@@ -551,6 +558,7 @@ export const dict = {
   "status.popover.tab.lsp": "LSP",
   "status.popover.tab.plugins": "ปลั๊กอิน",
   "status.popover.action.manageServers": "จัดการเซิร์ฟเวอร์",
+  "status.popover.server.switch": "สลับไป {{name}}",
 
   "session.share.popover.title": "เผยแพร่บนเว็บ",
   "session.share.popover.description.shared": "เซสชันนี้เป็นสาธารณะบนเว็บ สามารถเข้าถึงได้โดยผู้ที่มีลิงก์",
@@ -601,6 +609,8 @@ export const dict = {
   "sidebar.project.recentSessions": "เซสชันล่าสุด",
   "sidebar.project.viewAllSessions": "ดูเซสชันทั้งหมด",
   "sidebar.project.clearNotifications": "ล้างการแจ้งเตือน",
+  "sidebar.empty.title": "ไม่มีโปรเจกต์ที่เปิดอยู่",
+  "sidebar.empty.description": "เปิดโปรเจกต์เพื่อเริ่มต้น",
 
   "app.name.desktop": "OpenCode Desktop",
 
@@ -613,6 +623,7 @@ export const dict = {
   "settings.desktop.wsl.description": "เรียกใช้เซิร์ฟเวอร์ OpenCode ภายใน WSL บน Windows",
 
   "settings.general.section.appearance": "รูปลักษณ์",
+  "settings.general.section.advanced": "ขั้นสูง",
   "settings.general.section.notifications": "การแจ้งเตือนระบบ",
   "settings.general.section.updates": "การอัปเดต",
   "settings.general.section.sounds": "เสียงเอฟเฟกต์",
@@ -621,6 +632,11 @@ export const dict = {
 
   "settings.general.row.language.title": "ภาษา",
   "settings.general.row.language.description": "เปลี่ยนภาษาที่แสดงสำหรับ OpenCode",
+  "settings.general.row.shell.title": "เชลล์เทอร์มินัล",
+  "settings.general.row.shell.description":
+    "เลือกเชลล์ที่ใช้สำหรับเทอร์มินัลของคุณ เชลล์ที่เข้ากันได้ยังใช้สำหรับการเรียกเครื่องมือของเอเจนต์ด้วย",
+  "settings.general.row.shell.autoDefault": "อัตโนมัติ (ค่าเริ่มต้น)",
+  "settings.general.row.shell.terminalOnly": "เทอร์มินัลเท่านั้น",
   "settings.general.row.appearance.title": "รูปลักษณ์",
   "settings.general.row.appearance.description": "ปรับแต่งวิธีการที่ OpenCode มีลักษณะบนอุปกรณ์ของคุณ",
   "settings.general.row.colorScheme.title": "โทนสี",
@@ -637,6 +653,16 @@ export const dict = {
   "settings.general.row.followup.description": "เลือกว่าจะให้พร้อมท์ติดตามผลทำงานทันทีหรือรอในคิว",
   "settings.general.row.followup.option.queue": "คิว",
   "settings.general.row.followup.option.steer": "นำทาง",
+  "settings.general.row.showFileTree.title": "ไฟล์ทรี",
+  "settings.general.row.showFileTree.description": "แสดงปุ่มสลับและพาเนลไฟล์ทรีในเซสชันเดสก์ท็อป",
+  "settings.general.row.showNavigation.title": "ตัวควบคุมการนำทาง",
+  "settings.general.row.showNavigation.description": "แสดงปุ่มย้อนกลับและไปข้างหน้าในแถบชื่อเดสก์ท็อป",
+  "settings.general.row.showSearch.title": "คำสั่งพาเล็ตต์",
+  "settings.general.row.showSearch.description": "แสดงปุ่มค้นหาและคำสั่งพาเล็ตต์ในแถบชื่อเดสก์ท็อป",
+  "settings.general.row.showTerminal.title": "เทอร์มินัล",
+  "settings.general.row.showTerminal.description": "แสดงปุ่มเทอร์มินัลในแถบชื่อเดสก์ท็อป",
+  "settings.general.row.showStatus.title": "สถานะเซิร์ฟเวอร์",
+  "settings.general.row.showStatus.description": "แสดงปุ่มสถานะเซิร์ฟเวอร์ในแถบชื่อเดสก์ท็อป",
   "settings.general.row.reasoningSummaries.title": "แสดงสรุปการใช้เหตุผล",
   "settings.general.row.reasoningSummaries.description": "แสดงสรุปการใช้เหตุผลของโมเดลในไทม์ไลน์",
   "settings.general.row.shellToolPartsExpanded.title": "ขยายส่วนเครื่องมือ shell",
@@ -724,6 +750,7 @@ export const dict = {
   "settings.shortcuts.conflict.description": "{{keybind}} ถูกกำหนดให้กับ {{titles}} แล้ว",
   "settings.shortcuts.unassigned": "ไม่ได้กำหนด",
   "settings.shortcuts.pressKeys": "กดปุ่ม",
+  "settings.shortcuts.edit": "แก้ไขทางลัด {{title}}",
   "settings.shortcuts.search.placeholder": "ค้นหาทางลัด",
   "settings.shortcuts.search.empty": "ไม่พบทางลัด",
 

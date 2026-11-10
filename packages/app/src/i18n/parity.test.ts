@@ -17,16 +17,33 @@ import { dict as zh } from "./zh"
 import { dict as zht } from "./zht"
 import { dict as tr } from "./tr"
 
-const locales = [ar, br, bs, da, de, es, fr, ja, ko, no, pl, ru, th, tr, zh, zht]
+const locales = { ar, br, bs, da, de, es, fr, ja, ko, no, pl, ru, th, tr, zh, zht } as const
 const keys = ["command.session.previous.unseen", "command.session.next.unseen"] as const
 
 describe("i18n parity", () => {
   test("non-English locales translate targeted unseen session keys", () => {
-    for (const locale of locales) {
+    for (const locale of Object.values(locales)) {
       for (const key of keys) {
         expect(locale[key]).toBeDefined()
         expect(locale[key]).not.toBe(en[key])
       }
     }
+  })
+
+  test("every locale has exactly the same key set as en", () => {
+    const enKeys = Object.keys(en).sort()
+    const enKeySet = new Set(enKeys)
+    const drift = Object.fromEntries(
+      Object.entries(locales)
+        .map(([name, dict]) => {
+          const keys = new Set(Object.keys(dict))
+          return [name, {
+            missing: enKeys.filter((k) => !keys.has(k)),
+            extra: [...keys].filter((k) => !enKeySet.has(k)),
+          }] as const
+        })
+        .filter(([, v]) => v.missing.length > 0 || v.extra.length > 0),
+    )
+    expect(drift).toEqual({})
   })
 })

@@ -27,6 +27,8 @@ export const dict = {
 
   "command.sidebar.toggle": "切換側邊欄",
   "command.project.open": "開啟專案",
+  "command.project.previous": "上一個專案",
+  "command.project.next": "下一個專案",
   "command.provider.connect": "連接提供者",
   "command.server.switch": "切換伺服器",
   "command.settings.open": "開啟設定",
@@ -236,6 +238,8 @@ export const dict = {
   "prompt.mode.shell": "Shell",
   "prompt.mode.normal": "Prompt",
   "prompt.mode.shell.exit": "按 esc 退出",
+  "session.child.promptDisabled": "子代理工作階段無法接收提示。",
+  "session.child.backToParent": "返回主要工作階段。",
 
   "prompt.example.1": "修復程式碼庫中的一個 TODO",
   "prompt.example.2": "這個專案的技術堆疊是什麼?",
@@ -293,6 +297,7 @@ export const dict = {
   "dialog.mcp.title": "MCP",
   "dialog.mcp.description": "已啟用 {{enabled}} / {{total}}",
   "dialog.mcp.empty": "未設定 MCP",
+  "dialog.mcp.toggle": "切換 {{name}} MCP",
 
   "dialog.lsp.empty": "已從檔案類型自動偵測到 LSPs",
   "dialog.plugins.empty": "在 opencode.json 中設定的外掛程式",
@@ -498,6 +503,8 @@ export const dict = {
   "session.review.loadingChanges": "正在載入變更...",
   "session.review.empty": "此工作階段暫無變更",
   "session.review.noChanges": "沒有變更",
+  "session.review.noUncommittedChanges": "尚無未提交的變更",
+  "session.review.noBranchChanges": "尚無分支變更",
   "session.review.noVcs": "未偵測到 Git 版本控制系統，無法顯示變更",
   "session.review.noSnapshot": "設定中已停用快照追蹤，因此無法使用工作階段變更",
   "session.files.selectToOpen": "選取要開啟的檔案",
@@ -547,6 +554,7 @@ export const dict = {
   "status.popover.tab.lsp": "LSP",
   "status.popover.tab.plugins": "外掛程式",
   "status.popover.action.manageServers": "管理伺服器",
+  "status.popover.server.switch": "切換到 {{name}}",
 
   "session.share.popover.title": "發佈到網頁",
   "session.share.popover.description.shared": "此工作階段已在網頁上公開。任何擁有連結的人都可以存取。",
@@ -597,6 +605,8 @@ export const dict = {
   "sidebar.project.recentSessions": "最近工作階段",
   "sidebar.project.viewAllSessions": "查看全部工作階段",
   "sidebar.project.clearNotifications": "清除通知",
+  "sidebar.empty.title": "沒有開啟的專案",
+  "sidebar.empty.description": "開啟一個專案以開始使用",
 
   "app.name.desktop": "OpenCode Desktop",
   "settings.section.desktop": "桌面",
@@ -608,6 +618,7 @@ export const dict = {
   "settings.desktop.wsl.description": "在 Windows 上的 WSL 中執行 OpenCode 伺服器。",
 
   "settings.general.section.appearance": "外觀",
+  "settings.general.section.advanced": "進階",
   "settings.general.section.notifications": "系統通知",
   "settings.general.section.updates": "更新",
   "settings.general.section.sounds": "音效",
@@ -616,6 +627,11 @@ export const dict = {
 
   "settings.general.row.language.title": "語言",
   "settings.general.row.language.description": "變更 OpenCode 的顯示語言",
+  "settings.general.row.shell.title": "終端 Shell",
+  "settings.general.row.shell.description":
+    "選擇終端使用的 shell。相容的 shell 也用於代理程式工具呼叫。",
+  "settings.general.row.shell.autoDefault": "自動（預設）",
+  "settings.general.row.shell.terminalOnly": "僅終端",
   "settings.general.row.appearance.title": "外觀",
   "settings.general.row.appearance.description": "自訂 OpenCode 在你的裝置上的外觀",
   "settings.general.row.colorScheme.title": "配色方案",
@@ -632,6 +648,16 @@ export const dict = {
   "settings.general.row.followup.description": "選擇後續追問提示是立即引導還是進入佇列等待",
   "settings.general.row.followup.option.queue": "佇列",
   "settings.general.row.followup.option.steer": "引導",
+  "settings.general.row.showFileTree.title": "檔案樹",
+  "settings.general.row.showFileTree.description": "在桌面工作階段中顯示檔案樹開關與面板",
+  "settings.general.row.showNavigation.title": "導覽控制項",
+  "settings.general.row.showNavigation.description": "在桌面標題列中顯示上一步與下一步按鈕",
+  "settings.general.row.showSearch.title": "指令面板",
+  "settings.general.row.showSearch.description": "在桌面標題列中顯示搜尋與指令面板按鈕",
+  "settings.general.row.showTerminal.title": "終端",
+  "settings.general.row.showTerminal.description": "在桌面標題列中顯示終端按鈕",
+  "settings.general.row.showStatus.title": "伺服器狀態",
+  "settings.general.row.showStatus.description": "在桌面標題列中顯示伺服器狀態按鈕",
   "settings.general.row.reasoningSummaries.title": "顯示推理摘要",
   "settings.general.row.reasoningSummaries.description": "在時間軸中顯示模型推理摘要",
 
@@ -717,6 +743,7 @@ export const dict = {
   "settings.shortcuts.conflict.description": "{{keybind}} 已分配給 {{titles}}。",
   "settings.shortcuts.unassigned": "未設定",
   "settings.shortcuts.pressKeys": "按下按鍵",
+  "settings.shortcuts.edit": "編輯 {{title}} 快速鍵",
   "settings.shortcuts.search.placeholder": "搜尋快速鍵",
   "settings.shortcuts.search.empty": "找不到快速鍵",
 
