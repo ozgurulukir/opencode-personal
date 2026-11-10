@@ -1,20 +1,9 @@
 // Characterization tests (Rule 3, #380 Phase 1/2): lock the pure helper surface
 // of message-part.tsx before the god-file split. These import from
 // message-part.tsx now and follow the helpers into message-part.shared.ts.
-import { afterAll, describe, expect, mock, test } from "bun:test"
+import { describe, expect, test } from "bun:test"
 import type { Part, Session, ToolPart } from "@opencode-ai/sdk/v2"
-import type { PartGroup } from "./message-part"
-
-// message-part.tsx imports @solidjs/router, which reads window.history at module
-// load — bun test has no DOM. Stub it before the dynamic import (see
-// message-part.test.ts for the same pattern).
-mock.module("@solidjs/router", () => ({
-  useLocation: () => ({ pathname: "/" }),
-  useNavigate: () => () => {},
-}))
-afterAll(() => mock.restore())
-
-const {
+import {
   currentSession,
   groupParts,
   index,
@@ -30,7 +19,8 @@ const {
   taskSession,
   toolDefaultOpen,
   urls,
-} = await import("./message-part")
+  type PartGroup,
+} from "./message-part-shared"
 
 describe("relativizeProjectPath", () => {
   test("strips the directory but keeps the path's leading separator", () => {
