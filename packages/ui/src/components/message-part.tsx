@@ -193,14 +193,14 @@ export const PART_MAPPING: Record<string, PartComponent | undefined> = {}
 const TEXT_RENDER_PACE_MS = 24
 const TEXT_RENDER_SNAP = /[\s.,!?;:)\]]/
 
-function step(size: number) {
+export function step(size: number) {
   if (size <= 12) return 2
   if (size <= 48) return 4
   if (size <= 96) return 8
   return Math.min(24, Math.ceil(size / 8))
 }
 
-function next(text: string, start: number) {
+export function next(text: string, start: number) {
   const end = Math.min(text.length, start + step(text.length - start))
   const max = Math.min(text.length, end + 8)
   for (let i = end; i < max; i++) {
@@ -209,7 +209,7 @@ function next(text: string, start: number) {
   return end
 }
 
-function createPacedValue(getValue: () => string, live?: () => boolean) {
+export function createPacedValue(getValue: () => string, live?: () => boolean) {
   const [value, setValue] = createSignal(getValue())
   let shown = getValue()
   let timeout: ReturnType<typeof setTimeout> | undefined
@@ -264,7 +264,7 @@ function createPacedValue(getValue: () => string, live?: () => boolean) {
   return value
 }
 
-function PacedMarkdown(props: { text: string; cacheKey: string; streaming: boolean }) {
+export function PacedMarkdown(props: { text: string; cacheKey: string; streaming: boolean }) {
   const value = createPacedValue(
     () => props.text,
     () => props.streaming,
