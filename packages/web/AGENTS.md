@@ -5,33 +5,16 @@ This package follows the root [AGENTS.md](../../AGENTS.md) for general repo rule
 ## Typecheck
 
 `bun run typecheck` (= `astro check`) is wired into turbo, pre-push, and CI.
-The `tsconfig.json` `exclude` waives the orphaned share tree
-(`Share.tsx`, `share/`) pending #374 — do not add errors there; remove the
-exclude patterns once #374 deletes those files.
 
-## Share page — WebSocket message conversion gate
+## Share viewer — removed
 
-`Share.tsx:128-135` is the sole conversion point for incoming WebSocket messages:
-
-- V1 messages: identified by `"metadata" in d.content`; converted via `fromV1()`.
-- V2 messages: pass through as-is; their `parts` must already be populated or the message renders blank.
-
-`SessionMessage.Shell` (`type: "shell"`) is V2-only. Its `metadata` field is optional in the schema and is **not populated by the projector**, so `"metadata" in d.content` returns `false` and shell messages bypass `fromV1()`. They arrive with `parts: []`, causing the `Part` component to render nothing.
-
-**Fix**: Add a `d.content.type === "shell"` check before the metadata check and convert via `fromShell()`, which maps the shell message to an assistant message with a single `tool: "bash"` part.
-
-The current `share-next` producer intentionally sends V1-shaped message/part
-payloads at the external share API boundary, so `fromV1()` remains live. Keep
-the shell and V2 branches for payloads produced by newer share producers.
-
-## `BashTool` expected state shape
-
-`part.tsx:629-637` (`BashTool`) reads:
-- `state.input.command` — the command string
-- `state.metadata.output` — the output to render
-- `state.metadata.description` — the description shown in the tool title
-
-When constructing a synthetic bash tool part (e.g., from `fromShell()`), match this exact shape or `ContentBash` renders blank.
+The web share viewer tree (`Share.tsx`, `share/`, `icons/`) was deleted
+(#374): its pages were removed earlier and share viewing is external
+(opncd.ai, per `content/docs/share.mdx`). Do not re-add SolidJS to this
+package — `@astrojs/solid-js` was removed from `astro.config.mjs` and the
+solid/shiki/marked/luxon/lang-map dependency tail was pruned from
+`package.json`. Sharing stays external; the external share API producer
+(`share-next`) lives server-side, not here.
 
 ## Translated docs (English + Turkish only)
 
