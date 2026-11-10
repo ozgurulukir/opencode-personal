@@ -264,7 +264,7 @@ function PacedMarkdown(props: { text: string; cacheKey: string; streaming: boole
   )
 }
 
-function relativizeProjectPath(path: string, directory?: string) {
+export function relativizeProjectPath(path: string, directory?: string) {
   if (!path) return ""
   if (!directory) return path
   if (directory === "/") return path
@@ -282,7 +282,7 @@ function getDirectory(path: string | undefined) {
   return relativizeProjectPath(_getDirectory(path), data.directory)
 }
 
-function urls(text: string | undefined) {
+export function urls(text: string | undefined) {
   if (!text) return []
   const seen = new Set<string>()
   return [...text.matchAll(/https?:\/\/[^\s<>"'`)\]]+/g)]
@@ -294,7 +294,7 @@ function urls(text: string | undefined) {
     })
 }
 
-function sessionLink(id: string | undefined, path: string, href?: (id: string) => string | undefined) {
+export function sessionLink(id: string | undefined, path: string, href?: (id: string) => string | undefined) {
   if (!id) return
 
   const direct = href?.(id)
@@ -305,11 +305,11 @@ function sessionLink(id: string | undefined, path: string, href?: (id: string) =
   return `${path.slice(0, idx)}/session/${id}`
 }
 
-function currentSession(path: string) {
+export function currentSession(path: string) {
   return path.match(/\/session\/([^/?#]+)/)?.[1]
 }
 
-function taskSession(
+export function taskSession(
   input: Record<string, any>,
   path: string,
   sessions: Session[] | undefined,
@@ -344,24 +344,24 @@ function taskSession(
 const CONTEXT_GROUP_TOOLS = new Set(["read", "glob", "grep", "list"])
 const HIDDEN_TOOLS = new Set(["todowrite"])
 
-function list<T>(value: T[] | undefined | null, fallback: T[]) {
+export function list<T>(value: T[] | undefined | null, fallback: T[]) {
   if (Array.isArray(value)) return value
   return fallback
 }
 
-function same<T>(a: readonly T[] | undefined, b: readonly T[] | undefined) {
+export function same<T>(a: readonly T[] | undefined, b: readonly T[] | undefined) {
   if (a === b) return true
   if (!a || !b) return false
   if (a.length !== b.length) return false
   return a.every((x, i) => x === b[i])
 }
 
-type PartRef = {
+export type PartRef = {
   messageID: string
   partID: string
 }
 
-type PartGroup =
+export type PartGroup =
   | {
       key: string
       type: "part"
@@ -373,11 +373,11 @@ type PartGroup =
       refs: PartRef[]
     }
 
-function sameRef(a: PartRef, b: PartRef) {
+export function sameRef(a: PartRef, b: PartRef) {
   return a.messageID === b.messageID && a.partID === b.partID
 }
 
-function sameGroup(a: PartGroup, b: PartGroup) {
+export function sameGroup(a: PartGroup, b: PartGroup) {
   if (a === b) return true
   if (a.key !== b.key) return false
   if (a.type !== b.type) return false
@@ -390,14 +390,14 @@ function sameGroup(a: PartGroup, b: PartGroup) {
   return a.refs.every((ref, i) => sameRef(ref, b.refs[i]!))
 }
 
-function sameGroups(a: readonly PartGroup[] | undefined, b: readonly PartGroup[] | undefined) {
+export function sameGroups(a: readonly PartGroup[] | undefined, b: readonly PartGroup[] | undefined) {
   if (a === b) return true
   if (!a || !b) return false
   if (a.length !== b.length) return false
   return a.every((item, i) => sameGroup(item, b[i]!))
 }
 
-function groupParts(parts: { messageID: string; part: PartType }[]) {
+export function groupParts(parts: { messageID: string; part: PartType }[]) {
   const result: PartGroup[] = []
   let start = -1
 
@@ -441,7 +441,7 @@ function groupParts(parts: { messageID: string; part: PartType }[]) {
   return result
 }
 
-function index<T extends { id: string }>(items: readonly T[]) {
+export function index<T extends { id: string }>(items: readonly T[]) {
   const map = new Map<string, T>()
   for (const item of items) {
     map.set(item.id, item)
@@ -460,12 +460,12 @@ function renderable(part: PartType, showReasoningSummaries = true) {
   return !!PART_MAPPING[part.type]
 }
 
-function toolDefaultOpen(tool: string, shell = false, edit = false) {
+export function toolDefaultOpen(tool: string, shell = false, edit = false) {
   if (tool === "bash") return shell
   if (tool === "edit" || tool === "write" || tool === "apply_patch") return edit
 }
 
-function partDefaultOpen(part: PartType, shell = false, edit = false) {
+export function partDefaultOpen(part: PartType, shell = false, edit = false) {
   if (part.type !== "tool") return
   return toolDefaultOpen(part.tool, shell, edit)
 }
@@ -586,7 +586,7 @@ export function AssistantParts(props: {
   )
 }
 
-function isContextGroupTool(part: PartType): part is ToolPart {
+export function isContextGroupTool(part: PartType): part is ToolPart {
   return part.type === "tool" && CONTEXT_GROUP_TOOLS.has(part.tool)
 }
 
