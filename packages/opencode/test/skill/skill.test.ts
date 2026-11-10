@@ -204,20 +204,28 @@ description: Skill with a glob metacharacter in its name.
     ),
   )
 
+  // The folder name uses an UNSAFE_SKILL_NAME character, which is exactly a
+  // Windows-forbidden filename character — mkdir fails there, trivially
+  // satisfying the same guarantee the assertion below checks.
   it.live("skips registration when both frontmatter and folder names are unsafe", () =>
     provideTmpdirInstance(
       (dir) =>
         Effect.gen(function* () {
           yield* Effect.promise(() =>
-            Bun.write(
-              path.join(dir, ".opencode", "skill", "bad*folder", "SKILL.md"),
+            fs
+              .mkdir(path.join(dir, ".opencode", "skill", "bad*folder"), { recursive: true })
+              .then(() =>
+                Bun.write(
+                  path.join(dir, ".opencode", "skill", "bad*folder", "SKILL.md"),
               `---
 description: Skill whose folder name is also unsafe.
 ---
 
 # Bad Folder
 `,
-            ),
+                ),
+              )
+              .catch(() => undefined),
           )
 
           const skill = yield* Skill.Service
@@ -1034,7 +1042,11 @@ describe("skill semantic index resilience", () => {
     // A fresh layer value per runtime: Effect memoizes layer builds by reference,
     // so reusing one value would share the InstanceState cache across sessions and
     // never re-run the state init this test needs to observe.
-    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "opencode-skill-h34-"))
+    // Git-init the dir: a non-git directory resolves sandbox="/" and the
+// skill discovery `up` walk then sweeps real ~/.claude/.agents from the
+// whole ancestry instead of stopping at this directory.
+const tmp = await tmpdir({ git: true })
+const dir = tmp.path
     const cache = path.join(dir, "cache")
     const makeSkillLayer = () =>
       Skill.layer.pipe(
@@ -1112,7 +1124,7 @@ body
     } finally {
       await fs.rm(indexPath, { recursive: true, force: true }).catch(() => {})
       await fs.rm(manifestPath, { force: true }).catch(() => {})
-      await fs.rm(dir, { recursive: true, force: true }).catch(() => {})
+      await tmp[Symbol.asyncDispose]()
     }
   })
 })
