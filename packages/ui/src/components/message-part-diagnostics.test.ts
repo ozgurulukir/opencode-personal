@@ -1,25 +1,7 @@
 // Characterization tests (Rule 3, #380 Phase 2): lock getDiagnostics — the pure
-// diagnostics filter inside message-part.tsx — before the god-file split. They
-// import from message-part.tsx now and follow the helper into
-// message-part-diagnostics.tsx.
-import { afterAll, describe, expect, mock, test } from "bun:test"
-
-// message-part.tsx imports @solidjs/router, which reads window.history at module
-// load (node_modules/@solidjs/router/dist/index.js:43) — bun test has no DOM.
-mock.module("@solidjs/router", () => ({
-  useLocation: () => ({ pathname: "/" }),
-  useNavigate: () => () => {},
-}))
-// The module graph reaches useData(), which throws outside a provider.
-mock.module("../context", () => ({
-  useData: () => ({ directory: "/proj", store: {} }),
-}))
-afterAll(() => mock.restore())
-
-// Static import would run before mock.module (imports are hoisted) — dynamic
-// import after the mock is required.
-const { getDiagnostics } = await import("./message-part")
-import type { Diagnostic } from "./message-part"
+// severity-1 diagnostics filter — from message-part-diagnostics.tsx.
+import { describe, expect, test } from "bun:test"
+import { getDiagnostics, type Diagnostic } from "./message-part-diagnostics"
 
 const diagnostic = (overrides: Partial<Diagnostic> = {}): Diagnostic => ({
   range: { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } },
