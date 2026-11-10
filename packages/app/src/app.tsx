@@ -14,6 +14,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/solid-query"
 import { Effect } from "effect"
 import {
   type Component,
+  createEffect,
   createMemo,
   createResource,
   createSignal,
@@ -50,7 +51,6 @@ import { useCheckServerHealth } from "./utils/server-health"
 const HomeRoute = lazy(() => import("@/pages/home"))
 const loadSession = () => import("@/pages/session")
 const Session = lazy(loadSession)
-const Loading = () => <div class="size-full" />
 
 if (typeof location === "object" && /\/session(?:\/|$)/.test(location.pathname)) {
   void loadSession()
@@ -130,10 +130,8 @@ function SessionProviders(props: ParentProps) {
 function RouterRoot(props: ParentProps<{ appChildren?: JSX.Element }>) {
   return (
     <AppShellProviders>
-      {/*<Suspense fallback={<Loading />}>*/}
       {props.appChildren}
       {props.children}
-      {/*</Suspense>*/}
     </AppShellProviders>
   )
 }
@@ -155,13 +153,11 @@ export function AppBaseProviders(props: ParentProps<{ locale?: Locale }>) {
                 return <ErrorPage error={error} />
               }}
             >
-              <QueryProvider>
-                <DialogProvider>
-                  <MarkedProvider>
-                    <FileComponentProvider component={File}>{props.children}</FileComponentProvider>
-                  </MarkedProvider>
-                </DialogProvider>
-              </QueryProvider>
+              <DialogProvider>
+                <MarkedProvider>
+                  <FileComponentProvider component={File}>{props.children}</FileComponentProvider>
+                </MarkedProvider>
+              </DialogProvider>
             </ErrorBoundary>
           </UiI18nBridge>
         </LanguageProvider>
@@ -189,6 +185,7 @@ function ConnectionGate(props: ParentProps<{ disableHealthCheck?: boolean }>) {
             const res = yield* Effect.promise(() => checkServerHealth(http))
             if (res.healthy) return true
             if (checkMode() === "background" || type === "http") return false
+            yield* Effect.sleep("500 millis")
           }
         }).pipe(
           Effect.timeoutOrElse({ duration: "10 seconds", orElse: () => Effect.succeed(false) }),
@@ -205,22 +202,12 @@ function ConnectionGate(props: ParentProps<{ disableHealthCheck?: boolean }>) {
         </div>
       }
     >
-      {/*<Show
-        when={checkMode() === "blocking" ? !startupHealthCheck.loading : startupHealthCheck.state !== "pending"}
-        fallback={
-          <div class="h-dvh w-screen flex flex-col items-center justify-center bg-background-base">
-            <Splash class="w-16 h-20 opacity-50 animate-pulse" />
-          </div>
-        }
-      >*/}
       {checkMode() === "blocking" ? startupHealthCheck() : startupHealthCheck.latest}
       <Show
         when={startupHealthCheck()}
         fallback={
           <ConnectionError
-            onRetry={() => {
-              if (checkMode() === "background") void healthCheckActions.refetch()
-            }}
+            onRetry={checkMode() === "background" ? () => void healthCheckActions.refetch() : undefined}
             onServerSelected={(key) => {
               setCheckMode("blocking")
               server.setActive(key)
@@ -231,7 +218,6 @@ function ConnectionGate(props: ParentProps<{ disableHealthCheck?: boolean }>) {
       >
         {props.children}
       </Show>
-      {/*</Show>*/}
     </Suspense>
   )
 }
@@ -244,8 +230,11 @@ function ConnectionError(props: { onRetry?: () => void; onServerSelected?: (key:
   const serverToken = "\u0000server\u0000"
   const unreachable = createMemo(() => language.t("app.server.unreachable", { server: serverToken }).split(serverToken))
 
-  const timer = setInterval(() => props.onRetry?.(), 1000)
-  onCleanup(() => clearInterval(timer))
+  createEffect(() => {
+    if (!props.onRetry) return
+    const timer = setInterval(() => props.onRetry?.(), 1000)
+    onCleanup(() => clearInterval(timer))
+  })
 
   return (
     <div class="h-dvh w-screen flex flex-col items-center justify-center bg-background-base gap-6 p-6">
