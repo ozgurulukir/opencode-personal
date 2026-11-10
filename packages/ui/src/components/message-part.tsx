@@ -325,7 +325,7 @@ export function AssistantParts(props: {
   )
 }
 
-function contextToolDetail(part: ToolPart): string | undefined {
+export function contextToolDetail(part: ToolPart): string | undefined {
   const info = getToolInfo(
     part.tool,
     part.state.input ?? {},
@@ -340,7 +340,7 @@ function contextToolDetail(part: ToolPart): string | undefined {
   return undefined
 }
 
-function contextToolTrigger(part: ToolPart, i18n: ReturnType<typeof useI18n>) {
+export function contextToolTrigger(part: ToolPart, i18n: ReturnType<typeof useI18n>) {
   const input = (part.state.input ?? {}) as Record<string, unknown>
   const path = typeof input.path === "string" ? input.path : "/"
   const filePath = typeof input.filePath === "string" ? input.filePath : undefined
