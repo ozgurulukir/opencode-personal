@@ -21,7 +21,7 @@ afterAll(() => mock.restore())
 // import after the mock is required.
 import { dict as en } from "../i18n/en"
 
-const { contextToolDetail, contextToolTrigger } = await import("./message-part")
+const { contextToolDetail, contextToolTrigger } = await import("./message-part-context")
 
 // Real en dict behind a minimal accessor - contextToolTrigger takes the i18n
 // object as a parameter, so the translations double as assertions.
