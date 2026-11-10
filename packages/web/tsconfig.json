@@ -1,7 +1,11 @@
 {
   "extends": "astro/tsconfigs/strict",
   "include": [".astro/types.d.ts", "**/*"],
-  "exclude": ["dist"],
+  // WAIVER (issue #375 / AC4): the orphaned share-viewer tree
+  // (Share.tsx + share/) carries 25 pre-existing type errors from V1-shape
+  // drift. It has zero live imports and PR #374 deletes it wholesale —
+  // do NOT fix; exclude until #374 merges, then delete these two patterns.
+  "exclude": ["dist", "src/components/Share.tsx", "src/components/share/**"],
   "compilerOptions": {
     "jsx": "preserve",
     "jsxImportSource": "solid-js"
