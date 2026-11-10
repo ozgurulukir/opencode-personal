@@ -10,7 +10,7 @@ import { EmbeddingService, defaultLayer as embeddingDefaultLayer } from "./embed
 import { manifestPathFor } from "./manifest"
 import { InstanceState } from "@/effect/instance-state"
 import { lazy } from "@/util/lazy"
-import type { ZVecCollection } from "@zvec/zvec"
+import type { ZVecCollection, ZVecDoc } from "@zvec/zvec"
 
 const log = Log.create({ service: "search.zvec" })
 
@@ -22,6 +22,15 @@ const LOCK_RETRY_TIMEOUT_MS = 5_000
 // hex at the zvec boundary — the human-readable path is kept in the `path` field.
 function docId(input: string): string {
   return createHash("sha1").update(input).digest("hex").slice(0, 24)
+}
+
+function toSearchResult(doc: ZVecDoc): SearchResult {
+  return {
+    id: doc.id,
+    score: doc.score,
+    path: (doc.fields?.path as string) ?? "",
+    content: (doc.fields?.content as string) ?? "",
+  }
 }
 
 /**
@@ -161,7 +170,15 @@ function buildSchema(mod: ZVecModule, dimension: number) {
     },
     fields: [
       { name: "path", dataType: mod.ZVecDataType.STRING },
-      { name: "content", dataType: mod.ZVecDataType.STRING },
+      {
+        name: "content",
+        dataType: mod.ZVecDataType.STRING,
+        indexParams: {
+          indexType: mod.ZVecIndexType.FTS,
+          tokenizerName: "standard",
+          filters: ["lowercase"],
+        },
+      },
       { name: "mtime", dataType: mod.ZVecDataType.INT64 },
     ],
   })
@@ -175,6 +192,23 @@ function dimensionMismatch(col: ZVecCollection, expected: number): number | unde
     return typeof persisted === "number" && persisted > 0 && persisted !== expected ? persisted : undefined
   } catch {
     return undefined
+  }
+}
+
+// A collection opened before hybrid search (#101) lacks the FTS index on
+// `content`. Detect the schema drift so both collections sharing this class
+// (workspace_search + skills) migrate transparently. Inspection failure is
+// treated as "no drift" — a destructive migration loop is worse than a
+// collection that keeps vector-only search.
+function missingFts(mod: ZVecModule, col: ZVecCollection): boolean {
+  try {
+    const params = col.schema.field("content").indexParams
+    return params?.indexType !== mod.ZVecIndexType.FTS
+  } catch (e) {
+    log.warn("zvec schema inspection failed; assuming no FTS drift", {
+      error: e instanceof Error ? e.message : String(e),
+    })
+    return false
   }
 }
 
@@ -192,16 +226,18 @@ function openNative(
     if (!alreadyExists(e)) throw e
     const col = mod.ZVecOpen(indexPath) as ZVecCollection
     const persisted = dimensionMismatch(col, dimension)
-    if (persisted === undefined) return { collection: col, migrated: false }
+    const ftsMissing = persisted === undefined && missingFts(mod, col)
+    if (persisted === undefined && !ftsMissing) return { collection: col, migrated: false }
     let docCount: number | undefined
     try {
       docCount = col.stats.docCount
     } catch {
       docCount = undefined
     }
-    log.warn("zvec dimension mismatch: recreating collection", {
+    log.warn("zvec schema drift: recreating collection", {
       path: indexPath,
       persisted,
+      ftsMissing,
       expected: dimension,
       docCount,
     })
@@ -316,6 +352,31 @@ export class ZvecIndex {
           if (!col) throw new ZvecError("OPEN_FAILED", "collection is not open")
           const mod = zvec()
           if (!mod) throw new ZvecError("BINDING_UNAVAILABLE", "zvec binding unavailable")
+          // Hybrid search (#101): RRF-fuse vector similarity with an FTS literal
+          // match on the query string. The FTS sub-query degrades gracefully —
+          // empty queries and any fusion failure fall back to vector-only.
+          const trimQuery = query.trim()
+          if (trimQuery.length > 0) {
+            try {
+              const fused = col.multiQuerySync({
+                queries: [
+                  {
+                    fieldName: VECTOR_FIELD,
+                    vector: new Float32Array(embedding),
+                    params: { indexType: mod.ZVecIndexType.HNSW, ef: 100 },
+                  },
+                  { fieldName: "content", fts: { matchString: trimQuery } },
+                ],
+                topk: topK,
+                outputFields: ["path", "content"],
+              })
+              return fused.map(toSearchResult)
+            } catch (e) {
+              log.warn("hybrid search failed; falling back to vector-only", {
+                error: e instanceof Error ? e.message : String(e),
+              })
+            }
+          }
           const results = col.querySync({
             fieldName: VECTOR_FIELD,
             vector: new Float32Array(embedding),
@@ -323,12 +384,7 @@ export class ZvecIndex {
             outputFields: ["path", "content"],
             params: { indexType: mod.ZVecIndexType.HNSW, ef: 100 },
           })
-          return results.map((r) => ({
-            id: r.id,
-            score: r.score,
-            path: (r.fields?.path as string) ?? "",
-            content: (r.fields?.content as string) ?? "",
-          })) as SearchResult[]
+          return results.map(toSearchResult)
         },
         catch: (e) => toZvecError("SEARCH_FAILED", e),
       })
