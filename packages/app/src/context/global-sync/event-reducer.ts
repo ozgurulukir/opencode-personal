@@ -345,6 +345,15 @@ function updateAssistant(
   )
 }
 
+// Missing/empty event ids are a client wiring bug — the server bus always
+// assigns ids (bus/index.ts). Dropping the insert keeps the id-indexed
+// slices from corrupting (""); the optimistic entry (prompted) stays visible.
+function requireEventID(event: MessageEvent): string | undefined {
+  if (event.id) return event.id
+  console.warn(`[event-reducer] ${event.type} missing event.id; dropping insert`)
+  return undefined
+}
+
 function handlePrompted(input: MessageHandlerInput, event: MessageEvent) {
   const props = event.properties as {
     sessionID: string
@@ -358,7 +367,8 @@ function handlePrompted(input: MessageHandlerInput, event: MessageEvent) {
     agent: string
     model: { id: string; providerID: string; variant?: string }
   }
-  const id = event.id ?? ""
+  const id = requireEventID(event)
+  if (!id) return
   const created = eventTime(props.timestamp)
   const message = userMessage({
     id,
@@ -407,7 +417,8 @@ function handleShellStarted(input: MessageHandlerInput, event: MessageEvent) {
 
   // V1 shell flow: user message with a synthetic wrapper text part, then an
   // assistant carrying the bash tool part.
-  const wrapperID = event.id ?? ""
+  const wrapperID = requireEventID(event)
+  if (!wrapperID) return
   insertMessage(
     input,
     userMessage({ id: wrapperID, sessionID: props.sessionID, agent, model, created }),
@@ -472,6 +483,8 @@ function handleShellEnded(input: MessageHandlerInput, event: MessageEvent) {
 }
 
 function handleStepStarted(input: MessageHandlerInput, event: MessageEvent) {
+  const id = requireEventID(event)
+  if (!id) return
   const props = event.properties as {
     sessionID: string
     timestamp: number
@@ -490,7 +503,7 @@ function handleStepStarted(input: MessageHandlerInput, event: MessageEvent) {
   insertMessage(
     input,
     assistantMessage({
-      id: event.id ?? "",
+      id,
       sessionID: props.sessionID,
       parentID: user?.id ?? "",
       agent: props.agent,
@@ -758,8 +771,9 @@ function handleReasoningEnded(input: MessageHandlerInput, event: MessageEvent) {
 
 function handleCompactionStarted(input: MessageHandlerInput, event: MessageEvent) {
   const props = event.properties as { sessionID: string; timestamp: number; reason: "auto" | "manual" }
+  const id = requireEventID(event)
+  if (!id) return
   const user = latestUser(input.store.message[props.sessionID])
-  const id = event.id ?? ""
   insertMessage(
     input,
     userMessage({

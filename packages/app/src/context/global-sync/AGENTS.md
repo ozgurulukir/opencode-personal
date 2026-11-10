@@ -17,6 +17,17 @@ the V2-to-V1 conversion in `v2-adapter.ts`; do not recreate conversion logic in
   them as renderable comment notes.
 - Optimistic prompt confirmation matches prompt text, not message ID: V2
   message IDs are server event IDs and differ from the client's optimistic ID.
+  - Missing-id policy: `event.id` is required at insert sites (`prompted`,
+    `shell.started`, `step.started`, `compaction.started`); the reducer drops
+    the insert before any mutation (including `resolveOptimistic`) and warns —
+    never coerce a missing/empty id to `""`. The server bus always assigns ids,
+    so a missing id is a client wiring bug; `""` corrupts id-keyed lookups
+    (messages collide under `Binary.search`, the shell wrapper derives
+    `":assistant"` children from it).
+  - Round-trip invariant: `messageText(buildRequestParts.optimisticParts)` ≡
+    server projection (non-synthetic text joined `"\n"`) ≡ `messageText` after
+    the `session.prompted` event ≡ `messageText` after `sessionMessagesToV1` —
+    locked by `prompt-text-roundtrip.test.ts`.
 - `question.*`, `lsp.updated`, `vcs.branch.updated`, and
   `server.instance.disposed` remain infrastructure events outside the V2
   message projection. Preserve their existing handlers.
@@ -27,10 +38,11 @@ as one change; it is not part of the deferred 5f deletion pass.
 
 ## Tests and completion gate
 
-Update `v2-adapter.test.ts`, `event-reducer.test.ts`, and the optimistic-sync
-tests together when changing this boundary. A change is complete when load and
-live event paths produce the same V1 shapes, all relevant app tests pass, and
-`bun typecheck` passes from `packages/app`.
+Update `v2-adapter.test.ts`, `event-reducer.test.ts`,
+`prompt-text-roundtrip.test.ts`, and the optimistic-sync tests together when
+changing this boundary. A change is complete when load and live event paths
+produce the same V1 shapes, all relevant app tests pass, and `bun typecheck`
+passes from `packages/app`.
 
 ## `session.next.updated` is a partial patch keyed by `sessionID`
 
