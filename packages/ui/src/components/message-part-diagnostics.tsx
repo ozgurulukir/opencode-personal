@@ -7,6 +7,7 @@
 import { For, Show } from "solid-js"
 import type { JSX } from "solid-js"
 import { useI18n } from "../context/i18n"
+
 export interface Diagnostic {
   range: {
     start: { line: number; character: number }
