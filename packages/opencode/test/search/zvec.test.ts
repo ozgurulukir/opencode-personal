@@ -44,7 +44,9 @@ function isCodedZVecError(e: unknown): e is Error & { code: string } {
   return typeof code === "string" && code.startsWith("ZVEC_")
 }
 
-function testSchema(dimension: number) {
+// fts=true mirrors the current production schema (hybrid search, #101); the
+// default false is the pre-hybrid schema used to exercise drift migration.
+function testSchema(dimension: number, fts = false) {
   return new ZVecCollectionSchema({
     name: "workspace_search",
     vectors: {
@@ -60,7 +62,19 @@ function testSchema(dimension: number) {
     },
     fields: [
       { name: "path", dataType: ZVecDataType.STRING },
-      { name: "content", dataType: ZVecDataType.STRING },
+      {
+        name: "content",
+        dataType: ZVecDataType.STRING,
+        ...(fts
+          ? {
+              indexParams: {
+                indexType: ZVecIndexType.FTS,
+                tokenizerName: "standard",
+                filters: ["lowercase"],
+              },
+            }
+          : {}),
+      },
     ],
   })
 }
@@ -361,9 +375,11 @@ describe("search.zvec", () => {
       const dirHash = Hash.fast(dir)
       const indexPath = path.join(cacheDir, "zvec", dirHash)
 
-      // Pre-populate the index directory using the native API, then close it
+      // Pre-populate the index directory using the native API, then close it.
+      // Uses the current production schema (with FTS) so no schema drift
+      // triggers — this test targets the create-vs-open fallback path only.
       await fsNode.mkdir(path.join(cacheDir, "zvec"), { recursive: true })
-      const col = ZVecCreateAndOpen(indexPath, testSchema(384))
+      const col = ZVecCreateAndOpen(indexPath, testSchema(384, true))
       col.insertSync([
         { id: "a", vectors: { embedding: Array(384).fill(0.1) }, fields: { path: "a.ts", content: "hello world" } },
       ])
@@ -461,6 +477,62 @@ describe("search.zvec", () => {
           { id: "new", path: "new.ts", content: "new content", embedding: Array(8).fill(0.5), mtime: Date.now() },
         ])
         const results = yield* search.search("q", Array(8).fill(0.5), 10)
+        expect(results.some((r) => r.path === "new.ts")).toBe(true)
+        expect(results.some((r) => r.path === "old.ts")).toBe(false)
+      }).pipe(
+        Effect.provide(layer),
+        Effect.provide(AppFileSystem.defaultLayer),
+        Effect.provide(embedderLayer(8)),
+        provideInstance(dir),
+        Effect.runPromise,
+      )
+    } finally {
+      _testCacheDir = ""
+      await fsNode.rm(dir, { recursive: true, force: true }).catch(() => {})
+      await fsNode.rm(cacheDir, { recursive: true, force: true }).catch(() => {})
+    }
+  })
+
+  // A collection persisted by a pre-hybrid build (no FTS index on `content`)
+  // must migrate on open like a dimension drift: destroy + recreate + manifest
+  // wipe, so consumers re-embed and hybrid search becomes available (#101).
+  test("missing FTS index on reopen migrates: old collection destroyed, manifest wiped", async () => {
+    const { layer } = await import("../../src/search/zvec")
+    const { provideInstance } = await import("../fixture/fixture")
+    const { AppFileSystem } = await import("@opencode-ai/core/filesystem")
+
+    const dir = await fsNode.mkdtemp(path.join(os.tmpdir(), "opencode-zvec-fts-mig-ws-"))
+    const cacheDir = await fsNode.mkdtemp(path.join(os.tmpdir(), "opencode-zvec-fts-mig-cache-"))
+    _testCacheDir = cacheDir
+
+    try {
+      const dirHash = Hash.fast(dir)
+      const indexPath = path.join(cacheDir, "zvec", dirHash)
+      const manifestPath = `${indexPath}_manifest.json`
+      // Pre-populate a matching-dimension but pre-FTS collection + manifest.
+      await fsNode.mkdir(path.join(cacheDir, "zvec"), { recursive: true })
+      ZVecInitialize({ logLevel: ZVecLogLevel.ERROR })
+      const col = ZVecCreateAndOpen(indexPath, testSchema(8))
+      col.insertSync([
+        { id: "old", vectors: { embedding: Array(8).fill(0.1) }, fields: { path: "old.ts", content: "old content" } },
+      ])
+      col.closeSync()
+      await fsNode.writeFile(
+        manifestPath,
+        JSON.stringify({ version: 1, files: { "old.ts": { mtime: 1, chunkIds: ["old.ts:0"] } } }),
+      )
+
+      await Effect.gen(function* () {
+        const search = yield* SearchService
+        const fs = yield* AppFileSystem.Service
+        // Same dimension, but the content field lacks the FTS index — still a drift.
+        yield* search.open
+        expect(yield* fs.existsSafe(manifestPath)).toBe(false)
+        yield* search.index([
+          { id: "new", path: "new.ts", content: "searchable token", embedding: Array(8).fill(0.5), mtime: Date.now() },
+        ])
+        // Hybrid path: the FTS sub-query must find the re-indexed doc by literal match.
+        const results = yield* search.search("searchable token", Array(8).fill(0.5), 10)
         expect(results.some((r) => r.path === "new.ts")).toBe(true)
         expect(results.some((r) => r.path === "old.ts")).toBe(false)
       }).pipe(
