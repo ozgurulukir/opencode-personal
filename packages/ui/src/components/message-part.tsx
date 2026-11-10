@@ -18,6 +18,7 @@ import stripAnsi from "strip-ansi"
 import { findLastTextPart, parseUserMessageParts } from "./message-part-utils"
 import { PacedMarkdown } from "./message-part-paced"
 import { ContextToolGroup, getDirectory } from "./message-part-context"
+import { DiagnosticsDisplay, getDiagnostics } from "./message-part-diagnostics"
 import { Dynamic } from "solid-js/web"
 import {
   AgentPart,
@@ -118,45 +119,6 @@ function ShellSubmessage(props: { text: string; animate?: boolean }) {
         </span>
       </span>
     </span>
-  )
-}
-
-interface Diagnostic {
-  range: {
-    start: { line: number; character: number }
-    end: { line: number; character: number }
-  }
-  message: string
-  severity?: number
-}
-
-function getDiagnostics(
-  diagnosticsByFile: Record<string, Diagnostic[]> | undefined,
-  filePath: string | undefined,
-): Diagnostic[] {
-  if (!diagnosticsByFile || !filePath) return []
-  const diagnostics = diagnosticsByFile[filePath] ?? []
-  return diagnostics.filter((d) => d.severity === 1).slice(0, 3)
-}
-
-function DiagnosticsDisplay(props: { diagnostics: Diagnostic[] }): JSX.Element {
-  const i18n = useI18n()
-  return (
-    <Show when={props.diagnostics.length > 0}>
-      <div data-component="diagnostics">
-        <For each={props.diagnostics}>
-          {(diagnostic) => (
-            <div data-slot="diagnostic">
-              <span data-slot="diagnostic-label">{i18n.t("ui.messagePart.diagnostic.error")}</span>
-              <span data-slot="diagnostic-location">
-                [{diagnostic.range.start.line + 1}:{diagnostic.range.start.character + 1}]
-              </span>
-              <span data-slot="diagnostic-message">{diagnostic.message}</span>
-            </div>
-          )}
-        </For>
-      </div>
-    </Show>
   )
 }
 
