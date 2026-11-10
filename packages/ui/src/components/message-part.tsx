@@ -121,7 +121,7 @@ function ShellSubmessage(props: { text: string; animate?: boolean }) {
   )
 }
 
-interface Diagnostic {
+export interface Diagnostic {
   range: {
     start: { line: number; character: number }
     end: { line: number; character: number }
@@ -130,7 +130,7 @@ interface Diagnostic {
   severity?: number
 }
 
-function getDiagnostics(
+export function getDiagnostics(
   diagnosticsByFile: Record<string, Diagnostic[]> | undefined,
   filePath: string | undefined,
 ): Diagnostic[] {
