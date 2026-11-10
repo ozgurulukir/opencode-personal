@@ -1,19 +1,10 @@
 // Characterization tests (Rule 3, #380 Phase 1/2): lock the paced-text machinery
-// before extracting it from message-part.tsx into message-part-paced.tsx.
-// The reactive createPacedValue runs headless under Solid's createRoot.
-import { afterAll, describe, expect, mock, test } from "bun:test"
+// in message-part-paced.tsx. The reactive createPacedValue runs headless under
+// Solid's createRoot — no DOM needed.
+import { describe, expect, test } from "bun:test"
 import { createRoot, createSignal } from "solid-js"
 
-// message-part.tsx imports @solidjs/router, which reads window.history at module
-// load — bun test has no DOM. Stub what the module graph needs (removed after
-// extraction, when this test imports message-part-paced directly).
-mock.module("@solidjs/router", () => ({
-  useLocation: () => ({ pathname: "/" }),
-  useNavigate: () => () => {},
-}))
-afterAll(() => mock.restore())
-
-const { createPacedValue, next, step } = await import("./message-part")
+const { createPacedValue, next, step } = await import("./message-part-paced")
 
 const flush = () => new Promise<void>((resolve) => setTimeout(resolve, 0))
 
