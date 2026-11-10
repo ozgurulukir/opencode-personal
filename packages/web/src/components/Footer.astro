@@ -33,7 +33,7 @@ const github = config.social?.find((item) => item.icon === "github")
           <LanguageSelect />
         </div>
         <div>
-          <p><a target="_blank" rel="noopener noreferrer" href={config.github}>Personal fork · Source on GitHub</a></p>
+          <p><a target="_blank" rel="noopener noreferrer" href={github?.href}>Personal fork · Source on GitHub</a></p>
           <p title={Astro.locals.t("page.lastUpdated")}>
             {Astro.locals.t("page.lastUpdated")} {" "}
             {

@@ -8,7 +8,7 @@ const {
 } = Astro.locals.starlightRoute;
 const t = Astro.locals.t as (key: string) => string
 const titleSuffix = t("app.head.titleSuffix")
-const isHome = Astro.locals.starlightRoute.entry.slug === ""
+const isHome = Astro.locals.starlightRoute.id === ""
 ---
 
 { isHome && (

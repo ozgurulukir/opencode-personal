@@ -2,6 +2,13 @@
 
 This package follows the root [AGENTS.md](../../AGENTS.md) for general repo rules.
 
+## Typecheck
+
+`bun run typecheck` (= `astro check`) is wired into turbo, pre-push, and CI.
+The `tsconfig.json` `exclude` waives the orphaned share tree
+(`Share.tsx`, `share/`) pending #374 — do not add errors there; remove the
+exclude patterns once #374 deletes those files.
+
 ## Share page — WebSocket message conversion gate
 
 `Share.tsx:128-135` is the sole conversion point for incoming WebSocket messages:
