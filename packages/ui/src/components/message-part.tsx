@@ -20,6 +20,7 @@ import { PacedMarkdown } from "./message-part-paced"
 import { ContextToolGroup, getDirectory } from "./message-part-context"
 import { DiagnosticsDisplay, getDiagnostics } from "./message-part-diagnostics"
 import { ExaOutput } from "./message-part-exa"
+import { HighlightedText } from "./message-part-highlight"
 import { Dynamic } from "solid-js/web"
 import {
   AgentPart,
@@ -568,55 +569,6 @@ export function UserMessageDisplay(props: { message: UserMessage; parts: PartTyp
       </Show>
     </div>
   )
-}
-
-type HighlightSegment = { text: string; type?: "file" | "agent" }
-
-function HighlightedText(props: { text: string; references: FilePart[]; agents: AgentPart[] }) {
-  // ⚡ Bolt Optimization: Replace chained .filter().map() with direct loops
-  const segments = createMemo(() => {
-    const text = props.text
-
-    const allRefs: { start: number; end: number; type: "file" | "agent" }[] = []
-
-    for (let i = 0; i < props.references.length; i++) {
-      const r = props.references[i]
-      if (r.source?.text?.start !== undefined && r.source?.text?.end !== undefined) {
-        allRefs.push({ start: r.source.text.start, end: r.source.text.end, type: "file" })
-      }
-    }
-
-    for (let i = 0; i < props.agents.length; i++) {
-      const a = props.agents[i]
-      if (a.source?.start !== undefined && a.source?.end !== undefined) {
-        allRefs.push({ start: a.source.start, end: a.source.end, type: "agent" })
-      }
-    }
-
-    allRefs.sort((a, b) => a.start - b.start)
-
-    const result: HighlightSegment[] = []
-    let lastIndex = 0
-
-    for (const ref of allRefs) {
-      if (ref.start < lastIndex) continue
-
-      if (ref.start > lastIndex) {
-        result.push({ text: text.slice(lastIndex, ref.start) })
-      }
-
-      result.push({ text: text.slice(ref.start, ref.end), type: ref.type })
-      lastIndex = ref.end
-    }
-
-    if (lastIndex < text.length) {
-      result.push({ text: text.slice(lastIndex) })
-    }
-
-    return result
-  })
-
-  return <For each={segments()}>{(segment) => <span data-highlight={segment.type}>{segment.text}</span>}</For>
 }
 
 export function Part(props: MessagePartProps) {
