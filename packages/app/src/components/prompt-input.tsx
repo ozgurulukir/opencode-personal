@@ -37,6 +37,7 @@ import { usePlatform } from "@/context/platform"
 import { useSessionLayout } from "@/pages/session/session-layout"
 import { createSessionTabs } from "@/pages/session/helpers"
 import { createTextFragment, getCursorPosition, setCursorPosition, setRangeEdge } from "./prompt-input/editor-dom"
+import { atOptionGroup, atOptionKey, atSelectPart, compareAtGroups, createAtMentionItems } from "./prompt-input/at-mentions"
 import { createPromptAttachments } from "./prompt-input/attachments"
 import { ACCEPTED_FILE_TYPES } from "./prompt-input/files"
 import {
@@ -578,16 +579,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
 
   const handleAtSelect = (option: AtOption | undefined) => {
     if (!option) return
-    if (option.type === "agent") {
-      addPart({ type: "agent", name: option.name, content: "@" + option.name, start: 0, end: 0 })
-    } else {
-      addPart({ type: "file", path: option.path, content: "@" + option.path, start: 0, end: 0 })
-    }
-  }
-
-  const atKey = (x: AtOption | undefined) => {
-    if (!x) return ""
-    return x.type === "agent" ? `agent:${x.name}` : `file:${x.path}`
+    addPart(atSelectPart(option))
   }
 
   const {
@@ -597,33 +589,15 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     onInput: atOnInput,
     onKeyDown: atOnKeyDown,
   } = useFilteredList<AtOption>({
-    items: async (query) => {
-      const agents = agentList()
-      const open = recent()
-      const seen = new Set(open)
-      const pinned: AtOption[] = open.map((path) => ({ type: "file", path, display: path, recent: true }))
-      if (!query.trim()) return [...agents, ...pinned]
-      const paths = await files.searchFilesAndDirectories(query)
-      const fileOptions: AtOption[] = paths
-        .filter((path) => !seen.has(path))
-        .map((path) => ({ type: "file", path, display: path }))
-      return [...agents, ...pinned, ...fileOptions]
-    },
-    key: atKey,
+    items: createAtMentionItems({
+      agents: agentList,
+      recentPaths: recent,
+      searchFiles: (query) => files.searchFilesAndDirectories(query),
+    }),
+    key: atOptionKey,
     filterKeys: ["display"],
-    groupBy: (item) => {
-      if (item.type === "agent") return "agent"
-      if (item.recent) return "recent"
-      return "file"
-    },
-    sortGroupsBy: (a, b) => {
-      const rank = (category: string) => {
-        if (category === "agent") return 0
-        if (category === "recent") return 1
-        return 2
-      }
-      return rank(a.category) - rank(b.category)
-    },
+    groupBy: atOptionGroup,
+    sortGroupsBy: compareAtGroups,
     onSelect: handleAtSelect,
   })
 
@@ -746,7 +720,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
       const items = atFlat()
       if (items.length === 0) return
       const active = atActive()
-      const item = items.find((entry) => atKey(entry) === active) ?? items[0]
+      const item = items.find((entry) => atOptionKey(entry) === active) ?? items[0]
       handleAtSelect(item)
       return
     }
@@ -1282,7 +1256,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
         setSlashPopoverRef={(el) => (slashPopoverRef = el)}
         atFlat={atFlat()}
         atActive={atActive() ?? undefined}
-        atKey={atKey}
+        atKey={atOptionKey}
         setAtActive={setAtActive}
         onAtSelect={handleAtSelect}
         slashFlat={slashFlat()}
