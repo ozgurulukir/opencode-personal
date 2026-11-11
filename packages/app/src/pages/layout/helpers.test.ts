@@ -9,11 +9,15 @@ import {
 import { type Session } from "@opencode-ai/sdk/v2/client"
 import {
   childSessionOnPath,
+  dialogLeftMargin,
   displayName,
   effectiveWorkspaceOrder,
   errorMessage,
   hasProjectPermissions,
   latestRootSession,
+  orderedWorkspaceIds,
+  panelSide,
+  panelWidth,
   sessionIsWorking,
 } from "./helpers"
 import { pathKey } from "@/utils/path-key"
@@ -231,5 +235,75 @@ describe("layout workspace helpers", () => {
     expect(errorMessage({ data: { message: "boom" } }, "fallback")).toBe("boom")
     expect(errorMessage(new Error("broken"), "fallback")).toBe("broken")
     expect(errorMessage("unknown", "fallback")).toBe("fallback")
+  })
+})
+
+describe("dialog left margin", () => {
+  test("uses the sidebar width when opened", () => {
+    expect(dialogLeftMargin(true, 260)).toBe(260)
+  })
+
+  test("falls back to the collapsed rail width when closed", () => {
+    expect(dialogLeftMargin(false, 260)).toBe(48)
+  })
+})
+
+describe("panel sizing", () => {
+  test("side clamps the sidebar width to a 244px floor", () => {
+    expect(panelSide(200)).toBe(244)
+    expect(panelSide(244)).toBe(244)
+    expect(panelSide(320)).toBe(320)
+  })
+
+  test("panel width reserves 64px and clamps at zero", () => {
+    expect(panelWidth(244)).toBe(180)
+    expect(panelWidth(64)).toBe(0)
+    expect(panelWidth(10)).toBe(0)
+  })
+})
+
+describe("orderedWorkspaceIds", () => {
+  const input = (overrides: Partial<Parameters<typeof orderedWorkspaceIds>[0]> = {}) => ({
+    worktree: "/repo",
+    sandboxes: ["/repo/a", "/repo/b"],
+    persistedOrder: undefined,
+    currentDirectory: undefined,
+    isPending: () => false,
+    ...overrides,
+  })
+
+  test("orders local first, then sandboxes via effectiveWorkspaceOrder", () => {
+    expect(orderedWorkspaceIds(input())).toEqual(["/repo", "/repo/a", "/repo/b"])
+  })
+
+  test("appends a non-pending current directory outside the sandbox list", () => {
+    expect(orderedWorkspaceIds(input({ currentDirectory: "/repo/extra" }))).toEqual([
+      "/repo",
+      "/repo/a",
+      "/repo/b",
+      "/repo/extra",
+    ])
+  })
+
+  test("puts a pending current directory right after local", () => {
+    expect(
+      orderedWorkspaceIds(input({ currentDirectory: "/repo/extra", isPending: (d) => d === "/repo/extra" })),
+    ).toEqual(["/repo", "/repo/extra", "/repo/a", "/repo/b"])
+  })
+
+  test("ignores the current directory when it is already among the workspaces", () => {
+    expect(orderedWorkspaceIds(input({ currentDirectory: "/repo/b" }))).toEqual(["/repo", "/repo/a", "/repo/b"])
+  })
+
+  test("ignores a current directory equal to the local worktree", () => {
+    expect(orderedWorkspaceIds(input({ currentDirectory: "/repo/" }))).toEqual(["/repo", "/repo/a", "/repo/b"])
+  })
+
+  test("persists a custom order over the sandbox order", () => {
+    expect(orderedWorkspaceIds(input({ persistedOrder: ["/repo/b", "/repo/a"] }))).toEqual([
+      "/repo",
+      "/repo/b",
+      "/repo/a",
+    ])
   })
 })

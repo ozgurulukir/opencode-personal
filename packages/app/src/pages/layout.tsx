@@ -67,7 +67,11 @@ import { useLanguage, type Locale } from "@/context/language"
 import { pathKey } from "@/utils/path-key"
 import {
   displayName,
+  dialogLeftMargin,
   effectiveWorkspaceOrder,
+  orderedWorkspaceIds,
+  panelSide,
+  panelWidth,
   errorMessage,
   latestRootSession,
   sortedRootSessions,
@@ -1602,12 +1606,11 @@ export default function Layout(props: ParentProps) {
   )
 
   createEffect(() => {
-    const sidebarWidth = layout.sidebar.opened() ? layout.sidebar.width() : 48
-    document.documentElement.style.setProperty("--dialog-left-margin", `${sidebarWidth}px`)
+    document.documentElement.style.setProperty("--dialog-left-margin", `${dialogLeftMargin(layout.sidebar.opened(), layout.sidebar.width())}px`)
   })
 
-  const side = createMemo(() => Math.max(layout.sidebar.width(), 244))
-  const panel = createMemo(() => Math.max(side() - 64, 0))
+  const side = createMemo(() => panelSide(layout.sidebar.width()))
+  const panel = createMemo(() => panelWidth(side()))
 
   const loadedSessionDirs = new Set<string>()
 
@@ -1660,21 +1663,15 @@ export default function Layout(props: ParentProps) {
 
   function workspaceIds(project: LocalProject | undefined) {
     if (!project) return []
-    const local = project.worktree
-    const dirs = [local, ...(project.sandboxes ?? [])]
     const active = currentProject()
-    const directory = pathKey(active?.worktree ?? "") === pathKey(project.worktree) ? currentDir() : undefined
-    const extra =
-      directory && pathKey(directory) !== pathKey(local) && !dirs.some((item) => pathKey(item) === pathKey(directory))
-        ? directory
-        : undefined
-    const pending = extra ? WorktreeState.get(extra)?.status === "pending" : false
-
-    const ordered = effectiveWorkspaceOrder(local, dirs, store.workspaceOrder[project.worktree])
-    if (pending && extra) return [local, extra, ...ordered.filter((item) => item !== local)]
-    if (!extra) return ordered
-    if (pending) return ordered
-    return [...ordered, extra]
+    const sameProject = pathKey(active?.worktree ?? "") === pathKey(project.worktree)
+    return orderedWorkspaceIds({
+      worktree: project.worktree,
+      sandboxes: project.sandboxes,
+      persistedOrder: store.workspaceOrder[project.worktree],
+      currentDirectory: sameProject ? currentDir() : undefined,
+      isPending: (directory) => WorktreeState.get(directory)?.status === "pending",
+    })
   }
 
   const sidebarProject = createMemo(() => {
