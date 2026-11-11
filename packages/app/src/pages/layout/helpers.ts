@@ -107,3 +107,40 @@ export const effectiveWorkspaceOrder = (local: string, dirs: string[], persisted
 
   return [...result, ...live.values()]
 }
+
+export function dialogLeftMargin(sidebarOpened: boolean, sidebarWidth: number) {
+  return sidebarOpened ? sidebarWidth : 48
+}
+
+export function panelSide(sidebarWidth: number) {
+  return Math.max(sidebarWidth, 244)
+}
+
+export function panelWidth(side: number) {
+  return Math.max(side - 64, 0)
+}
+
+export function orderedWorkspaceIds(input: {
+  worktree: string
+  sandboxes?: string[]
+  persistedOrder?: string[]
+  currentDirectory?: string
+  isPending: (directory: string) => boolean
+}) {
+  const local = input.worktree
+  const dirs = [local, ...(input.sandboxes ?? [])]
+  const currentDirectory = input.currentDirectory
+  const extra =
+    currentDirectory &&
+    pathKey(currentDirectory) !== pathKey(local) &&
+    !dirs.some((item) => pathKey(item) === pathKey(currentDirectory))
+      ? currentDirectory
+      : undefined
+  const pending = extra ? input.isPending(extra) : false
+
+  const ordered = effectiveWorkspaceOrder(local, dirs, input.persistedOrder)
+  if (pending && extra) return [local, extra, ...ordered.filter((item) => item !== local)]
+  if (!extra) return ordered
+  if (pending) return ordered
+  return [...ordered, extra]
+}
