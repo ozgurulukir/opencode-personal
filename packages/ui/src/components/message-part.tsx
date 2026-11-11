@@ -19,6 +19,7 @@ import { findLastTextPart, parseUserMessageParts } from "./message-part-utils"
 import { PacedMarkdown } from "./message-part-paced"
 import { ContextToolGroup, getDirectory } from "./message-part-context"
 import { DiagnosticsDisplay, getDiagnostics } from "./message-part-diagnostics"
+import { ExaOutput } from "./message-part-exa"
 import { Dynamic } from "solid-js/web"
 import {
   AgentPart,
@@ -67,7 +68,6 @@ import {
   sameGroups,
   sessionLink,
   taskSession,
-  urls,
   type PartGroup,
 } from "./message-part-shared"
 export {
@@ -276,32 +276,6 @@ export function AssistantParts(props: {
         )
       }}
     </Index>
-  )
-}
-
-function ExaOutput(props: { output?: string }) {
-  const links = createMemo(() => urls(props.output))
-
-  return (
-    <Show when={links().length > 0}>
-      <div data-component="exa-tool-output">
-        <div data-slot="exa-tool-links">
-          <For each={links()}>
-            {(url) => (
-              <a
-                data-slot="exa-tool-link"
-                href={url}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={(event) => event.stopPropagation()}
-              >
-                {url}
-              </a>
-            )}
-          </For>
-        </div>
-      </div>
-    </Show>
   )
 }
 
