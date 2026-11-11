@@ -1,4 +1,5 @@
 import { batch, createMemo, onCleanup, onMount, type Accessor } from "solid-js"
+import type { Project } from "@opencode-ai/sdk/v2"
 import { createStore } from "solid-js/store"
 import { makeEventListener } from "@solid-primitives/event-listener"
 import { same } from "@/utils/same"
@@ -192,3 +193,15 @@ export const createSizing = () => {
 }
 
 export type Sizing = ReturnType<typeof createSizing>
+
+export function upsertProject(list: Project[], next: Project) {
+  const idx = list.findIndex((item) => item.id === next.id)
+  if (idx >= 0) {
+    return list.map((item, i) => (i === idx ? { ...item, ...next } : item))
+  }
+  const at = list.findIndex((item) => item.id > next.id)
+  if (at >= 0) {
+    return [...list.slice(0, at), next, ...list.slice(at)]
+  }
+  return [...list, next]
+}

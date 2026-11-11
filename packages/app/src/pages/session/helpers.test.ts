@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test"
+import type { Project } from "@opencode-ai/sdk/v2"
 import { createMemo, createRoot } from "solid-js"
 import { createStore } from "solid-js/store"
 import {
@@ -8,6 +9,7 @@ import {
   focusTerminalById,
   getTabReorderIndex,
   shouldFocusTerminalOnKeyDown,
+  upsertProject,
 } from "./helpers"
 
 describe("createOpenReviewFile", () => {
@@ -177,5 +179,44 @@ describe("createSessionTabs", () => {
       expect(result.closableTab()).toBeUndefined()
       dispose()
     })
+  })
+})
+
+describe("upsertProject", () => {
+  const project = (id: string, extra: Record<string, unknown> = {}) => ({ id, ...extra }) as Project
+
+  test("merges into the existing entry in place, keeping order", () => {
+    const list = [project("a", { worktree: "/w1" }), project("b")]
+    const next = project("a", { worktree: "/w2" })
+    expect(upsertProject(list, next)).toEqual([project("a", { worktree: "/w2" }), project("b")])
+  })
+
+  test("inserts at the sorted position among lower ids", () => {
+    const list = [project("a"), project("c")]
+    expect(upsertProject(list, project("b"))).toEqual([project("a"), project("b"), project("c")])
+  })
+
+  test("appends when the id sorts after every entry", () => {
+    expect(upsertProject([project("a")], project("z"))).toEqual([project("a"), project("z")])
+  })
+
+  test("inserts into an empty list", () => {
+    expect(upsertProject([], project("m"))).toEqual([project("m")])
+  })
+
+  test("keeps unrelated entries referentially untouched on insert", () => {
+    const a = project("a")
+    const c = project("c")
+    const result = upsertProject([a, c], project("b"))
+    expect(result[0]).toBe(a)
+    expect(result[2]).toBe(c)
+  })
+
+  test("keeps unrelated entries referentially untouched on update", () => {
+    const a = project("a", { worktree: "/w1" })
+    const b = project("b")
+    const result = upsertProject([a, b], project("a", { worktree: "/w2" }))
+    expect(result[0]).not.toBe(a)
+    expect(result[1]).toBe(b)
   })
 })
