@@ -51,6 +51,7 @@ import {
   shouldFocusTerminalOnKeyDown,
   upsertProject,
 } from "@/pages/session/helpers"
+import { changeModes, newSessionWorktreeFor, resolveVcsMode, reviewDiffsFor, reviewIsReady, type ChangeMode, type VcsMode } from "@/pages/session/review"
 import { createSessionHistoryWindow, emptyUserMessages } from "@/pages/session/history-window"
 import { MessageTimeline } from "@/pages/session/message-timeline"
 import { type DiffStyle, SessionReviewTab, type SessionReviewTabProps } from "@/pages/session/review-tab"
@@ -71,8 +72,6 @@ type FollowupItem = FollowupDraft & { id: string }
 type FollowupEdit = Pick<FollowupItem, "id" | "prompt" | "context">
 const emptyFollowups: FollowupItem[] = []
 
-type ChangeMode = "git" | "branch" | "turn"
-type VcsMode = "git" | "branch"
 
 export default function Page() {
   const globalSync = useGlobalSync()
@@ -324,29 +323,14 @@ export default function Page() {
 
   const turnDiffs = createMemo(() => list(lastUserMessage()?.summary?.diffs))
   const nogit = createMemo(() => !!sync.project && sync.project.vcs !== "git")
-  const changesOptions = createMemo<ChangeMode[]>(() => {
-    const list: ChangeMode[] = []
-    if (sync.project?.vcs === "git") list.push("git")
-    if (
-      sync.project?.vcs === "git" &&
-      sync.data.vcs?.branch &&
-      sync.data.vcs?.default_branch &&
-      sync.data.vcs.branch !== sync.data.vcs.default_branch
-    ) {
-      list.push("branch")
-    }
-    list.push("turn")
-    return list
-  })
+  const changesOptions = createMemo<ChangeMode[]>(() => changeModes(sync.project, sync.data.vcs))
   const mobileChanges = createMemo(() => !isDesktop() && store.mobileTab === "changes")
   const wantsReview = createMemo(() =>
     isDesktop()
       ? desktopFileTreeOpen() || (desktopReviewOpen() && activeTab() === "review")
       : store.mobileTab === "changes",
   )
-  const vcsMode = createMemo<VcsMode | undefined>(() => {
-    if (store.changes === "git" || store.changes === "branch") return store.changes
-  })
+  const vcsMode = createMemo<VcsMode | undefined>(() => resolveVcsMode(store.changes))
   const vcsKey = createMemo(
     () => ["session-vcs", sdk.directory, sync.data.vcs?.branch ?? "", sync.data.vcs?.default_branch ?? ""] as const,
   )
@@ -372,25 +356,12 @@ export default function Page() {
     }
   })
   const refreshVcs = () => void queryClient.invalidateQueries({ queryKey: vcsKey() })
-  const reviewDiffs = () => {
-    if (store.changes === "git" || store.changes === "branch")
-      // avoids suspense
-      return vcsQuery.isFetched ? (vcsQuery.data ?? []) : []
-    return turnDiffs()
-  }
+  const reviewDiffs = () => reviewDiffsFor(store.changes, vcsQuery.isFetched, vcsQuery.data, turnDiffs())
   const reviewCount = () => reviewDiffs().length
   const hasReview = () => reviewCount() > 0
-  const reviewReady = () => {
-    if (store.changes === "git" || store.changes === "branch") return !vcsQuery.isPending
-    return true
-  }
+  const reviewReady = () => reviewIsReady(store.changes, vcsQuery.isPending)
 
-  const newSessionWorktree = createMemo(() => {
-    if (store.newSessionWorktree === "create") return "create"
-    const project = sync.project
-    if (project && sdk.directory !== project.worktree) return sdk.directory
-    return "main"
-  })
+  const newSessionWorktree = createMemo(() => newSessionWorktreeFor(store.newSessionWorktree, sync.project, sdk.directory))
 
   const setActiveMessage = (message: UserMessage | undefined) => {
     messageMark = scrollMark
