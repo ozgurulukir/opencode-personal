@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, mock, test } from "bun:test"
 import type { Message, Part } from "@opencode-ai/sdk/v2"
+import type { FollowupDraft } from "./sendFollowupDraft"
 
 let sendFollowupDraftFn: typeof import("./sendFollowupDraft").sendFollowupDraft
 let detectCommandFn: typeof import("./detectCommand").detectCommand
@@ -55,7 +56,7 @@ describe("useOptimisticSend", () => {
       session: {
         optimistic: { add },
       },
-    } as any
+    } as unknown as Parameters<typeof optimisticAddFn>[0]
     const message = { id: "m1" } as Message
     const parts = [] as Part[]
     optimisticAddFn(sync, "/dir", "session-1", message, parts)
@@ -68,7 +69,7 @@ describe("useOptimisticSend", () => {
       session: {
         optimistic: { remove },
       },
-    } as any
+    } as unknown as Parameters<typeof optimisticRemoveFn>[0]
     optimisticRemoveFn(sync, "/dir", "session-1", "m1")
     expect(remove).toHaveBeenCalledWith({ directory: "/dir", sessionID: "session-1", messageID: "m1" })
   })
@@ -111,14 +112,28 @@ describe("sendFollowupDraft", () => {
     },
   })
 
-  const createDraft = (text: string) => ({
+  const createDraft = (text: string): FollowupDraft => ({
     sessionID: "session-1",
     sessionDirectory: "/dir",
-    prompt: [{ type: "text", content: text, start: 0, end: text.length }] as any,
-    context: [] as any,
+    prompt: [{ type: "text", content: text, start: 0, end: text.length }],
+    context: [],
     agent: "agent",
     model: { providerID: "p", modelID: "m" },
-  } as any)
+  })
+
+  // Single typed cast boundary so call sites pass fixtures without per-site casts
+  const sendInput = (overrides: {
+    client: unknown
+    globalSync: unknown
+    sync: unknown
+    draft: FollowupDraft
+    before?: () => Promise<boolean> | boolean
+  }) =>
+    ({
+      messageID: "msg-1",
+      optimisticBusy: true,
+      ...overrides,
+    }) as unknown as Parameters<typeof sendFollowupDraftFn>[0]
 
   test("executes command when text starts with /", async () => {
     const client = createClient()
@@ -126,14 +141,7 @@ describe("sendFollowupDraft", () => {
     const sync = createSync()
     const draft = createDraft("/test args")
 
-    const result = await sendFollowupDraftFn({
-      client: client as any,
-      globalSync: { child } as any,
-      sync: sync as any,
-      draft,
-      messageID: "msg-1",
-      optimisticBusy: true,
-    })
+    const result = await sendFollowupDraftFn(sendInput({ client, globalSync: { child }, sync, draft }))
 
     expect(result).toBe(true)
     expect(setStoreCalls).toEqual([["session_status", "session-1", { type: "busy" }]])
@@ -145,15 +153,7 @@ describe("sendFollowupDraft", () => {
     const sync = createSync()
     const draft = createDraft("/test args")
 
-    const result = await sendFollowupDraftFn({
-      client: client as any,
-      globalSync: { child } as any,
-      sync: sync as any,
-      draft,
-      messageID: "msg-1",
-      optimisticBusy: true,
-      before: () => false,
-    })
+    const result = await sendFollowupDraftFn(sendInput({ client, globalSync: { child }, sync, draft, before: () => false }))
 
     expect(result).toBe(false)
     expect(setStoreCalls).toEqual([
@@ -169,14 +169,7 @@ describe("sendFollowupDraft", () => {
     const draft = createDraft("/test args")
 
     await expect(
-      sendFollowupDraftFn({
-        client: client as any,
-        globalSync: { child } as any,
-        sync: sync as any,
-        draft,
-        messageID: "msg-1",
-        optimisticBusy: true,
-      }),
+      sendFollowupDraftFn(sendInput({ client, globalSync: { child }, sync, draft })),
     ).rejects.toThrow("command failed")
     expect(setStoreCalls).toEqual([
       ["session_status", "session-1", { type: "busy" }],
@@ -190,14 +183,7 @@ describe("sendFollowupDraft", () => {
     const sync = createSync()
     const draft = createDraft("hello")
 
-    const result = await sendFollowupDraftFn({
-      client: client as any,
-      globalSync: { child } as any,
-      sync: sync as any,
-      draft,
-      messageID: "msg-1",
-      optimisticBusy: true,
-    })
+    const result = await sendFollowupDraftFn(sendInput({ client, globalSync: { child }, sync, draft }))
 
     expect(result).toBe(true)
     expect(setStoreCalls).toEqual([["session_status", "session-1", { type: "busy" }]])
@@ -209,15 +195,7 @@ describe("sendFollowupDraft", () => {
     const sync = createSync()
     const draft = createDraft("hello")
 
-    const result = await sendFollowupDraftFn({
-      client: client as any,
-      globalSync: { child } as any,
-      sync: sync as any,
-      draft,
-      messageID: "msg-1",
-      optimisticBusy: true,
-      before: () => false,
-    })
+    const result = await sendFollowupDraftFn(sendInput({ client, globalSync: { child }, sync, draft, before: () => false }))
 
     expect(result).toBe(false)
     expect(setStoreCalls).toEqual([
@@ -233,14 +211,7 @@ describe("sendFollowupDraft", () => {
     const draft = createDraft("hello")
 
     await expect(
-      sendFollowupDraftFn({
-        client: client as any,
-        globalSync: { child } as any,
-        sync: sync as any,
-        draft,
-        messageID: "msg-1",
-        optimisticBusy: true,
-      }),
+      sendFollowupDraftFn(sendInput({ client, globalSync: { child }, sync, draft })),
     ).rejects.toThrow("prompt failed")
     expect(setStoreCalls).toEqual([
       ["session_status", "session-1", { type: "busy" }],
