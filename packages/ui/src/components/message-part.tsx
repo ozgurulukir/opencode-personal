@@ -25,7 +25,6 @@ import {
   UserMessage,
 } from "@opencode-ai/sdk/v2"
 import { useData } from "../context"
-import { useFileComponent } from "../context/file"
 import { useDialog } from "../context/dialog"
 import { useI18n } from "../context/i18n"
 import { GenericTool } from "./basic-tool"
@@ -36,7 +35,6 @@ import { ImagePreview } from "./image-preview"
 
 import {
   ToolRegistry,
-  taskAgent,
   webSearchProviderLabel,
 } from "./message-part-registry"
 import {
@@ -48,7 +46,6 @@ import {
   same,
   sameGroups,
   sessionLink,
-  taskSession,
   type PartGroup,
 } from "./message-part-shared"
 export {
@@ -60,13 +57,10 @@ export {
   webSearchProviderLabel,
 } from "./message-part-registry"
 export type { ToolInfo, ToolProps, ToolComponent } from "./message-part-registry"
-import { checksum } from "@opencode-ai/core/util/encode"
 import { Tooltip } from "./tooltip"
 import { IconButton } from "./icon-button"
-import { Spinner } from "./spinner"
-import { TextShimmer } from "./text-shimmer"
-import { patchFiles } from "./apply-patch-file"
 import { useLocation } from "@solidjs/router"
+import "./message-part-tools"
 import { attached, inline, kind } from "./message-file"
 
 export interface MessageProps {
@@ -360,7 +354,6 @@ export function UserMessageDisplay(props: { message: UserMessage; parts: PartTyp
   // ⚡ Bolt Optimization: Replace multiple .filter() calls with a single loop to reduce GC pressure and O(N) traversals
   const parsedParts = createMemo(() => parseUserMessageParts(props.parts))
 
-  const files = () => parsedParts().files
   const attachments = () => parsedParts().attachments
   const inlineFiles = () => parsedParts().inlineFiles
   const agents = () => parsedParts().agents
@@ -759,5 +752,3 @@ PART_MAPPING["reasoning"] = function ReasoningPartDisplay(props) {
     </Show>
   )
 }
-
-import "./message-part-tools"
