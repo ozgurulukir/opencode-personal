@@ -52,6 +52,7 @@ import {
   upsertProject,
 } from "@/pages/session/helpers"
 import { changeModes, newSessionWorktreeFor, resolveVcsMode, reviewDiffsFor, reviewIsReady, type ChangeMode, type VcsMode } from "@/pages/session/review"
+import { deepActiveElement, isEditableTarget, isScrollGestureKey, sessionKeyGuardBlocked, shouldFocusComposer } from "@/pages/session/keyboard"
 import { createSessionHistoryWindow, emptyUserMessages } from "@/pages/session/history-window"
 import { MessageTimeline } from "@/pages/session/message-timeline"
 import { type DiffStyle, SessionReviewTab, type SessionReviewTabProps } from "@/pages/session/review-tab"
@@ -647,19 +648,6 @@ export default function Page() {
     saveLabel: language.t("common.save"),
   }))
 
-  const isEditableTarget = (target: EventTarget | null | undefined) => {
-    if (!(target instanceof HTMLElement)) return false
-    return /^(INPUT|TEXTAREA|SELECT|BUTTON)$/.test(target.tagName) || target.isContentEditable
-  }
-
-  const deepActiveElement = () => {
-    let current: Element | null = document.activeElement
-    while (current instanceof HTMLElement && current.shadowRoot?.activeElement) {
-      current = current.shadowRoot.activeElement
-    }
-    return current instanceof HTMLElement ? current : undefined
-  }
-
   const handleKeyDown = (event: KeyboardEvent) => {
     const path = event.composedPath()
     const target = path.find((item): item is HTMLElement => item instanceof HTMLElement)
@@ -668,14 +656,17 @@ export default function Page() {
     const protectedTarget = path.some(
       (item) => item instanceof HTMLElement && item.closest("[data-prevent-autofocus]") !== null,
     )
-    if (protectedTarget || isEditableTarget(target)) return
-
-    if (activeElement) {
-      const isProtected = activeElement.closest("[data-prevent-autofocus]")
-      const isInput = isEditableTarget(activeElement)
-      if (isProtected || isInput) return
-    }
-    if (dialog.active) return
+    if (
+      sessionKeyGuardBlocked({
+        protectedTarget,
+        targetEditable: isEditableTarget(target),
+        activeElement,
+        activeElementProtected: activeElement ? activeElement.closest("[data-prevent-autofocus]") !== null : false,
+        activeElementEditable: activeElement ? isEditableTarget(activeElement) : false,
+        dialogActive: !!dialog.active,
+      })
+    )
+      return
 
     if (activeElement === inputRef) {
       if (event.key === "Escape") inputRef?.blur()
@@ -689,13 +680,20 @@ export default function Page() {
     }
 
     // Only treat explicit scroll keys as potential "user scroll" gestures.
-    if (event.key === "PageUp" || event.key === "PageDown" || event.key === "Home" || event.key === "End") {
+    if (isScrollGestureKey(event.key)) {
       markScrollGesture()
       return
     }
 
-    if (event.key.length === 1 && event.key !== "Unidentified" && !(event.ctrlKey || event.metaKey)) {
-      if (composer.blocked() || isChildSession()) return
+    if (
+      shouldFocusComposer({
+        key: event.key,
+        ctrlKey: event.ctrlKey,
+        metaKey: event.metaKey,
+        composerBlocked: composer.blocked(),
+        childSession: isChildSession(),
+      })
+    ) {
       inputRef?.focus()
     }
   }
