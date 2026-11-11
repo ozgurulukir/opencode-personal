@@ -1169,7 +1169,8 @@ describe("applyDirectoryEvent", () => {
     })
 
     tool = store.part["evt_2"]?.[0]
-    expect(tool).toMatchObject({
+    // Solid store proxies (browser build) defeat the matcher; unwrap before comparing
+    expect(JSON.parse(JSON.stringify(tool))).toMatchObject({
       state: { status: "running", input: { command: "ls" }, metadata: { partial: true } },
     })
 
@@ -1195,7 +1196,7 @@ describe("applyDirectoryEvent", () => {
     })
 
     tool = store.part["evt_2"]?.[0]
-    expect(tool).toMatchObject({
+    expect(JSON.parse(JSON.stringify(tool))).toMatchObject({
       state: {
         status: "completed",
         output: "out",
@@ -1341,7 +1342,8 @@ describe("applyDirectoryEvent", () => {
     apply({ type: "session.next.reasoning.delta", properties: { sessionID, reasoningID: "rsn_a", delta: "A" } })
     apply({ type: "session.next.reasoning.delta", properties: { sessionID, reasoningID: "rsn_b", delta: "B" } })
 
-    expect(store.part["evt_2"]).toEqual(
+    // Solid store proxies (browser build) defeat the matcher; unwrap before comparing
+    expect(JSON.parse(JSON.stringify(store.part["evt_2"]))).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ type: "reasoning", id: "evt_2:reasoning:rsn_a", text: "A" }),
         expect.objectContaining({ type: "reasoning", id: "evt_2:reasoning:rsn_b", text: "B" }),
