@@ -2,7 +2,6 @@ import { useFilteredList } from "@opencode-ai/ui/hooks"
 import { useSpring } from "@opencode-ai/ui/motion-spring"
 import { createEffect, on, Component, Show, onCleanup, createMemo, createSignal, createResource } from "solid-js"
 import { createStore } from "solid-js/store"
-import { useLocal } from "@/context/local"
 import { selectionFromLines, type SelectedLineRange, useFile } from "@/context/file"
 import {
   ContentPart,
@@ -11,8 +10,6 @@ import {
   Prompt,
   usePrompt,
   ImageAttachmentPart,
-  AgentPart,
-  FileAttachmentPart,
 } from "@/context/prompt"
 import { useLayout } from "@/context/layout"
 import { useSDK } from "@/context/sdk"
@@ -102,7 +99,6 @@ const NON_EMPTY_TEXT = /[^\s\u200B]/
 export const PromptInput: Component<PromptInputProps> = (props) => {
   const sdk = useSDK()
   const sync = useSync()
-  const local = useLocal()
   const files = useFile()
   const prompt = usePrompt()
   const layout = useLayout()

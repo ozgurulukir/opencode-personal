@@ -1,5 +1,3 @@
-import type { SlashCommand } from "./slash-popover"
-
 export type BuiltinCommandOption = {
   id: string
   title: string
