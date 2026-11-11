@@ -21,6 +21,7 @@ import { ContextToolGroup, getDirectory } from "./message-part-context"
 import { DiagnosticsDisplay, getDiagnostics } from "./message-part-diagnostics"
 import { ExaOutput } from "./message-part-exa"
 import { HighlightedText } from "./message-part-highlight"
+import { ToolFileAccordion } from "./message-part-file-accordion"
 import { Dynamic } from "solid-js/web"
 import {
   AgentPart,
@@ -585,42 +586,6 @@ export function Part(props: MessagePartProps) {
         turnDurationMs={props.turnDurationMs}
       />
     </Show>
-  )
-}
-
-function ToolFileAccordion(props: { path: string; actions?: JSX.Element; children: JSX.Element }) {
-  const value = createMemo(() => props.path || "tool-file")
-
-  return (
-    <Accordion
-      multiple
-      data-scope="apply-patch"
-      style={{ "--sticky-accordion-offset": "calc(32px + var(--tool-content-gap))" }}
-      defaultValue={[value()]}
-    >
-      <Accordion.Item value={value()}>
-        <StickyAccordionHeader>
-          <Accordion.Trigger>
-            <div data-slot="apply-patch-trigger-content">
-              <div data-slot="apply-patch-file-info">
-                <FileIcon node={{ path: props.path, type: "file" }} />
-                <div data-slot="apply-patch-file-name-container">
-                  <Show when={props.path.includes("/")}>
-                    <span data-slot="apply-patch-directory">{`\u202A${getDirectory(props.path)}\u202C`}</span>
-                  </Show>
-                  <span data-slot="apply-patch-filename">{getFilename(props.path)}</span>
-                </div>
-              </div>
-              <div data-slot="apply-patch-trigger-actions">
-                {props.actions}
-                <Icon name="chevron-grabber-vertical" size="small" />
-              </div>
-            </div>
-          </Accordion.Trigger>
-        </StickyAccordionHeader>
-        <Accordion.Content>{props.children}</Accordion.Content>
-      </Accordion.Item>
-    </Accordion>
   )
 }
 
