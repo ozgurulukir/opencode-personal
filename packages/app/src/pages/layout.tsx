@@ -1444,7 +1444,8 @@ export default function Layout(props: ParentProps) {
         const next = new Set(dirs)
         for (const directory of next) {
           if (loadedSessionDirs.has(directory)) continue
-          void globalSync.project.loadSessions(directory)
+          // background bootstrap — failure leaves sessions unloaded; later syncs retry
+          globalSync.project.loadSessions(directory).catch(() => {})
         }
 
         loadedSessionDirs.clear()

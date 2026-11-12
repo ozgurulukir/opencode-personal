@@ -279,7 +279,8 @@ const WorkspaceSessionList = (props: {
           class="flex w-full text-left justify-start text-14-regular text-text-weak pl-2 pr-10"
           size="large"
           onClick={(e: MouseEvent) => {
-            void props.loadMore()
+            // load-more click — failure keeps the list as-is; clicking again retries
+            props.loadMore().catch(() => {})
             ;(e.currentTarget as HTMLButtonElement).blur()
           }}
         >

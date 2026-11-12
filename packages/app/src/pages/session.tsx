@@ -495,7 +495,8 @@ export default function Page() {
           refreshTimer = undefined
           if (params.id !== id) return
           untrack(() => {
-            if (stale) void sync.session.sync(id, { force: true })
+            // background refresh — failure leaves stale data, nothing to surface
+            if (stale) sync.session.sync(id, { force: true }).catch(() => {})
           })
         }, 0)
       })
@@ -530,7 +531,8 @@ export default function Page() {
             todoTimer = undefined
             if (sdk.directory !== dir || params.id !== id) return
             untrack(() => {
-              void sync.session.todo(id, cached ? { force: true } : undefined)
+              // background refresh — failure leaves todo data stale, nothing to surface
+              sync.session.todo(id, cached ? { force: true } : undefined).catch(() => {})
             })
           }, 0)
         })
@@ -963,7 +965,8 @@ export default function Page() {
     if (sync.data.session_diff[id] !== undefined) return
     if (sync.status === "loading") return
 
-    void sync.session.diff(id)
+    // background preload — failure leaves the diff absent, nothing to surface
+    sync.session.diff(id).catch(() => {})
   })
 
   createEffect(
@@ -985,7 +988,8 @@ export default function Page() {
           diffTimer = window.setTimeout(() => {
             diffTimer = undefined
             if (sessionKey() !== key) return
-            void sync.session.diff(id, { force: true })
+            // background refresh — failure leaves the diff stale, nothing to surface
+            sync.session.diff(id, { force: true }).catch(() => {})
           }, 0)
         })
       },

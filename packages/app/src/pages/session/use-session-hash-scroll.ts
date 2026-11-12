@@ -206,7 +206,9 @@ export const useSessionHashScroll = (input: {
     if (messageById().has(targetId)) return
     if (!input.historyMore() || input.historyLoading()) return
 
-    void input.loadMore(sessionID)
+    // background history load — failure leaves history truncated; loading flag
+    // resets via finally, so the effect retries when it re-runs
+    input.loadMore(sessionID).catch(() => {})
   })
 
   onMount(() => {
