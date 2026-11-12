@@ -66,6 +66,7 @@ import { useServer } from "@/context/server"
 import { useLanguage, type Locale } from "@/context/language"
 import { pathKey } from "@/utils/path-key"
 import { createActiveRouteSync } from "./layout/active-route"
+import { pickOffsetIndex, pickUnseenOffsetIndex } from "./layout/navigation"
 import {
   displayName,
   dialogLeftMargin,
@@ -859,14 +860,11 @@ export default function Layout(props: ParentProps) {
     const sessions = currentSessions()
     if (sessions.length === 0) return
 
-    const sessionIndex = params.id ? sessions.findIndex((s) => s.id === params.id) : -1
-
-    let targetIndex: number
-    if (sessionIndex === -1) {
-      targetIndex = offset > 0 ? 0 : sessions.length - 1
-    } else {
-      targetIndex = (sessionIndex + offset + sessions.length) % sessions.length
-    }
+    const targetIndex = pickOffsetIndex({
+      offset,
+      length: sessions.length,
+      activeIndex: params.id ? sessions.findIndex((s) => s.id === params.id) : -1,
+    })
 
     const session = sessions[targetIndex]
     if (!session) return
@@ -886,12 +884,7 @@ export default function Layout(props: ParentProps) {
     const active = current ?? fallback
     const index = active ? projects.findIndex((project) => project.worktree === active) : -1
 
-    const target =
-      index === -1
-        ? offset > 0
-          ? projects[0]
-          : projects[projects.length - 1]
-        : projects[(index + offset + projects.length) % projects.length]
+    const target = projects[pickOffsetIndex({ offset, length: projects.length, activeIndex: index })]
     if (!target) return
 
     // warm up child store to prevent flicker
@@ -903,24 +896,21 @@ export default function Layout(props: ParentProps) {
     const sessions = currentSessions()
     if (sessions.length === 0) return
 
-    const hasUnseen = sessions.some((session) => notification.session.unseenCount(session.id) > 0)
-    if (!hasUnseen) return
+    const index = pickUnseenOffsetIndex({
+      offset,
+      length: sessions.length,
+      activeIndex: params.id ? sessions.findIndex((s) => s.id === params.id) : -1,
+      unseen: (index) => {
+        const session = sessions[index]
+        return !!session && notification.session.unseenCount(session.id) > 0
+      },
+    })
+    if (index === undefined) return
 
-    const activeIndex = params.id ? sessions.findIndex((s) => s.id === params.id) : -1
-    const start = activeIndex === -1 ? (offset > 0 ? -1 : 0) : activeIndex
-
-    for (let i = 1; i <= sessions.length; i++) {
-      const index = offset > 0 ? (start + i) % sessions.length : (start - i + sessions.length) % sessions.length
-      const session = sessions[index]
-      if (!session) continue
-      if (notification.session.unseenCount(session.id) === 0) continue
-
-      prefetchSession(session, "high")
-      warm(sessions, index)
-
-      navigateToSession(session)
-      return
-    }
+    const session = sessions[index]
+    prefetchSession(session, "high")
+    warm(sessions, index)
+    navigateToSession(session)
   }
 
   async function archiveSession(session: Session) {
