@@ -97,7 +97,7 @@ describe("sendFollowupDraft", () => {
     const setStoreCalls: unknown[][] = []
     const child = (_directory: string) => {
       const setStore = (...args: unknown[]) => setStoreCalls.push(args)
-      return [{} as any, setStore]
+      return [{}, setStore]
     }
     return { child, setStoreCalls }
   }
