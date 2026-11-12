@@ -67,6 +67,7 @@ import { useLanguage, type Locale } from "@/context/language"
 import { pathKey } from "@/utils/path-key"
 import { createActiveRouteSync } from "./layout/active-route"
 import { pickOffsetIndex, pickUnseenOffsetIndex } from "./layout/navigation"
+import { pickCycleNext } from "./layout/cycler"
 import {
   displayName,
   dialogLeftMargin,
@@ -329,11 +330,8 @@ export default function Layout(props: ParentProps) {
   }
 
   function cycleTheme(direction = 1) {
-    const ids = availableThemeEntries().map(([id]) => id)
-    if (ids.length === 0) return
-    const currentIndex = ids.indexOf(theme.themeId())
-    const nextIndex = currentIndex === -1 ? 0 : (currentIndex + direction + ids.length) % ids.length
-    const nextThemeId = ids[nextIndex]
+    const nextThemeId = pickCycleNext(availableThemeEntries().map(([id]) => id), theme.themeId(), direction)
+    if (!nextThemeId) return
     theme.setTheme(nextThemeId)
     showToast({
       title: language.t("toast.theme.title"),
@@ -342,11 +340,8 @@ export default function Layout(props: ParentProps) {
   }
 
   function cycleColorScheme(direction = 1) {
-    const current = theme.colorScheme()
-    const currentIndex = colorSchemeOrder.indexOf(current)
-    const nextIndex =
-      currentIndex === -1 ? 0 : (currentIndex + direction + colorSchemeOrder.length) % colorSchemeOrder.length
-    const next = colorSchemeOrder[nextIndex]
+    const next = pickCycleNext(colorSchemeOrder, theme.colorScheme(), direction)
+    if (!next) return
     theme.setColorScheme(next)
     showToast({
       title: language.t("toast.scheme.title"),
@@ -364,10 +359,7 @@ export default function Layout(props: ParentProps) {
   }
 
   function cycleLanguage(direction = 1) {
-    const locales = language.locales
-    const currentIndex = locales.indexOf(language.locale())
-    const nextIndex = currentIndex === -1 ? 0 : (currentIndex + direction + locales.length) % locales.length
-    const next = locales[nextIndex]
+    const next = pickCycleNext(language.locales, language.locale(), direction)
     if (!next) return
     setLocale(next)
   }
