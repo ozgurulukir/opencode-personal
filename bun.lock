@@ -197,7 +197,7 @@
         "solid-js": "catalog:",
         "strip-ansi": "7.2.0",
         "tree-sitter-bash": "0.25.1",
-        "tree-sitter-powershell": "0.26.4",
+        "tree-sitter-powershell": "0.26.6",
         "turndown": "7.2.4",
         "ulid": "catalog:",
         "venice-ai-sdk-provider": "2.1.1",
@@ -3318,7 +3318,7 @@
 
     "tree-sitter-bash": ["tree-sitter-bash@0.25.1", "", { "dependencies": { "node-addon-api": "^8.2.1", "node-gyp-build": "^4.8.2" }, "peerDependencies": { "tree-sitter": "^0.25.0" }, "optionalPeers": ["tree-sitter"] }, "sha512-7hMytuYIMoXOq24yRulgIxthE9YmggZIOHCyPTTuJcu6EU54tYD+4G39cUb28kxC6jMf/AbPfWGLQtgPTdh3xw=="],
 
-    "tree-sitter-powershell": ["tree-sitter-powershell@0.26.4", "", { "dependencies": { "node-addon-api": "^8.5.0", "node-gyp-build": "^4.8.4" }, "peerDependencies": { "tree-sitter": "^0.25.0" }, "optionalPeers": ["tree-sitter"] }, "sha512-5RwNW/qN/cKArZY0znvTOG+OWSau7Agel5K0A8KQ5Nubw/4SyZ5KC02RKCaYcA2ur5UQ8esyxe9+6yXup2MXkw=="],
+    "tree-sitter-powershell": ["tree-sitter-powershell@0.26.6", "", { "dependencies": { "node-addon-api": "^8.5.0", "node-gyp-build": "^4.8.4" }, "peerDependencies": { "tree-sitter": "^0.25.0" }, "optionalPeers": ["tree-sitter"] }, "sha512-cIM7ltrLqaeCH+yqWQmtDoWASLQqLaDjK8JgZBCACN9qh1o6Blw06pG6ONlyoAWZYGy4Xu2T7PB/il1ZWy2gaQ=="],
 
     "treeverse": ["treeverse@3.0.0", "", {}, "sha512-gcANaAnd2QDZFmHFEOF4k7uc1J/6a6z3DJMd/QwEyxLoKGiptJRwid582r7QIsFlFMIZ3SnxfS52S4hm2DHkuQ=="],
 
