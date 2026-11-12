@@ -650,6 +650,7 @@ export default function Layout(props: ParentProps) {
       if (active.has(directory)) continue
       prefetchedByDir.delete(directory)
     }
+    prefetchQueues.cleanupInvisible(active)
   })
 
   createEffect(() => {
@@ -659,10 +660,6 @@ export default function Layout(props: ParentProps) {
     prefetchToken.value += 1
     clearSessionPrefetchInflight()
     prefetchQueues.clear()
-  })
-
-  createEffect(() => {
-    prefetchQueues.cleanupInvisible(new Set(visibleSessionDirs()))
   })
 
   const queueFor = prefetchQueues.queueFor
