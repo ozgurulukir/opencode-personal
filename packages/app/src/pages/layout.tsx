@@ -113,8 +113,6 @@ export default function Layout(props: ParentProps) {
     }),
   )
 
-  const pageReady = createMemo(() => ready())
-
   let scrollContainerRef: HTMLDivElement | undefined
   let dialogRun = 0
   let dialogDead = false
@@ -123,7 +121,6 @@ export default function Layout(props: ParentProps) {
   const globalSDK = useGlobalSDK()
   const globalSync = useGlobalSync()
   const layout = useLayout()
-  const layoutReady = createMemo(() => layout.ready())
   const platform = usePlatform()
   const settings = useSettings()
   const server = useServer()
@@ -587,8 +584,8 @@ export default function Layout(props: ParentProps) {
   })
 
   createEffect(() => {
-    if (!pageReady()) return
-    if (!layoutReady()) return
+    if (!ready()) return
+    if (!layout.ready()) return
     const projects = layout.projects.list()
     for (const [directory, expanded] of Object.entries(store.workspaceExpanded)) {
       if (!expanded) continue
@@ -1415,7 +1412,7 @@ export default function Layout(props: ParentProps) {
     clearLastProjectSession,
   })
   createActiveRouteSync({
-    pageReady,
+    pageReady: ready,
     slug: () => route().slug,
     sessionId: () => params.id,
     projectRoot: () => currentProject()?.worktree,
