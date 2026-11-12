@@ -140,7 +140,7 @@
         "@ai-sdk/provider": "3.0.17",
         "@ai-sdk/provider-utils": "4.0.54",
         "@ai-sdk/togetherai": "2.0.87",
-        "@ai-sdk/vercel": "2.0.80",
+        "@ai-sdk/vercel": "2.0.94",
         "@ai-sdk/xai": "3.0.151",
         "@aws-sdk/credential-providers": "3.1164.0",
         "@clack/prompts": "1.8.1",
@@ -518,7 +518,7 @@
 
     "@ai-sdk/togetherai": ["@ai-sdk/togetherai@2.0.87", "", { "dependencies": { "@ai-sdk/openai-compatible": "2.0.81", "@ai-sdk/provider": "3.0.18", "@ai-sdk/provider-utils": "4.0.57" }, "peerDependencies": { "zod": "^3.25.76 || ^4.1.8" } }, "sha512-huozw2UgcyMKTBZYcLmzFm+y1Zq4qzUEYjnlAmzp+WItUULcglZ3rRH8HX3cbCycMWI8pUA4Mnh2dDClOQ1/Eg=="],
 
-    "@ai-sdk/vercel": ["@ai-sdk/vercel@2.0.80", "", { "dependencies": { "@ai-sdk/openai-compatible": "2.0.78", "@ai-sdk/provider": "3.0.17", "@ai-sdk/provider-utils": "4.0.54" }, "peerDependencies": { "zod": "^3.25.76 || ^4.1.8" } }, "sha512-ww0+bVBOoJrSSISCoHXZkiZB2C/CIeZfRRel+A8hwHbVcZ3g38QQsbNF55eMuSS9OgnGZwi/gzBQzSpUJyOXLg=="],
+    "@ai-sdk/vercel": ["@ai-sdk/vercel@2.0.94", "", { "dependencies": { "@ai-sdk/openai-compatible": "2.0.92", "@ai-sdk/provider": "3.0.19", "@ai-sdk/provider-utils": "4.0.65" }, "peerDependencies": { "zod": "^3.25.76 || ^4.1.8" } }, "sha512-jzjH6/NA7p/tLYU9/EaV3UHI7nuRRGAO7WtFNKrpdAq3EBr/yKqjqsjoKFt46m1o4kxYeFdLmAwmgGGKBbby4Q=="],
 
     "@ai-sdk/xai": ["@ai-sdk/xai@3.0.151", "", { "dependencies": { "@ai-sdk/openai-compatible": "2.0.92", "@ai-sdk/provider": "3.0.19", "@ai-sdk/provider-utils": "4.0.65" }, "peerDependencies": { "zod": "^3.25.76 || ^4.1.8" } }, "sha512-NbfcLpf9Hna/B2xHaSJAievCn2yNDzoPgKcN/nMdBEriCFS/voD3zKCUR59ix8CQ1RHr8uSHu9bxCndsDauVtA=="],
 
@@ -3594,6 +3594,12 @@
 
     "@ai-sdk/togetherai/@ai-sdk/provider-utils": ["@ai-sdk/provider-utils@4.0.57", "", { "dependencies": { "@ai-sdk/provider": "3.0.18", "@standard-schema/spec": "^1.1.0", "eventsource-parser": "^3.0.8", "undici": "^6.28.0" }, "peerDependencies": { "zod": "^3.25.76 || ^4.1.8" } }, "sha512-89a7sPvZqXsP3PigcAQLWntu/duIVEcN/RyChAB+j6p3C7NwW767sVttvL8r0+BetTg63uAXQoYHCZZueQKBSw=="],
 
+    "@ai-sdk/vercel/@ai-sdk/openai-compatible": ["@ai-sdk/openai-compatible@2.0.92", "", { "dependencies": { "@ai-sdk/provider": "3.0.19", "@ai-sdk/provider-utils": "4.0.65" }, "peerDependencies": { "zod": "^3.25.76 || ^4.1.8" } }, "sha512-Z21Lrhxq8HHl6q67nNgkb2z2uSjw6ZQp+g8s595E2HjdDEXLZs5uKbMWOC85Ps9XDeRKl4CW22Q1vfDHnr0Uaw=="],
+
+    "@ai-sdk/vercel/@ai-sdk/provider": ["@ai-sdk/provider@3.0.19", "", { "dependencies": { "json-schema": "^0.4.0" } }, "sha512-5lWq7zSfRaU5ylDESn3sDQjgGl2AI1vjZKO/6JY3aFW70ct4zcP1kN+ZUYOuTXr28fVsYbyu2YFhddLdIgQFZQ=="],
+
+    "@ai-sdk/vercel/@ai-sdk/provider-utils": ["@ai-sdk/provider-utils@4.0.65", "", { "dependencies": { "@ai-sdk/provider": "3.0.19", "@standard-schema/spec": "^1.1.0", "eventsource-parser": "^3.0.8", "undici": "^6.28.0" }, "peerDependencies": { "zod": "^3.25.76 || ^4.1.8" } }, "sha512-9K/75/v+nVAKIBKEm7wTwrv49FpQOtGgE0w1+xPo/FQ2JivcWK2VjO7r5uqnzofURlXSuzHBjdoPtQJjO9tyjw=="],
+
     "@ai-sdk/xai/@ai-sdk/openai-compatible": ["@ai-sdk/openai-compatible@2.0.92", "", { "dependencies": { "@ai-sdk/provider": "3.0.19", "@ai-sdk/provider-utils": "4.0.65" }, "peerDependencies": { "zod": "^3.25.76 || ^4.1.8" } }, "sha512-Z21Lrhxq8HHl6q67nNgkb2z2uSjw6ZQp+g8s595E2HjdDEXLZs5uKbMWOC85Ps9XDeRKl4CW22Q1vfDHnr0Uaw=="],
 
     "@ai-sdk/xai/@ai-sdk/provider": ["@ai-sdk/provider@3.0.19", "", { "dependencies": { "json-schema": "^0.4.0" } }, "sha512-5lWq7zSfRaU5ylDESn3sDQjgGl2AI1vjZKO/6JY3aFW70ct4zcP1kN+ZUYOuTXr28fVsYbyu2YFhddLdIgQFZQ=="],
@@ -4033,6 +4039,8 @@
     "@ai-sdk/mistral/@ai-sdk/provider-utils/undici": ["undici@6.28.0", "", {}, "sha512-LIY910g9TI13YS95lrMFrs8Rm/u/irgHeTWoKCoteeJ04CUJ92eEfj0rVn+7VKMPBpUPiUoBKfhNyLI23EE/KA=="],
 
     "@ai-sdk/togetherai/@ai-sdk/provider-utils/undici": ["undici@6.28.0", "", {}, "sha512-LIY910g9TI13YS95lrMFrs8Rm/u/irgHeTWoKCoteeJ04CUJ92eEfj0rVn+7VKMPBpUPiUoBKfhNyLI23EE/KA=="],
+
+    "@ai-sdk/vercel/@ai-sdk/provider-utils/undici": ["undici@6.28.0", "", {}, "sha512-LIY910g9TI13YS95lrMFrs8Rm/u/irgHeTWoKCoteeJ04CUJ92eEfj0rVn+7VKMPBpUPiUoBKfhNyLI23EE/KA=="],
 
     "@ai-sdk/xai/@ai-sdk/provider-utils/undici": ["undici@6.28.0", "", {}, "sha512-LIY910g9TI13YS95lrMFrs8Rm/u/irgHeTWoKCoteeJ04CUJ92eEfj0rVn+7VKMPBpUPiUoBKfhNyLI23EE/KA=="],
 
