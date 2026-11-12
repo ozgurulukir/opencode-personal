@@ -79,6 +79,7 @@ beforeAll(async () => {
 
   mock.module("@opencode-ai/ui/toast", () => ({
     showToast: () => 0,
+    toaster: { dismiss: () => {} },
   }))
 
   mock.module("@opencode-ai/core/util/encode", () => ({
