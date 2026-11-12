@@ -59,7 +59,7 @@
     "@zvec/bindings-linux-x64": "0.7.1",
     "@zvec/bindings-linux-x64-musl": "0.7.1",
     "@zvec/bindings-win32-arm64": "0.7.1",
-    "@zvec/bindings-win32-x64": "0.7.1",
+    "@zvec/bindings-win32-x64": "0.8.0",
     "@tsconfig/bun": "catalog:",
     "@types/bun": "catalog:",
     "@types/cross-spawn": "catalog:",

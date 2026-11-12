@@ -237,7 +237,7 @@
         "@zvec/bindings-linux-x64": "0.7.1",
         "@zvec/bindings-linux-x64-musl": "0.7.1",
         "@zvec/bindings-win32-arm64": "0.7.1",
-        "@zvec/bindings-win32-x64": "0.7.1",
+        "@zvec/bindings-win32-x64": "0.8.0",
         "drizzle-kit": "catalog:",
         "drizzle-orm": "catalog:",
         "prettier": "3.9.9",
@@ -1768,7 +1768,7 @@
 
     "@zvec/bindings-win32-arm64": ["@zvec/bindings-win32-arm64@0.7.1", "", { "os": "win32", "cpu": "arm64" }, "sha512-qAF4Oj9py5GVz079TUXi+kaXJW4pIYAg0eoFssUf7ZfX8VsDixTUK/DLnp5bdta2Isj6mBU1tOxlzyqn7aBrKA=="],
 
-    "@zvec/bindings-win32-x64": ["@zvec/bindings-win32-x64@0.7.1", "", { "os": "win32", "cpu": "x64" }, "sha512-iPJHeacfuaLbduihwr6oQKic5laTL/RQx1LbcnuopshJ3ISxcSLLHhg16I8sEAKhYM9I3uFG8CsCdmJIYLi8sw=="],
+    "@zvec/bindings-win32-x64": ["@zvec/bindings-win32-x64@0.8.0", "", { "os": "win32", "cpu": "x64" }, "sha512-6Tg26+4VrmrzNWiYvtQMTlbDWjNUAib4VdLlmDo/pKqzgcQFSF6bDDPUHizH1VfOkgdsctH6tOVvpYNh8Ept6w=="],
 
     "@zvec/zvec": ["@zvec/zvec@0.7.1", "", { "dependencies": { "detect-libc": "^2.1.2" }, "optionalDependencies": { "@zvec/bindings-darwin-arm64": "0.7.1", "@zvec/bindings-darwin-x64": "0.7.1", "@zvec/bindings-linux-arm64": "0.7.1", "@zvec/bindings-linux-arm64-musl": "0.7.1", "@zvec/bindings-linux-x64": "0.7.1", "@zvec/bindings-linux-x64-musl": "0.7.1", "@zvec/bindings-win32-arm64": "0.7.1", "@zvec/bindings-win32-x64": "0.7.1" } }, "sha512-uzaSjlLukTiczMP1OhTBmofQXFcidvfTv1tUl3+KAaSPxG5rRiirMzvJooun5q7z3R3ggnrOSM12BnA2L6i1PQ=="],
 
@@ -3755,6 +3755,8 @@
     "@tufjs/models/minimatch": ["minimatch@10.2.5", "", { "dependencies": { "brace-expansion": "^5.0.5" } }, "sha512-MULkVLfKGYDFYejP07QOurDLLQpcjk7Fw+7jXS2R2czRQzR56yHRveU5NDJEOviH+hETZKSkIk5c+T23GjFUMg=="],
 
     "@vscode/emmet-helper/jsonc-parser": ["jsonc-parser@2.3.1", "", {}, "sha512-H8jvkz1O50L3dMZCsLqiuB2tA7muqbSg1AtGEkN0leAqGjsUzDJir3Zwr02BhqdcITPg3ei3mZ+HjMocAknhhg=="],
+
+    "@zvec/zvec/@zvec/bindings-win32-x64": ["@zvec/bindings-win32-x64@0.7.1", "", { "os": "win32", "cpu": "x64" }, "sha512-iPJHeacfuaLbduihwr6oQKic5laTL/RQx1LbcnuopshJ3ISxcSLLHhg16I8sEAKhYM9I3uFG8CsCdmJIYLi8sw=="],
 
     "ai-gateway-provider/@ai-sdk/amazon-bedrock": ["@ai-sdk/amazon-bedrock@4.0.148", "", { "dependencies": { "@ai-sdk/anthropic": "3.0.107", "@ai-sdk/openai": "3.0.91", "@ai-sdk/provider": "3.0.14", "@ai-sdk/provider-utils": "4.0.42", "@smithy/eventstream-codec": "^4.0.1", "@smithy/util-utf8": "^4.0.0", "aws4fetch": "^1.0.20" }, "peerDependencies": { "zod": "^3.25.76 || ^4.1.8" } }, "sha512-BMPgT4X/8u0Z1wO1X6d0HxjYS7F7tl9m1jgkE3rO+KBMXtPWpHU0agxQgAsS8HAH3zJQv0gF0bvkpi/01UV79g=="],
 
