@@ -65,6 +65,7 @@ import { Titlebar } from "@/components/titlebar"
 import { useServer } from "@/context/server"
 import { useLanguage, type Locale } from "@/context/language"
 import { pathKey } from "@/utils/path-key"
+import { createActiveRouteSync } from "./layout/active-route"
 import {
   displayName,
   dialogLeftMargin,
@@ -1553,57 +1554,17 @@ export default function Layout(props: ParentProps) {
     })
   }
 
-  const activeRoute = {
-    session: "",
-    sessionProject: "",
-    directory: "",
-  }
-
-  createEffect(
-    on(
-      () => {
-        return [pageReady(), route().slug, params.id, currentProject()?.worktree, currentDir()] as const
-      },
-      ([ready, slug, id, root, dir]) => {
-        if (!ready || !slug || !dir) {
-          activeRoute.session = ""
-          activeRoute.sessionProject = ""
-          activeRoute.directory = ""
-          return
-        }
-
-        if (!id) {
-          activeRoute.session = ""
-          activeRoute.sessionProject = ""
-          activeRoute.directory = ""
-          return
-        }
-
-        const session = `${slug}/${id}`
-
-        if (!root) {
-          activeRoute.session = session
-          activeRoute.directory = dir
-          activeRoute.sessionProject = ""
-          return
-        }
-
-        if (server.projects.last() !== root) server.projects.touch(root)
-
-        const changed = session !== activeRoute.session || dir !== activeRoute.directory
-        if (changed) {
-          activeRoute.session = session
-          activeRoute.directory = dir
-          activeRoute.sessionProject = syncSessionRoute(dir, id, root)
-          return
-        }
-
-        if (root === activeRoute.sessionProject) return
-        activeRoute.directory = dir
-        activeRoute.sessionProject = rememberSessionRoute(dir, id, root)
-      },
-    ),
-  )
+  createActiveRouteSync({
+    pageReady,
+    slug: () => route().slug,
+    sessionId: () => params.id,
+    projectRoot: () => currentProject()?.worktree,
+    directory: currentDir,
+    lastServerProjectRoot: () => server.projects.last(),
+    touchProject: (root) => server.projects.touch(root),
+    syncSessionRoute,
+    rememberSessionRoute,
+  })
 
   createEffect(() => {
     document.documentElement.style.setProperty("--dialog-left-margin", `${dialogLeftMargin(layout.sidebar.opened(), layout.sidebar.width())}px`)
