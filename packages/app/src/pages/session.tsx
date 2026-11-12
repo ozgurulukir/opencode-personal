@@ -48,6 +48,7 @@ import {
   createSessionTabs,
   createSizing,
   focusTerminalById,
+  isNewerUserMessage,
   shouldFocusTerminalOnKeyDown,
   upsertProject,
 } from "@/pages/session/helpers"
@@ -246,17 +247,6 @@ export default function Page() {
 
   createEffect(
     on(
-      () => lastUserMessage()?.id,
-      () => {
-        const msg = lastUserMessage()
-        if (!msg) return
-        syncSessionModel(local, msg)
-      },
-    ),
-  )
-
-  createEffect(
-    on(
       () => ({ dir: params.dir, id: params.id }),
       (next, prev) => {
         if (!prev) return
@@ -273,6 +263,12 @@ export default function Page() {
     changes: "git" as ChangeMode,
     newSessionWorktree: "main",
     deferRender: false,
+  })
+
+  const [tree, setTree] = createStore({
+    reviewScroll: undefined as HTMLDivElement | undefined,
+    pendingDiff: undefined as string | undefined,
+    activeDiff: undefined as string | undefined,
   })
 
   const [followup, setFollowup] = persisted(
@@ -544,15 +540,16 @@ export default function Page() {
     ),
   )
 
+  // syncs the local model on every user-message change (incl. the mount run);
+  // clears the active message only when a strictly newer message lands
   createEffect(
     on(
-      () => visibleUserMessages().at(-1)?.id,
-      (lastId, prevLastId) => {
-        if (lastId && prevLastId && lastId > prevLastId) {
-          setStore("messageId", undefined)
-        }
+      () => lastUserMessage()?.id,
+      (lastId, prevId) => {
+        const msg = lastUserMessage()
+        if (msg) syncSessionModel(local, msg)
+        if (isNewerUserMessage(lastId, prevId)) setStore("messageId", undefined)
       },
-      { defer: true },
     ),
   )
 
@@ -563,6 +560,11 @@ export default function Page() {
         setStore("messageId", undefined)
         setStore("changes", "git")
         setUi("pendingMessage", undefined)
+        setTree({
+          reviewScroll: undefined,
+          pendingDiff: undefined,
+          activeDiff: undefined,
+        })
       },
       { defer: true },
     ),
@@ -719,26 +721,6 @@ export default function Page() {
 
   const fileTreeTab = () => layout.fileTree.tab()
   const setFileTreeTab = (value: "changes" | "all") => layout.fileTree.setTab(value)
-
-  const [tree, setTree] = createStore({
-    reviewScroll: undefined as HTMLDivElement | undefined,
-    pendingDiff: undefined as string | undefined,
-    activeDiff: undefined as string | undefined,
-  })
-
-  createEffect(
-    on(
-      sessionKey,
-      () => {
-        setTree({
-          reviewScroll: undefined,
-          pendingDiff: undefined,
-          activeDiff: undefined,
-        })
-      },
-      { defer: true },
-    ),
-  )
 
   const showAllFiles = () => {
     if (fileTreeTab() !== "changes") return

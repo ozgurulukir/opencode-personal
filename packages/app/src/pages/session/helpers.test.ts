@@ -8,9 +8,24 @@ import {
   createSessionTabs,
   focusTerminalById,
   getTabReorderIndex,
+  isNewerUserMessage,
   shouldFocusTerminalOnKeyDown,
   upsertProject,
 } from "./helpers"
+
+describe("isNewerUserMessage", () => {
+  test("true only when the id strictly grows lexicographically", () => {
+    expect(isNewerUserMessage("msg_b", "msg_a")).toBe(true)
+    expect(isNewerUserMessage("msg_a", "msg_b")).toBe(false)
+    expect(isNewerUserMessage("msg_a", "msg_a")).toBe(false)
+  })
+
+  test("false when either id is missing (incl. the mount run, prevId undefined)", () => {
+    expect(isNewerUserMessage("msg_a", undefined)).toBe(false)
+    expect(isNewerUserMessage(undefined, "msg_a")).toBe(false)
+    expect(isNewerUserMessage(undefined, undefined)).toBe(false)
+  })
+})
 
 describe("createOpenReviewFile", () => {
   test("opens and loads selected review file", () => {

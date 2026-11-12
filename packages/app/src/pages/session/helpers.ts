@@ -21,6 +21,13 @@ type TabsInput = {
 
 export const getSessionKey = (dir: string | undefined, id: string | undefined) => `${dir ?? ""}${id ? `/${id}` : ""}`
 
+/**
+ * Message ids grow lexicographically, so a "newer message landed" reset only
+ * fires on a strictly greater id — replacement or removal never counts.
+ */
+export const isNewerUserMessage = (lastId: string | undefined, prevId: string | undefined) =>
+  !!(lastId && prevId && lastId > prevId)
+
 export const createSessionTabs = (input: TabsInput) => {
   const review = input.review ?? (() => false)
   const hasReview = input.hasReview ?? (() => false)
