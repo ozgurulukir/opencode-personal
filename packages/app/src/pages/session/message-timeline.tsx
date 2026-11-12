@@ -310,7 +310,8 @@ export function MessageTimeline(props: {
       ([id, description]) => {
         if (!id || description) return
         if (sync.data.message[id] !== undefined) return
-        void sync.session.sync(id)
+        // background preload — failure leaves the message absent, nothing to surface
+        sync.session.sync(id).catch(() => {})
       },
       { defer: true },
     ),

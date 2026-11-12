@@ -495,7 +495,8 @@ export default function Page() {
           refreshTimer = undefined
           if (params.id !== id) return
           untrack(() => {
-            if (stale) void sync.session.sync(id, { force: true })
+            // background refresh — failure leaves stale data, nothing to surface
+            if (stale) sync.session.sync(id, { force: true }).catch(() => {})
           })
         }, 0)
       })
