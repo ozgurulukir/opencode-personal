@@ -559,7 +559,8 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
         open(directory: string) {
           const root = rootFor(directory)
           if (server.projects.list().find((x) => x.worktree === root)) return
-          void globalSync.project.loadSessions(root)
+          // background bootstrap — failure leaves sessions unloaded; later syncs retry
+          globalSync.project.loadSessions(root).catch(() => {})
           server.projects.open(root)
         },
         close(directory: string) {
