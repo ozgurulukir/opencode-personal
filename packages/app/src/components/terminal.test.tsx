@@ -47,7 +47,7 @@ beforeAll(async () => {
   mock.module("@opencode-ai/ui/theme/color", () => ({
     withAlpha: (color: string, _alpha: number) => color,
   }))
-  mock.module("@opencode-ai/ui/toast", () => ({ showToast: () => {} }))
+  mock.module("@opencode-ai/ui/toast", () => ({ showToast: () => {}, toaster: { dismiss: () => {} } }))
 
   const mod = await import("./terminal")
   useTerminalUiBindings = mod.useTerminalUiBindings

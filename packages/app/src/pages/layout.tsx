@@ -68,6 +68,7 @@ import { pathKey } from "@/utils/path-key"
 import { createActiveRouteSync } from "./layout/active-route"
 import { pickOffsetIndex, pickUnseenOffsetIndex } from "./layout/navigation"
 import { pickCycleNext } from "./layout/cycler"
+import { createWorkspaceOperations } from "./layout/workspace-operations"
 import {
   displayName,
   dialogLeftMargin,
@@ -1398,144 +1399,24 @@ export default function Layout(props: ParentProps) {
     }
   }
 
-  const deleteWorkspace = async (root: string, directory: string, leaveDeletedWorkspace = false) => {
-    if (directory === root) return
-
-    const current = currentDir()
-    const currentKey = pathKey(current)
-    const deletedKey = pathKey(directory)
-    const shouldLeave = leaveDeletedWorkspace || (!!params.dir && currentKey === deletedKey)
-    if (!leaveDeletedWorkspace && shouldLeave) {
-      navigateWithSidebarReset(`/${base64Encode(root)}/session`)
-    }
-
-    setBusy(directory, true)
-
-    const result = await globalSDK.client.worktree
-      .remove({ directory: root, worktreeRemoveInput: { directory } })
-      .then((x) => x.data)
-      .catch((err) => {
-        showToast({
-          title: language.t("workspace.delete.failed.title"),
-          description: errorMessage(err, language.t("common.requestFailed")),
-        })
-        return false
-      })
-
-    setBusy(directory, false)
-
-    if (!result) return
-
-    if (pathKey(store.lastProjectSession[root]?.directory ?? "") === pathKey(directory)) {
-      clearLastProjectSession(root)
-    }
-
-    globalSync.set(
-      "project",
-      produce((draft) => {
-        const project = draft.find((item) => item.worktree === root)
-        if (!project) return
-        project.sandboxes = (project.sandboxes ?? []).filter((sandbox) => sandbox !== directory)
-      }),
-    )
-    setStore("workspaceOrder", root, (order) => (order ?? []).filter((workspace) => workspace !== directory))
-
-    layout.projects.close(directory)
-    layout.projects.open(root)
-
-    if (shouldLeave) return
-
-    const nextCurrent = currentDir()
-    const nextKey = pathKey(nextCurrent)
-    const project = layout.projects.list().find((item) => item.worktree === root)
-    const dirs = project
-      ? effectiveWorkspaceOrder(root, [root, ...(project.sandboxes ?? [])], store.workspaceOrder[root])
-      : [root]
-    const valid = dirs.some((item) => pathKey(item) === nextKey)
-
-    if (params.dir && projectRoot(nextCurrent) === root && !valid) {
-      navigateWithSidebarReset(`/${base64Encode(root)}/session`)
-    }
-  }
-
-  const resetWorkspace = async (root: string, directory: string) => {
-    if (directory === root) return
-    setBusy(directory, true)
-
-    const progress = showToast({
-      persistent: true,
-      title: language.t("workspace.resetting.title"),
-      description: language.t("workspace.resetting.description"),
-    })
-    const dismiss = () => toaster.dismiss(progress)
-
-    const sessions: Session[] = await globalSDK.client.v2.session
-      .list({ directory, limit: 100 })
-      .then((x) => x.data?.items ?? [])
-      .catch(() => [])
-
-    clearWorkspaceTerminals(
-      directory,
-      sessions.map((s) => s.id),
-      platform,
-      getTerminalServerScope(server.current, server.key),
-    )
-    await globalSDK.client.instance.dispose({ directory }).catch(() => undefined)
-
-    const result = await globalSDK.client.worktree
-      .reset({ directory: root, worktreeResetInput: { directory } })
-      .then((x) => x.data)
-      .catch((err) => {
-        showToast({
-          title: language.t("workspace.reset.failed.title"),
-          description: errorMessage(err, language.t("common.requestFailed")),
-        })
-        return false
-      })
-
-    if (!result) {
-      setBusy(directory, false)
-      dismiss()
-      return
-    }
-
-    const archivedAt = Date.now()
-    await Promise.all(
-      sessions
-        .filter((session) => session.time.archived === undefined)
-        .map((session) =>
-          globalSDK.client.v2.session.update({
-            sessionID: session.id,
-            directory: session.directory,
-            time: { archived: archivedAt },
-          })
-            .catch(() => undefined),
-        ),
-    )
-
-    setBusy(directory, false)
-    dismiss()
-
-    showToast({
-      title: language.t("workspace.reset.success.title"),
-      description: language.t("workspace.reset.success.description"),
-      actions: [
-        {
-          label: language.t("command.session.new"),
-          onClick: () => {
-            const href = `/${base64Encode(directory)}/session`
-            navigate(href)
-            layout.mobileSidebar.hide()
-          },
-        },
-        {
-          label: language.t("common.dismiss"),
-          onClick: "dismiss",
-        },
-      ],
-    })
-  }
-
+  const { deleteWorkspace, resetWorkspace } = createWorkspaceOperations({
+    currentDir,
+    params,
+    globalSDK,
+    globalSync,
+    language,
+    layout,
+    store,
+    navigateRoot: navigateWithSidebarReset,
+    navigate,
+    setBusy,
+    clearTerminals: (directory, sessionIDs) =>
+      clearWorkspaceTerminals(directory, sessionIDs, platform, getTerminalServerScope(server.current, server.key)),
+    removeWorkspaceOrder: (root, directory) =>
+      setStore("workspaceOrder", root, (order) => (order ?? []).filter((workspace) => workspace !== directory)),
+    resolveProjectRoot: projectRoot,
+    clearLastProjectSession,
+  })
   createActiveRouteSync({
     pageReady,
     slug: () => route().slug,
