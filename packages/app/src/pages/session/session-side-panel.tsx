@@ -68,7 +68,6 @@ export function SessionSidePanel(props: {
   const reviewOpen = createMemo(() => isDesktop() && view().reviewPanel.opened())
   const fileOpen = createMemo(() => isDesktop() && shown() && layout.fileTree.opened())
   const open = createMemo(() => reviewOpen() || fileOpen())
-  const reviewTab = createMemo(() => isDesktop())
   const panelWidth = createMemo(() => {
     if (!open()) return "0px"
     if (reviewOpen()) return `calc(100% - ${layout.session.width()}px)`
@@ -153,7 +152,7 @@ export function SessionSidePanel(props: {
     tabs,
     pathFromTab: file.pathFromTab,
     normalizeTab,
-    review: reviewTab,
+    review: isDesktop,
     hasReview: props.canReview,
   })
   const contextOpen = tabState.contextOpen
@@ -259,7 +258,7 @@ export function SessionSidePanel(props: {
                         onCleanup(stop)
                       }}
                     >
-                      <Show when={reviewTab() && props.canReview()}>
+                      <Show when={isDesktop() && props.canReview()}>
                         <Tabs.Trigger value="review">
                           <div class="flex items-center gap-1.5">
                             <div>{language.t("session.tab.review")}</div>
@@ -323,7 +322,7 @@ export function SessionSidePanel(props: {
                     </Tabs.List>
                   </div>
 
-                  <Show when={reviewTab() && props.canReview()}>
+                  <Show when={isDesktop() && props.canReview()}>
                     <Tabs.Content value="review" class="flex flex-col h-full overflow-hidden contain-strict">
                       <Show when={activeTab() === "review"}>{props.reviewPanel()}</Show>
                     </Tabs.Content>

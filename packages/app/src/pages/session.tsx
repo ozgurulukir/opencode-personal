@@ -192,12 +192,11 @@ export default function Page() {
   const isChildSession = createMemo(() => !!info()?.parentID)
   const diffs = createMemo(() => (params.id ? list(sync.data.session_diff[params.id]) : []))
   const canReview = createMemo(() => !!sync.project)
-  const reviewTab = createMemo(() => isDesktop())
   const tabState = createSessionTabs({
     tabs,
     pathFromTab: file.pathFromTab,
     normalizeTab,
-    review: reviewTab,
+    review: isDesktop,
     hasReview: canReview,
   })
   const activeTab = tabState.activeTab
@@ -736,7 +735,7 @@ export default function Page() {
     navigateMessageByOffset,
     setActiveMessage,
     focusInput,
-    review: reviewTab,
+    review: isDesktop,
   })
 
   const openReviewFile = createOpenReviewFile({
