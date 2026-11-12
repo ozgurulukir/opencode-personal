@@ -461,7 +461,10 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
             const cached = store.message[sessionID] !== undefined && meta.limit[key] !== undefined
             if (cached && hasSession && !opts?.force) return
 
-            const limit = meta.limit[key] ?? initialMessagePageSize
+            // meta.limit stores the loaded page size, which is 0 for empty
+            // sessions — 0 is not a valid API limit (server rejects < 1), so
+            // fall through to the default via || instead of ??.
+            const limit = meta.limit[key] || initialMessagePageSize
             const sessionReq =
               hasSession && !opts?.force
                 ? Promise.resolve()
