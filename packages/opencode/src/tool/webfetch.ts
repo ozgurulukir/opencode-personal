@@ -44,6 +44,8 @@ export function isPrivateIPv4(ip: string): boolean {
 function isPrivateIPv6(ip: string): boolean {
   const lower = ip.toLowerCase()
   if (lower === "::" || lower === "::1") return true // unspecified + loopback
+  // Expanded or zero-padded unspecified (0:0:0:0:0:0:0:0) and loopback (0:0:0:0:0:0:0:1)
+  if (/^(?:0{1,4}:){7}0{0,3}[01]$/.test(lower)) return true
   if (lower.startsWith("fe8") || lower.startsWith("fe9") || lower.startsWith("fea") || lower.startsWith("feb"))
     return true // fe80::/10 link-local
   if (lower.startsWith("fc") || lower.startsWith("fd")) return true // fc00::/7 unique local
@@ -65,16 +67,23 @@ function embeddedIPv4(ip: string): string | undefined {
 }
 
 export function isPrivateIP(ip: string): boolean {
-  if (ip.startsWith("::ffff:")) {
-    const v4 = ip.slice(7)
+  const lower = ip.toLowerCase()
+  if (lower.startsWith("::ffff:")) {
+    const v4 = lower.slice(7)
     if (!v4.includes(":")) return isPrivateIPv4(v4)
+    const hex = v4.match(/^([0-9a-f]{1,4}):([0-9a-f]{1,4})$/)
+    if (hex) {
+      const hi = parseInt(hex[1], 16)
+      const lo = parseInt(hex[2], 16)
+      return isPrivateIPv4(`${(hi >> 8) & 0xff}.${hi & 0xff}.${(lo >> 8) & 0xff}.${lo & 0xff}`)
+    }
   }
-  if (ip.includes(":")) {
-    const v4 = embeddedIPv4(ip)
+  if (lower.includes(":")) {
+    const v4 = embeddedIPv4(lower)
     if (v4 && isPrivateIPv4(v4)) return true
-    return isPrivateIPv6(ip)
+    return isPrivateIPv6(lower)
   }
-  return isPrivateIPv4(ip)
+  return isPrivateIPv4(lower)
 }
 
 /**

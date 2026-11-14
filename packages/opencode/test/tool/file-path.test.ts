@@ -46,6 +46,20 @@ describe("file-path.resolvePath", () => {
     const resolved = resolvePath(path.join(fixture.path, "link", "future.ts"))
     expect(resolved).toContain(await fs.realpath(outside.path))
   })
+
+  test("handles nested nonexistent subdirectories under a symlinked ancestor", async () => {
+    await using outside = await tmpdir()
+    await using fixture = await tmpdir()
+    await fs.symlink(
+      outside.path,
+      path.join(fixture.path, "link"),
+      process.platform === "win32" ? "junction" : "dir",
+    )
+    const target = path.join(fixture.path, "link", "nested", "deep", "future.ts")
+    const resolved = resolvePath(target)
+    expect(resolved).toBe(path.join(await fs.realpath(outside.path), "nested", "deep", "future.ts"))
+    expect(projectContainmentError(resolved, await fs.realpath(fixture.path))).toContain("Path escapes project directory")
+  })
 })
 
 describe("file-path.projectContainmentError", () => {

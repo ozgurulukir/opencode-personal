@@ -12,15 +12,17 @@ import { AppFileSystem } from "@opencode-ai/core/filesystem"
 
 export function resolvePath(filePath: string): string {
   const resolved = AppFileSystem.resolve(path.resolve(filePath))
-  try {
-    return fs.realpathSync(resolved)
-  } catch {
-    // Non-existent file: resolve the parent directory to catch symlinks in the path
-    const parent = path.dirname(resolved)
+  let current = resolved
+  const tail: string[] = []
+  while (true) {
     try {
-      return path.join(fs.realpathSync(parent), path.basename(resolved))
+      const real = fs.realpathSync(current)
+      return tail.length ? path.join(real, ...tail.reverse()) : real
     } catch {
-      return resolved
+      const parent = path.dirname(current)
+      if (parent === current) return resolved
+      tail.push(path.basename(current))
+      current = parent
     }
   }
 }
