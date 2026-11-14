@@ -41,39 +41,39 @@ export function reduceSessionData(input: SessionDataInput): SessionDataOutput {
   const event = input.event
 
   if (event.type === "message.updated") {
-    return handleMessageUpdated(data, event as any, input.sessionID, input.thinking, input.limits)
+    return handleMessageUpdated(data, event, input.sessionID, input.thinking, input.limits)
   }
 
   if (event.type === "message.part.delta") {
-    return handleMessagePartDelta(data, event as any, input.sessionID, input.thinking)
+    return handleMessagePartDelta(data, event, input.sessionID, input.thinking)
   }
 
   if (event.type === "message.part.updated") {
-    return handleMessagePartUpdated(data, event as any, input.sessionID, input.thinking)
+    return handleMessagePartUpdated(data, event, input.sessionID, input.thinking)
   }
 
   if (event.type === "permission.asked") {
-    return handlePermissionAsked(data, event as any, input.sessionID)
+    return handlePermissionAsked(data, event, input.sessionID)
   }
 
   if (event.type === "permission.replied") {
-    return handlePermissionReplied(data, event as any, input.sessionID)
+    return handlePermissionReplied(data, event, input.sessionID)
   }
 
   if (event.type === "question.asked") {
-    return handleQuestionAsked(data, event as any, input.sessionID)
+    return handleQuestionAsked(data, event, input.sessionID)
   }
 
   if (event.type === "question.replied") {
-    return handleQuestionReplied(data, event as any, input.sessionID)
+    return handleQuestionReplied(data, event, input.sessionID)
   }
 
   if (event.type === "question.rejected") {
-    return handleQuestionRejected(data, event as any, input.sessionID)
+    return handleQuestionRejected(data, event, input.sessionID)
   }
 
   if (event.type === "session.error") {
-    return handleSessionError(data, event as any, input.sessionID)
+    return handleSessionError(data, event, input.sessionID)
   }
 
   return out(data, [])
