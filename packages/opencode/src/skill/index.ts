@@ -21,7 +21,7 @@ import { Hash } from "@opencode-ai/core/util/hash"
 import * as Log from "@opencode-ai/core/util/log"
 import { Discovery } from "./discovery"
 import { EmbeddingService, defaultLayer as embeddingDefaultLayer } from "@/search/embedding"
-import { manifestPathFor } from "@/search/manifest"
+import { manifestPathFor, parseSkillManifest, type SkillManifest } from "@/search/manifest"
 import { ZvecIndex } from "@/search/zvec"
 import CUSTOMIZE_OPENCODE_SKILL_BODY from "./prompt/customize-opencode.md" with { type: "text" }
 
@@ -104,10 +104,6 @@ type State = {
   manifest: SkillManifest
 }
 
-type SkillManifest = {
-  version: number
-  skills: Record<string, { contentHash: string }>
-}
 
 type DiscoveryState = {
   matches: string[]
@@ -439,9 +435,7 @@ export const layer = Layer.effect(
         const manifestExists = yield* fsys.existsSafe(manifestPath)
         if (manifestExists) {
           const raw = yield* fsys.readJson(manifestPath).pipe(Effect.catch(() => Effect.succeed(undefined)))
-          if (raw && typeof raw === "object" && (raw as any).version === 1 && (raw as any).skills) {
-            s.manifest = raw as any
-          }
+          s.manifest = parseSkillManifest(raw) ?? s.manifest
         }
 
         // Register the built-in skill BEFORE disk discovery so a user-disk

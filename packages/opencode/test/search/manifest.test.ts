@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { MANIFEST_SUFFIX, manifestPathFor } from "@/search/manifest"
+import { MANIFEST_SUFFIX, manifestPathFor, parseFileManifest, parseSkillManifest } from "@/search/manifest"
 
 describe("manifestPathFor", () => {
   test("appends MANIFEST_SUFFIX to index path", () => {
@@ -16,5 +16,29 @@ describe("manifestPathFor", () => {
   test("handles paths with existing file extensions or complex paths", () => {
     expect(manifestPathFor("/var/cache/db.index")).toBe("/var/cache/db.index_manifest.json")
     expect(manifestPathFor("./relative/path/index")).toBe("./relative/path/index_manifest.json")
+  })
+})
+
+describe("manifest parsing", () => {
+  test("Valid file manifest is returned unchanged", () => {
+    const raw = { version: 1 as const, files: { "a.ts": { mtime: 1, chunkIds: ["x"] } } }
+    expect(parseFileManifest(raw)).toEqual(raw)
+  })
+
+  test("File manifest with malformed entries is rejected", () => {
+    expect(parseFileManifest({ version: 1, files: { "a.ts": { mtime: "1" } } })).toBeUndefined()
+    expect(parseFileManifest({ version: 2, files: {} })).toBeUndefined()
+    expect(parseFileManifest(null)).toBeUndefined()
+    expect(parseFileManifest("str")).toBeUndefined()
+  })
+
+  test("Valid skill manifest is returned unchanged", () => {
+    const raw = { version: 1 as const, skills: { s: { contentHash: "h" } } }
+    expect(parseSkillManifest(raw)).toEqual(raw)
+  })
+
+  test("Skill manifest with malformed entries is rejected", () => {
+    expect(parseSkillManifest({ version: 1, skills: { s: {} } })).toBeUndefined()
+    expect(parseSkillManifest({ version: 1, files: {} })).toBeUndefined()
   })
 })
