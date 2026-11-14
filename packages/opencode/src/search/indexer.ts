@@ -5,7 +5,7 @@ import { Path as GlobalPath } from "@opencode-ai/core/global"
 import { Hash } from "@opencode-ai/core/util/hash"
 import { SearchService } from "./search"
 import { EmbeddingService } from "./embedding"
-import { manifestPathFor } from "./manifest"
+import { manifestPathFor, parseFileManifest, type FileManifest } from "./manifest"
 import { InstanceState } from "@/effect/instance-state"
 import { FileIgnore } from "@/file/ignore"
 import * as NFS from "node:fs/promises"
@@ -67,16 +67,14 @@ export const IndexWorkspace = Effect.gen(function* () {
     // the manifest, so a copy read before open() would resurrect stale entries.
     yield* search.open
     const manifestExists = yield* fs.existsSafe(manifestPath)
-    let manifest: { version: number; files: Record<string, { mtime: number; chunkIds: string[] }> } = {
+    let manifest: FileManifest = {
       version: 1,
       files: {},
     }
     if (manifestExists) {
       try {
         const raw = yield* fs.readJson(manifestPath)
-        if (raw && typeof raw === "object" && (raw as any).version === 1 && (raw as any).files) {
-          manifest = raw as any
-        }
+        manifest = parseFileManifest(raw) ?? manifest
       } catch {
         // ignore corruption
       }

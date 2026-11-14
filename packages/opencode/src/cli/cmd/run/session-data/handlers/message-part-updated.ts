@@ -154,7 +154,7 @@ function handleToolCompleted(
   data.ids.add(part.id)
   stashEcho(data, part)
 
-  const output = (part.state as any).output
+  const output = part.state.status === "completed" ? part.state.output : undefined
   if (mode.output && typeof output === "string" && output.trim()) {
     commits.push({
       kind: "tool",
@@ -193,7 +193,7 @@ function handleToolError(
   }
 
   data.ids.add(part.id)
-  const error = (part.state as any).error
+  const error = part.state.status === "error" ? part.state.error : undefined
   const text =
     typeof error === "string" && error.trim() ? error : "unknown error"
   commits.push(failTool(part, text))
