@@ -70,5 +70,11 @@ describe("webfetch.isPrivateIP", () => {
   test("flags IPv4-mapped PRIVATE and embedded forms", () => {
     expect(isPrivateIP("::ffff:192.168.1.5")).toBe(true)
     expect(isPrivateIP("::ffff:169.254.169.254")).toBe(true)
+    expect(isPrivateIP("::ffff:7f00:1")).toBe(true) // 127.0.0.1 in hex
+    expect(isPrivateIP("::FFFF:a9fe:a9fe")).toBe(true) // 169.254.169.254 in hex, uppercase
+    expect(isPrivateIP("::ffff:0a00:0001")).toBe(true) // 10.0.0.1 in hex
+    expect(isPrivateIP("0:0:0:0:0:0:0:1")).toBe(true) // expanded loopback
+    expect(isPrivateIP("0000:0000:0000:0000:0000:0000:0000:0001")).toBe(true) // zero-padded loopback
+    expect(isPrivateIP("0:0:0:0:0:0:0:0")).toBe(true) // expanded unspecified
   })
 })
