@@ -104,7 +104,6 @@ type State = {
   manifest: SkillManifest
 }
 
-
 type DiscoveryState = {
   matches: string[]
   dirs: string[]
