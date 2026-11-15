@@ -11,7 +11,9 @@
   },
   "scripts": {
     "build:wasm": "wasm-pack build --target web --out-dir pkg",
-    "build": "bun run build:wasm"
+    "build": "bun run build:wasm",
+    "typecheck": "tsgo --noEmit",
+    "test": "bun test"
   },
   "files": [
     "pkg/**/*"

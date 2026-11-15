@@ -70,6 +70,13 @@
         "vite-plugin-solid": "catalog:",
       },
     },
+    "packages/containers": {
+      "name": "@opencode-ai/containers",
+      "devDependencies": {
+        "@tsconfig/bun": "catalog:",
+        "@types/bun": "catalog:",
+      },
+    },
     "packages/core": {
       "name": "@opencode-ai/core",
       "version": "1.14.48",
@@ -1053,6 +1060,8 @@
     "@octokit/webhooks-types": ["@octokit/webhooks-types@7.6.1", "", {}, "sha512-S8u2cJzklBC0FgTwWVLaM8tMrDuDMVE4xiTK4EYXM9GntyvrdbSoxqDQa+Fh57CCNApyIpyeqPhhFEmHPfrXgw=="],
 
     "@opencode-ai/app": ["@opencode-ai/app@workspace:packages/app"],
+
+    "@opencode-ai/containers": ["@opencode-ai/containers@workspace:packages/containers"],
 
     "@opencode-ai/core": ["@opencode-ai/core@workspace:packages/core"],
 
