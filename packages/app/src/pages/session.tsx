@@ -103,6 +103,17 @@ export default function Page() {
     })
   })
 
+  createEffect(() => {
+    const id = params.id
+    const dir = sdk.directory
+    if (id && dir) {
+      globalSync.project.setActiveSession(dir, id)
+      onCleanup(() => {
+        globalSync.project.setActiveSession(dir, undefined)
+      })
+    }
+  })
+
   const [ui, setUi] = createStore({
     pendingMessage: undefined as string | undefined,
     reviewSnap: false,

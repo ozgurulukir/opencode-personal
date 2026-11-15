@@ -56,4 +56,64 @@ describe("trimSessions", () => {
       "root-2",
     ])
   })
+
+  test("always preserves roots in preserve list regardless of limit and age cutoff", () => {
+    const now = 1_000_000
+    const list = [
+      session({ id: "root-1", created: now - 1000 }),
+      session({ id: "root-2", created: now - 2000 }),
+      session({ id: "root-ancient", created: now - 50_000_000 }),
+    ]
+
+    const result = trimSessions(list, {
+      limit: 1,
+      permission: {},
+      preserve: ["root-ancient"],
+      now,
+    })
+
+    expect(result.map((x) => x.id)).toContain("root-ancient")
+  })
+
+  test("always preserves child in preserve list and automatically keeps its parent root", () => {
+    const now = 1_000_000
+    const list = [
+      session({ id: "root-active", created: now - 1000 }),
+      session({ id: "root-parent", created: now - 50_000_000 }),
+      session({ id: "child-active", parentID: "root-parent", created: now - 40_000_000 }),
+    ]
+
+    const result = trimSessions(list, {
+      limit: 1,
+      permission: {},
+      preserve: ["child-active"],
+      now,
+    })
+
+    expect(result.map((x) => x.id)).toContain("child-active")
+    expect(result.map((x) => x.id)).toContain("root-parent")
+  })
+
+  test("preserves nested multi-level ancestors regardless of order in children list", () => {
+    const now = 1_000_000
+    // Note: parent-child is before sub-child in list, and root is ancient
+    const list = [
+      session({ id: "root-active", created: now - 1000 }),
+      session({ id: "root-ancient-grandparent", created: now - 90_000_000 }),
+      session({ id: "child-parent", parentID: "root-ancient-grandparent", created: now - 60_000_000 }),
+      session({ id: "child-subagent", parentID: "child-parent", created: now - 40_000_000 }),
+    ]
+
+    const result = trimSessions(list, {
+      limit: 1,
+      permission: {},
+      preserve: ["child-subagent"],
+      now,
+    })
+
+    const ids = result.map((x) => x.id)
+    expect(ids).toContain("child-subagent")
+    expect(ids).toContain("child-parent")
+    expect(ids).toContain("root-ancient-grandparent")
+  })
 })

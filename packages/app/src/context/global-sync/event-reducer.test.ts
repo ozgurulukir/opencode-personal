@@ -11,7 +11,14 @@ import type {
 } from "@opencode-ai/sdk/v2/client"
 import { createStore } from "solid-js/store"
 import type { State } from "./types"
-import { applyDirectoryEvent, applyGlobalEvent, cleanupDroppedSessionCaches } from "./event-reducer"
+import {
+  applyDirectoryEvent,
+  applyGlobalEvent,
+  cleanupDroppedSessionCaches,
+  clearPendingSessionPatchesForDirectory,
+  getPendingSessionPatch,
+  setPendingSessionPatch,
+} from "./event-reducer"
 
 const rootSession = (input: { id: string; parentID?: string; archived?: number }) =>
   ({
@@ -1891,5 +1898,204 @@ describe("missing event.id", () => {
 
     expect(store.message[sessionID]?.map((x) => x.id)).toEqual(["evt_1", "evt_2", "evt_2:assistant", "evt_3", "evt_4"])
     expect(warn).not.toHaveBeenCalled()
+  })
+
+  test("session.next.updated buffers patches for unknown sessions and merges them into session.created", () => {
+    const sessionID = "ses_buffered_1"
+    const directory = "/test/dir"
+    const [store, setStore] = createStore(baseState())
+
+    // 1. Update arrives before session.created
+    applyDirectoryEvent({
+      event: {
+        type: "session.next.updated",
+        properties: {
+          sessionID,
+          info: { title: "Generated Session Name" },
+        },
+      },
+      store,
+      setStore,
+      push() {},
+      directory,
+      loadLsp() {},
+    })
+
+    // Session is not yet in store
+    expect(store.session.find((s) => s.id === sessionID)).toBeUndefined()
+
+    // 2. session.created arrives later with initial/placeholder title
+    const createdSession: Session = {
+      ...rootSession({ id: sessionID }),
+      slug: "slug-1",
+      projectID: "prj_1",
+      directory,
+      title: "New Session",
+    }
+
+    applyDirectoryEvent({
+      event: {
+        type: "session.created",
+        properties: {
+          info: createdSession,
+        },
+      },
+      store,
+      setStore,
+      push() {},
+      directory,
+      loadLsp() {},
+    })
+
+    // Buffered patch was applied!
+    const found = store.session.find((s) => s.id === sessionID)
+    expect(found).toBeDefined()
+    expect(found?.title).toBe("Generated Session Name")
+  })
+
+  test("session.updated event updates existing session title", () => {
+    const sessionID = "ses_legacy_1"
+    const directory = "/test/dir"
+    const initialSession: Session = {
+      ...rootSession({ id: sessionID }),
+      slug: "slug-1",
+      projectID: "prj_1",
+      directory,
+      title: "Initial Title",
+    }
+    const [store, setStore] = createStore(
+      baseState({
+        session: [initialSession],
+      }),
+    )
+
+    applyDirectoryEvent({
+      event: {
+        type: "session.updated",
+        properties: {
+          sessionID,
+          info: { title: "Updated Title Via Legacy Event" },
+        },
+      },
+      store,
+      setStore,
+      push() {},
+      directory,
+      loadLsp() {},
+    })
+
+    expect(store.session[0]?.title).toBe("Updated Title Via Legacy Event")
+  })
+
+  test("cleanupDroppedSessionCaches keeps message and part cache for preserved sessions", () => {
+    const keptSessionID = "ses_kept"
+    const preservedSessionID = "ses_preserved"
+    const droppedSessionID = "ses_dropped"
+
+    const [store, setStore] = createStore(
+      baseState({
+        session: [rootSession({ id: keptSessionID })],
+        message: {
+          [keptSessionID]: [userMessage("m1", keptSessionID)],
+          [preservedSessionID]: [userMessage("m2", preservedSessionID)],
+          [droppedSessionID]: [userMessage("m3", droppedSessionID)],
+        },
+        part: {
+          m1: [textPart("p1", keptSessionID, "m1")],
+          m2: [textPart("p2", preservedSessionID, "m2")],
+          m3: [textPart("p3", droppedSessionID, "m3")],
+        },
+      }),
+    )
+
+    cleanupDroppedSessionCaches(
+      store,
+      setStore,
+      [rootSession({ id: keptSessionID })],
+      undefined,
+      [preservedSessionID],
+    )
+
+    // keptSessionID and preservedSessionID messages/parts are preserved
+    expect(store.message[keptSessionID]).toBeDefined()
+    expect(store.part.m1).toBeDefined()
+    expect(store.message[preservedSessionID]).toBeDefined()
+    expect(store.part.m2).toBeDefined()
+
+    // droppedSessionID messages/parts were evicted
+    expect(store.message[droppedSessionID]).toBeUndefined()
+    expect(store.part.m3).toBeUndefined()
+  })
+
+  test("clearPendingSessionPatchesForDirectory clears all buffered patches for a directory", () => {
+    const dirA = "/tmp/dirA"
+    const dirB = "/tmp/dirB"
+    setPendingSessionPatch(dirA, "ses_a1", { title: "Title A1" })
+    setPendingSessionPatch(dirB, "ses_b1", { title: "Title B1" })
+
+    expect(getPendingSessionPatch(dirA, "ses_a1")?.title).toBe("Title A1")
+    expect(getPendingSessionPatch(dirB, "ses_b1")?.title).toBe("Title B1")
+
+    clearPendingSessionPatchesForDirectory(dirA)
+
+    expect(getPendingSessionPatch(dirA, "ses_a1")).toBeUndefined()
+    expect(getPendingSessionPatch(dirB, "ses_b1")?.title).toBe("Title B1")
+
+    clearPendingSessionPatchesForDirectory(dirB)
+  })
+
+  test("setPendingSessionPatch evicts oldest patch when max limit of 100 is reached", () => {
+    const dir = "/tmp/dirCap"
+    clearPendingSessionPatchesForDirectory(dir)
+
+    for (let i = 0; i < 100; i++) {
+      setPendingSessionPatch(dir, `ses_${i}`, { title: `Title ${i}` })
+    }
+
+    expect(getPendingSessionPatch(dir, "ses_0")).toBeDefined()
+
+    // 101st item should evict ses_0
+    setPendingSessionPatch(dir, "ses_100", { title: "Title 100" })
+    expect(getPendingSessionPatch(dir, "ses_0")).toBeUndefined()
+    expect(getPendingSessionPatch(dir, "ses_100")).toBeDefined()
+
+    clearPendingSessionPatchesForDirectory(dir)
+  })
+
+  test("applyDirectoryEvent safely handles malformed or empty session events without throwing", () => {
+    const [store, setStore] = createStore(baseState())
+
+    expect(() => {
+      applyDirectoryEvent({
+        event: { type: "session.next.updated", properties: undefined },
+        store,
+        setStore,
+        push() {},
+        directory: "/tmp",
+        loadLsp() {},
+      })
+    }).not.toThrow()
+
+    expect(() => {
+      applyDirectoryEvent({
+        event: { type: "session.created", properties: {} },
+        store,
+        setStore,
+        push() {},
+        directory: "/tmp",
+        loadLsp() {},
+      })
+    }).not.toThrow()
+
+    expect(() => {
+      applyDirectoryEvent({
+        event: { type: "session.deleted", properties: {} },
+        store,
+        setStore,
+        push() {},
+        directory: "/tmp",
+        loadLsp() {},
+      })
+    }).not.toThrow()
   })
 })
