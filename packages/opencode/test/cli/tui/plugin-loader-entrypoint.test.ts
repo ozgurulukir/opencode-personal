@@ -1,4 +1,5 @@
 import { expect, spyOn, test } from "bun:test"
+import * as Log from "@opencode-ai/core/util/log"
 import fs from "fs/promises"
 import path from "path"
 import { pathToFileURL } from "url"
@@ -301,7 +302,8 @@ test("does not use npm package main for tui entry", async () => {
   const wait = spyOn(TuiConfig, "waitForDependencies").mockResolvedValue()
   const cwd = spyOn(process, "cwd").mockImplementation(() => tmp.path)
   const install = spyOn(Npm, "add").mockResolvedValue({ directory: tmp.extra.mod, entrypoint: undefined })
-  const warn = spyOn(console, "warn").mockImplementation(() => {})
+  const logger = Log.create({ service: "tui.plugin" })
+  const warn = spyOn(logger, "warn").mockImplementation(() => {})
   const error = spyOn(console, "error").mockImplementation(() => {})
 
   try {

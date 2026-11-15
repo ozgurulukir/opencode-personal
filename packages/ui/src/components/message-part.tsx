@@ -537,12 +537,11 @@ PART_MAPPING["tool"] = function ToolPartDisplay(props) {
     () => part().tool === "question" && (part().state.status === "pending" || part().state.status === "running"),
   )
 
-  const emptyInput: Record<string, any> = {}
-  const emptyMetadata: Record<string, any> = {}
+  const emptyInput: Record<string, unknown> = {}
+  const emptyMetadata: Record<string, unknown> = {}
 
   const input = () => part().state?.input ?? emptyInput
-  // @ts-expect-error
-  const partMetadata = () => part().state?.metadata ?? emptyMetadata
+  const partMetadata = () => part().metadata ?? (part().state as { metadata?: Record<string, unknown> })?.metadata ?? emptyMetadata
   const taskId = createMemo(() => {
     if (part().tool !== "task") return
     const value = partMetadata().sessionId
@@ -559,13 +558,18 @@ PART_MAPPING["tool"] = function ToolPartDisplay(props) {
     return taskId()
   })
 
+  const toolError = createMemo(() => {
+    const state = part().state
+    return state.status === "error" ? state.error : undefined
+  })
+
   const render = createMemo(() => ToolRegistry.render(part().tool) ?? GenericTool)
 
   return (
     <Show when={!hideQuestion()}>
       <div data-component="tool-part-wrapper">
         <Switch>
-          <Match when={part().state.status === "error" && (part().state as any).error}>
+          <Match when={toolError()}>
             {(error) => {
               const cleaned = error().replace("Error: ", "")
               if (part().tool === "question" && cleaned.includes("dismissed this question")) {

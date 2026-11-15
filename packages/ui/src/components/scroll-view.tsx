@@ -212,21 +212,21 @@ export function ScrollView(props: ScrollViewProps) {
         class="scroll-view__viewport"
         onScroll={(e) => {
           updateThumb()
-          if (typeof events.onScroll === "function") events.onScroll(e as any)
+          if (typeof events.onScroll === "function") (events.onScroll as (e: Event) => void)(e)
         }}
-        onWheel={events.onWheel as any}
-        onTouchStart={events.onTouchStart as any}
-        onTouchMove={events.onTouchMove as any}
-        onTouchEnd={events.onTouchEnd as any}
-        onTouchCancel={events.onTouchCancel as any}
-        onPointerDown={events.onPointerDown as any}
-        onClick={events.onClick as any}
+        onWheel={events.onWheel}
+        onTouchStart={events.onTouchStart}
+        onTouchMove={events.onTouchMove}
+        onTouchEnd={events.onTouchEnd}
+        onTouchCancel={events.onTouchCancel}
+        onPointerDown={events.onPointerDown}
+        onClick={events.onClick}
         tabIndex={0}
         role="region"
         aria-label={i18n.t("ui.scrollView.ariaLabel")}
         onKeyDown={(e) => {
           onKeyDown(e)
-          if (typeof events.onKeyDown === "function") events.onKeyDown(e as any)
+          if (typeof events.onKeyDown === "function") (events.onKeyDown as (e: KeyboardEvent) => void)(e)
         }}
       >
         {local.children}

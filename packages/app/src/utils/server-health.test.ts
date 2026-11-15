@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import type { ServerConnection } from "@/context/server"
+import type { ServerConnection } from "@/context/server/types"
 import { checkServerHealth } from "./server-health"
 
 const server: ServerConnection.HttpBase = {
@@ -137,5 +137,22 @@ describe("checkServerHealth", () => {
 
     expect(count).toBe(3)
     expect(result).toEqual({ healthy: false })
+  })
+
+  test("bounds health cache entries when many servers are checked", async () => {
+    const fetch = Object.assign(
+      async () =>
+        new Response(JSON.stringify({ healthy: true, version: "1.0.0" }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        }),
+      { preconnect: () => {} },
+    ) as typeof globalThis.fetch
+
+    for (let i = 0; i < 110; i++) {
+      const s: ServerConnection.HttpBase = { url: `http://localhost:${5000 + i}` }
+      const res = await checkServerHealth(s, fetch)
+      expect(res.healthy).toBe(true)
+    }
   })
 })

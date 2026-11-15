@@ -47,6 +47,20 @@ export type LineCommentAnchorProps = {
   children?: JSX.Element
 }
 
+function toNativeHandler<T extends Element, E extends Event>(
+  handler?: JSX.EventHandlerUnion<T, E>,
+): ((e: E) => void) | undefined {
+  if (!handler) return undefined
+  return (e) => {
+    const typed = e as E & { currentTarget: T; target: Element }
+    if (typeof handler === "function") {
+      handler(typed)
+    } else {
+      handler[0](handler[1], typed)
+    }
+  }
+}
+
 export const LineCommentAnchor = (props: LineCommentAnchorProps) => {
   const hidden = () => !props.inline && props.top === undefined
   const variant = () => props.variant ?? "default"
@@ -84,8 +98,8 @@ export const LineCommentAnchor = (props: LineCommentAnchorProps) => {
               data-slot="line-comment-button"
               on:mousedown={(e) => e.stopPropagation()}
               on:mouseup={(e) => e.stopPropagation()}
-              on:click={props.onClick as any}
-              on:mouseenter={props.onMouseEnter as any}
+              on:click={toNativeHandler(props.onClick)}
+              on:mouseenter={toNativeHandler(props.onMouseEnter)}
             >
               <Show
                 when={props.inline}
@@ -101,7 +115,7 @@ export const LineCommentAnchor = (props: LineCommentAnchorProps) => {
                   [props.popoverClass ?? ""]: !!props.popoverClass,
                 }}
                 on:mousedown={(e) => e.stopPropagation()}
-                on:focusout={props.onPopoverFocusOut as any}
+                on:focusout={toNativeHandler(props.onPopoverFocusOut)}
               >
                 {props.children}
               </div>
@@ -116,9 +130,9 @@ export const LineCommentAnchor = (props: LineCommentAnchorProps) => {
             [props.popoverClass ?? ""]: !!props.popoverClass,
           }}
           on:mousedown={(e) => e.stopPropagation()}
-          on:click={props.onClick as any}
-          on:mouseenter={props.onMouseEnter as any}
-          on:focusout={props.onPopoverFocusOut as any}
+          on:click={toNativeHandler(props.onClick)}
+          on:mouseenter={toNativeHandler(props.onMouseEnter)}
+          on:focusout={toNativeHandler(props.onPopoverFocusOut)}
         >
           {props.children}
         </div>
@@ -406,8 +420,8 @@ export const LineCommentEditor = (props: LineCommentEditorProps) => {
                   type="button"
                   data-slot="line-comment-action"
                   data-variant="ghost"
-                  on:mousedown={hold as any}
-                  on:click={click(split.onCancel) as any}
+                  on:mousedown={hold}
+                  on:click={toNativeHandler(click(split.onCancel))}
                 >
                   {split.cancelLabel ?? i18n.t("ui.common.cancel")}
                 </button>
@@ -416,8 +430,8 @@ export const LineCommentEditor = (props: LineCommentEditorProps) => {
                   data-slot="line-comment-action"
                   data-variant="primary"
                   disabled={split.value.trim().length === 0}
-                  on:mousedown={hold as any}
-                  on:click={click(submit) as any}
+                  on:mousedown={hold}
+                  on:click={toNativeHandler(click(submit))}
                 >
                   {split.submitLabel ?? i18n.t("ui.lineComment.submit")}
                 </button>

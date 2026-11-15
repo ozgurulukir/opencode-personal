@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, spyOn, test } from "bun:test"
+import * as Log from "@opencode-ai/core/util/log"
 import {
   clineUsageProvider,
   parseCurrentUser,
@@ -388,7 +389,7 @@ describe("clineUsageProvider.fetchUsage with captured live shapes", () => {
   })
 
   test("keeps the balance row and logs the failure when the /users/me/plan request throws", async () => {
-    const errorSpy = spyOn(console, "error").mockImplementation(() => {})
+    const errorSpy = spyOn(Log.Default, "error").mockImplementation(() => {})
     try {
       stubFetch((url) => {
         if (url.endsWith("/api/v1/users/me")) return jsonResponse({ data: { id: "user_1" }, success: true })
@@ -510,7 +511,7 @@ describe("clineUsageProvider.fetchUsage with the quota endpoint", () => {
   })
 
   test("keeps the credits and plan rows and logs when the quota request throws", async () => {
-    const errorSpy = spyOn(console, "error").mockImplementation(() => {})
+    const errorSpy = spyOn(Log.Default, "error").mockImplementation(() => {})
     try {
       stubFetch((url) => {
         if (url.endsWith("/api/v1/users/me")) return jsonResponse({ data: { id: "user_1" }, success: true })

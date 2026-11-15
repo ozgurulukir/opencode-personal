@@ -8,21 +8,24 @@ import {
   mediaKindFromPath,
   normalizeMimeType,
   svgTextFromValue,
+  type MediaValue,
 } from "../pierre/media"
+
+export type { MediaValue }
 
 export type FileMediaOptions = {
   mode?: "auto" | "off"
   path?: string
-  current?: unknown
-  before?: unknown
-  after?: unknown
+  current?: MediaValue
+  before?: MediaValue
+  after?: MediaValue
   deleted?: boolean
   readFile?: (path: string) => Promise<FileContent | undefined>
   onLoad?: () => void
   onError?: (ctx: { kind: "image" | "audio" | "svg" }) => void
 }
 
-function mediaValue(cfg: FileMediaOptions, mode: "image" | "audio") {
+function mediaValue(cfg: FileMediaOptions, mode: "image" | "audio"): MediaValue {
   if (cfg.current !== undefined) return cfg.current
   if (mode === "image") return cfg.after ?? cfg.before
   return cfg.after ?? cfg.before
@@ -41,7 +44,7 @@ export function FileMedia(props: { media?: FileMediaOptions; fallback: () => JSX
     const media = cfg()
     if (!media || media.mode === "off") return false
     if (kind()) return false
-    return isBinaryContent(media.current as any)
+    return isBinaryContent(media.current)
   })
 
   const onLoad = () => props.media?.onLoad?.()
@@ -53,7 +56,7 @@ export function FileMedia(props: { media?: FileMediaOptions; fallback: () => JSX
     if (media.deleted) return true
     if (k === "svg") return false
     if (media.current !== undefined) return false
-    return !hasMediaValue(media.after as any) && hasMediaValue(media.before as any)
+    return !hasMediaValue(media.after) && hasMediaValue(media.before)
   })
 
   const direct = createMemo(() => {
@@ -84,7 +87,7 @@ export function FileMedia(props: { media?: FileMediaOptions; fallback: () => JSX
   const [loaded] = createResource(request, async (input) => {
     return input.readFile(input.path).then(
       (result) => {
-        const src = dataUrlFromMediaValue(result as any, input.kind)
+        const src = dataUrlFromMediaValue(result, input.kind)
         if (!src) {
           input.onError?.({ kind: input.kind })
           return { key: input.key, error: true as const }
@@ -130,18 +133,18 @@ export function FileMedia(props: { media?: FileMediaOptions; fallback: () => JSX
   const svgSource = createMemo(() => {
     const media = cfg()
     if (!media || kind() !== "svg") return
-    return svgTextFromValue(media.current as any)
+    return svgTextFromValue(media.current)
   })
   const svgSrc = createMemo(() => {
     const media = cfg()
     if (!media || kind() !== "svg") return
-    return dataUrlFromMediaValue(media.current as any, "svg")
+    return dataUrlFromMediaValue(media.current, "svg")
   })
   const svgInvalid = createMemo(() => {
     const media = cfg()
     if (!media || kind() !== "svg") return
     if (svgSource() !== undefined) return
-    if (!hasMediaValue(media.current as any)) return
+    if (!hasMediaValue(media.current)) return
     return [media.path, media.current] as const
   })
 

@@ -32,7 +32,7 @@ import { type TaskPromptOps } from "@/tool/task"
 import { SyncEvent } from "@/sync"
 import { NamedError } from "@opencode-ai/core/util/error"
 import { wrapMessageContinuation } from "../message-continuation"
-import { createStructuredOutputTool, STRUCTURED_OUTPUT_SYSTEM_PROMPT } from "../prompt/structured-output"
+import { createStructuredOutputTool } from "../prompt/structured-output"
 import MAX_STEPS from "../prompt/max-steps.txt"
 import type { SystemPrompt as LLMSystemPrompt } from "../llm"
 import { LLM } from "../llm"
@@ -42,6 +42,12 @@ import { getModel, lastAssistant } from "./model"
 import { handleSubtask } from "./subtask"
 import { resolveTools, type CachedToolSchema } from "./tools"
 import { insertReminders } from "./reminders"
+import { assemblePromptSuffix, extractUserText } from "./prompt-assembler"
+import {
+  handleCompactionTask,
+  createAutoCompaction,
+  pruneAndCheckTurnCompaction,
+} from "./compaction-policy"
 
 const elog = EffectLogger.create({ service: "session.prompt" })
 
@@ -73,18 +79,7 @@ export interface RunLoopDeps {
   sync: SyncEvent.Interface
 }
 
-// ⚡ Bolt Optimization: Replace chained .filter().map().join(" ") with a single loop to reduce GC pressure and O(N) traversals
-function extractUserText(parts: MessageV2.Part[] | undefined): string | undefined {
-  if (!parts) return undefined
-  const texts: string[] = []
-  for (let i = 0; i < parts.length; i++) {
-    const p = parts[i]
-    if (p.type === "text") {
-      texts.push(p.text)
-    }
-  }
-  return texts.join(" ")
-}
+
 
 export const runLoop: (deps: RunLoopDeps, sessionID: SessionID) => Effect.Effect<MessageV2.WithParts> = Effect.fn(
   "SessionPrompt.run",
@@ -178,13 +173,10 @@ export const runLoop: (deps: RunLoopDeps, sessionID: SessionID) => Effect.Effect
       if (task.auto) {
         consecutiveAutoCompactions++
       }
-      const result = yield* deps.compaction.process({
-        messages: msgs,
-        parentID: task.messageID ?? lastUser.id,
-        sessionID,
-        auto: task.auto,
-        overflow: task.overflow,
-      })
+      const result = yield* handleCompactionTask(
+        { compaction: deps.compaction },
+        { task, lastUser, sessionID, msgs },
+      )
       if (result === "stop") break
       continue
     }
@@ -195,56 +187,19 @@ export const runLoop: (deps: RunLoopDeps, sessionID: SessionID) => Effect.Effect
       consecutiveAutoCompactions = 0
     }
 
-    const createAutoCompaction = (overflow?: boolean) =>
-      Effect.gen(function* () {
-        if (CompactionTrigger.breakerTripped(consecutiveAutoCompactions)) {
-          const error = new NamedError.Unknown({ message: CompactionTrigger.BREAKER_MESSAGE })
-          yield* deps.bus.publish(Session.Event.Error, { sessionID, error: error.toObject() })
-          throw error
-        }
-        yield* deps.compaction.create({
-          sessionID,
-          agent: lastUser.agent,
-          model: lastUser.model,
-          auto: true,
-          overflow,
-          tools: lastUser.tools,
-          format: lastUser.format,
-          system: lastUser.system,
-        })
-      })
-
     if (lastFinished && !isCurrentTurnContinue) {
-      // Prune only for regular finished turns — a summary turn's output IS
-      // the compaction, there is nothing to prune underneath it.
-      if (lastFinished.summary !== true) {
-        const pruned = yield* deps.compaction
-          .prune({ sessionID })
-          .pipe(
-            Effect.tapError((error) =>
-              slog
-                .warn("compaction prune failed; proceeding with unpruned token counts", { error: String(error) })
-                .pipe(Effect.as(undefined)),
-            ),
-            Effect.catch(() => Effect.succeed(0)),
-          )
-        if (pruned > 0) {
-          lastFinished.tokens = CompactionTrigger.adjustTokensAfterPrune(lastFinished.tokens, pruned)
-        }
-      }
-      const cfg = yield* deps.config.get()
-      if (
-        CompactionTrigger.shouldCompactAfterTurn({
-          cfg,
+      const compacted = yield* pruneAndCheckTurnCompaction(
+        { compaction: deps.compaction, config: deps.config, bus: deps.bus },
+        {
+          sessionID,
+          lastFinished,
+          isCurrentTurnContinue,
+          consecutiveAutoCompactions,
+          lastUser,
           model,
-          tokens: lastFinished.tokens,
-          summary: lastFinished.summary === true,
-          continueTurn: isCurrentTurnContinue,
-        })
-      ) {
-        yield* createAutoCompaction()
-        continue
-      }
+        },
+      )
+      if (compacted) continue
     }
 
     const agent = yield* deps.agents.get(lastUser.agent)
@@ -349,29 +304,19 @@ export const runLoop: (deps: RunLoopDeps, sessionID: SessionID) => Effect.Effect
         MessageV2.toModelMessagesEffect(msgs, model),
       ])
       const format = lastUser.format ?? { type: "text" as const }
-      const suffixParts = [
-        ...env,
-        ...(skills ? [skills] : []),
-        ...(!model.capabilities.toolcall
-          ? [
-              "The selected model does not support tool calls. Do not attempt to use tools; explain when a requested action requires them.",
-            ]
-          : []),
-        ...(format.type === "json_schema"
-          ? [
-              model.capabilities.toolcall
-                ? STRUCTURED_OUTPUT_SYSTEM_PROMPT
-                : "This model cannot call the StructuredOutput tool required by the requested JSON schema format. Explain this limitation in plain text.",
-            ]
-          : []),
-        ...(lastUser.system ? [lastUser.system] : []),
-      ]
+      const suffix = assemblePromptSuffix({
+        env,
+        skills: skills || undefined,
+        modelHasToolcall: Boolean(model.capabilities.toolcall),
+        formatType: format.type,
+        lastUserSystem: lastUser.system,
+      })
       const system: LLMSystemPrompt = {
         // Intentionally empty — LLM.stream resolves the prefix from
         // `agent.prompt ?? SystemPrompt.provider(model).prefix`. See the
         // SystemPrompt type JSDoc in llm.ts for the two-phase assembly rationale.
         prefix: "",
-        suffix: suffixParts.filter((x) => x).join("\n"),
+        suffix,
       }
       const result = yield* handle.process({
         user: lastUser,
@@ -420,7 +365,15 @@ export const runLoop: (deps: RunLoopDeps, sessionID: SessionID) => Effect.Effect
       if (result === "stop") return "break" as const
       if (result === "compact") {
         // create() is Effect<void>; the next iteration re-reads compacted messages
-        yield* createAutoCompaction(handle.compactionReason === "provider-rejected")
+        yield* createAutoCompaction(
+          { compaction: deps.compaction, bus: deps.bus },
+          {
+            sessionID,
+            consecutiveAutoCompactions,
+            lastUser,
+            overflow: handle.compactionReason === "provider-rejected",
+          },
+        )
       }
       return "continue" as const
     }).pipe(Effect.ensuring(deps.instruction.clear(handle.message.id)))

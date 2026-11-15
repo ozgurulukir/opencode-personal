@@ -12,14 +12,14 @@ export const { use: useKV, provider: KVProvider } = createSimpleContext({
   name: "KV",
   init: () => {
     const [ready, setReady] = createSignal(false)
-    const [store, setStore] = createStore<Record<string, any>>()
+    const [store, setStore] = createStore<Record<string, unknown>>({})
     const filePath = path.join(Global.Path.state, "kv.json")
     const lock = `tui-kv:${filePath}`
     // Queue same-process writes so rapid updates persist in order.
     let write = Promise.resolve()
 
     // Write to a temp file first so kv.json is only replaced once the JSON is complete, avoiding partial writes if shutdown interrupts persistence.
-    function writeSnapshot(snapshot: Record<string, any>) {
+    function writeSnapshot(snapshot: Record<string, unknown>) {
       const tempPath = `${filePath}.${process.pid}.${Date.now()}.tmp`
       return Filesystem.writeJson(tempPath, snapshot)
         .then(() => rename(tempPath, filePath))
@@ -30,7 +30,7 @@ export const { use: useKV, provider: KVProvider } = createSimpleContext({
     }
 
     // Read under the same lock used for writes because kv.json is shared across processes.
-    Flock.withLock(lock, () => Filesystem.readJson<Record<string, any>>(filePath))
+    Flock.withLock(lock, () => Filesystem.readJson<Record<string, unknown>>(filePath))
       .then((x) => {
         setStore(x)
       })
@@ -52,17 +52,17 @@ export const { use: useKV, provider: KVProvider } = createSimpleContext({
         if (store[name] === undefined) setStore(name, defaultValue)
         return [
           function () {
-            return result.get(name)
+            return result.get(name, defaultValue)
           },
           function setter(next: Setter<T>) {
-            result.set(name, next)
+            result.set(name, typeof next === "function" ? (next as (prev: T) => T)(result.get(name, defaultValue)) : next)
           },
         ] as const
       },
-      get(key: string, defaultValue?: any) {
-        return store[key] ?? defaultValue
+      get<T = unknown>(key: string, defaultValue?: T): T {
+        return (store[key] as T) ?? (defaultValue as T)
       },
-      set(key: string, value: any) {
+      set(key: string, value: unknown) {
         setStore(key, value)
         const snapshot = structuredClone(unwrap(store))
         write = write

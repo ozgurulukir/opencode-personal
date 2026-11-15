@@ -12,15 +12,15 @@ import {
   taskDenyGateFromRuleset,
 } from "../agent/subagent-permissions"
 import { subagentAbortGuard, subagentResultText, subagentTitle } from "../agent/subagent-spawn"
-import type { SessionPrompt } from "../session/prompt"
+import type { PromptInput } from "../session/loop/types"
 import { Config } from "@/config/config"
 import { Cause, Effect, Schema } from "effect"
 import { EffectBridge } from "@/effect/bridge"
 
 export interface TaskPromptOps {
   cancel(sessionID: SessionID): Effect.Effect<void>
-  resolvePromptParts(template: string): Effect.Effect<SessionPrompt.PromptInput["parts"]>
-  prompt(input: SessionPrompt.PromptInput): Effect.Effect<MessageV2.WithParts>
+  resolvePromptParts(template: string): Effect.Effect<PromptInput["parts"]>
+  prompt(input: PromptInput): Effect.Effect<MessageV2.WithParts>
 }
 
 const id = "task"

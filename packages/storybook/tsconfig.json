@@ -10,7 +10,11 @@
     "moduleResolution": "bundler",
     "noEmit": true,
     "strict": true,
-    "types": ["vite/client", "node"]
+    "skipLibCheck": true,
+    "types": ["vite/client", "node"],
+    "paths": {
+      "@/*": ["../app/src/*"]
+    }
   },
   "include": [".storybook/**/*.ts", ".storybook/**/*.tsx"]
 }

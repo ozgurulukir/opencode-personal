@@ -1,10 +1,9 @@
-import { afterAll, describe, expect, mock, test } from "bun:test"
+import { describe, expect, test } from "bun:test"
 import { createRoot } from "solid-js"
 import { createStore, type Store } from "solid-js/store"
 import type { Part, TextPart, UserMessage } from "@opencode-ai/sdk/v2"
 import { createTimelineStaging } from "./message-staging"
 
-afterAll(() => mock.restore())
 import { messageComments, taskDescription } from "./message-comments"
 import { pace } from "./message-staging"
 import { boundaryTarget, markBoundaryGesture } from "./message-gesture"
@@ -307,59 +306,56 @@ describe("createTimelineStaging", () => {
     }
   }
 
-  // SolidJS server build no-ops createEffect, so we patch it to run
-  // the effect synchronously so the staging store gets initialized.
-  const { mock } = require("bun:test")
-  mock.module("solid-js", (exports: Record<string, unknown>) => {
-    return {
-      ...exports,
-      createEffect: (fn: () => void) => fn(),
-    }
-  })
+  const tick = () => new Promise((resolve) => queueMicrotask(resolve))
 
-  test("returns all messages when turnStart is 0", () => {
+  test("returns all messages when turnStart is 0", async () => {
     const messages = Array.from({ length: 5 }, (_, i) => ({ id: `m${i}` } as unknown as UserMessage))
-    createRoot((dispose) => {
+    await createRoot(async (dispose) => {
       const staging = createTimelineStaging(makeInput(messages))
+      await tick()
       expect(staging.messages().length).toBe(5)
       expect(staging.isStaging()).toBe(false)
       dispose()
     })
   })
 
-  test("returns init-sized slice when windowed and not completed", () => {
+  test("returns init-sized slice when windowed and not completed", async () => {
     const messages = Array.from({ length: 10 }, (_, i) => ({ id: `m${i}` } as unknown as UserMessage))
-    createRoot((dispose) => {
+    await createRoot(async (dispose) => {
       const staging = createTimelineStaging(makeInput(messages, { turnStart: 2 }))
+      await tick()
       expect(staging.messages().length).toBe(1)
       expect(staging.isStaging()).toBe(true)
       dispose()
     })
   })
 
-  test("returns all messages when total is less than init", () => {
+  test("returns all messages when total is less than init", async () => {
     const messages = Array.from({ length: 2 }, (_, i) => ({ id: `m${i}` } as unknown as UserMessage))
-    createRoot((dispose) => {
+    await createRoot(async (dispose) => {
       const staging = createTimelineStaging(makeInput(messages, { turnStart: 2, config: { init: 5, batch: 3 } }))
+      await tick()
       expect(staging.messages().length).toBe(2)
       expect(staging.isStaging()).toBe(false)
       dispose()
     })
   })
 
-  test("isStaging is true while activeSession matches", () => {
+  test("isStaging is true while activeSession matches", async () => {
     const messages = Array.from({ length: 10 }, (_, i) => ({ id: `m${i}` } as unknown as UserMessage))
-    createRoot((dispose) => {
+    await createRoot(async (dispose) => {
       const staging = createTimelineStaging(makeInput(messages, { turnStart: 2 }))
+      await tick()
       expect(staging.isStaging()).toBe(true)
       dispose()
     })
   })
 
-  test("isStaging is false when turnStart is 0", () => {
+  test("isStaging is false when turnStart is 0", async () => {
     const messages = Array.from({ length: 10 }, (_, i) => ({ id: `m${i}` } as unknown as UserMessage))
-    createRoot((dispose) => {
+    await createRoot(async (dispose) => {
       const staging = createTimelineStaging(makeInput(messages))
+      await tick()
       expect(staging.isStaging()).toBe(false)
       dispose()
     })
