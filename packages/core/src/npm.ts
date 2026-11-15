@@ -158,22 +158,33 @@ export const layer = Layer.effect(
         const pkg = yield* afs.readJson(path.join(dir, "package.json")).pipe(Effect.orElseSucceed(() => ({})))
         const lock = yield* afs.readJson(path.join(dir, "package-lock.json")).pipe(Effect.orElseSucceed(() => ({})))
 
-        const pkgAny = pkg as any
-        const lockAny = lock as any
+        type DepsMap = Record<string, string>
+        type PackageShape = {
+          dependencies?: DepsMap
+          devDependencies?: DepsMap
+          peerDependencies?: DepsMap
+          optionalDependencies?: DepsMap
+        }
+        type LockShape = {
+          packages?: Record<string, PackageShape>
+        }
+
+        const pkgJson = (pkg && typeof pkg === "object" ? pkg : {}) as PackageShape
+        const lockJson = (lock && typeof lock === "object" ? lock : {}) as LockShape
         const declared = new Set([
-          ...Object.keys(pkgAny?.dependencies || {}),
-          ...Object.keys(pkgAny?.devDependencies || {}),
-          ...Object.keys(pkgAny?.peerDependencies || {}),
-          ...Object.keys(pkgAny?.optionalDependencies || {}),
+          ...Object.keys(pkgJson.dependencies ?? {}),
+          ...Object.keys(pkgJson.devDependencies ?? {}),
+          ...Object.keys(pkgJson.peerDependencies ?? {}),
+          ...Object.keys(pkgJson.optionalDependencies ?? {}),
           ...(input?.add || []).map((pkg) => pkg.name),
         ])
 
-        const root = lockAny?.packages?.[""] || {}
+        const root = lockJson.packages?.[""] ?? {}
         const locked = new Set([
-          ...Object.keys(root?.dependencies || {}),
-          ...Object.keys(root?.devDependencies || {}),
-          ...Object.keys(root?.peerDependencies || {}),
-          ...Object.keys(root?.optionalDependencies || {}),
+          ...Object.keys(root.dependencies ?? {}),
+          ...Object.keys(root.devDependencies ?? {}),
+          ...Object.keys(root.peerDependencies ?? {}),
+          ...Object.keys(root.optionalDependencies ?? {}),
         ])
 
         for (const name of declared) {

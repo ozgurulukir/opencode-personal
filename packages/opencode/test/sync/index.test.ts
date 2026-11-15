@@ -122,7 +122,7 @@ describe("SyncEvent", () => {
           const { Created } = setup()
           const events: Array<{
             type: string
-            properties: { id: string; name: string }
+            properties: unknown
           }> = []
           let resolve = () => {}
           const received = new Promise<void>((done) => {

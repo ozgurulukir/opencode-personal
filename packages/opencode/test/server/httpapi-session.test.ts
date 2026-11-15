@@ -785,7 +785,9 @@ describe("session HttpApi", () => {
         yield* runWithServices(tmp.path, Effect.gen(function* () {
           const bus = yield* Bus.Service
           const unsubscribe = yield* bus.subscribeAllCallback((event) => {
-            if (event.type.startsWith("session.next.")) events.push(event)
+            if (event.type.startsWith("session.next.")) {
+              events.push({ type: event.type, properties: event.properties as Record<string, any> })
+            }
           })
 
           const session = yield* Session.Service.use((svc) => svc.create({ title: "bridge" }))
