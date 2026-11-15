@@ -5,7 +5,12 @@ export type MediaKind = "image" | "audio" | "svg"
 const imageExtensions = new Set(["png", "jpg", "jpeg", "gif", "webp", "avif", "bmp", "ico", "tif", "tiff", "heic"])
 const audioExtensions = new Set(["mp3", "wav", "ogg", "m4a", "aac", "flac", "opus"])
 
-type MediaValue = unknown
+export type MediaValue =
+  | string
+  | FileContent
+  | (Partial<FileContent> & { content?: unknown; encoding?: unknown; mimeType?: unknown; type?: unknown })
+  | null
+  | undefined
 
 function mediaRecord(value: unknown) {
   if (!value || typeof value !== "object") return

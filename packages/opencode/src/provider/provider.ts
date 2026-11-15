@@ -9,6 +9,7 @@ import { Hash } from "@opencode-ai/core/util/hash"
 import { Plugin } from "../plugin"
 import { type LanguageModelV3 } from "@ai-sdk/provider"
 import * as ModelsDev from "./models"
+import type { Auth as PluginAuth } from "@opencode-ai/sdk/v2"
 import { Auth } from "../auth"
 import { Env } from "../env"
 import { InstallationVersion } from "@opencode-ai/core/installation/version"
@@ -1193,14 +1194,12 @@ const layer: Layer.Layer<
         function mergeProvider(providerID: ProviderID, provider: Partial<Info>) {
           const existing = providers[providerID]
           if (existing) {
-            // @ts-expect-error
-            providers[providerID] = mergeDeep(existing, provider)
+            providers[providerID] = mergeDeep(existing, provider) as Info
             return
           }
           const match = getDatabaseProvider(providerID)
           if (!match) return
-          // @ts-expect-error
-          providers[providerID] = mergeDeep(match, provider)
+          providers[providerID] = mergeDeep(match, provider) as Info
         }
 
         // load plugins first so config() hook runs before reading cfg.provider
@@ -1384,7 +1383,7 @@ const layer: Layer.Layer<
 
           const options = yield* Effect.promise(() =>
             plugin.auth!.loader!(
-              () => bridge.promise(auth.get(providerID).pipe(Effect.orDie)) as any,
+              () => bridge.promise(auth.get(providerID).pipe(Effect.orDie)) as Promise<PluginAuth>,
               toPublicInfo(getDatabaseProvider(plugin.auth!.provider)!),
             ),
           )
