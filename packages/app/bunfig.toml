@@ -1,3 +1,4 @@
 [test]
 root = "./src"
+# `solid-client.ts` forces solid-js' client build; src/solid-runtime.test.ts is the canary.
 preload = ["./happydom.ts", "../ui/test/solid-jsx.ts", "./solid-client.ts"]
