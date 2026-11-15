@@ -372,7 +372,20 @@ export const GithubRunCommand = effectCmd({
       function normalizeOidcBaseUrl(): string {
         const value = process.env["OIDC_BASE_URL"]
         if (!value) return "https://api.opencode.ai"
-        return value.replace(/\/+$/, "")
+        const base = value.replace(/\/+$/, "")
+        // The OIDC base URL receives the raw PAT as a Bearer token, so only send
+        // credentials over https (http is allowed for loopback testing).
+        try {
+          const parsed = new URL(base)
+          const loopback = parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1"
+          if (parsed.protocol !== "https:" && !loopback) {
+            throw new Error(`Refusing to send tokens over plain HTTP OIDC endpoint: ${base}. Use an https:// URL.`)
+          }
+        } catch (error) {
+          if (error instanceof TypeError) throw new Error(`Invalid OIDC_BASE_URL "${base}": not a valid URL`)
+          throw error
+        }
+        return base
       }
 
       function isIssueCommentEvent(

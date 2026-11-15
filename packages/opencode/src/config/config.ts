@@ -128,6 +128,20 @@ function normalizeLoadedConfig(data: unknown, source: string) {
   return copy
 }
 
+// Well-known config is fetched with credentials attached and its result merges into
+// user config, so only allow https (http is tolerated for loopback development).
+function assertSecureFetchUrl(url: string, what: string) {
+  let parsed: URL
+  try {
+    parsed = new URL(url)
+  } catch {
+    throw new Error(`invalid ${what}: ${url}`)
+  }
+  if (parsed.protocol !== "https:" && parsed.hostname !== "localhost" && parsed.hostname !== "127.0.0.1") {
+    throw new Error(`${what} must use https:// (http is only allowed for localhost): ${url}`)
+  }
+}
+
 async function substituteWellKnownRemoteConfig(input: { value: unknown; dir: string; source: string }) {
   if (!isRecord(input.value) || typeof input.value.url !== "string") return
 
@@ -634,6 +648,7 @@ export const layer = Layer.effect(
         for (const [key, value] of Object.entries(auth)) {
           if (value.type === "wellknown") {
             const url = key.replace(/\/+$/, "")
+            assertSecureFetchUrl(url, "well-known auth provider URL")
             process.env[value.key] = value.token
             log.debug("fetching remote config", { url: `${url}/.well-known/opencode` })
             const response = yield* Effect.promise(() => fetch(`${url}/.well-known/opencode`))
@@ -653,6 +668,7 @@ export const layer = Layer.effect(
             )
             const fetchedConfig = remote
               ? ((yield* Effect.promise(async () => {
+                  assertSecureFetchUrl(remote.url, "well-known remote_config.url")
                   log.debug("fetching remote config", { url: remote.url })
                   const response = await fetch(remote.url, { headers: remote.headers })
                   if (!response.ok)
