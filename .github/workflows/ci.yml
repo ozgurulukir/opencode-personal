@@ -51,3 +51,15 @@ jobs:
       - name: Test WASM path
         working-directory: packages/diff-wasm
         run: bun test
+
+  app-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install
+      # Guards the app's default `bun test` invocation (bunfig.toml preloads),
+      # which is easy to break by moving preloads back into npm scripts.
+      - name: App tests (default invocation)
+        working-directory: packages/app
+        run: bun test

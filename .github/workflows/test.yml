@@ -68,13 +68,6 @@ jobs:
         env:
           OPENCODE_EXPERIMENTAL_DISABLE_FILEWATCHER: ${{ runner.os == 'Windows' && 'true' || 'false' }}
 
-      # Guards the app's default `bun test` invocation (bunfig.toml preloads),
-      # which is easy to break by moving preloads back into npm scripts.
-      - name: App tests (default invocation)
-        if: runner.os == 'Linux'
-        working-directory: packages/app
-        run: bun test
-
       - name: Run HttpApi exerciser gates
         if: runner.os == 'Linux'
         working-directory: packages/opencode
