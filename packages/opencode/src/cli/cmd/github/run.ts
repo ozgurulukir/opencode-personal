@@ -22,7 +22,6 @@ import type { SessionID } from "../../../session/schema"
 import { MessageID, PartID } from "../../../session/schema"
 import { Provider } from "@/provider/provider"
 import { Bus } from "../../../bus"
-import { MessageV2 } from "../../../session/message-v2"
 import { SessionEvent } from "../../../v2/session-event"
 import { SessionPrompt } from "@/session/prompt"
 import { Git } from "@/git"
@@ -36,12 +35,6 @@ import {
   REPO_EVENTS,
   type UserEvent,
   type RepoEvent,
-  type GitHubAuthor,
-  type GitHubComment,
-  type GitHubReviewComment,
-  type GitHubCommit,
-  type GitHubFile,
-  type GitHubReview,
   type GitHubPullRequest,
   type GitHubIssue,
   type PullRequestQueryResponse,

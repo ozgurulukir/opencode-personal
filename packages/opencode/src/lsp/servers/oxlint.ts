@@ -1,27 +1,12 @@
 import {
   type Info,
-  type InstanceContext,
-  type Handle,
   NearestRoot,
-  pathExists,
-  run,
-  output,
   spawn,
   which,
   path,
-  fs,
-  os,
   log,
-  Process,
   Filesystem,
-  Flag,
-  Global,
-  Archive,
-  Module,
-  Npm,
   text,
-  venvCandidates,
-  resolveVenvPython,
 } from "./shared"
 
 export const Oxlint: Info = {

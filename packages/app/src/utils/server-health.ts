@@ -101,13 +101,18 @@ export function useCheckServerHealth() {
     const key = cacheKey(http)
     const hit = healthCache.get(key)
     const now = Date.now()
-    if (hit && hit.fetch === fetcher && (!hit.done || now - hit.at < cacheMs)) return hit.promise
+    if (hit && hit.fetch === fetcher && (!hit.done || now - hit.at < cacheMs)) {
+      healthCache.delete(key)
+      healthCache.set(key, hit)
+      return hit.promise
+    }
     const promise = checkServerHealth(http, fetcher).finally(() => {
       const next = healthCache.get(key)
       if (!next || next.promise !== promise) return
       next.done = true
       next.at = Date.now()
     })
+    healthCache.delete(key)
     if (healthCache.size >= MAX_HEALTH_CACHE_ENTRIES) {
       const oldestKey = healthCache.keys().next().value
       if (oldestKey !== undefined) healthCache.delete(oldestKey)

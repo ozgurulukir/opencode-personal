@@ -1,11 +1,7 @@
 import {
   type Info,
-  type InstanceContext,
-  type Handle,
   NearestRoot,
   pathExists,
-  run,
-  output,
   spawn,
   which,
   path,
@@ -13,14 +9,8 @@ import {
   os,
   log,
   Process,
-  Filesystem,
   Flag,
   Global,
-  Archive,
-  Module,
-  Npm,
-  venvCandidates,
-  resolveVenvPython,
 } from "./shared"
 
 export const CSharp: Info = {
