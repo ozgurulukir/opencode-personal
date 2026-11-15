@@ -896,6 +896,16 @@ function updateCompactionText(
   mode: "append" | "set",
 ) {
   input.setStore("part", messageID, produce((draft) => {
+    if (!text) {
+      // A failed compaction ends with empty text; drop any partial summary so
+      // the live store matches reload, which omits empty summaries.
+      if (mode === "set") {
+        for (let i = draft.length - 1; i >= 0; i--) {
+          if (draft[i].type === "text") draft.splice(i, 1)
+        }
+      }
+      return
+    }
     let target: TextPart | undefined
     for (let i = draft.length - 1; i >= 0; i--) {
       if (draft[i].type === "text") {
