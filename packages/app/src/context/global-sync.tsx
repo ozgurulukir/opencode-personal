@@ -33,6 +33,7 @@ import { formatServerError } from "@/utils/server-errors"
 import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/solid-query"
 import { createRefreshQueue } from "./global-sync/queue"
 import { directoryKey } from "./global-sync/utils"
+import { loadLspQuery, loadMcpQuery, lspQueryKey, mcpQueryKey } from "./global-sync/queries"
 
 type GlobalStore = {
   ready: boolean
@@ -53,8 +54,6 @@ const EMPTY_PATH: Path = { state: "", config: "", worktree: "", directory: "", h
 const EMPTY_PROVIDER: ProviderListResponse = { all: [], connected: [], default: {} }
 
 export const loadSessionsQueryKey = (directory: string) => [directory, "loadSessions"] as const
-
-import { loadLspQuery, loadMcpQuery, lspQueryKey, mcpQueryKey } from "./global-sync/queries"
 
 export { loadLspQuery, loadMcpQuery, lspQueryKey, mcpQueryKey }
 
