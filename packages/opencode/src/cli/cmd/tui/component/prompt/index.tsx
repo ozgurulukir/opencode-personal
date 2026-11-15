@@ -63,6 +63,12 @@ import { type WorkspaceStatus } from "../workspace-label"
 import { useCommandPalette } from "../../context/command-palette"
 import { useBindings, useCommandShortcut, useLeaderActive, useOpencodeKeymap } from "../../keymap"
 import { useTuiConfig } from "../../context/tui-config"
+import {
+  formatEditorContext,
+  formatEditorFileLabel,
+  getEditorRangeLabel,
+  hasEditorRangeSelection,
+} from "./editor-context"
 
 export type PromptProps = {
   sessionID?: string
@@ -106,31 +112,7 @@ function fadeColor(color: RGBA, alpha: number) {
   return RGBA.fromValues(color.r, color.g, color.b, color.a * alpha)
 }
 
-function hasEditorRangeSelection(selection: EditorSelection["ranges"][number]) {
-  return (
-    selection.selection.start.line !== selection.selection.end.line ||
-    selection.selection.start.character !== selection.selection.end.character
-  )
-}
 
-function getEditorRangeLabel(selection: EditorSelection["ranges"][number]) {
-  if (!hasEditorRangeSelection(selection)) return
-  if (selection.selection.start.line === selection.selection.end.line) return `#${selection.selection.start.line}`
-  return `#${selection.selection.start.line}-${selection.selection.end.line}`
-}
-
-function formatEditorContext(selection: EditorSelection) {
-  const selected = selection.ranges.filter(hasEditorRangeSelection)
-  if (selected.length === 0)
-    return `<system-reminder>Note: The user opened the file "${selection.filePath}". This may or may not be relevant to the current task.</system-reminder>\n`
-
-  const ranges = selected.map((range, index) => {
-    const prefix = selected.length > 1 ? `Selection ${index + 1}: ` : ""
-    return `Note: The user selected ${prefix}${getEditorRangeLabel(range)} from "${selection.filePath}". \`\`\`${range.text}\`\`\`\n\n`
-  })
-
-  return `<system-reminder>${ranges.join("\n")} This may or may not be relevant to the current task.</system-reminder>\n`
-}
 
 let stashed: { prompt: PromptInfo; cursor: number } | undefined
 
@@ -181,15 +163,7 @@ export function Prompt(props: PromptProps) {
       .filter(Boolean)
       .join(" ")
   })
-  const editorFileLabel = createMemo(() => {
-    const value = editorPath()
-    if (!value) return
-    const filename = path.basename(value)
-    const file = /^index\.[^./]+$/.test(filename)
-      ? [path.basename(path.dirname(value)), filename].filter(Boolean).join("/")
-      : filename
-    return `${file.split(path.sep).join("/")}${editorSelectionLabel() ?? ""}`
-  })
+  const editorFileLabel = createMemo(() => formatEditorFileLabel(editorPath(), editorSelectionLabel()))
   const editorFileLabelDisplay = createMemo(() => {
     const file = editorFileLabel()
     if (!file) return

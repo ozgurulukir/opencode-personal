@@ -1,5 +1,5 @@
 import { usePlatform } from "@/context/platform"
-import type { ServerConnection } from "@/context/server"
+import type { ServerConnection } from "@/context/server/types"
 import { createSdkForServer } from "./server"
 
 export type ServerHealth = { healthy: boolean; version?: string }
@@ -15,6 +15,7 @@ const defaultTimeoutMs = 3000
 const defaultRetryCount = 2
 const defaultRetryDelayMs = 100
 const cacheMs = 750
+const MAX_HEALTH_CACHE_ENTRIES = 100
 const healthCache = new Map<
   string,
   { at: number; done: boolean; fetch: typeof globalThis.fetch; promise: Promise<ServerHealth> }
@@ -107,6 +108,10 @@ export function useCheckServerHealth() {
       next.done = true
       next.at = Date.now()
     })
+    if (healthCache.size >= MAX_HEALTH_CACHE_ENTRIES) {
+      const oldestKey = healthCache.keys().next().value
+      if (oldestKey !== undefined) healthCache.delete(oldestKey)
+    }
     healthCache.set(key, { at: now, done: false, fetch: fetcher, promise })
     return promise
   }

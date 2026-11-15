@@ -18,8 +18,6 @@ import { useComments } from "@/context/comments"
 import { Button } from "@opencode-ai/ui/button"
 import { DockShellForm, DockTray } from "@opencode-ai/ui/dock-surface"
 import { Icon } from "@opencode-ai/ui/icon"
-import { Tooltip, TooltipKeybind } from "@opencode-ai/ui/tooltip"
-import { IconButton } from "@opencode-ai/ui/icon-button"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { useCommand } from "@/context/command"
 import { Persist, persisted } from "@/utils/persist"
@@ -33,7 +31,6 @@ import { atOptionGroup, atOptionKey, atSelectPart, compareAtGroups, createAtMent
 import { createPill, isNormalizedEditor, parseFromDOM, renderEditor } from "./prompt-input/editor-sync"
 import { buildSlashCommands } from "./prompt-input/slash-commands"
 import { createPromptAttachments } from "./prompt-input/attachments"
-import { ACCEPTED_FILE_TYPES } from "./prompt-input/files"
 import {
   canNavigateHistoryAtCursor,
   navigatePromptHistory,
@@ -49,7 +46,8 @@ import { PromptPopover, type AtOption, type SlashCommand } from "./prompt-input/
 import { PromptContextItems } from "./prompt-input/context-items"
 import { PromptImageAttachments } from "./prompt-input/image-attachments"
 import { PromptDragOverlay } from "./prompt-input/drag-overlay"
-import { promptPlaceholder } from "./prompt-input/placeholder"
+import { promptPlaceholder, PROMPT_EXAMPLES } from "./prompt-input/placeholder"
+import { PromptSubmitControls } from "./prompt-input/submit-controls"
 import { ImagePreview } from "@opencode-ai/ui/image-preview"
 import { TrayControls } from "./prompt-input/tray-controls"
 
@@ -66,33 +64,7 @@ interface PromptInputProps {
   onSubmit?: () => void
 }
 
-const EXAMPLES = [
-  "prompt.example.1",
-  "prompt.example.2",
-  "prompt.example.3",
-  "prompt.example.4",
-  "prompt.example.5",
-  "prompt.example.6",
-  "prompt.example.7",
-  "prompt.example.8",
-  "prompt.example.9",
-  "prompt.example.10",
-  "prompt.example.11",
-  "prompt.example.12",
-  "prompt.example.13",
-  "prompt.example.14",
-  "prompt.example.15",
-  "prompt.example.16",
-  "prompt.example.17",
-  "prompt.example.18",
-  "prompt.example.19",
-  "prompt.example.20",
-  "prompt.example.21",
-  "prompt.example.22",
-  "prompt.example.23",
-  "prompt.example.24",
-  "prompt.example.25",
-] as const
+
 
 const NON_EMPTY_TEXT = /[^\s\u200B]/
 
@@ -254,7 +226,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     popover: null,
     historyIndex: -1,
     savedPrompt: null as PromptHistoryEntry | null,
-    placeholder: Math.floor(Math.random() * EXAMPLES.length),
+    placeholder: Math.floor(Math.random() * PROMPT_EXAMPLES.length),
     draggingType: null,
     mode: "normal",
     applyingHistory: false,
@@ -347,7 +319,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     promptPlaceholder({
       mode: store.mode,
       commentCount: commentCount(),
-      example: suggest() ? (store.mode === "shell" ? "git status" : language.t(EXAMPLES[store.placeholder])) : "",
+      example: suggest() ? (store.mode === "shell" ? "git status" : language.t(PROMPT_EXAMPLES[store.placeholder])) : "",
       suggest: suggest(),
       t: (key, params) => language.t(key as Parameters<typeof language.t>[0], params as never),
     }),
@@ -534,7 +506,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     if (params.id) return
     if (!suggest()) return
     const interval = setInterval(() => {
-      setStore("placeholder", (prev) => (prev + 1) % EXAMPLES.length)
+      setStore("placeholder", (prev) => (prev + 1) % PROMPT_EXAMPLES.length)
     }, 6500)
     onCleanup(() => clearInterval(interval))
   })
@@ -1177,75 +1149,21 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
             </div>
           </div>
 
-          <div
-            aria-hidden="true"
-            class="pointer-events-none absolute inset-x-0 bottom-0"
-            style={{
-              height: space,
-              background:
-                "linear-gradient(to top, var(--surface-raised-stronger-non-alpha) calc(100% - 20px), transparent)",
-            }}
+          <PromptSubmitControls
+            space={space}
+            fileInputRef={(el) => (fileInputRef = el)}
+            onAddFiles={(files) => void addAttachments(files)}
+            working={working()}
+            blank={blank()}
+            stopping={stopping()}
+            mode={store.mode}
+            tip={tip()}
+            buttonsSpring={buttonsSpring()}
+            buttonsStyle={buttons()}
+            onPick={pick}
+            t={(key) => language.t(key as Parameters<typeof language.t>[0])}
+            keybind={(id) => command.keybind(id as Parameters<typeof command.keybind>[0])}
           />
-
-          <div class="pointer-events-none absolute bottom-2 right-2 flex items-center gap-2">
-            <input
-              ref={fileInputRef}
-              type="file"
-              multiple
-              accept={ACCEPTED_FILE_TYPES.join(",")}
-              class="hidden"
-              onChange={(e) => {
-                const list = e.currentTarget.files
-                if (list) void addAttachments(Array.from(list))
-                e.currentTarget.value = ""
-              }}
-            />
-
-            <div class="flex items-center gap-1 pointer-events-auto">
-              <Tooltip placement="top" inactive={!working() && blank()} value={tip()}>
-                <IconButton
-                  data-action="prompt-submit"
-                  type="submit"
-                  disabled={!working() && blank()}
-                  tabIndex={store.mode === "normal" ? undefined : -1}
-                  icon={stopping() ? "stop" : store.mode === "shell" ? "arrow-undo-down" : "arrow-up"}
-                  variant="primary"
-                  class="size-8"
-                  aria-label={stopping() ? language.t("prompt.action.stop") : language.t("prompt.action.send")}
-                />
-              </Tooltip>
-            </div>
-          </div>
-
-          <div class="pointer-events-none absolute bottom-2 left-2">
-            <div
-              aria-hidden={store.mode !== "normal"}
-              class="pointer-events-auto"
-              style={{
-                "pointer-events": buttonsSpring() > 0.5 ? "auto" : "none",
-              }}
-            >
-              <TooltipKeybind
-                placement="top"
-                title={language.t("prompt.action.attachFile")}
-                keybind={command.keybind("file.attach")}
-              >
-                <IconButton
-                  data-action="prompt-attach"
-                  type="button"
-                  icon="plus"
-                  variant="ghost"
-                  class="size-8 p-0"
-                  style={buttons()}
-                  onClick={pick}
-                  disabled={store.mode !== "normal"}
-                  tabIndex={store.mode === "normal" ? undefined : -1}
-                  aria-label={language.t("prompt.action.attachFile")}
-                  iconSize="normal"
-                />
-              </TooltipKeybind>
-            </div>
-          </div>
         </div>
       </DockShellForm>
       <Show when={store.mode === "normal" || store.mode === "shell"}>
