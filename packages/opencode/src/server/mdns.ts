@@ -8,12 +8,20 @@ const BASE_DELAY_MS = 500
 
 let bonjour: InstanceType<typeof Bonjour> | undefined
 let currentPort: number | undefined
+let retryTimer: ReturnType<typeof setTimeout> | undefined
+let unpublished = false
 
 export function publish(port: number, domain?: string) {
   if (currentPort === port) return
   if (bonjour) unpublish()
+  if (retryTimer) {
+    clearTimeout(retryTimer)
+    retryTimer = undefined
+  }
+  unpublished = false
 
   const attempt = (retriesLeft: number) => {
+    if (unpublished) return
     try {
       const host = domain ?? "opencode.local"
       const name = `opencode-${port}`
@@ -45,9 +53,12 @@ export function publish(port: number, domain?: string) {
       bonjour = undefined
       currentPort = undefined
 
-      if (retriesLeft > 0) {
+      if (!unpublished && retriesLeft > 0) {
         const delay = BASE_DELAY_MS * Math.pow(2, MAX_RETRIES - retriesLeft)
-        setTimeout(() => attempt(retriesLeft - 1), delay)
+        retryTimer = setTimeout(() => {
+          retryTimer = undefined
+          attempt(retriesLeft - 1)
+        }, delay)
       }
     }
   }
@@ -56,6 +67,11 @@ export function publish(port: number, domain?: string) {
 }
 
 export function unpublish() {
+  unpublished = true
+  if (retryTimer) {
+    clearTimeout(retryTimer)
+    retryTimer = undefined
+  }
   if (bonjour) {
     try {
       bonjour.unpublishAll()

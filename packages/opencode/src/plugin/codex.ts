@@ -284,9 +284,16 @@ async function startOAuthServer(): Promise<{ port: number; redirectUri: string }
       const error = url.searchParams.get("error")
       const errorDescription = url.searchParams.get("error_description")
 
+      if (!pendingOAuth || state !== pendingOAuth.state) {
+        const errorMsg = "Invalid state - potential CSRF attack"
+        res.writeHead(400, { "Content-Type": "text/html" })
+        res.end(HTML_ERROR(errorMsg))
+        return
+      }
+
       if (error) {
         const errorMsg = errorDescription || error
-        pendingOAuth?.reject(new Error(errorMsg))
+        pendingOAuth.reject(new Error(errorMsg))
         pendingOAuth = undefined
         res.writeHead(200, { "Content-Type": "text/html" })
         res.end(HTML_ERROR(errorMsg))
@@ -295,16 +302,7 @@ async function startOAuthServer(): Promise<{ port: number; redirectUri: string }
 
       if (!code) {
         const errorMsg = "Missing authorization code"
-        pendingOAuth?.reject(new Error(errorMsg))
-        pendingOAuth = undefined
-        res.writeHead(400, { "Content-Type": "text/html" })
-        res.end(HTML_ERROR(errorMsg))
-        return
-      }
-
-      if (!pendingOAuth || state !== pendingOAuth.state) {
-        const errorMsg = "Invalid state - potential CSRF attack"
-        pendingOAuth?.reject(new Error(errorMsg))
+        pendingOAuth.reject(new Error(errorMsg))
         pendingOAuth = undefined
         res.writeHead(400, { "Content-Type": "text/html" })
         res.end(HTML_ERROR(errorMsg))

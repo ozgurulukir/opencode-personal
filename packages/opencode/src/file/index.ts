@@ -10,7 +10,8 @@ import fuzzysort from "fuzzysort"
 import ignore from "ignore"
 import path from "path"
 import { Global } from "@opencode-ai/core/global"
-import { containsPath } from "../project/instance-context"
+import { containsPath, type InstanceContext } from "../project/instance-context"
+import { resolvePath } from "@/tool/file-path"
 import * as Log from "@opencode-ai/core/util/log"
 import { Protected } from "./protected"
 import { Ripgrep } from "./ripgrep"
@@ -288,6 +289,16 @@ const isBinaryByExtension = (file: string) => binary.has(ext(file))
 const isImage = (mimeType: string) => mimeType.startsWith("image/")
 const getImageMimeType = (file: string) => mime[ext(file)] || "image/" + ext(file)
 
+function containsResolvedPath(filepath: string, ctx: InstanceContext): boolean {
+  if (!containsPath(filepath, ctx)) return false
+  const resolvedCtx: InstanceContext = {
+    ...ctx,
+    directory: resolvePath(ctx.directory),
+    worktree: ctx.worktree === "/" ? "/" : resolvePath(ctx.worktree),
+  }
+  return containsPath(resolvePath(filepath), resolvedCtx)
+}
+
 function shouldEncode(mimeType: string) {
   const type = mimeType.toLowerCase()
   log.debug("shouldEncode", { type })
@@ -507,7 +518,7 @@ export const layer = Layer.effect(
       const ctx = yield* InstanceState.context
       const full = path.join(ctx.directory, file)
 
-      if (!containsPath(full, ctx)) {
+      if (!containsResolvedPath(full, ctx)) {
         throw new Error("Access denied: path escapes project directory")
       }
 
@@ -589,7 +600,7 @@ export const layer = Layer.effect(
       }
 
       const resolved = dir ? path.join(ctx.directory, dir) : ctx.directory
-      if (!containsPath(resolved, ctx)) {
+      if (!containsResolvedPath(resolved, ctx)) {
         throw new Error("Access denied: path escapes project directory")
       }
 

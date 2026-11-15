@@ -4,6 +4,9 @@ import { claudeUsageProvider } from "./claude"
 import { zaiUsageProvider } from "./zai"
 import { clineUsageProvider } from "./cline"
 import { openaiUsageProvider } from "./openai"
+import * as Log from "@opencode-ai/core/util/log"
+
+const log = Log.create({ service: "usage" })
 
 /** All registered usage providers. */
 const providers: UsageProvider[] = [claudeUsageProvider, zaiUsageProvider, clineUsageProvider, openaiUsageProvider]
@@ -47,7 +50,9 @@ export async function fetchUsageReports(auth: Record<string, Auth.Info>): Promis
       try {
         const report = await provider.fetchUsage(credential)
         if (report) reports.push(report)
-      } catch {}
+      } catch (err) {
+        log.warn("failed to fetch provider usage report", { providerId, error: err })
+      }
     }
   }
 

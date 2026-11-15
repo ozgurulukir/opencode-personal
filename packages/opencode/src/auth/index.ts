@@ -4,6 +4,7 @@ import { zod } from "@opencode-ai/core/effect-zod"
 import { NonNegativeInt } from "@opencode-ai/core/schema"
 import { Global } from "@opencode-ai/core/global"
 import { AppFileSystem } from "@opencode-ai/core/filesystem"
+import * as Log from "@opencode-ai/core/util/log"
 
 export const OAUTH_DUMMY_KEY = "opencode-oauth-dummy-key"
 
@@ -60,7 +61,9 @@ export const layer = Layer.effect(
       if (process.env.OPENCODE_AUTH_CONTENT) {
         try {
           return JSON.parse(process.env.OPENCODE_AUTH_CONTENT)
-        } catch (err) {}
+        } catch (err) {
+          Log.Default.warn("failed to parse OPENCODE_AUTH_CONTENT, falling back to auth.json", { error: err })
+        }
       }
 
       const data = (yield* fsys.readJson(file).pipe(Effect.orElseSucceed(() => ({})))) as Record<string, unknown>
