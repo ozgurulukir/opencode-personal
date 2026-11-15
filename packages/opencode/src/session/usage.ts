@@ -3,6 +3,15 @@ import type { LanguageModelUsage } from "ai"
 import type { ProviderMetadata } from "ai"
 import type { Provider } from "@/provider/provider"
 
+function nestedNumber(obj: unknown, ...keys: string[]): unknown {
+  let cur: unknown = obj
+  for (const key of keys) {
+    if (!cur || typeof cur !== "object") return undefined
+    cur = (cur as Record<string, unknown>)[key]
+  }
+  return cur
+}
+
 export function getUsage(input: { model: Provider.Model; usage: LanguageModelUsage; metadata?: ProviderMetadata }) {
   const safe = (value: number) => {
     if (!Number.isFinite(value)) return 0
@@ -15,16 +24,16 @@ export function getUsage(input: { model: Provider.Model; usage: LanguageModelUsa
   const cacheReadInputTokens = safe(
     input.usage.inputTokenDetails?.cacheReadTokens || input.usage.cachedInputTokens || 0,
   )
-  const cacheWriteInputTokens = safe(Number(
-    input.usage.inputTokenDetails?.cacheWriteTokens ||
-    input.metadata?.["anthropic"]?.["cacheCreationInputTokens"] ||
-    input.metadata?.["vertex"]?.["cacheCreationInputTokens"] ||
-    // @ts-expect-error
-    input.metadata?.["bedrock"]?.["usage"]?.["cacheWriteInputTokens"] ||
-    // @ts-expect-error
-    input.metadata?.["venice"]?.["usage"]?.["cacheCreationInputTokens"] ||
-    0,
-  ))
+  const cacheWriteInputTokens = safe(
+    Number(
+      input.usage.inputTokenDetails?.cacheWriteTokens ||
+        input.metadata?.["anthropic"]?.["cacheCreationInputTokens"] ||
+        input.metadata?.["vertex"]?.["cacheCreationInputTokens"] ||
+        nestedNumber(input.metadata, "bedrock", "usage", "cacheWriteInputTokens") ||
+        nestedNumber(input.metadata, "venice", "usage", "cacheCreationInputTokens") ||
+        0,
+    ),
+  )
 
   const adjustedInputTokens = safe(inputTokens - cacheReadInputTokens - cacheWriteInputTokens)
 

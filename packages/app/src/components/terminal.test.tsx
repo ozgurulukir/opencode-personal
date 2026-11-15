@@ -1,4 +1,8 @@
-import { beforeAll, describe, expect, mock, test } from "bun:test"
+import { afterAll, beforeAll, describe, expect, mock, test } from "bun:test"
+
+afterAll(() => {
+  mock.restore()
+})
 
 let useTerminalUiBindings: typeof import("./terminal").useTerminalUiBindings
 let persistTerminal: typeof import("./terminal").persistTerminal

@@ -1,5 +1,9 @@
 import { afterAll, beforeAll, describe, expect, test, mock } from "bun:test"
 
+afterAll(() => {
+  mock.restore()
+})
+
 const mockThemeFiles: Record<string, () => Promise<{ default: { name: string; id: string } }>> = {
   "./themes/amoled.json": () => Promise.resolve({ default: { name: "AMOLED", id: "amoled" } }),
   "./themes/dracula.json": () => Promise.resolve({ default: { name: "Dracula", id: "dracula" } }),

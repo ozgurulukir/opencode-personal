@@ -21,7 +21,7 @@ describe("Bus integration: acquireRelease subscriber pattern", () => {
 
     await withInstance(tmp.path, async () => {
       const unsub = Bus.subscribe(TestEvent, (evt) => {
-        received.push(evt.properties.value)
+        received.push((evt.properties as { value: number }).value)
       })
       await Bun.sleep(10)
       await Bus.publish(TestEvent, { value: 1 })
@@ -47,7 +47,7 @@ describe("Bus integration: acquireRelease subscriber pattern", () => {
 
     await withInstance(tmp.path, async () => {
       Bus.subscribeAll((evt) => {
-        received.push({ type: evt.type, value: evt.properties.value })
+        received.push({ type: evt.type, value: (evt.properties as { value: number }).value })
       })
       await Bun.sleep(10)
       await Bus.publish(TestEvent, { value: 10 })
@@ -72,7 +72,7 @@ describe("Bus integration: acquireRelease subscriber pattern", () => {
           disposed = true
           return
         }
-        received.push(evt.properties.value)
+        received.push((evt.properties as { value: number }).value)
       })
       await Bun.sleep(10)
       await Bus.publish(TestEvent, { value: 1 })

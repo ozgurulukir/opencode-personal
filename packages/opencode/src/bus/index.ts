@@ -42,7 +42,7 @@ export interface Interface {
     def: D,
     callback: (event: Payload<D>) => unknown,
   ) => Effect.Effect<() => void>
-  readonly subscribeAllCallback: (callback: (event: any) => unknown) => Effect.Effect<() => void>
+  readonly subscribeAllCallback: (callback: (event: Payload) => unknown) => Effect.Effect<() => void>
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/Bus") {}
@@ -174,7 +174,7 @@ export const layer = Layer.effect(
       return yield* on(ps, def.type, callback)
     })
 
-    const subscribeAllCallback = Effect.fn("Bus.subscribeAllCallback")(function* (callback: (event: any) => unknown) {
+    const subscribeAllCallback = Effect.fn("Bus.subscribeAllCallback")(function* (callback: (event: Payload) => unknown) {
       const s = yield* InstanceState.get(state)
       return yield* on(s.wildcard, "*", callback)
     })
@@ -205,7 +205,7 @@ export function subscribe<D extends BusEvent.Definition>(def: D, callback: (even
   return runSync((svc) => svc.subscribeCallback(def, callback))
 }
 
-export function subscribeAll(callback: (event: any) => unknown) {
+export function subscribeAll(callback: (event: Payload) => unknown) {
   return runSync((svc) => svc.subscribeAllCallback(callback))
 }
 
