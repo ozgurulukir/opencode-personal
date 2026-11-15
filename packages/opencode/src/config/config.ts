@@ -565,7 +565,7 @@ export const layer = Layer.effect(
               await fsNode.writeFile(path.join(Global.Path.config, "config.json"), JSON.stringify(result, null, 2))
               await fsNode.unlink(legacy)
             })
-            .catch(() => {}),
+            .catch((error) => log.warn("legacy config migration failed; keeping legacy file", { error: String(error) })),
         )
       }
 
