@@ -3,6 +3,7 @@ import type { GlobalEvent } from "@opencode-ai/sdk/v2"
 import { createSimpleContext } from "./helper"
 import { createGlobalEmitter } from "@solid-primitives/event-bus"
 import { Flag } from "@opencode-ai/core/flag/flag"
+import * as Log from "@opencode-ai/core/util/log"
 import { batch, onCleanup, onMount } from "solid-js"
 
 export type EventSource = {
@@ -80,19 +81,25 @@ export const { use: useSDK, provider: SDKProvider } = createSimpleContext({
         while (true) {
           if (abort.signal.aborted || ctrl.signal.aborted) break
 
-          const events = await sdk.global.event({
-            signal: ctrl.signal,
-          })
+          try {
+            const events = await sdk.global.event({
+              signal: ctrl.signal,
+            })
 
-          if (Flag.OPENCODE_EXPERIMENTAL_WORKSPACES) {
-            // Start syncing workspaces, it's important to do this after
-            // we've started listening to events
-            await sdk.sync.start().catch(() => {})
-          }
+            if (Flag.OPENCODE_EXPERIMENTAL_WORKSPACES) {
+              // Start syncing workspaces, it's important to do this after
+              // we've started listening to events
+              await sdk.sync.start().catch(() => {})
+            }
 
-          for await (const event of events.stream) {
-            if (ctrl.signal.aborted) break
-            handleEvent(event)
+            attempt = 0
+            for await (const event of events.stream) {
+              if (ctrl.signal.aborted) break
+              handleEvent(event)
+            }
+          } catch (err) {
+            if (abort.signal.aborted || ctrl.signal.aborted) break
+            Log.Default.warn("tui sdk sse stream error, retrying", { error: err, attempt })
           }
 
           if (timer) clearTimeout(timer)
@@ -104,7 +111,9 @@ export const { use: useSDK, provider: SDKProvider } = createSimpleContext({
           const backoff = Math.min(retryDelay * 2 ** (attempt - 1), maxRetryDelay)
           await new Promise((resolve) => setTimeout(resolve, backoff))
         }
-      })().catch(() => {})
+      })().catch((err) => {
+        Log.Default.error("tui sdk sse loop terminated unexpectedly", { error: err })
+      })
     }
 
     onMount(async () => {

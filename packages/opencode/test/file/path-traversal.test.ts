@@ -92,6 +92,26 @@ describe("File.read path traversal protection", () => {
       },
     })
   })
+
+  test("rejects symlink escaping project directory", async () => {
+    await using outside = await tmpdir({
+      init: async (dir) => {
+        await Bun.write(path.join(dir, "secret.txt"), "top secret")
+      },
+    })
+    await using tmp = await tmpdir({
+      init: async (dir) => {
+        await fs.symlink(path.join(outside.path, "secret.txt"), path.join(dir, "escape.txt"))
+      },
+    })
+
+    await WithInstance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        await expect(read("escape.txt")).rejects.toThrow("Access denied: path escapes project directory")
+      },
+    })
+  })
 })
 
 describe("File.list path traversal protection", () => {
@@ -118,6 +138,26 @@ describe("File.list path traversal protection", () => {
       fn: async () => {
         const result = await list("subdir")
         expect(Array.isArray(result)).toBe(true)
+      },
+    })
+  })
+
+  test("rejects symlink directory escaping project directory", async () => {
+    await using outside = await tmpdir({
+      init: async (dir) => {
+        await Bun.write(path.join(dir, "secret.txt"), "top secret")
+      },
+    })
+    await using tmp = await tmpdir({
+      init: async (dir) => {
+        await fs.symlink(outside.path, path.join(dir, "escape-dir"))
+      },
+    })
+
+    await WithInstance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        await expect(list("escape-dir")).rejects.toThrow("Access denied: path escapes project directory")
       },
     })
   })

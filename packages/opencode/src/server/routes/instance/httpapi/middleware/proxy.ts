@@ -3,6 +3,7 @@ import { Effect, Stream } from "effect"
 import { HttpBody, HttpClient, HttpClientRequest, HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
 import * as Socket from "effect/unstable/socket/Socket"
 import { WebSocketTracker } from "../websocket-tracker"
+import * as Log from "@opencode-ai/core/util/log"
 
 function webSource(request: HttpServerRequest.HttpServerRequest): Request | undefined {
   return request.source instanceof Request ? request.source : undefined
@@ -108,7 +109,12 @@ export function http(
       statusText: statusText(response),
       headers,
     })
-  }).pipe(Effect.catch(() => Effect.succeed(HttpServerResponse.empty({ status: 500 }))))
+  }).pipe(
+    Effect.catch((err) => {
+      Log.Default.error("http proxy request failed", { url: String(url), error: err })
+      return Effect.succeed(HttpServerResponse.empty({ status: 500 }))
+    }),
+  )
 }
 
 export * as HttpApiProxy from "./proxy"
