@@ -11,7 +11,14 @@ import type {
 } from "@opencode-ai/sdk/v2/client"
 import { createStore } from "solid-js/store"
 import type { State } from "./types"
-import { applyDirectoryEvent, applyGlobalEvent, cleanupDroppedSessionCaches } from "./event-reducer"
+import {
+  applyDirectoryEvent,
+  applyGlobalEvent,
+  cleanupDroppedSessionCaches,
+  clearPendingSessionPatchesForDirectory,
+  getPendingSessionPatch,
+  setPendingSessionPatch,
+} from "./event-reducer"
 
 const rootSession = (input: { id: string; parentID?: string; archived?: number }) =>
   ({
@@ -2018,5 +2025,77 @@ describe("missing event.id", () => {
     // droppedSessionID messages/parts were evicted
     expect(store.message[droppedSessionID]).toBeUndefined()
     expect(store.part.m3).toBeUndefined()
+  })
+
+  test("clearPendingSessionPatchesForDirectory clears all buffered patches for a directory", () => {
+    const dirA = "/tmp/dirA"
+    const dirB = "/tmp/dirB"
+    setPendingSessionPatch(dirA, "ses_a1", { title: "Title A1" })
+    setPendingSessionPatch(dirB, "ses_b1", { title: "Title B1" })
+
+    expect(getPendingSessionPatch(dirA, "ses_a1")?.title).toBe("Title A1")
+    expect(getPendingSessionPatch(dirB, "ses_b1")?.title).toBe("Title B1")
+
+    clearPendingSessionPatchesForDirectory(dirA)
+
+    expect(getPendingSessionPatch(dirA, "ses_a1")).toBeUndefined()
+    expect(getPendingSessionPatch(dirB, "ses_b1")?.title).toBe("Title B1")
+
+    clearPendingSessionPatchesForDirectory(dirB)
+  })
+
+  test("setPendingSessionPatch evicts oldest patch when max limit of 100 is reached", () => {
+    const dir = "/tmp/dirCap"
+    clearPendingSessionPatchesForDirectory(dir)
+
+    for (let i = 0; i < 100; i++) {
+      setPendingSessionPatch(dir, `ses_${i}`, { title: `Title ${i}` })
+    }
+
+    expect(getPendingSessionPatch(dir, "ses_0")).toBeDefined()
+
+    // 101st item should evict ses_0
+    setPendingSessionPatch(dir, "ses_100", { title: "Title 100" })
+    expect(getPendingSessionPatch(dir, "ses_0")).toBeUndefined()
+    expect(getPendingSessionPatch(dir, "ses_100")).toBeDefined()
+
+    clearPendingSessionPatchesForDirectory(dir)
+  })
+
+  test("applyDirectoryEvent safely handles malformed or empty session events without throwing", () => {
+    const [store, setStore] = createStore(baseState())
+
+    expect(() => {
+      applyDirectoryEvent({
+        event: { type: "session.next.updated", properties: undefined },
+        store,
+        setStore,
+        push() {},
+        directory: "/tmp",
+        loadLsp() {},
+      })
+    }).not.toThrow()
+
+    expect(() => {
+      applyDirectoryEvent({
+        event: { type: "session.created", properties: {} },
+        store,
+        setStore,
+        push() {},
+        directory: "/tmp",
+        loadLsp() {},
+      })
+    }).not.toThrow()
+
+    expect(() => {
+      applyDirectoryEvent({
+        event: { type: "session.deleted", properties: {} },
+        store,
+        setStore,
+        push() {},
+        directory: "/tmp",
+        loadLsp() {},
+      })
+    }).not.toThrow()
   })
 })

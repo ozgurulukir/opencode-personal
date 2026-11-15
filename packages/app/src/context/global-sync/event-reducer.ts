@@ -84,6 +84,7 @@ function cleanupSessionCaches(
 }
 
 const pendingPatchesByDir = new Map<string, Map<string, Partial<Session>>>()
+const MAX_PENDING_PATCHES_PER_DIR = 100
 
 export function getPendingSessionPatch(directory: string, sessionID: string): Partial<Session> | undefined {
   return pendingPatchesByDir.get(directory)?.get(sessionID)
@@ -96,11 +97,21 @@ export function clearPendingSessionPatch(directory: string, sessionID: string): 
   if (map.size === 0) pendingPatchesByDir.delete(directory)
 }
 
+export function clearPendingSessionPatchesForDirectory(directory: string): void {
+  if (!directory) return
+  pendingPatchesByDir.delete(directory)
+}
+
 export function setPendingSessionPatch(directory: string, sessionID: string, patch: Partial<Session>): void {
+  if (!directory || !sessionID) return
   let map = pendingPatchesByDir.get(directory)
   if (!map) {
     map = new Map()
     pendingPatchesByDir.set(directory, map)
+  }
+  if (map.size >= MAX_PENDING_PATCHES_PER_DIR && !map.has(sessionID)) {
+    const oldest = map.keys().next().value
+    if (oldest) map.delete(oldest)
   }
   const existing = map.get(sessionID)
   map.set(sessionID, {
@@ -160,6 +171,7 @@ function handleSessionCreated(input: {
   setSessionTodo?: (sessionID: string, todos: Todo[] | undefined) => void
   preserve?: string[]
 }) {
+  if (!input.info?.id) return
   const pending = input.directory ? getPendingSessionPatch(input.directory, input.info.id) : undefined
   if (pending && input.directory) clearPendingSessionPatch(input.directory, input.info.id)
   const sessionInfo = pending
@@ -243,6 +255,7 @@ function handleSessionDeleted(input: {
   directory?: string
   setSessionTodo?: (sessionID: string, todos: Todo[] | undefined) => void
 }) {
+  if (!input.info?.id) return
   if (input.directory) clearPendingSessionPatch(input.directory, input.info.id)
   const result = Binary.search(input.store.session, input.info.id, (s) => s.id)
   if (result.found) {
@@ -981,9 +994,9 @@ export function applyDirectoryEvent(input: {
     }
     case "session.updated":
     case "session.next.updated": {
-      const props = event.properties as { info: Partial<Session>; sessionID?: string }
-      const sessionID = props.sessionID ?? props.info.id
-      if (!sessionID) break
+      const props = event.properties as { info?: Partial<Session>; sessionID?: string } | undefined
+      const sessionID = props?.sessionID ?? props?.info?.id
+      if (!sessionID || !props?.info) break
       handleSessionUpdated({
         store: input.store,
         setStore: input.setStore,

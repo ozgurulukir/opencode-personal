@@ -28,6 +28,7 @@ import {
   applyGlobalEvent,
   cleanupDroppedSessionCaches,
   clearPendingSessionPatch,
+  clearPendingSessionPatchesForDirectory,
   getPendingSessionPatch,
 } from "./global-sync/event-reducer"
 import { clearSessionPrefetchDirectory } from "./global-sync/session-prefetch"
@@ -204,6 +205,8 @@ function createGlobalSync() {
       sdkCache.delete(key)
       clearProviderRev(key)
       clearSessionPrefetchDirectory(key)
+      clearPendingSessionPatchesForDirectory(directory)
+      if (key !== directory) clearPendingSessionPatchesForDirectory(key)
     },
     translate: language.t,
     getSdk: sdkFor,
@@ -265,17 +268,29 @@ function createGlobalSync() {
                 })
                 .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
               const limit = store.limit
+              const preserveSet = new Set(preserve)
+              let expanded = true
+              while (expanded) {
+                expanded = false
+                for (const s of store.session) {
+                  if (preserveSet.has(s.id) && s.parentID && !preserveSet.has(s.parentID)) {
+                    preserveSet.add(s.parentID)
+                    expanded = true
+                  }
+                }
+              }
+              const effectivePreserve = Array.from(preserveSet)
               const childSessions = store.session.filter((s) => !!s.parentID)
               const extraSessions = store.session.filter(
                 (s) =>
-                  preserve.includes(s.id) &&
+                  preserveSet.has(s.id) &&
                   !nonArchived.some((item) => item.id === s.id) &&
                   !childSessions.some((item) => item.id === s.id),
               )
               const sessions = trimSessions([...nonArchived, ...childSessions, ...extraSessions], {
                 limit,
                 permission: store.permission,
-                preserve,
+                preserve: effectivePreserve,
               })
               batch(() => {
                 setStore(
@@ -287,7 +302,7 @@ function createGlobalSync() {
                   }),
                 )
                 setStore("session", reconcile(sessions, { key: "id" }))
-                cleanupDroppedSessionCaches(store, setStore, sessions, setSessionTodo, preserve)
+                cleanupDroppedSessionCaches(store, setStore, sessions, setSessionTodo, effectivePreserve)
               })
               sessionMeta.set(key, { limit })
             })

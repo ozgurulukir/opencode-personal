@@ -66,9 +66,16 @@ export function trimSessions(
 
   if (preserve.size > 0) {
     const keepIds = new Set(keepRoots.map((r) => r.id))
-    for (let i = 0; i < children.length; i++) {
-      const c = children[i]
-      if (preserve.has(c.id) && c.parentID) preserve.add(c.parentID)
+    let expanded = true
+    while (expanded) {
+      expanded = false
+      for (let i = 0; i < children.length; i++) {
+        const c = children[i]
+        if (preserve.has(c.id) && c.parentID && !preserve.has(c.parentID)) {
+          preserve.add(c.parentID)
+          expanded = true
+        }
+      }
     }
     for (let i = 0; i < roots.length; i++) {
       const r = roots[i]

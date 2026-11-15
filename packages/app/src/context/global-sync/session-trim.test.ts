@@ -93,4 +93,27 @@ describe("trimSessions", () => {
     expect(result.map((x) => x.id)).toContain("child-active")
     expect(result.map((x) => x.id)).toContain("root-parent")
   })
+
+  test("preserves nested multi-level ancestors regardless of order in children list", () => {
+    const now = 1_000_000
+    // Note: parent-child is before sub-child in list, and root is ancient
+    const list = [
+      session({ id: "root-active", created: now - 1000 }),
+      session({ id: "root-ancient-grandparent", created: now - 90_000_000 }),
+      session({ id: "child-parent", parentID: "root-ancient-grandparent", created: now - 60_000_000 }),
+      session({ id: "child-subagent", parentID: "child-parent", created: now - 40_000_000 }),
+    ]
+
+    const result = trimSessions(list, {
+      limit: 1,
+      permission: {},
+      preserve: ["child-subagent"],
+      now,
+    })
+
+    const ids = result.map((x) => x.id)
+    expect(ids).toContain("child-subagent")
+    expect(ids).toContain("child-parent")
+    expect(ids).toContain("root-ancient-grandparent")
+  })
 })
