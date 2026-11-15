@@ -309,4 +309,33 @@ describe("sessionMessagesToLegacy", () => {
 
     expect(ended[0]?.properties).toMatchObject({ part: { type: "reasoning", time: { start: 120, end: 130 } } })
   })
+
+  test("appends the compaction summary as a text part after the compaction part", () => {
+    const result = sessionMessagesToLegacy(
+      [
+        {
+          id: "user_1",
+          type: "user",
+          text: "hello",
+          agent: "build",
+          model,
+          time: { created: 100 },
+        },
+        {
+          id: "compaction_1",
+          type: "compaction",
+          reason: "auto",
+          summary: "the summary",
+          time: { created: 200 },
+        } as SessionMessage,
+      ],
+      sessionID,
+    )
+
+    expect(result[1]?.info).toMatchObject({ id: "compaction_1", role: "user" })
+    expect(result[1]?.parts).toEqual([
+      expect.objectContaining({ type: "compaction", auto: true }),
+      expect.objectContaining({ type: "text", text: "the summary", time: { start: 200, end: 200 } }),
+    ])
+  })
 })

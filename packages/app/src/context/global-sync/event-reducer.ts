@@ -13,6 +13,7 @@ import type {
   Session,
   SessionStatus,
   SnapshotFileDiff,
+  TextPart,
   Todo,
   UserMessage,
 } from "@opencode-ai/sdk/v2/client"
@@ -856,9 +857,70 @@ function handleCompactionStarted(input: MessageHandlerInput, event: MessageEvent
   insertPart(input, compactionPart({ messageID: id, sessionID: props.sessionID, auto: props.reason === "auto" }))
 }
 
-// compaction.delta / compaction.ended are no-ops: the summary text already
-// streams through the compaction assistant's text events, which is where the
-// V1 rendering read it from.
+// compaction.delta streams live deltas into a text part on the compaction
+// message, and compaction.ended folds the final summary into that part so the
+// web UI renders the summary both while streaming and after reload.
+function handleCompactionDelta(input: MessageHandlerInput, event: MessageEvent) {
+  const props = event.properties as { sessionID: string; text: string }
+  const compaction = activeCompaction(input, props.sessionID)
+  if (!compaction) return
+  updateCompactionText(input, compaction.messageID, compaction.sessionID, props.text, "append")
+}
+
+function handleCompactionEnded(input: MessageHandlerInput, event: MessageEvent) {
+  const props = event.properties as { sessionID: string; text: string; include?: string; status?: "ok" | "failed"; error?: string }
+  const compaction = activeCompaction(input, props.sessionID)
+  if (!compaction) return
+  updateCompactionText(input, compaction.messageID, compaction.sessionID, props.text, "set")
+}
+
+function activeCompaction(input: MessageHandlerInput, sessionID: string) {
+  const messages = input.store.message[sessionID]
+  if (!messages) return
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const message = messages[i]
+    if (message.role !== "user") continue
+    const parts = input.store.part[message.id]
+    if (parts && parts.some((p) => p.type === "compaction")) {
+      return { messageID: message.id, sessionID: message.sessionID }
+    }
+  }
+  return
+}
+
+function updateCompactionText(
+  input: MessageHandlerInput,
+  messageID: string,
+  sessionID: string,
+  text: string,
+  mode: "append" | "set",
+) {
+  input.setStore("part", messageID, produce((draft) => {
+    if (!text) {
+      // A failed compaction ends with empty text; drop any partial summary so
+      // the live store matches reload, which omits empty summaries.
+      if (mode === "set") {
+        for (let i = draft.length - 1; i >= 0; i--) {
+          if (draft[i].type === "text") draft.splice(i, 1)
+        }
+      }
+      return
+    }
+    let target: TextPart | undefined
+    for (let i = draft.length - 1; i >= 0; i--) {
+      if (draft[i].type === "text") {
+        target = draft[i] as TextPart
+        break
+      }
+    }
+    const next = mode === "set" ? text : (target?.text ?? "") + text
+    if (!target) {
+      draft.push(textPart({ messageID, sessionID, index: draft.length, text: next }))
+      return
+    }
+    target.text = next
+  }))
+}
 
 function handleVcsBranchUpdated(input: {
   store: Store<State>
@@ -1111,7 +1173,10 @@ export function applyDirectoryEvent(input: {
       handleCompactionStarted(messages, event)
       break
     case "session.next.compaction.delta":
+      handleCompactionDelta(messages, event)
+      break
     case "session.next.compaction.ended":
+      handleCompactionEnded(messages, event)
       break
     case "vcs.branch.updated": {
       const props = event.properties as { branch?: string }

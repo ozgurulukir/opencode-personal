@@ -1387,6 +1387,241 @@ describe("applyDirectoryEvent", () => {
     expect(store.part["evt_2"]?.[0]).toMatchObject({ type: "compaction", auto: true })
   })
 
+  test("compaction delta appends live summary text to the compaction message", () => {
+    const sessionID = "ses_1"
+    const [store, setStore] = createStore(baseState())
+
+    applyDirectoryEvent({
+      event: promptedEvent("evt_1", sessionID, "hello"),
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+    applyDirectoryEvent({
+      event: {
+        id: "evt_2",
+        type: "session.next.compaction.started",
+        properties: { sessionID, timestamp: 2, reason: "auto" },
+      },
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+    applyDirectoryEvent({
+      event: {
+        id: "evt_2",
+        type: "session.next.compaction.delta",
+        properties: { sessionID, text: "summary part one" },
+      },
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+    applyDirectoryEvent({
+      event: {
+        id: "evt_2",
+        type: "session.next.compaction.delta",
+        properties: { sessionID, text: " summary part two" },
+      },
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+
+    const parts = store.part["evt_2"] ?? []
+    expect(parts).toEqual([
+      expect.objectContaining({ type: "compaction", auto: true }),
+      expect.objectContaining({ type: "text", text: "summary part one summary part two" }),
+    ])
+  })
+
+  test("compaction ended folds final summary into the text part", () => {
+    const sessionID = "ses_1"
+    const [store, setStore] = createStore(baseState())
+
+    applyDirectoryEvent({
+      event: promptedEvent("evt_1", sessionID, "hello"),
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+    applyDirectoryEvent({
+      event: {
+        id: "evt_2",
+        type: "session.next.compaction.started",
+        properties: { sessionID, timestamp: 2, reason: "auto" },
+      },
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+    applyDirectoryEvent({
+      event: {
+        id: "evt_2",
+        type: "session.next.compaction.delta",
+        properties: { sessionID, text: "streamed" },
+      },
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+    applyDirectoryEvent({
+      event: {
+        id: "evt_2",
+        type: "session.next.compaction.ended",
+        properties: { sessionID, text: "final summary", include: "inc_1" },
+      },
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+
+    const parts = store.part["evt_2"] ?? []
+    expect(parts).toEqual([
+      expect.objectContaining({ type: "compaction", auto: true }),
+      expect.objectContaining({ type: "text", text: "final summary" }),
+    ])
+  })
+
+  test("compaction delta targets the newest compaction message", () => {
+    const sessionID = "ses_1"
+    const [store, setStore] = createStore(baseState())
+
+    applyDirectoryEvent({
+      event: promptedEvent("evt_1", sessionID, "hello"),
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+    applyDirectoryEvent({
+      event: {
+        id: "evt_2",
+        type: "session.next.compaction.started",
+        properties: { sessionID, timestamp: 2, reason: "auto" },
+      },
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+    applyDirectoryEvent({
+      event: {
+        id: "evt_2",
+        type: "session.next.compaction.ended",
+        properties: { sessionID, text: "first summary" },
+      },
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+    applyDirectoryEvent({
+      event: {
+        id: "evt_3",
+        type: "session.next.compaction.started",
+        properties: { sessionID, timestamp: 3, reason: "auto" },
+      },
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+    applyDirectoryEvent({
+      event: {
+        id: "evt_3",
+        type: "session.next.compaction.delta",
+        properties: { sessionID, text: "second" },
+      },
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+
+    expect(store.part["evt_2"]).toEqual([
+      expect.objectContaining({ type: "compaction", auto: true }),
+      expect.objectContaining({ type: "text", text: "first summary" }),
+    ])
+    expect(store.part["evt_3"]).toEqual([
+      expect.objectContaining({ type: "compaction", auto: true }),
+      expect.objectContaining({ type: "text", text: "second" }),
+    ])
+  })
+
+  test("failed compaction ended with empty text drops the partial summary", () => {
+    const sessionID = "ses_1"
+    const [store, setStore] = createStore(baseState())
+
+    applyDirectoryEvent({
+      event: promptedEvent("evt_1", sessionID, "hello"),
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+    applyDirectoryEvent({
+      event: {
+        id: "evt_2",
+        type: "session.next.compaction.started",
+        properties: { sessionID, timestamp: 2, reason: "auto" },
+      },
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+    applyDirectoryEvent({
+      event: {
+        id: "evt_2",
+        type: "session.next.compaction.delta",
+        properties: { sessionID, text: "partial" },
+      },
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+    applyDirectoryEvent({
+      event: {
+        id: "evt_2",
+        type: "session.next.compaction.ended",
+        properties: { sessionID, text: "", status: "failed", error: "ContextOverflowError" },
+      },
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+
+    expect(store.part["evt_2"]).toEqual([expect.objectContaining({ type: "compaction", auto: true })])
+  })
+
   test("tracks permission and question request lifecycles", () => {
     const sessionID = "ses_1"
     const [store, setStore] = createStore(

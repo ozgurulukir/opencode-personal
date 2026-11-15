@@ -505,6 +505,19 @@ export function sessionMessagesToLegacy(
             type: "compaction",
             auto: message.reason === "auto",
           },
+          ...(message.summary
+            ? [
+                legacyTextPart({
+                  id: partID(message.id, 1, "text"),
+                  sessionID,
+                  messageID: message.id,
+                  text: message.summary,
+                  ...(options.includeTextTime
+                    ? { start: message.time.created, end: message.time.created }
+                    : {}),
+                }),
+              ]
+            : []),
         ],
       })
       continue
