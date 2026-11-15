@@ -83,13 +83,44 @@ function cleanupSessionCaches(
   )
 }
 
+const pendingPatchesByDir = new Map<string, Map<string, Partial<Session>>>()
+
+export function getPendingSessionPatch(directory: string, sessionID: string): Partial<Session> | undefined {
+  return pendingPatchesByDir.get(directory)?.get(sessionID)
+}
+
+export function clearPendingSessionPatch(directory: string, sessionID: string): void {
+  const map = pendingPatchesByDir.get(directory)
+  if (!map) return
+  map.delete(sessionID)
+  if (map.size === 0) pendingPatchesByDir.delete(directory)
+}
+
+export function setPendingSessionPatch(directory: string, sessionID: string, patch: Partial<Session>): void {
+  let map = pendingPatchesByDir.get(directory)
+  if (!map) {
+    map = new Map()
+    pendingPatchesByDir.set(directory, map)
+  }
+  const existing = map.get(sessionID)
+  map.set(sessionID, {
+    ...existing,
+    ...patch,
+    ...(patch.time ? { time: { ...existing?.time, ...patch.time } } : {}),
+  })
+}
+
 export function cleanupDroppedSessionCaches(
   store: Store<State>,
   setStore: SetStoreFunction<State>,
   next: Session[],
   setSessionTodo?: (sessionID: string, todos: Todo[] | undefined) => void,
+  preserve?: string[],
 ) {
   const keep = new Set(next.map((item) => item.id))
+  if (preserve) {
+    for (const id of preserve) if (id) keep.add(id)
+  }
   // Runs on every session.created event and sessions load. Collect into a Set
   // in single passes — the previous spread + indexOf dedupe was O(N^2) over all
   // cached sessions and parts.
@@ -125,19 +156,35 @@ function handleSessionCreated(input: {
   store: Store<State>
   setStore: SetStoreFunction<State>
   info: Session
+  directory?: string
   setSessionTodo?: (sessionID: string, todos: Todo[] | undefined) => void
+  preserve?: string[]
 }) {
-  const result = Binary.search(input.store.session, input.info.id, (s) => s.id)
+  const pending = input.directory ? getPendingSessionPatch(input.directory, input.info.id) : undefined
+  if (pending && input.directory) clearPendingSessionPatch(input.directory, input.info.id)
+  const sessionInfo = pending
+    ? {
+        ...input.info,
+        ...pending,
+        ...(pending.time ? { time: { ...input.info.time, ...pending.time } } : {}),
+      }
+    : input.info
+
+  const result = Binary.search(input.store.session, sessionInfo.id, (s) => s.id)
   if (result.found) {
-    input.setStore("session", result.index, reconcile(input.info))
+    input.setStore("session", result.index, reconcile(sessionInfo))
     return
   }
   const next = input.store.session.slice()
-  next.splice(result.index, 0, input.info)
-  const trimmed = trimSessions(next, { limit: input.store.limit, permission: input.store.permission })
+  next.splice(result.index, 0, sessionInfo)
+  const trimmed = trimSessions(next, {
+    limit: input.store.limit,
+    permission: input.store.permission,
+    preserve: input.preserve,
+  })
   input.setStore("session", reconcile(trimmed, { key: "id" }))
-  cleanupDroppedSessionCaches(input.store, input.setStore, trimmed, input.setSessionTodo)
-  if (!input.info.parentID) input.setStore("sessionTotal", (value) => value + 1)
+  cleanupDroppedSessionCaches(input.store, input.setStore, trimmed, input.setSessionTodo, input.preserve)
+  if (!sessionInfo.parentID) input.setStore("sessionTotal", (value) => value + 1)
 }
 
 function handleSessionUpdated(input: {
@@ -145,6 +192,7 @@ function handleSessionUpdated(input: {
   setStore: SetStoreFunction<State>
   info: Partial<Session>
   sessionID: string
+  directory?: string
   setSessionTodo?: (sessionID: string, todos: Todo[] | undefined) => void
 }) {
   // `info` is a partial patch (no `id`) for session updates such as title, summary,
@@ -153,6 +201,7 @@ function handleSessionUpdated(input: {
   // leaves sessions stale (e.g. undo can't reflect a `session.revert`).
   const result = Binary.search(input.store.session, input.sessionID, (s) => s.id)
   if (input.info.time?.archived) {
+    if (input.directory) clearPendingSessionPatch(input.directory, input.sessionID)
     if (result.found) {
       input.setStore(
         "session",
@@ -168,6 +217,7 @@ function handleSessionUpdated(input: {
   }
   const merged = { ...input.info, id: input.sessionID }
   if (result.found) {
+    if (input.directory) clearPendingSessionPatch(input.directory, input.sessionID)
     input.setStore(
       "session",
       produce((draft) => {
@@ -179,15 +229,21 @@ function handleSessionUpdated(input: {
     return
   }
   // Unknown updates can be partial and do not contain enough data to create a
-  // valid session. The next full session load will add it to the store.
+  // valid session. Buffer the patch so when the session is loaded or created,
+  // the patch is merged instead of dropped.
+  if (input.directory) {
+    setPendingSessionPatch(input.directory, input.sessionID, input.info)
+  }
 }
 
 function handleSessionDeleted(input: {
   store: Store<State>
   setStore: SetStoreFunction<State>
   info: Session
+  directory?: string
   setSessionTodo?: (sessionID: string, todos: Todo[] | undefined) => void
 }) {
+  if (input.directory) clearPendingSessionPatch(input.directory, input.info.id)
   const result = Binary.search(input.store.session, input.info.id, (s) => s.id)
   if (result.found) {
     input.setStore(
@@ -899,6 +955,7 @@ export function applyDirectoryEvent(input: {
   vcsCache?: VcsCache
   setSessionTodo?: (sessionID: string, todos: Todo[] | undefined) => void
   resolveOptimistic?: (sessionID: string, text: string) => void
+  preserve?: string[]
 }) {
   const event = input.event
   const messages: MessageHandlerInput = {
@@ -916,10 +973,13 @@ export function applyDirectoryEvent(input: {
         store: input.store,
         setStore: input.setStore,
         info: (event.properties as { info: Session }).info,
+        directory: input.directory,
         setSessionTodo: input.setSessionTodo,
+        preserve: input.preserve,
       })
       break
     }
+    case "session.updated":
     case "session.next.updated": {
       const props = event.properties as { info: Partial<Session>; sessionID?: string }
       const sessionID = props.sessionID ?? props.info.id
@@ -929,15 +989,18 @@ export function applyDirectoryEvent(input: {
         setStore: input.setStore,
         info: props.info,
         sessionID,
+        directory: input.directory,
         setSessionTodo: input.setSessionTodo,
       })
       break
     }
+    case "session.deleted":
     case "session.next.deleted": {
       handleSessionDeleted({
         store: input.store,
         setStore: input.setStore,
         info: (event.properties as { info: Session }).info,
+        directory: input.directory,
         setSessionTodo: input.setSessionTodo,
       })
       break

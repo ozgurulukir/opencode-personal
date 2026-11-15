@@ -9,6 +9,7 @@ import {
   getSessionPrefetchPromise,
   setSessionPrefetch,
 } from "./global-sync/session-prefetch"
+import { clearPendingSessionPatch, getPendingSessionPatch } from "./global-sync/event-reducer"
 import { useGlobalSync } from "./global-sync"
 import { useSDK } from "./sdk"
 import type { Message, Part } from "@opencode-ai/sdk/v2/client"
@@ -472,15 +473,24 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
                     if (!tracked(directory, sessionID)) return
                     const data = session.data
                     if (!data) return
+                    const pending = getPendingSessionPatch(directory, sessionID)
+                    if (pending) clearPendingSessionPatch(directory, sessionID)
+                    const resolved = pending
+                      ? {
+                          ...data,
+                          ...pending,
+                          ...(pending.time ? { time: { ...data.time, ...pending.time } } : {}),
+                        }
+                      : data
                     setStore(
                       "session",
                       produce((draft) => {
                         const match = Binary.search(draft, sessionID, (s) => s.id)
                         if (match.found) {
-                          draft[match.index] = data
+                          draft[match.index] = resolved
                           return
                         }
-                        draft.splice(match.index, 0, data)
+                        draft.splice(match.index, 0, resolved)
                       }),
                     )
                   })

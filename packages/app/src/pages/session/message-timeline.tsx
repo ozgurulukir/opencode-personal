@@ -31,6 +31,7 @@ import { usePlatform } from "@/context/platform"
 import { useSettings } from "@/context/settings"
 import { useSDK } from "@/context/sdk"
 import { useSync } from "@/context/sync"
+import { useGlobalSync } from "@/context/global-sync"
 import { messageAgentColor } from "@/utils/agent"
 import { sessionTitle } from "@/utils/session-title"
 import { parseCommentNote, readCommentMetadata } from "@/utils/comment-note"
@@ -70,6 +71,7 @@ export function MessageTimeline(props: {
 
   const navigate = useNavigate()
   const globalSDK = useGlobalSDK()
+  const globalSync = useGlobalSync()
   const sdk = useSDK()
   const sync = useSync()
   const settings = useSettings()
@@ -183,13 +185,13 @@ export function MessageTimeline(props: {
     return
   })
   const childTitle = createMemo(() => {
-    if (!parentID()) return titleLabel() ?? ""
+    if (!parentID()) return titleLabel() ?? (sessionID() ? language.t("command.session.new") : "")
     if (childTaskDescription()) return childTaskDescription()
     const value = titleLabel()?.replace(/\s+\(@[^)]+ subagent\)$/, "")
     if (value) return value
     return language.t("command.session.new")
   })
-  const showHeader = createMemo(() => !!(titleValue() || parentID()))
+  const showHeader = createMemo(() => !!(sessionID() || titleValue() || parentID()))
   const stageCfg = { init: 1, batch: 3 }
   const staging = createTimelineStaging({
     sessionKey,
@@ -259,6 +261,16 @@ export function MessageTimeline(props: {
     mutationFn: (input: { id: string; title: string }) =>
       sdk.client.v2.session.update({ sessionID: input.id, title: input.title }),
     onSuccess: (_, input) => {
+      const targetDir = info()?.directory ?? sdk.directory
+      if (targetDir !== sdk.directory) {
+        const [, setStore] = globalSync.child(targetDir)
+        setStore(
+          produce((draft) => {
+            const index = draft.session.findIndex((s) => s.id === input.id)
+            if (index !== -1) draft.session[index].title = input.title
+          }),
+        )
+      }
       sync.set(
         produce((draft) => {
           const index = draft.session.findIndex((s) => s.id === input.id)

@@ -23,7 +23,13 @@ import {
   loadProvidersQuery,
 } from "./global-sync/bootstrap"
 import { createChildStoreManager } from "./global-sync/child-store"
-import { applyDirectoryEvent, applyGlobalEvent, cleanupDroppedSessionCaches } from "./global-sync/event-reducer"
+import {
+  applyDirectoryEvent,
+  applyGlobalEvent,
+  cleanupDroppedSessionCaches,
+  clearPendingSessionPatch,
+  getPendingSessionPatch,
+} from "./global-sync/event-reducer"
 import { clearSessionPrefetchDirectory } from "./global-sync/session-prefetch"
 import { estimateRootSessionTotal, loadRootSessionsWithFallback } from "./global-sync/session-load"
 import { trimSessions } from "./global-sync/session-trim"
@@ -206,8 +212,12 @@ function createGlobalSync() {
     },
   })
 
-  async function loadSessions(directory: string) {
+  const activeSessions = new Map<string, string>()
+
+  async function loadSessions(directory: string, options?: { preserve?: string[] }) {
     const key = directoryKey(directory)
+    const active = activeSessions.get(key)
+    const preserve = [...(options?.preserve ?? []), ...(active ? [active] : [])]
     const pending = sessionLoads.get(key)
     if (pending) return pending
 
@@ -218,10 +228,11 @@ function createGlobalSync() {
       const next = trimSessions(store.session, {
         limit: store.limit,
         permission: store.permission,
+        preserve,
       })
       if (next.length !== store.session.length) {
         setStore("session", reconcile(next, { key: "id" }))
-        cleanupDroppedSessionCaches(store, setStore, next, setSessionTodo)
+        cleanupDroppedSessionCaches(store, setStore, next, setSessionTodo, preserve)
       }
       children.unpin(key)
       return
@@ -242,12 +253,29 @@ function createGlobalSync() {
               const nonArchived = (x.data ?? [])
                 .filter((s) => !!s?.id)
                 .filter((s) => !s.time?.archived)
+                .map((s) => {
+                  const pendingPatch = getPendingSessionPatch(directory, s.id)
+                  if (!pendingPatch) return s
+                  clearPendingSessionPatch(directory, s.id)
+                  return {
+                    ...s,
+                    ...pendingPatch,
+                    ...(pendingPatch.time ? { time: { ...s.time, ...pendingPatch.time } } : {}),
+                  }
+                })
                 .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
               const limit = store.limit
               const childSessions = store.session.filter((s) => !!s.parentID)
-              const sessions = trimSessions([...nonArchived, ...childSessions], {
+              const extraSessions = store.session.filter(
+                (s) =>
+                  preserve.includes(s.id) &&
+                  !nonArchived.some((item) => item.id === s.id) &&
+                  !childSessions.some((item) => item.id === s.id),
+              )
+              const sessions = trimSessions([...nonArchived, ...childSessions, ...extraSessions], {
                 limit,
                 permission: store.permission,
+                preserve,
               })
               batch(() => {
                 setStore(
@@ -259,7 +287,7 @@ function createGlobalSync() {
                   }),
                 )
                 setStore("session", reconcile(sessions, { key: "id" }))
-                cleanupDroppedSessionCaches(store, setStore, sessions, setSessionTodo)
+                cleanupDroppedSessionCaches(store, setStore, sessions, setSessionTodo, preserve)
               })
               sessionMeta.set(key, { limit })
             })
@@ -367,6 +395,7 @@ function createGlobalSync() {
           void queryClient.fetchQuery(loadLspQuery(key, sdkFor(directory)))
         },
         resolveOptimistic: (sessionID, text) => optimisticResolver?.(directory, sessionID, text),
+        preserve: activeSessions.get(key) ? [activeSessions.get(key)!] : undefined,
       }),
     )
   })
@@ -400,6 +429,17 @@ function createGlobalSync() {
 
   const projectApi = {
     loadSessions,
+    setActiveSession(directory: string, sessionID: string | undefined) {
+      const key = directoryKey(directory)
+      if (!sessionID) {
+        activeSessions.delete(key)
+      } else {
+        activeSessions.set(key, sessionID)
+      }
+    },
+    getActiveSession(directory: string): string | undefined {
+      return activeSessions.get(directoryKey(directory))
+    },
     meta(directory: string, patch: ProjectMeta) {
       children.projectMeta(directory, patch)
     },

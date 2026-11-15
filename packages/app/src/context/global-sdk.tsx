@@ -13,6 +13,21 @@ const abortError = z.object({
   name: z.literal("AbortError"),
 })
 
+// Coalesce only full-state, idempotent events whose reordering cannot
+// corrupt incremental deltas: V2 text/reasoning/compaction deltas are
+// appends applied in order and are never dropped, and no coalescable
+// event shares a target with them.
+// Note: session.next.updated carries partial patches (e.g. title, summary, time, revert).
+// Coalescing would overwrite earlier patches with later ones (e.g. touch dropping title).
+export const coalesceEventKey = (directory: string, payload: Event) => {
+  if (payload.type === "session.next.status") return `session.next.status:${directory}:${payload.properties.sessionID}`
+  if (payload.type === "lsp.updated") return `lsp.updated:${directory}`
+  if (payload.type === "session.next.todo") return `session.next.todo:${directory}:${payload.properties.sessionID}`
+  if (payload.type === "session.next.diff") return `session.next.diff:${directory}:${payload.properties.sessionID}`
+  if (payload.type === "session.next.tool.progress")
+    return `session.next.tool.progress:${directory}:${payload.properties.callID}`
+}
+
 export const { use: useGlobalSDK, provider: GlobalSDKProvider } = createSimpleContext({
   name: "GlobalSDK",
   init: () => {
@@ -55,19 +70,7 @@ export const { use: useGlobalSDK, provider: GlobalSDKProvider } = createSimpleCo
     let timer: ReturnType<typeof setTimeout> | undefined
     let last = 0
 
-    // Coalesce only full-state, idempotent events whose reordering cannot
-    // corrupt incremental deltas: V2 text/reasoning/compaction deltas are
-    // appends applied in order and are never dropped, and no coalescable
-    // event shares a target with them.
-    const key = (directory: string, payload: Event) => {
-      if (payload.type === "session.next.status") return `session.next.status:${directory}:${payload.properties.sessionID}`
-      if (payload.type === "lsp.updated") return `lsp.updated:${directory}`
-      if (payload.type === "session.next.updated") return `session.next.updated:${directory}:${payload.properties.sessionID}`
-      if (payload.type === "session.next.todo") return `session.next.todo:${directory}:${payload.properties.sessionID}`
-      if (payload.type === "session.next.diff") return `session.next.diff:${directory}:${payload.properties.sessionID}`
-      if (payload.type === "session.next.tool.progress")
-        return `session.next.tool.progress:${directory}:${payload.properties.callID}`
-    }
+    const key = coalesceEventKey
 
     const flush = () => {
       if (timer) clearTimeout(timer)
