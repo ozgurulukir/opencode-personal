@@ -21,7 +21,7 @@ import { MessageV2 } from "../message-v2"
 import { Session } from "../session"
 import { bashRegex, argsRegex, placeholderRegex, quoteTrimRegex } from "../prompt/command-regex"
 import { currentModel, getModel } from "./model"
-import type { CommandInput, PromptInput } from "../prompt"
+import type { CommandInput, PromptInput } from "./types"
 
 const elog = EffectLogger.create({ service: "session.prompt" })
 
