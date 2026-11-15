@@ -226,7 +226,10 @@ describe("sessionMessagesToV1", () => {
 
     expect(session).toHaveLength(2)
     expect(session[1]).toMatchObject({ id: "evt_2", role: "user", agent: "assistant" })
-    expect(part["evt_2"]?.[0]).toMatchObject({ type: "compaction", auto: true })
+    expect(part["evt_2"]).toEqual([
+      expect.objectContaining({ type: "compaction", auto: true }),
+      expect.objectContaining({ type: "text", text: "summary" }),
+    ])
   })
 
   test("attaches synthetic comment notes to the latest user message and skips others", () => {
