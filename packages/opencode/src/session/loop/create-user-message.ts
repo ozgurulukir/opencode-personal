@@ -30,7 +30,7 @@ import { NamedError } from "@opencode-ai/core/util/error"
 import { decodeDataUrl } from "@/util/data-url"
 import { Database, eq } from "@/storage/db"
 import { SessionTable } from "../session.sql"
-import { PromptInput } from "../prompt"
+import { PromptInput } from "./types"
 import { currentModel } from "./model"
 import { Tool } from "@/tool/tool"
 

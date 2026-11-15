@@ -16,7 +16,7 @@ import {
 import { canDisposeDirectory, pickDirectoriesToEvict } from "./eviction"
 import { useQueries } from "@tanstack/solid-query"
 import { loadPathQuery, loadProvidersQuery } from "./bootstrap"
-import { loadLspQuery, loadMcpQuery } from "../global-sync"
+import { loadLspQuery, loadMcpQuery } from "./queries"
 import { directoryKey, type DirectoryKey } from "./utils"
 
 export function createChildStoreManager(input: {

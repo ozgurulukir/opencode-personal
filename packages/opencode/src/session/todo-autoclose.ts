@@ -1,4 +1,7 @@
-import type { Info, TodoStatus } from "./todo"
+export interface AutocloseTodo {
+  content: string
+  status: string
+}
 
 export interface FileChange {
   filePath: string
@@ -14,7 +17,7 @@ export interface FileChange {
  * 2. It has at least one significant word (>3 characters)
  * 3. All significant words appear in at least one diff (case insensitive)
  */
-export function shouldComplete(todo: Info, fileChanges: FileChange[]): boolean {
+export function shouldComplete(todo: AutocloseTodo, fileChanges: FileChange[]): boolean {
   if (todo.status === "completed" || todo.status === "cancelled") return false
 
   const contentLower = todo.content.toLowerCase()
@@ -33,14 +36,14 @@ export function shouldComplete(todo: Info, fileChanges: FileChange[]): boolean {
  * Returns the same array reference if no todos were changed (reference equality
  * optimization for callers that check `changed`).
  */
-export function applyAutoclose(todos: Info[], fileChanges: FileChange[]): Info[] {
+export function applyAutoclose<T extends AutocloseTodo>(todos: T[], fileChanges: FileChange[]): T[] {
   if (todos.length === 0) return todos
 
   let changed = false
   const next = todos.map((todo) => {
     if (shouldComplete(todo, fileChanges)) {
       changed = true
-      return { ...todo, status: "completed" as TodoStatus }
+      return { ...todo, status: "completed" }
     }
     return todo
   })
