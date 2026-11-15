@@ -12,6 +12,7 @@ import { Global } from "@opencode-ai/core/global"
 import * as Log from "@opencode-ai/core/util/log"
 import { NonNegativeInt, withStatics } from "@opencode-ai/core/schema"
 import { zod } from "@opencode-ai/core/effect-zod"
+import { parseNameStatus, parseNumstat } from "./parse"
 
 export const Patch = Schema.Struct({
   hash: Schema.String,
@@ -761,19 +762,12 @@ export const layer: Layer.Layer<
               )
 
               const result: FileDiff[] = []
-              const status = new Map<string, "added" | "deleted" | "modified">()
 
               const statuses = yield* git(
                 [...quote, ...args(["diff", "--no-ext-diff", "--name-status", "--no-renames", from, to, "--", "."])],
                 { cwd: state.worktree },
               )
-
-              for (const line of statuses.text.trim().split("\n")) {
-                if (!line) continue
-                const [code, file] = line.split("\t")
-                if (!code || !file) continue
-                status.set(file, code.startsWith("A") ? "added" : code.startsWith("D") ? "deleted" : "modified")
-              }
+              const status = parseNameStatus(statuses.text)
 
               const numstat = yield* git(
                 [...quote, ...args(["diff", "--no-ext-diff", "--no-renames", "--numstat", from, to, "--", "."])],
@@ -781,27 +775,7 @@ export const layer: Layer.Layer<
                   cwd: state.worktree,
                 },
               )
-
-              const rows = numstat.text
-                .trim()
-                .split("\n")
-                .filter(Boolean)
-                .flatMap((line) => {
-                  const [adds, dels, file] = line.split("\t")
-                  if (!file) return []
-                  const binary = adds === "-" && dels === "-"
-                  const additions = binary ? 0 : parseInt(adds)
-                  const deletions = binary ? 0 : parseInt(dels)
-                  return [
-                    {
-                      file,
-                      status: status.get(file) ?? "modified",
-                      binary,
-                      additions: Number.isFinite(additions) ? additions : 0,
-                      deletions: Number.isFinite(deletions) ? deletions : 0,
-                    } satisfies Row,
-                  ]
-                })
+              const rows = parseNumstat(numstat.text, status)
 
               // Hide ignored-file removals from the user-facing diff output.
               const ignored = yield* ignore(rows.map((r) => r.file))
