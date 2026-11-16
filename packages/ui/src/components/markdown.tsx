@@ -109,11 +109,14 @@ function createCopyButton(labels: CopyLabels) {
   return button
 }
 
-function setCopyState(button: HTMLButtonElement, labels: CopyLabels, copied: boolean) {
+// Exported for the setCopyState characterization test: only touches the
+// button's attributes, so a plain stub object passes for HTMLButtonElement.
+export function setCopyState(button: HTMLButtonElement, labels: CopyLabels, copied: boolean) {
   if (copied) {
     button.setAttribute("data-copied", "true")
     button.setAttribute("aria-label", labels.copied)
     button.setAttribute("data-tooltip", labels.copied)
+    return
   }
   button.removeAttribute("data-copied")
   button.setAttribute("aria-label", labels.copy)

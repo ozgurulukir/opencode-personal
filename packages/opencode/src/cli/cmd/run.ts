@@ -622,7 +622,10 @@ export const RunCommand = effectCmd({
             toolError,
             client,
           }
-          loop(ctx, events, { native: true }).catch((e) => {
+          // Await the event drain before returning: the top-level finally runs
+          // process.exit(), which would otherwise kill the still-draining SSE
+          // consumer and truncate buffered output/tool events.
+          const drain = loop(ctx, events, { native: true }).catch((e) => {
             console.error(e)
             process.exit(1)
           })
@@ -636,7 +639,7 @@ export const RunCommand = effectCmd({
               arguments: message,
               variant: args.variant,
             })
-            return
+            return await drain
           }
 
           const model = pick(args.model)
@@ -650,7 +653,7 @@ export const RunCommand = effectCmd({
               files: files.map((file) => ({ uri: file.url, mime: file.mime, name: file.filename })),
             },
           })
-          return
+          return await drain
         }
 
         const model = pick(args.model)

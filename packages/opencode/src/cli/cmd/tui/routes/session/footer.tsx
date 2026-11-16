@@ -42,27 +42,33 @@ export function Footer() {
   })
 
   onMount(() => {
-    // Track all timeouts to ensure proper cleanup
-    const timeouts: ReturnType<typeof setTimeout>[] = []
+    // Single pending timer: the tick chain previously pushed every fired
+    // handle into the array without removal (unbounded growth while
+    // disconnected).
+    let pending: ReturnType<typeof setTimeout> | undefined
 
     function tick() {
-      if (connected()) return
+      pending = undefined
+      // Connecting during the 5s welcome window must clear the hint — the
+      // welcome <Match> precedes the connected <Match>, so a stale hint
+      // otherwise stays on screen forever.
+      if (connected()) {
+        if (store.welcome) setStore("welcome", false)
+        return
+      }
       if (!store.welcome) {
         setStore("welcome", true)
-        timeouts.push(setTimeout(() => tick(), 5000))
+        pending = setTimeout(() => tick(), 5000)
         return
       }
 
-      if (store.welcome) {
-        setStore("welcome", false)
-        timeouts.push(setTimeout(() => tick(), 10_000))
-        return
-      }
+      setStore("welcome", false)
+      pending = setTimeout(() => tick(), 10_000)
     }
-    timeouts.push(setTimeout(() => tick(), 10_000))
+    pending = setTimeout(() => tick(), 10_000)
 
     onCleanup(() => {
-      timeouts.forEach(clearTimeout)
+      if (pending) clearTimeout(pending)
     })
   })
 
@@ -71,7 +77,7 @@ export function Footer() {
       <text fg={theme.textMuted}>{directory()}</text>
       <box gap={2} flexDirection="row" flexShrink={0}>
         <Switch>
-          <Match when={store.welcome}>
+          <Match when={store.welcome && !connected()}>
             <text fg={theme.text}>
               Get started <span style={{ fg: theme.textMuted }}>/connect</span>
             </text>
