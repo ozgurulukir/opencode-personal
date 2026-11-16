@@ -25,8 +25,10 @@ const ctx = {
 void mock.module("dns", () => {
   const dns = require("dns")
   const originalLookup = dns.promises.lookup.bind(dns.promises)
-  dns.promises.lookup = async (hostname: string) => {
+  dns.promises.lookup = async (hostname: string, options?: { all?: boolean }) => {
     if (hostname.toLowerCase() === "localhost") {
+      // guardedFetch resolves with { all: true }, which expects an address array.
+      if (options?.all) return [{ address: "8.8.8.8", family: 4 }]
       return { address: "8.8.8.8", family: 4 }
     }
     return originalLookup(hostname)
@@ -176,7 +178,7 @@ describe("tool.webfetch", () => {
       directory: projectRoot,
       fn: async () => {
         await expect(exec({ url: "http://127.0.0.1/", format: "text" })).rejects.toThrow(
-          "SSRF guard: requests to private/internal IPs are not allowed",
+          "Refusing to fetch webfetch from private/internal network target",
         )
       },
     })
@@ -187,7 +189,7 @@ describe("tool.webfetch", () => {
       directory: projectRoot,
       fn: async () => {
         await expect(exec({ url: "http://169.254.169.254/latest/meta-data/", format: "text" })).rejects.toThrow(
-          "SSRF guard: requests to private/internal IPs are not allowed",
+          "Refusing to fetch webfetch from private/internal network target",
         )
       },
     })
@@ -198,7 +200,7 @@ describe("tool.webfetch", () => {
       directory: projectRoot,
       fn: async () => {
         await expect(exec({ url: "http://10.0.0.1/", format: "text" })).rejects.toThrow(
-          "SSRF guard: requests to private/internal IPs are not allowed",
+          "Refusing to fetch webfetch from private/internal network target",
         )
       },
     })
@@ -209,7 +211,7 @@ describe("tool.webfetch", () => {
       directory: projectRoot,
       fn: async () => {
         await expect(exec({ url: "http://192.168.1.1/", format: "text" })).rejects.toThrow(
-          "SSRF guard: requests to private/internal IPs are not allowed",
+          "Refusing to fetch webfetch from private/internal network target",
         )
       },
     })
@@ -220,7 +222,7 @@ describe("tool.webfetch", () => {
       directory: projectRoot,
       fn: async () => {
         await expect(exec({ url: "http://[::1]/", format: "text" })).rejects.toThrow(
-          "SSRF guard: requests to private/internal IPs are not allowed",
+          "Refusing to fetch webfetch from private/internal network target",
         )
       },
     })
@@ -231,7 +233,7 @@ describe("tool.webfetch", () => {
       directory: projectRoot,
       fn: async () => {
         await expect(exec({ url: "http://[fc00::1]/", format: "text" })).rejects.toThrow(
-          "SSRF guard: requests to private/internal IPs are not allowed",
+          "Refusing to fetch webfetch from private/internal network target",
         )
       },
     })
@@ -241,30 +243,26 @@ describe("tool.webfetch", () => {
     await WithInstance.provide({
       directory: projectRoot,
       fn: async () => {
-        const quotedClient = HttpClient.make((request: HttpClientRequest.HttpClientRequest) =>
-          Effect.succeed(
-            HttpClientResponse.fromWeb(
-              request,
-              new Response("<p>hello from quoted charset</p>", {
-                status: 200,
-                headers: { "content-type": 'text/html; charset="utf-8"' },
-              }),
-            ),
-          ),
-        )
-
-        const { WebFetchTool } = await import("../../src/tool/webfetch")
-        const result = await WebFetchTool.pipe(
-          Effect.flatMap((info) => info.init()),
-          Effect.flatMap((tool) =>
-            tool.execute({ url: "http://localhost/quoted-charset", format: "text" }, ctx),
-          ),
-          Effect.provideService(HttpClient.HttpClient, quotedClient),
-          Effect.provide(Layer.mergeAll(Truncate.defaultLayer, Agent.defaultLayer)),
-          Effect.runPromise,
-        )
-
-        expect(result.output).toContain("hello from quoted charset")
+        // webfetch now fetches through util/network guardedFetch (global fetch),
+        // so responses are injected via a fetch mock instead of an HttpClient layer.
+        const originalFetch = globalThis.fetch
+        ;(globalThis as any).fetch = async () =>
+          new Response("<p>hello from quoted charset</p>", {
+            status: 200,
+            headers: { "content-type": 'text/html; charset="utf-8"' },
+          })
+        try {
+          const { WebFetchTool } = await import("../../src/tool/webfetch")
+          const result = await WebFetchTool.pipe(
+            Effect.flatMap((info) => info.init()),
+            Effect.flatMap((tool) => tool.execute({ url: "http://localhost/quoted-charset", format: "text" }, ctx)),
+            Effect.provide(Layer.mergeAll(Truncate.defaultLayer, Agent.defaultLayer)),
+            Effect.runPromise,
+          )
+          expect(result.output).toContain("hello from quoted charset")
+        } finally {
+          ;(globalThis as any).fetch = originalFetch
+        }
       },
     })
   })
@@ -274,7 +272,7 @@ describe("tool.webfetch", () => {
       directory: projectRoot,
       fn: async () => {
         await expect(exec({ url: "http://[fd00::1]/", format: "text" })).rejects.toThrow(
-          "SSRF guard: requests to private/internal IPs are not allowed",
+          "Refusing to fetch webfetch from private/internal network target",
         )
       },
     })
@@ -285,7 +283,7 @@ describe("tool.webfetch", () => {
       directory: projectRoot,
       fn: async () => {
         await expect(exec({ url: "http://[fc00::1]/", format: "text" })).rejects.toThrow(
-          "SSRF guard: requests to private/internal IPs are not allowed",
+          "Refusing to fetch webfetch from private/internal network target",
         )
       },
     })

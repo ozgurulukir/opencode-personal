@@ -1,4 +1,6 @@
 import { describe, expect } from "bun:test"
+import fsp from "fs/promises"
+import path from "path"
 import { Effect, Layer } from "effect"
 import { HttpRouter } from "effect/unstable/http"
 import { Flag } from "@opencode-ai/core/flag/flag"
@@ -139,6 +141,35 @@ describe("worktree endpoint reproduction", () => {
 
         expect(response.status).toBe(200)
         expect(Date.now() - started).toBeLessThan(1_500)
+      }),
+    { git: true },
+  )
+
+  it.instance(
+    "worktree remove refuses to delete a directory outside the managed worktree root",
+    () =>
+      Effect.gen(function* () {
+        const test = yield* TestInstance
+        const server = yield* serverScoped()
+
+        const victim = path.join(test.directory, "victim-dir")
+        yield* Effect.promise(() => fsp.mkdir(victim, { recursive: true }))
+        yield* Effect.promise(() => fsp.writeFile(path.join(victim, "keep.txt"), "precious"))
+
+        const response = yield* withRequestTimeout(
+          request(server, `${ExperimentalPaths.worktree}?directory=${encodeURIComponent(test.directory)}`, {
+            method: "DELETE",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ directory: victim }),
+          }),
+          "worktree remove containment",
+        )
+
+        // Worktree* errors map to 400 in the instance error middleware.
+        expect(response.status).toBe(400)
+        // The directory must be left untouched.
+        const stillThere = yield* Effect.promise(() => fsp.stat(path.join(victim, "keep.txt")))
+        expect(stillThere.isFile()).toBe(true)
       }),
     { git: true },
   )

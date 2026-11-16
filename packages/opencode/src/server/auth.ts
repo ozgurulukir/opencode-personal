@@ -3,6 +3,7 @@ export * as ServerAuth from "./auth"
 import { ConfigService } from "@/effect/config-service"
 import { Flag } from "@opencode-ai/core/flag/flag"
 import { Config as EffectConfig, Context, Option, Redacted } from "effect"
+import { timingSafeEqual } from "node:crypto"
 
 export type Credentials = {
   password?: string
@@ -21,6 +22,20 @@ export class Config extends ConfigService.Service<Config>()("@opencode/ServerAut
 
 export type Info = Context.Service.Shape<typeof Config>
 
+// Constant-time comparison for secret values: ordinary `===` leaks a
+// prefix-match timing side channel. Length mismatch is handled before
+// `timingSafeEqual` (which throws on unequal lengths).
+function constantTimeEqual(a: string, b: string) {
+  const bufA = Buffer.from(a, "utf8")
+  const bufB = Buffer.from(b, "utf8")
+  if (bufA.length !== bufB.length) {
+    // Burn comparable time so the early exit itself stays indistinguishable.
+    timingSafeEqual(bufA, bufA)
+    return false
+  }
+  return timingSafeEqual(bufA, bufB)
+}
+
 export function required(config: Info) {
   return Option.isSome(config.password) && config.password.value !== ""
 }
@@ -28,8 +43,8 @@ export function required(config: Info) {
 export function authorized(credentials: DecodedCredentials, config: Info) {
   return (
     Option.isSome(config.password) &&
-    credentials.username === config.username &&
-    Redacted.value(credentials.password) === config.password.value
+    constantTimeEqual(credentials.username, config.username) &&
+    constantTimeEqual(Redacted.value(credentials.password), config.password.value)
   )
 }
 

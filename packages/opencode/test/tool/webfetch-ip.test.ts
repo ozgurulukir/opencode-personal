@@ -3,7 +3,7 @@
 // rebinding defense-in-depth ranges and fail-closed malformed input).
 
 import { describe, expect, test } from "bun:test"
-import { isPrivateIP, isPrivateIPv4 } from "../../src/tool/webfetch"
+import { isPrivateIP, isPrivateIPv4 } from "../../src/util/network"
 
 describe("webfetch.isPrivateIPv4", () => {
   const privateIPs = [

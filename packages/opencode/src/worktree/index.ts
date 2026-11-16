@@ -389,6 +389,16 @@ export const layer: Layer.Layer<
       const entry = yield* locateWorktree(entries, directory)
 
       if (!entry?.path) {
+        // The directory is not a registered git worktree. Deleting an arbitrary
+        // caller-supplied path here would turn this endpoint into an
+        // unauthenticated `rm -rf` primitive, so only clean up directories this
+        // service manages (leftovers under the project's worktree root).
+        const managedRoot = yield* canonical(pathSvc.join(Global.Path.data, "worktree", ctx.project.id))
+        if (directory !== managedRoot && !directory.startsWith(managedRoot + pathSvc.sep)) {
+          throw new RemoveFailedError({
+            message: `Refusing to remove "${input.directory}": not a registered git worktree and outside the managed worktree root`,
+          })
+        }
         const directoryExists = yield* fs.exists(directory).pipe(Effect.orDie)
         if (directoryExists) {
           yield* stopFsmonitor(directory)

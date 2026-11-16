@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { assertSafeRemoteUrl, isLoopbackHostname, isPrivateIP, safeFetchJson } from "@/util/network"
+import { assertSafeRemoteUrl, guardedFetch, isLoopbackHostname, isPrivateIP, safeFetchJson } from "@/util/network"
 
 describe("network safety", () => {
   describe("isLoopbackHostname", () => {
@@ -110,6 +110,87 @@ describe("network safety", () => {
       } finally {
         globalThis.fetch = originalFetch
       }
+    })
+  })
+
+  describe("guardedFetch", () => {
+    test("rejects a redirect to a private IP target", async () => {
+      const server = Bun.serve({
+        port: 0,
+        fetch(req) {
+          const url = new URL(req.url)
+          if (url.pathname === "/redirect") {
+            return new Response(null, { status: 302, headers: { location: "https://10.0.0.1/secret" } })
+          }
+          return new Response("ok")
+        },
+      })
+      try {
+        await expect(
+          guardedFetch(`http://localhost:${server.port}/redirect`, "test", { allowLocalhost: true }),
+        ).rejects.toThrow("private/internal network target")
+      } finally {
+        server.stop(true)
+      }
+    })
+
+    test("pins http targets to the resolved IP and keeps the original Host header", async () => {
+      let seenHost: string | undefined
+      const server = Bun.serve({
+        port: 0,
+        fetch(req) {
+          seenHost = req.headers.get("host") ?? undefined
+          return new Response("ok")
+        },
+      })
+      try {
+        const response = await guardedFetch(`http://localhost:${server.port}/pin`, "test", { allowLocalhost: true })
+        expect(response.status).toBe(200)
+        expect(seenHost).toBe(`localhost:${server.port}`)
+      } finally {
+        server.stop(true)
+      }
+    })
+
+    test("follows a bounded redirect chain that stays valid", async () => {
+      const server = Bun.serve({
+        port: 0,
+        fetch(req) {
+          const url = new URL(req.url)
+          if (url.pathname === "/hop1") {
+            return new Response(null, { status: 302, headers: { location: "/hop2" } })
+          }
+          return new Response("landed")
+        },
+      })
+      try {
+        const response = await guardedFetch(`http://localhost:${server.port}/hop1`, "test", { allowLocalhost: true })
+        expect(await response.text()).toBe("landed")
+      } finally {
+        server.stop(true)
+      }
+    })
+
+    test("returns the last 3xx response once the redirect budget is exhausted", async () => {
+      const server = Bun.serve({
+        port: 0,
+        fetch(req) {
+          return new Response(null, { status: 302, headers: { location: "/loop" } })
+        },
+      })
+      try {
+        const response = await guardedFetch(`http://localhost:${server.port}/loop`, "test", {
+          allowLocalhost: true,
+          maxRedirects: 2,
+        })
+        expect(response.status).toBe(302)
+      } finally {
+        server.stop(true)
+      }
+    })
+
+    test("rejects plain http for non-loopback targets without allowHttp", async () => {
+      await expect(guardedFetch("http://example.com/x", "test")).rejects.toThrow("must use https://")
     })
   })
 })

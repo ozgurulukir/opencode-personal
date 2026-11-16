@@ -971,9 +971,51 @@ export const ConfigProvidersResult = Schema.Struct({
 }).pipe(withStatics((s) => ({ zod: zod(s) })))
 export type ConfigProvidersResult = Types.DeepMutable<Schema.Schema.Type<typeof ConfigProvidersResult>>
 
+/**
+ * Secret-bearing option field names that must never appear in public provider
+ * info (the /provider and /config/providers endpoints are unauthenticated by
+ * default): API keys, tokens, passwords and auth headers.
+ */
+const SECRET_OPTION_KEYS = new Set([
+  "apikey",
+  "api_key",
+  "token",
+  "accesstoken",
+  "refreshtoken",
+  "secret",
+  "password",
+  "authorization",
+])
+
+function redactSecretOptions(options: Record<string, any>) {
+  for (const [name, value] of Object.entries(options)) {
+    if (SECRET_OPTION_KEYS.has(name.toLowerCase())) {
+      delete options[name]
+      continue
+    }
+    if (name.toLowerCase() === "headers" && value && typeof value === "object") {
+      redactSecretOptions(value)
+    }
+  }
+}
+
+/**
+ * Serializes a provider for HTTP exposure with all credential material
+ * stripped: the API key itself plus secret-bearing option fields. Connection
+ * state is conveyed separately by the endpoint's `connected` list.
+ */
 export function toPublicInfo(provider: Info): Info {
+  const fallback = {
+    id: provider.id,
+    name: provider.name,
+    source: provider.source,
+    env: provider.env,
+    options: {} as Record<string, any>,
+    models: {},
+  }
+  let safe: Info
   try {
-    return JSON.parse(
+    safe = JSON.parse(
       JSON.stringify(provider, (_, value) => {
         if (typeof value === "function" || typeof value === "symbol" || value === undefined) return undefined
         if (typeof value === "bigint") return value.toString()
@@ -981,16 +1023,16 @@ export function toPublicInfo(provider: Info): Info {
       }),
     )
   } catch {
-    return {
-      id: provider.id,
-      name: provider.name,
-      source: provider.source,
-      env: provider.env,
-      ...(provider.key ? { key: provider.key } : {}),
-      options: {},
-      models: {},
+    safe = fallback
+  }
+  delete safe.key
+  if (safe.options && typeof safe.options === "object") redactSecretOptions(safe.options)
+  if (safe.models) {
+    for (const model of Object.values(safe.models)) {
+      if (model.options && typeof model.options === "object") redactSecretOptions(model.options as Record<string, any>)
     }
   }
+  return safe
 }
 
 export function defaultModelIDs<T extends { models: Record<string, { id: string }> }>(providers: Record<string, T>) {

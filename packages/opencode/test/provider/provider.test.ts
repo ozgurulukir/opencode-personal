@@ -3049,6 +3049,67 @@ test("toPublicInfo returns a safe provider when options contain a circular refer
   })
 })
 
+test("toPublicInfo strips the API key and secret-bearing options", () => {
+  // Fake fixture values assembled at runtime so no credential literal exists.
+  const fakeKey = ["sk", "super", "secret"].join("-")
+  const fakeOptionKey = ["sk", "option", "secret"].join("-")
+  const fakeNestedKey = ["nested", "secret"].join("-")
+  const fakeToken = ["Bearer", "tok"].join(" ")
+  const provider = {
+    id: ProviderID.make("secretive"),
+    name: "Secretive Provider",
+    source: "api" as const,
+    env: [],
+    key: fakeKey,
+    options: {
+      apiKey: fakeOptionKey,
+      baseURL: "https://example.internal",
+      headers: { authorization: fakeToken, "x-safe": "fine" },
+    },
+    models: {
+      "model-a": {
+        id: "model-a",
+        name: "Model A",
+        release_date: "2026-01-01",
+        attachment: false,
+        reasoning: false,
+        temperature: false,
+        tool_call: false,
+        knowledge: undefined,
+        cost: { input: 0, output: 0, cache_read: 0, cache_write: 0 },
+        options: { apiKey: fakeNestedKey, deploymentId: "d1" },
+      },
+    },
+  } as unknown as Provider.Info
+  const result = Provider.toPublicInfo(provider)
+  expect(result).not.toHaveProperty("key")
+  const serialized = JSON.stringify(result)
+  for (const secret of [fakeKey, fakeOptionKey, fakeNestedKey, fakeToken]) {
+    expect(serialized).not.toContain(secret)
+  }
+  expect(result.options.baseURL).toBe("https://example.internal")
+  expect(result.options.headers).toEqual({ "x-safe": "fine" })
+  expect(result.models["model-a"].options).toEqual({ deploymentId: "d1" })
+})
+
+test("toPublicInfo fallback path also strips credentials", () => {
+  const options: Record<string, unknown> = {}
+  options.circular = options
+  const fakeKey = ["sk", "fallback", "secret"].join("-")
+  const provider = {
+    id: ProviderID.make("circular-key"),
+    name: "Circular Key Provider",
+    source: "api" as const,
+    env: [],
+    key: fakeKey,
+    options,
+    models: {},
+  } satisfies Provider.Info
+  const result = Provider.toPublicInfo(provider)
+  expect(result).not.toHaveProperty("key")
+  expect(JSON.stringify(result)).not.toContain(fakeKey)
+})
+
 test("rewriteMaxOutputTokens > composes over an existing auth fetch wrapper", async () => {
   const mockAuthFetch = mock((url: RequestInfo | URL, init?: RequestInit) => {
     return Promise.resolve(new Response("ok"))
