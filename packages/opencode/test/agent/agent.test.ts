@@ -70,6 +70,21 @@ test("build agent has correct default properties", async () => {
   })
 })
 
+test("get() resolves prototype keys as not-found", async () => {
+  await using tmp = await tmpdir()
+  await WithInstance.provide({
+    directory: tmp.path,
+    fn: async () => {
+      // "constructor"/"toString"/"__proto__" are truthy on a plain object
+      // literal and previously bypassed the not-found guards downstream.
+      for (const name of ["constructor", "toString", "__proto__", "hasOwnProperty"]) {
+        const found = await load(tmp.path, (svc) => svc.get(name))
+        expect(found).toBeUndefined()
+      }
+    },
+  })
+})
+
 test("plan agent denies edits except .opencode/plans/*", async () => {
   await using tmp = await tmpdir()
   await WithInstance.provide({

@@ -60,7 +60,14 @@ export const layer = Layer.effect(
     const all = Effect.fn("Auth.all")(function* () {
       if (process.env.OPENCODE_AUTH_CONTENT) {
         try {
-          return JSON.parse(process.env.OPENCODE_AUTH_CONTENT)
+          const parsed: unknown = JSON.parse(process.env.OPENCODE_AUTH_CONTENT)
+          if (parsed && typeof parsed === "object") {
+            // Validate through the same Info schema as the disk path so
+            // set()/remove() never persist an unvalidated shape to auth.json.
+            return Record.filterMap(parsed as Record<string, unknown>, (value) =>
+              Result.fromOption(decode(value), () => undefined),
+            )
+          }
         } catch (err) {
           Log.Default.warn("failed to parse OPENCODE_AUTH_CONTENT, falling back to auth.json", { error: err })
         }

@@ -215,7 +215,10 @@ export const __exportTestFetchFn = (options: any, model: any, customFetch: any, 
         // Deliberately throw so the catch block falls through to unmodified pass-through
         if (!body || typeof body !== "object") throw new Error("Body is not an object")
       } catch {
-        // Malformed JSON — pass through unmodified
+        // Malformed JSON — pass through unmodified. cleanup() first: the
+        // early return bypasses the try/finally below, which would leak the
+        // AbortSignal listeners attached by combineSignals.
+        cleanup()
         return fetchFn(input, { ...opts, timeout: false })
       }
       const keepIds = body.store === true

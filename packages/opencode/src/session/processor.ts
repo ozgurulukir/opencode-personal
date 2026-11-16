@@ -380,6 +380,7 @@ export const layer: Layer.Layer<
             }
 
             const agent = yield* agents.get(ctx.assistantMessage.agent)
+            if (!agent) return yield* Effect.die(new Error(`agent not found: ${ctx.assistantMessage.agent}`))
             yield* permission.ask({
               permission: "doom_loop",
               patterns: [value.toolName],

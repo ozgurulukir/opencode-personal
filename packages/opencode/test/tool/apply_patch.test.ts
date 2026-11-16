@@ -10,6 +10,7 @@ import { LSP } from "@/lsp/lsp"
 import { AppFileSystem } from "@opencode-ai/core/filesystem"
 import { Format } from "../../src/format"
 import { Agent } from "../../src/agent/agent"
+import { Permission } from "../../src/permission"
 import { Bus } from "../../src/bus"
 import { Truncate } from "@/tool/truncate"
 import { tmpdir } from "../fixture/fixture"
@@ -175,6 +176,59 @@ describe("tool.apply_patch freeform", () => {
         expect(moveFile.movePath).toBe(path.join(fixture.path, "renamed/dir/name.txt"))
         expect(moveFile.patch).toContain("-old content")
         expect(moveFile.patch).toContain("+new content")
+      },
+    })
+  })
+
+  test("permission patterns cover both endpoints of a move", async () => {
+    await using fixture = await tmpdir({ git: true })
+    const { ctx, calls } = makeCtx()
+
+    await WithInstance.provide({
+      directory: fixture.path,
+      fn: async () => {
+        const original = path.join(fixture.path, "old", "name.txt")
+        await fs.mkdir(path.dirname(original), { recursive: true })
+        await fs.writeFile(original, "old content\n", "utf-8")
+
+        const patchText =
+          "*** Begin Patch\n*** Update File: old/name.txt\n*** Move to: renamed/dir/name.txt\n@@\n-old content\n+new content\n*** End Patch"
+
+        await execute({ patchText }, ctx)
+
+        expect(calls.length).toBe(1)
+        // The destination is the path actually written, so it must be evaluated
+        // against edit rules too (deny rules on secrets/* etc.).
+        expect(calls[0].patterns).toContain("old/name.txt")
+        expect(calls[0].patterns).toContain("renamed/dir/name.txt")
+      },
+    })
+  })
+
+  test("a deny rule on the move destination blocks the move", async () => {
+    await using fixture = await tmpdir({ git: true })
+    const denyCtx: ToolCtx = {
+      ...baseCtx,
+      ask: (input) =>
+        input.patterns.some((p) => p.startsWith("secrets/"))
+          ? Effect.die(new Permission.DeniedError({ ruleset: [] }))
+          : Effect.void,
+    }
+
+    await WithInstance.provide({
+      directory: fixture.path,
+      fn: async () => {
+        const original = path.join(fixture.path, "src", "name.txt")
+        await fs.mkdir(path.dirname(original), { recursive: true })
+        await fs.writeFile(original, "old content\n", "utf-8")
+
+        const patchText =
+          "*** Begin Patch\n*** Update File: src/name.txt\n*** Move to: secrets/keys.txt\n@@\n-old content\n+new content\n*** End Patch"
+
+        await expect(execute({ patchText }, denyCtx)).rejects.toThrow()
+        // Nothing was written and the source survived.
+        expect(await fs.readFile(original, "utf-8")).toBe("old content\n")
+        await expect(fs.readFile(path.join(fixture.path, "secrets", "keys.txt"), "utf-8")).rejects.toThrow()
       },
     })
   })
