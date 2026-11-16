@@ -146,6 +146,9 @@ export const TuiThreadCommand = cmd({
       const worker = new Worker(file, {
         env,
       })
+
+      const client = Rpc.client<typeof rpc>(worker)
+
       worker.onerror = (e) => {
         Log.Default.error("thread error", {
           message: e.message,
@@ -154,9 +157,13 @@ export const TuiThreadCommand = cmd({
           colno: e.colno,
           error: e.error,
         })
+        // A dead worker never produces rpc results — reject in-flight calls so
+        // callers do not hang forever and the pending map does not leak.
+        client.rejectPending(new Error(`worker error: ${e.message}`))
       }
-
-      const client = Rpc.client<typeof rpc>(worker)
+      worker.addEventListener("exit", () => {
+        client.rejectPending(new Error("worker exited"))
+      })
       const error = (e: unknown) => {
         Log.Default.error("process error", { error: errorMessage(e) })
       }

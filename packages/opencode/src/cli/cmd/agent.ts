@@ -205,6 +205,17 @@ const AgentCreateCommand = effectCmd({
       // Write file
       const content = matter.stringify(generated.systemPrompt, frontmatter)
       const filePath = path.join(targetPath, `${generated.identifier}.md`)
+      // Defense in depth for the slug schema above: the LLM-emitted identifier
+      // must never escape the agents/ directory (arbitrary .md write).
+      if (!path.resolve(filePath).startsWith(path.resolve(targetPath) + path.sep)) {
+        const message = `Refusing to write agent file outside the target directory: ${filePath}`
+        if (isFullyNonInteractive) {
+          console.error(`Error: ${message}`)
+          process.exit(1)
+        }
+        prompts.log.error(message)
+        throw new UI.CancelledError()
+      }
 
       await fs.mkdir(targetPath, { recursive: true })
 

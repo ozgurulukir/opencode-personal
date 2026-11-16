@@ -13,6 +13,7 @@ import {
   Flag,
   Global,
 } from "./shared"
+import { createHash } from "node:crypto"
 
 export const JDTLS: Info = {
   id: "jdtls",
@@ -108,7 +109,16 @@ export const JDTLS: Info = {
         }
       })(),
     )
-    const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), "opencode-jdtls-data"))
+    // Stable per-root data dir instead of a fresh mkdtemp per spawn: the
+    // mkdtemp path was never returned to a finalizer, so directories
+    // accumulated across spawns/retries. A stable path is bounded by the
+    // number of project roots and lets JDTLS reuse its workspace metadata
+    // across restarts.
+    const dataDir = path.join(
+      os.tmpdir(),
+      `opencode-jdtls-data-${createHash("sha1").update(root).digest("hex").slice(0, 16)}`,
+    )
+    await fs.mkdir(dataDir, { recursive: true })
     return {
       process: spawn(
         java,

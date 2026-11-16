@@ -355,7 +355,19 @@ export const ProvidersLoginCommand = effectCmd({
         yield* Prompt.outro("Done")
         return
       }
-      yield* Prompt.log.info(`Running \`${wellknown.auth.command.join(" ")}\``)
+      // Remote-supplied command: the well-known document is user-controlled
+      // content, so require explicit confirmation with the exact resolved
+      // command before spawning — a social-engineered URL would otherwise run
+      // arbitrary commands with the user's privileges.
+      yield* Prompt.log.info(`The auth provider requests running: ${wellknown.auth.command.join(" ")}`)
+      const proceed = yield* Prompt.confirm({
+        message: `Run this command to authenticate with ${url}?`,
+      })
+      if (!proceed) {
+        yield* Prompt.log.error("Cancelled — no command was executed")
+        yield* Prompt.outro("Done")
+        return
+      }
       const abort = new AbortController()
       const proc = Process.spawn(wellknown.auth.command, { stdout: "pipe", stderr: "inherit", abort: abort.signal })
       if (!proc.stdout) {
