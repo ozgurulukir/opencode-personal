@@ -33,22 +33,24 @@ let PORT: number | undefined
 async function writeDebugData(port: number, id: string, env: Record<string, string | undefined>) {
   const stagingDir = await mkdtemp(path.join(tmpdir(), "opencode-workspace-dev-"))
   const stagingFile = path.join(stagingDir, "data.json")
-  await writeFile(
-    stagingFile,
-    JSON.stringify(
-      {
-        port,
-        id,
-        env,
-      },
-      null,
-      2,
-    ),
-    { mode: 0o600 },
-  )
-
-  await rename(stagingFile, DEV_DATA_FILE)
-  await rm(stagingDir, { recursive: true, force: true })
+  try {
+    await writeFile(
+      stagingFile,
+      JSON.stringify(
+        {
+          port,
+          id,
+          env,
+        },
+        null,
+        2,
+      ),
+      { mode: 0o600 },
+    )
+    await rename(stagingFile, DEV_DATA_FILE)
+  } finally {
+    await rm(stagingDir, { recursive: true, force: true })
+  }
 }
 
 export const DebugWorkspacePlugin: Plugin = async ({ experimental_workspace }) => {
