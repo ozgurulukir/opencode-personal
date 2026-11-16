@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { reorderWorkspaceIds } from "./workspace-drag"
+import { reorderWorkspaceIds } from "./workspace-order"
 
 describe("reorderWorkspaceIds", () => {
   test("moves an item down to the target index", () => {
