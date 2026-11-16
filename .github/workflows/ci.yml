@@ -21,7 +21,7 @@ jobs:
         with:
           targets: wasm32-unknown-unknown
       - name: Install wasm-pack
-        run: curl -sSf https://rustwasm.github.io/wasm-pack/installer/init.sh | sh
+        uses: ./.github/actions/setup-wasm-pack
       - name: Build WASM
         working-directory: packages/diff-wasm
         run: bun run build:wasm
@@ -41,7 +41,7 @@ jobs:
         with:
           targets: wasm32-unknown-unknown
       - name: Install wasm-pack
-        run: curl -sSf https://rustwasm.github.io/wasm-pack/installer/init.sh | sh
+        uses: ./.github/actions/setup-wasm-pack
       - name: Build WASM
         working-directory: packages/diff-wasm
         run: bun run build:wasm

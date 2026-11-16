@@ -81,6 +81,27 @@ try {
             $url = "https://github.com/$Repo/releases/download/v$Version/$asset"
             Invoke-WebRequest -Uri $url -OutFile $zip -UseBasicParsing
         }
+
+        # Verify integrity against the release's SHA256SUMS manifest before the
+        # archive is extracted and its binary executed. Older releases without
+        # a manifest skip with a warning.
+        $manifestOk = $true
+        try {
+            $sumsUrl = "https://github.com/$Repo/releases/download/v$Version/SHA256SUMS"
+            $sums = Join-Path $tmp "SHA256SUMS"
+            Invoke-WebRequest -Uri $sumsUrl -OutFile $sums -UseBasicParsing
+        } catch {
+            $manifestOk = $false
+        }
+        if ($manifestOk) {
+            $expected = (Get-Content $sums | Where-Object { $_ -match [regex]::Escape($asset) } | Select-Object -First 1) -split '\s+' | Select-Object -First 1
+            if (-not $expected) { throw "SHA256SUMS manifest does not list $asset" }
+            $actual = (Get-FileHash -Algorithm SHA256 -Path $zip).Hash.ToLower()
+            if ($actual -ne $expected.ToLower()) { throw "Checksum verification failed for $asset" }
+            Write-Host "Checksum verified"
+        } else {
+            Write-Warning "No SHA256SUMS verification for $asset (manifest unavailable for this release)"
+        }
         $x = Join-Path $tmp "x"
         Expand-Archive -Path $zip -DestinationPath $x -Force
         # Rename the compiled binary to the fork command name, then copy ALL archive

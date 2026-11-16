@@ -336,6 +336,32 @@ download_and_install() {
         curl -# -L -o "$tmp_dir/$filename" "$url"
     fi
 
+    # Verify integrity against the release's SHA256SUMS manifest before the
+    # archive is extracted and its binary executed. The manifest is published
+    # by the release build; older releases without one skip with a warning.
+    if curl -fsSL -o "$tmp_dir/SHA256SUMS" "${url%$filename}SHA256SUMS"; then
+        local expected actual
+        expected=$(grep -E " ${filename}\$" "$tmp_dir/SHA256SUMS" | head -1 | awk '{print $1}')
+        if command -v sha256sum >/dev/null 2>&1; then
+            actual=$(sha256sum "$tmp_dir/$filename" | awk '{print $1}')
+        elif command -v shasum >/dev/null 2>&1; then
+            actual=$(shasum -a 256 "$tmp_dir/$filename" | awk '{print $1}')
+        else
+            echo -e "${RED}Error: sha256sum or shasum is required for checksum verification${NC}" >&2
+            rm -rf "$tmp_dir"
+            exit 1
+        fi
+        if [ -n "$expected" ] && [ "$expected" = "$actual" ]; then
+            print_message info "${MUTED}Checksum verified${NC}"
+        else
+            rm -rf "$tmp_dir"
+            echo -e "${RED}Error: checksum verification failed for $filename${NC}" >&2
+            exit 1
+        fi
+    else
+        print_message warning "No SHA256SUMS manifest for this release — skipping checksum verification"
+    fi
+
     # Extract into a subdirectory so the archive file itself is never copied into INSTALL_DIR.
     mkdir -p "$tmp_dir/x"
     if [ "$os" = "linux" ]; then
