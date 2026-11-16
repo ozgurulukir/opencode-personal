@@ -1,4 +1,4 @@
-import { Context, Effect, FiberMap, Iterable, Layer, Schema, Stream } from "effect"
+import { Context, Effect, Exit, FiberMap, Iterable, Layer, Schema, Stream } from "effect"
 import { FetchHttpClient, HttpBody, HttpClient, HttpClientError, HttpClientRequest } from "effect/unstable/http"
 import { Database } from "@/storage/db"
 import { asc } from "drizzle-orm"
@@ -592,8 +592,16 @@ export const layer = Layer.effect(
         OTEL_RESOURCE_ATTRIBUTES: process.env.OTEL_RESOURCE_ATTRIBUTES,
       }
 
-      yield* EffectBridge.fromPromise(() => adapter.create(config, env))
-      yield* Effect.all(
+      // Compensating delete on every failure path after the insert: without
+      // it, list/get report a workspace whose backing directory/instance
+      // never came up (orphan row). onError keeps the original failure.
+      const deleteRow = Effect.fn("Workspace.create.compensate")(function* () {
+        yield* Effect.sync(() =>
+          Database.use((db) => db.delete(WorkspaceTable).where(eq(WorkspaceTable.id, info.id)).run()),
+        )
+      })
+
+      const boot = Effect.all(
         [
           waitEvent({
             timeout: TIMEOUT,
@@ -609,6 +617,17 @@ export const layer = Layer.effect(
         ],
         { concurrency: 2, discard: true },
       )
+
+      const createExit = yield* Effect.exit(EffectBridge.fromPromise(() => adapter.create(config, env)))
+      if (Exit.isFailure(createExit)) {
+        yield* deleteRow().pipe(Effect.ignore)
+        return yield* Effect.failCause(createExit.cause)
+      }
+      const bootExit = yield* Effect.exit(boot)
+      if (Exit.isFailure(bootExit)) {
+        yield* deleteRow().pipe(Effect.ignore)
+        return yield* Effect.failCause(bootExit.cause)
+      }
 
       return info
     })

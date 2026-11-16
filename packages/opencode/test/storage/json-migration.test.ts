@@ -829,4 +829,41 @@ describe("JSON to SQLite migration", () => {
     expect(db.select().from(PermissionTable).all().length).toBe(1)
     expect(db.select().from(SessionShareTable).all().length).toBe(1)
   })
+
+  test("rolls back and leaves the connection usable when a mid-import step throws", async () => {
+    await writeProject(storageDir, { ...fixtures.project, time: { created: 1, updated: 1 } })
+
+    // Throw inside the transaction: the progress callback is invoked inside
+    // the BEGIN..COMMIT region (per-batch step()), so a throwing progress
+    // propagates through the transaction body. (The per-batch insert helper
+    // records failures into stats.errors instead of throwing.)
+    let calls = 0
+    await expect(
+      JsonMigration.run(db, {
+        progress: () => {
+          if (++calls >= 2) throw new Error("progress boom")
+        },
+      }),
+    ).rejects.toThrow("progress boom")
+
+    // Nothing persisted and the connection is usable — the rollback released
+    // the open transaction (pre-fix, the next statement would fail with
+    // "cannot start a transaction within a transaction").
+    expect(db.select().from(ProjectTable).all()).toHaveLength(0)
+
+    // The import is retried on the next boot-equivalent call and succeeds.
+    const stats = await JsonMigration.run(db)
+    expect(stats?.projects).toBe(1)
+  })
+
+  test("restores connection PRAGMAs after the bulk import", async () => {
+    await writeProject(storageDir, { ...fixtures.project, time: { created: 1, updated: 1 } })
+    const stats = await JsonMigration.run(db)
+    expect(stats?.projects).toBe(1)
+
+    // synchronous=NORMAL (1, not the bulk-import OFF=0) and the 64MB cache
+    // are restored on the shared connection used for all later writes.
+    expect((sqlite.query("PRAGMA synchronous").get() as { synchronous: number }).synchronous).toBe(1)
+    expect((sqlite.query("PRAGMA cache_size").get() as { cache_size: number }).cache_size).toBe(-64000)
+  })
 })

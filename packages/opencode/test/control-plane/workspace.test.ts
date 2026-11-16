@@ -514,7 +514,7 @@ describe("workspace CRUD", () => {
     })
   })
 
-  test("create leaves the inserted row when adapter create fails", async () => {
+  test("create deletes the inserted row when adapter create fails", async () => {
     await withInstance(async () => {
       const type = unique("create-failure")
       const recorded = recordedAdapter({
@@ -531,11 +531,11 @@ describe("workspace CRUD", () => {
         createWorkspace({ type, branch: "branch", projectID: Instance.project.id, extra: { x: 1 } }),
       ).rejects.toThrow("create exploded")
 
+      // The compensating delete keeps list/get honest: no orphan row for a
+      // workspace whose backing instance never came up.
       const rows = await listWorkspaces(Instance.project)
-      expect(rows).toHaveLength(1)
-      expect(rows[0]).toMatchObject({ type, branch: "branch", extra: { x: 1 } })
+      expect(rows).toHaveLength(0)
       expect(recorded.calls.target).toHaveLength(0)
-      await removeWorkspace(rows[0].id)
     })
   })
 

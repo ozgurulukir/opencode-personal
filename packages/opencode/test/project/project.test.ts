@@ -112,6 +112,19 @@ describe("Project.fromDirectory", () => {
     const { project: b } = await run((svc) => svc.fromDirectory(tmp.path))
     expect(b.id).toBe(a.id)
   })
+
+  test("ignores a crafted .git/opencode cache whose value is not a root-commit hash", async () => {
+    await using tmp = await tmpdir({ git: true })
+    // Compute the real ID first, then corrupt the cache with a traversal string.
+    const real = await run((svc) => svc.fromDirectory(tmp.path))
+    const gitdir = await $`git rev-parse --git-dir`.cwd(tmp.path).quiet().text().then((t) => t.trim())
+    await Bun.write(path.join(tmp.path, gitdir, "opencode"), "../../elsewhere")
+    const { project } = await run((svc) => svc.fromDirectory(tmp.path))
+    // The traversal value must NOT become the project ID; discovery falls back
+    // to recomputing the root-commit hash.
+    expect(project.id).not.toBe("../../elsewhere")
+    expect(project.id).toBe(real.project.id)
+  })
 })
 
 describe("Project.fromDirectory git failure paths", () => {
