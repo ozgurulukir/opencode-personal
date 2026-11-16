@@ -497,7 +497,12 @@ export const layer = Layer.effect(
           })(),
           model: language,
           schema: z.object({
-            identifier: z.string(),
+            // Slug-only: the identifier becomes a filename under agents/ and is
+            // interpolated with path.join, so an LLM-emitted traversal string
+            // ("../..") must never reach the filesystem.
+            identifier: z
+              .string()
+              .regex(/^[a-z0-9][a-z0-9-_]{0,63}$/i, "identifier must be a slug (letters, digits, - and _)"),
             whenToUse: z.string(),
             systemPrompt: z.string(),
           }),

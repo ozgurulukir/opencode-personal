@@ -105,7 +105,12 @@ export const Clangd: Info = {
       log.error("clangd encountered unsafe asset name", { name })
       return
     }
-    const downloadResponse = await fetch(asset.browser_download_url)
+    // Construct the URL from the validated tag and name instead of trusting the
+    // GitHub API's browser_download_url: both parts are allowlisted above, so
+    // the download can only come from the clangd/clangd release CDN. The API
+    // response is user-manipulable content for forked/mirrored repos.
+    const downloadUrl = `https://github.com/clangd/clangd/releases/download/${encodeURIComponent(tag)}/${encodeURIComponent(name)}`
+    const downloadResponse = await fetch(downloadUrl)
     if (!downloadResponse.ok) {
       log.error("Failed to download clangd")
       return
