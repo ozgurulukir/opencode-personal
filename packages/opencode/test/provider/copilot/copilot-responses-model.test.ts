@@ -1,6 +1,7 @@
 import { OpenAIResponsesLanguageModel } from "@/provider/sdk/copilot/responses/openai-responses-language-model"
 import { describe, test, expect, mock } from "bun:test"
 import type { LanguageModelV3Prompt } from "@ai-sdk/provider"
+import type { FetchFunction } from "@ai-sdk/provider-utils"
 
 async function convertReadableStreamToArray<T>(stream: ReadableStream<T>): Promise<T[]> {
   const reader = stream.getReader()
@@ -71,12 +72,12 @@ function createMockFetch(chunks: string[], status = 200) {
   })
 }
 
-function createModel(fetchFn: typeof globalThis.fetch) {
+function createModel(fetchFn: ReturnType<typeof mock>) {
   return new OpenAIResponsesLanguageModel("gpt-4o", {
     provider: "copilot.responses",
     url: () => "https://api.test.com/responses",
     headers: () => ({ Authorization: "Bearer test-token" }),
-    fetch: fetchFn,
+    fetch: fetchFn as unknown as FetchFunction,
   })
 }
 
