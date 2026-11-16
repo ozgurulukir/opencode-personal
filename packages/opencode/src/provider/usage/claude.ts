@@ -1,5 +1,8 @@
 import type { UsageProvider, UsageReport, UsageLimit, UsageWindow, UsageCredential } from "./types"
 import { buildUsageAmount, buildUsageStatus } from "./types"
+import * as Log from "@opencode-ai/core/util/log"
+
+const log = Log.create({ service: "usage.claude" })
 
 const ANTHROPIC_USAGE_URL = "https://api.anthropic.com/api/oauth/usage"
 const ANTHROPIC_PROFILE_URL = "https://api.anthropic.com/api/oauth/profile"
@@ -137,7 +140,9 @@ async function fetchClaudeUsage(credential: UsageCredential): Promise<UsageRepor
         accountId = accountId ?? profile.uuid ?? profile.account?.uuid
         email = email ?? profile.email ?? profile.account?.email
       }
-    } catch {}
+    } catch (error) {
+      log.debug("failed to fetch anthropic profile for usage enrichment", { error: String(error) })
+    }
   }
 
   return {

@@ -46,11 +46,17 @@ function rewrite(request: Request, values: { directory?: string; workspace?: str
 
 export function createOpencodeClient(config?: Config & { directory?: string; experimental_workspaceID?: string }) {
   if (!config?.fetch) {
-    const customFetch: any = (req: any) => {
-      // @ts-ignore
-      req.timeout = false
-      return fetch(req)
-    }
+    // Bun's fetch supports a per-request `timeout` option that the generated client's
+    // types don't carry; disable it via a documented narrowing instead of `any`.
+    // `preconnect` is part of Bun's fetch type signature and must be present on any
+    // drop-in fetch replacement.
+    const customFetch = Object.assign(
+      (input: RequestInfo | URL) => {
+        ;(input as RequestInfo & { timeout?: number | false }).timeout = false
+        return fetch(input)
+      },
+      { preconnect: () => {} },
+    ) as typeof globalThis.fetch
     config = {
       ...config,
       fetch: customFetch,

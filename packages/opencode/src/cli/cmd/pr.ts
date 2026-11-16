@@ -52,7 +52,21 @@ export const PrCommand = effectCmd({
     let sessionId: string | undefined
 
     if (prInfoResult.code === 0 && prInfoResult.text.trim()) {
-      const prInfo = JSON.parse(prInfoResult.text)
+      // `gh` can exit 0 with non-JSON output on stderr edge cases; fork setup is
+      // optional behavior, so a parse failure just skips it.
+      const prInfo = yield* Effect.promise(async () => {
+        try {
+          return JSON.parse(prInfoResult.text) as {
+            isCrossRepository?: boolean
+            headRepository?: { name: string }
+            headRepositoryOwner?: { login: string }
+            headRefName?: string
+            body?: string
+          }
+        } catch {
+          return undefined
+        }
+      })
 
       if (prInfo?.isCrossRepository && prInfo.headRepository && prInfo.headRepositoryOwner) {
         const forkOwner = prInfo.headRepositoryOwner.login

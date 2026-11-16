@@ -131,8 +131,13 @@ async function findVscodeRazorExtension() {
     path.join(os.homedir(), ".vscode-server-insiders", "extensions"),
   ].filter((item) => item !== undefined)
 
-  for (const root of [...new Set(roots)]) {
-    const entries = await fs.readdir(root, { withFileTypes: true }).catch(() => [])
+  const uniqueRoots = [...new Set(roots)]
+  // Readdir all roots in parallel; selection below still short-circuits in root order.
+  const rootEntries = await Promise.all(
+    uniqueRoots.map((root) => fs.readdir(root, { withFileTypes: true }).catch(() => [])),
+  )
+  for (const [index, root] of uniqueRoots.entries()) {
+    const entries = rootEntries[index]
     const candidates = await Promise.all(
       entries
         .filter((entry) => entry.isDirectory() && entry.name.startsWith("ms-dotnettools.csharp-"))

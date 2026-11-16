@@ -1,5 +1,8 @@
 import type { UsageProvider, UsageReport, UsageLimit, UsageWindow, UsageCredential } from "./types"
 import { buildUsageAmount, buildUsageStatus } from "./types"
+import * as Log from "@opencode-ai/core/util/log"
+
+const log = Log.create({ service: "usage.zai" })
 
 const ZAI_BASE_URL = "https://api.z.ai"
 const QUOTA_PATH = "/api/monitor/usage/quota/limit"
@@ -139,7 +142,9 @@ async function fetchZaiUsage(credential: UsageCredential): Promise<UsageReport |
     if (resp.ok) {
       report.metadata!.modelUsage = await resp.json()
     }
-  } catch {}
+  } catch (error) {
+    log.debug("failed to fetch zai model usage breakdown", { error: String(error) })
+  }
 
   return report
 }
