@@ -6,6 +6,8 @@ describe("network safety", () => {
     test("detects loopback hostnames", () => {
       expect(isLoopbackHostname("localhost")).toBe(true)
       expect(isLoopbackHostname("127.0.0.1")).toBe(true)
+      expect(isLoopbackHostname("127.0.0.2")).toBe(true)
+      expect(isLoopbackHostname("dev.localhost")).toBe(true)
       expect(isLoopbackHostname("::1")).toBe(true)
       expect(isLoopbackHostname("[::1]")).toBe(true)
       expect(isLoopbackHostname("LOCALHOST")).toBe(true)
@@ -47,14 +49,32 @@ describe("network safety", () => {
       await expect(assertSafeRemoteUrl("https://127.0.0.1/config", "test")).rejects.toThrow("private/internal network target")
       await expect(assertSafeRemoteUrl("https://localhost/config", "test")).rejects.toThrow("private/internal network target")
     })
+
+    test("fails closed on ambiguous octal or malformed IPv4", () => {
+      expect(isPrivateIP("0177.0.0.1")).toBe(true)
+      expect(isPrivateIP("127.0..1")).toBe(true)
+      expect(isPrivateIP("010.0.0.1")).toBe(true)
+    })
   })
 
   describe("safeFetchJson", () => {
-    test("enforces response body size cap", async () => {
+    test("enforces response body size cap on streaming responses without content-length", async () => {
       const originalFetch = globalThis.fetch
+      let streamCancelled = false
       try {
         globalThis.fetch = (async () => {
-          return new Response(JSON.stringify({ big: "x".repeat(100) }), {
+          const stream = new ReadableStream({
+            start(controller) {
+              controller.enqueue(new TextEncoder().encode('{"chunks": "'))
+              controller.enqueue(new TextEncoder().encode("x".repeat(200)))
+              controller.enqueue(new TextEncoder().encode('"}'))
+              controller.close()
+            },
+            cancel() {
+              streamCancelled = true
+            },
+          })
+          return new Response(stream, {
             status: 200,
             headers: { "content-type": "application/json" },
           })
@@ -63,9 +83,10 @@ describe("network safety", () => {
         await expect(
           safeFetchJson("http://localhost:1234/data", "test", {
             allowLocalhost: true,
-            maxBytes: 10,
+            maxBytes: 50,
           }),
         ).rejects.toThrow("exceeds maximum allowed size")
+        expect(streamCancelled).toBe(true)
       } finally {
         globalThis.fetch = originalFetch
       }

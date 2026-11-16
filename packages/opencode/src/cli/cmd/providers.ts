@@ -36,17 +36,6 @@ const cliTry = <Value>(message: string, fn: () => PromiseLike<Value>) =>
     catch: (error) => new CliError({ message: message + errorMessage(error) }),
   })
 
-// `.well-known` metadata drives process execution below; only accept https (or localhost)
-// and reject payloads whose `auth` section is not the exact expected shape.
-function isSecureWellKnownUrl(url: string) {
-  try {
-    const parsed = new URL(url)
-    return parsed.protocol === "https:" || parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1"
-  } catch {
-    return false
-  }
-}
-
 function isValidWellKnownAuth(value: unknown): value is { auth: { command: string[]; env: string } } {
   if (typeof value !== "object" || value === null) return false
   const auth = (value as { auth?: unknown }).auth
@@ -350,9 +339,7 @@ export const ProvidersLoginCommand = effectCmd({
         }
       })
       if (check instanceof Error) {
-        yield* Prompt.log.error(
-          `Refusing to fetch auth provider metadata: ${errorMessage(check)}. Use an https:// URL (http:// is only allowed for localhost).`,
-        )
+        yield* Prompt.log.error(`Refusing to fetch auth provider metadata: ${errorMessage(check)}`)
         yield* Prompt.outro("Done")
         return
       }

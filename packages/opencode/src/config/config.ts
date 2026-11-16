@@ -129,13 +129,6 @@ function normalizeLoadedConfig(data: unknown, source: string) {
   return copy
 }
 
-// Well-known config is fetched with credentials attached and its result merges into
-// user config, so only allow https (http is tolerated for loopback development) and
-// refuse targets resolving to private/internal network addresses.
-async function assertSecureFetchUrl(url: string, what: string) {
-  await assertSafeRemoteUrl(url, what, { allowLocalhost: true })
-}
-
 async function substituteWellKnownRemoteConfig(input: { value: unknown; dir: string; source: string }) {
   if (!isRecord(input.value) || typeof input.value.url !== "string") return
 

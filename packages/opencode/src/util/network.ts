@@ -11,8 +11,16 @@ export function proxied() {
 }
 
 function ipv4ToInt(ip: string): number {
-  const parts = ip.split(".").map(Number)
-  if (parts.length !== 4 || parts.some((p) => !Number.isInteger(p) || p < 0 || p > 255)) return -1
+  const rawParts = ip.split(".")
+  if (rawParts.length !== 4) return -1
+  for (const part of rawParts) {
+    if (!/^\d+$/.test(part)) return -1
+    // Reject leading zeros (octal or ambiguous notation in C/POSIX) to fail closed
+    if (part.length > 1 && part.startsWith("0")) return -1
+    const n = Number(part)
+    if (n < 0 || n > 255) return -1
+  }
+  const parts = rawParts.map(Number)
   return parts[0] * 16777216 + parts[1] * 65536 + parts[2] * 256 + parts[3]
 }
 
@@ -42,7 +50,7 @@ export function isPrivateIPv4(ip: string): boolean {
 
 function isPrivateIPv6(ip: string): boolean {
   const lower = ip.toLowerCase()
-  if (lower === "::" || lower === "::1") return true // unspecified + loopback
+  if (lower === "::" || /^::0*[01]$/.test(lower)) return true // unspecified + loopback
   // Expanded or zero-padded unspecified (0:0:0:0:0:0:0:0) and loopback (0:0:0:0:0:0:0:1)
   if (/^(?:0{1,4}:){7}0{0,3}[01]$/.test(lower)) return true
   if (lower.startsWith("fe8") || lower.startsWith("fe9") || lower.startsWith("fea") || lower.startsWith("feb"))
@@ -89,7 +97,9 @@ export function normalizeHostname(hostname: string): string {
 
 export function isLoopbackHostname(hostname: string): boolean {
   const bare = normalizeHostname(hostname).toLowerCase()
-  return bare === "localhost" || bare === "127.0.0.1" || bare === "::1"
+  if (bare === "localhost" || bare.endsWith(".localhost") || bare === "::1") return true
+  const num = ipv4ToInt(bare)
+  return num >= 0x7f000000 && num <= 0x7fffffff // 127.0.0.0/8
 }
 
 export const MAX_REMOTE_CONFIG_BYTES = 2 * 1024 * 1024 // 2MB
@@ -132,6 +142,10 @@ export async function assertSafeRemoteUrl(url: string, what: string, options?: S
     throw new Error(`DNS lookup failed for ${what} host (${parsed.hostname}): ${error instanceof Error ? error.message : String(error)}`)
   }
 
+  if (addresses.length === 0) {
+    throw new Error(`DNS lookup returned no addresses for ${what} host (${parsed.hostname}): ${url}`)
+  }
+
   for (const record of addresses) {
     if (isPrivateIP(record.address)) {
       throw new Error(`Refusing to fetch ${what} from private/internal network target (${record.address}): ${url}`)
@@ -162,9 +176,31 @@ export async function safeFetchJson<T = unknown>(
     }
   }
 
-  const text = await response.text()
-  if (Buffer.byteLength(text, "utf-8") > maxBytes) {
-    throw new Error(`Response size for ${what} from ${url} exceeds maximum allowed size of ${maxBytes} bytes`)
+  let text = ""
+  if (response.body && typeof response.body.getReader === "function") {
+    const reader = response.body.getReader()
+    const decoder = new TextDecoder()
+    let bytes = 0
+    try {
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        bytes += value.byteLength
+        if (bytes > maxBytes) {
+          await reader.cancel()
+          throw new Error(`Response size for ${what} from ${url} exceeds maximum allowed size of ${maxBytes} bytes`)
+        }
+        text += decoder.decode(value, { stream: true })
+      }
+      text += decoder.decode()
+    } finally {
+      reader.releaseLock?.()
+    }
+  } else {
+    text = await response.text()
+    if (Buffer.byteLength(text, "utf-8") > maxBytes) {
+      throw new Error(`Response size for ${what} from ${url} exceeds maximum allowed size of ${maxBytes} bytes`)
+    }
   }
 
   return JSON.parse(text) as T
