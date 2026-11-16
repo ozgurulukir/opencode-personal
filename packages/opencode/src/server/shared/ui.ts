@@ -101,7 +101,12 @@ function proxyResponseHeaders(headers: Record<string, string>) {
 }
 
 export function upstreamURL(path: string) {
-  return new URL(path, UI_UPSTREAM).toString()
+  // Assign the pathname on a fresh copy of the upstream base instead of using
+  // the two-argument URL constructor: `new URL("//evil.com/x", base)` treats a
+  // protocol-relative path as an authority and rebinds the host (SSRF).
+  const url = new URL(UI_UPSTREAM)
+  url.pathname = path
+  return url.toString()
 }
 
 function notFound() {

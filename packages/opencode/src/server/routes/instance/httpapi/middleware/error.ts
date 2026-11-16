@@ -48,7 +48,9 @@ export const errorLayer = HttpRouter.middleware<{ handles: unknown }>()((effect)
       return Effect.succeed(
         HttpServerResponse.jsonUnsafe(
           new NamedError.Unknown({
-            message: error instanceof Error && error.stack ? error.stack : String(error),
+            // Never leak stack traces (absolute paths, internal frames) to clients;
+            // the full detail is already logged server-side above.
+            message: error instanceof Error ? error.message : String(error),
           }).toObject(),
           { status: 500 },
         ),

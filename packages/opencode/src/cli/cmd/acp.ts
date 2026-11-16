@@ -1,12 +1,12 @@
 import * as Log from "@opencode-ai/core/util/log"
 import { Effect } from "effect"
-import { effectCmd } from "../effect-cmd"
+import { effectCmd, fail } from "../effect-cmd"
 import { AgentSideConnection, ndJsonStream } from "@agentclientprotocol/sdk"
 import { ACP } from "@/acp/agent"
 import { Server } from "@/server/server"
 import { ServerAuth } from "@/server/auth"
 import { createOpencodeClient } from "@opencode-ai/sdk/v2"
-import { withNetworkOptions, resolveNetworkOptions } from "../network"
+import { withNetworkOptions, resolveNetworkOptions, insecureBindingError } from "../network"
 
 const log = Log.create({ service: "acp-command" })
 
@@ -23,6 +23,8 @@ export const AcpCommand = effectCmd({
   handler: Effect.fn("Cli.acp")(function* (args) {
     process.env.OPENCODE_CLIENT = "acp"
     const opts = yield* resolveNetworkOptions(args)
+    const insecure = insecureBindingError(opts.hostname)
+    if (insecure) return yield* fail(insecure)
     const server = yield* Effect.promise(() => Server.listen(opts))
 
     const sdk = createOpencodeClient({

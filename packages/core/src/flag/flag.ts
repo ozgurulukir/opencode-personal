@@ -57,6 +57,8 @@ export const Flag = {
   OPENCODE_FAKE_VCS: process.env["OPENCODE_FAKE_VCS"],
   OPENCODE_SERVER_PASSWORD: process.env["OPENCODE_SERVER_PASSWORD"],
   OPENCODE_SERVER_USERNAME: process.env["OPENCODE_SERVER_USERNAME"],
+  // Explicit opt-in to bind a non-loopback hostname without a server password.
+  OPENCODE_ALLOW_INSECURE_REMOTE: process.env["OPENCODE_ALLOW_INSECURE_REMOTE"],
   OPENCODE_ENABLE_QUESTION_TOOL: truthy("OPENCODE_ENABLE_QUESTION_TOOL"),
 
   // Experimental

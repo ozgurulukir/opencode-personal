@@ -160,14 +160,12 @@ export async function safeFetchJson<T = unknown>(
   what: string,
   options?: RequestInit & { maxBytes?: number; allowLocalhost?: boolean },
 ): Promise<T> {
-  await assertSafeRemoteUrl(url, what, { allowLocalhost: options?.allowLocalhost })
-
-  const maxBytes = options?.maxBytes ?? MAX_REMOTE_CONFIG_BYTES
-  const response = await fetch(url, options)
+  const response = await guardedFetch(url, what, { allowLocalhost: options?.allowLocalhost, ...options })
   if (!response.ok) {
     throw new Error(`failed to fetch ${what} from ${url}: ${response.status}`)
   }
 
+  const maxBytes = options?.maxBytes ?? MAX_REMOTE_CONFIG_BYTES
   const contentLength = response.headers.get("content-length")
   if (contentLength) {
     const size = parseInt(contentLength, 10)
@@ -204,4 +202,116 @@ export async function safeFetchJson<T = unknown>(
   }
 
   return JSON.parse(text) as T
+}
+
+const MAX_REDIRECTS = 5
+const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308])
+
+export interface FetchTarget {
+  /** URL to actually fetch (the validated IP is pinned in for http:// targets). */
+  url: URL
+  /** Host header to send when the URL is IP-pinned; undefined otherwise. */
+  host?: string
+}
+
+/**
+ * Validates one fetch target and returns what to fetch:
+ * - scheme must be http/https (https-only unless `allowHttp`, which also
+ *   requires loopback + allowLocalhost semantics to stay strict elsewhere)
+ * - literal and DNS-resolved IPs must be public unless the target is loopback
+ *   and `allowLocalhost` is set
+ * - http:// targets are pinned to the validated IP with the original host
+ *   returned for the Host header, defeating DNS rebinding. https:// targets
+ *   are NOT pinned: TLS certificate validation checks the URL host, so an
+ *   IP-pinned https request fails certificate verification; instead the DNS
+ *   validation runs on every hop, narrowing any rebinding window to the one
+ *   lookup performed inside fetch().
+ */
+export async function validateFetchTarget(
+  rawUrl: string,
+  what: string,
+  options?: SafeUrlOptions & { allowHttp?: boolean },
+): Promise<FetchTarget> {
+  let parsed: URL
+  try {
+    parsed = new URL(rawUrl)
+  } catch {
+    throw new Error(`invalid ${what}: ${rawUrl}`)
+  }
+
+  if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+    throw new Error(`${what} must use http:// or https://: ${rawUrl}`)
+  }
+  const loopback = isLoopbackHostname(parsed.hostname)
+  if (parsed.protocol === "http:" && !(options?.allowHttp || (options?.allowLocalhost && loopback))) {
+    throw new Error(`${what} must use https://: ${rawUrl}`)
+  }
+
+  const bareHost = normalizeHostname(parsed.hostname)
+  const allowPrivate = options?.allowLocalhost && loopback
+
+  // Only classify the hostname itself when it is a literal IP — non-IP
+  // hostnames (including "localhost") are judged by what DNS resolves them to.
+  const isIPv4Literal = ipv4ToInt(bareHost) !== -1 && /^\d{1,3}(\.\d{1,3}){3}$/.test(bareHost)
+  const isLiteralIP = bareHost.includes(":") || isIPv4Literal
+  if (isLiteralIP && !allowPrivate && isPrivateIP(bareHost)) {
+    throw new Error(`Refusing to fetch ${what} from private/internal network target (${bareHost}): ${rawUrl}`)
+  }
+
+  let address: string | undefined
+  if (!isLiteralIP) {
+    let addresses: dns.LookupAddress[]
+    try {
+      addresses = await dns.promises.lookup(bareHost, { all: true })
+    } catch (error) {
+      throw new Error(
+        `DNS lookup failed for ${what} host (${parsed.hostname}): ${error instanceof Error ? error.message : String(error)}`,
+      )
+    }
+    if (addresses.length === 0) {
+      throw new Error(`DNS lookup returned no addresses for ${what} host (${parsed.hostname}): ${rawUrl}`)
+    }
+    for (const record of addresses) {
+      if (!allowPrivate && isPrivateIP(record.address)) {
+        throw new Error(`Refusing to fetch ${what} from private/internal network target (${record.address}): ${rawUrl}`)
+      }
+    }
+    address = addresses[0]?.address
+  } else {
+    address = bareHost
+  }
+
+  if (parsed.protocol === "http:") {
+    const pin = address!.includes(":") ? `[${address!}]` : address!
+    const pinned = new URL(parsed.toString())
+    pinned.hostname = pin
+    return { url: pinned, host: parsed.host }
+  }
+  return { url: parsed }
+}
+
+/**
+ * Fetch with SSRF guards: the initial target and every redirect hop are
+ * validated (`redirect: "manual"` + bounded loop), and http:// targets are
+ * pinned to their validated IP. Use this for any fetch whose URL can be
+ * influenced by untrusted input.
+ */
+export async function guardedFetch(
+  url: string,
+  what: string,
+  options?: RequestInit & SafeUrlOptions & { allowHttp?: boolean; maxRedirects?: number },
+): Promise<Response> {
+  const maxRedirects = options?.maxRedirects ?? MAX_REDIRECTS
+  let target = await validateFetchTarget(url, what, options)
+  for (let hop = 0; ; hop++) {
+    const response = await fetch(target.url, {
+      ...options,
+      redirect: "manual",
+      headers: { ...options?.headers, ...(target.host ? { Host: target.host } : {}) },
+    })
+    const location = response.headers.get("location")
+    if (!REDIRECT_STATUSES.has(response.status) || !location || hop >= maxRedirects) return response
+    const next = new URL(location, target.url)
+    target = await validateFetchTarget(next.toString(), what, options)
+  }
 }

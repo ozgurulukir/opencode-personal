@@ -1,14 +1,10 @@
 import { Effect, Schema } from "effect"
 import { PositiveInt } from "@opencode-ai/core/schema"
-import { HttpClient, HttpClientRequest } from "effect/unstable/http"
 import * as Tool from "./tool"
 import TurndownService from "turndown"
 import DESCRIPTION from "./webfetch.txt"
 import { isImageAttachment } from "@/util/media"
-import { isPrivateIP, isPrivateIPv4, normalizeHostname } from "@/util/network"
-import dns from "dns"
-
-export { isPrivateIP, isPrivateIPv4 }
+import { guardedFetch } from "@/util/network"
 
 const MAX_RESPONSE_SIZE = 5 * 1024 * 1024 // 5MB
 const DEFAULT_TIMEOUT = 30 * 1000 // 30 seconds
@@ -29,9 +25,6 @@ export const Parameters = Schema.Struct({
 export const WebFetchTool = Tool.define(
   "webfetch",
   Effect.gen(function* () {
-    const http = yield* HttpClient.HttpClient
-    const httpOk = HttpClient.filterStatusOk(http)
-
     return {
       description: DESCRIPTION,
       parameters: Parameters,
@@ -39,16 +32,6 @@ export const WebFetchTool = Tool.define(
         Effect.gen(function* () {
           if (!params.url.startsWith("http://") && !params.url.startsWith("https://")) {
             throw new Error("URL must start with http:// or https://")
-          }
-
-          const { hostname } = new URL(params.url)
-          const resolvedAddress = yield* Effect.tryPromise({
-            try: () => dns.promises.lookup(normalizeHostname(hostname), { all: false }),
-            catch: (error) => new Error(`DNS lookup failed: ${error instanceof Error ? error.message : String(error)}`),
-          })
-
-          if (isPrivateIP(resolvedAddress.address)) {
-            throw new Error("SSRF guard: requests to private/internal IPs are not allowed")
           }
 
           yield* ctx.ask({
@@ -81,59 +64,54 @@ export const WebFetchTool = Tool.define(
               acceptHeader =
                 "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8"
           }
-          const headers = {
+
+          // SSRF-hardened fetch: validateFetchTarget resolves + checks DNS on
+          // every hop and pins http:// targets to their validated IP. https://
+          // is not pinned (TLS cert validation checks the URL host, so an
+          // IP-pinned https request fails certificate verification) — the
+          // per-hop DNS + private-IP validation inside guardedFetch narrows
+          // any rebinding window instead. Redirects are followed manually
+          // with re-validation, so a public URL cannot 302 into the internal
+          // network.
+          const fetchHeaders = {
             "User-Agent":
               "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
             Accept: acceptHeader,
             "Accept-Language": "en-US,en;q=0.9",
           }
-
-          const originalUrl = new URL(params.url)
-          // Pin the resolved IP into the request URL to defeat DNS rebinding: the
-          // HTTP client would otherwise re-resolve the hostname independently and
-          // could be directed at a different (private) IP on the second lookup.
-          // The WHATWG URL hostname setter IGNORES unbracketed IPv6 (assignment is
-          // a silent no-op), so IPv6 literals must be wrapped in brackets.
-          const pin = resolvedAddress.address.includes(":") ? `[${resolvedAddress.address}]` : resolvedAddress.address
-          const pinnedUrl = new URL(params.url)
-          pinnedUrl.hostname = pin
-          const pinnedHeaders = {
-            ...headers,
-            // Preserve virtual hosting: original hostname AND port (`.host`, not
-            // `.hostname`, so non-default ports survive).
-            Host: originalUrl.host,
-          }
-          const request = HttpClientRequest.get(pinnedUrl.toString()).pipe(HttpClientRequest.setHeaders(pinnedHeaders))
-
-          // Retry with honest UA if blocked by Cloudflare bot detection (TLS fingerprint mismatch)
-          const response = yield* httpOk.execute(request).pipe(
-            Effect.catchIf(
-              (err) =>
-                err.reason._tag === "StatusCodeError" &&
-                err.reason.response.status === 403 &&
-                err.reason.response.headers["cf-mitigated"] === "challenge",
-              () =>
-                httpOk.execute(
-                  HttpClientRequest.get(pinnedUrl.toString()).pipe(
-                    HttpClientRequest.setHeaders({ ...pinnedHeaders, "User-Agent": "opencode" }),
-                  ),
-                ),
-            ),
+          const guarded = (extraHeaders?: Record<string, string>) =>
+            Effect.tryPromise({
+              try: (signal) =>
+                guardedFetch(params.url, "webfetch", {
+                  allowHttp: true,
+                  headers: { ...fetchHeaders, ...extraHeaders },
+                  signal,
+                }),
+              catch: (error) => new Error(`Fetch failed: ${error instanceof Error ? error.message : String(error)}`),
+            })
+          const first = yield* guarded().pipe(
             Effect.timeoutOrElse({ duration: timeout, orElse: () => Effect.die(new Error("Request timed out")) }),
           )
+          // Retry with honest UA if blocked by Cloudflare bot detection (TLS fingerprint mismatch)
+          const response =
+            first.status === 403 && first.headers.get("cf-mitigated") === "challenge"
+              ? yield* guarded({ "User-Agent": "opencode" }).pipe(
+                  Effect.timeoutOrElse({ duration: timeout, orElse: () => Effect.die(new Error("Request timed out")) }),
+                )
+              : first
 
           // Check content length
-          const contentLength = response.headers["content-length"]
+          const contentLength = response.headers.get("content-length")
           if (contentLength && parseInt(contentLength) > MAX_RESPONSE_SIZE) {
             throw new Error("Response too large (exceeds 5MB limit)")
           }
 
-          const arrayBuffer = yield* response.arrayBuffer
+          const arrayBuffer = yield* Effect.promise(() => response.arrayBuffer())
           if (arrayBuffer.byteLength > MAX_RESPONSE_SIZE) {
             throw new Error("Response too large (exceeds 5MB limit)")
           }
 
-          const contentType = response.headers["content-type"] || ""
+          const contentType = response.headers.get("content-type") || ""
           const mime = contentType.split(";")[0]?.trim().toLowerCase() || ""
           const title = `${params.url} (${contentType})`
 

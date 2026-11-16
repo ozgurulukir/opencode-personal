@@ -1,5 +1,6 @@
 import type { Argv, InferredOptionTypes } from "yargs"
 import { Config } from "@/config/config"
+import { Flag } from "@opencode-ai/core/flag/flag"
 import { Effect } from "effect"
 
 const options = {
@@ -59,4 +60,24 @@ export function resolveNetworkOptionsNoConfig(args: NetworkOptions, config?: Con
   const cors = [...configCors, ...argsCors]
 
   return { hostname, port, mdns, mdnsDomain, cors }
+}
+
+function isLoopbackHostname(hostname: string) {
+  const bare = hostname.replace(/^\[|\]$/g, "").toLowerCase()
+  return bare === "localhost" || bare === "::1" || bare === "::" || bare.startsWith("127.")
+}
+
+/**
+ * Returns an error message when the resolved server hostname would expose the
+ * API beyond loopback without any authentication: the Authorization middleware
+ * is a no-op unless OPENCODE_SERVER_PASSWORD is set, so binding a non-loopback
+ * hostname (including the `--mdns` default `0.0.0.0`) would expose
+ * shell/PTY/config endpoints to the network. Honors the explicit
+ * OPENCODE_ALLOW_INSECURE_REMOTE=1 opt-in.
+ */
+export function insecureBindingError(hostname: string): string | undefined {
+  if (isLoopbackHostname(hostname)) return undefined
+  if (Flag.OPENCODE_SERVER_PASSWORD) return undefined
+  if (Flag.OPENCODE_ALLOW_INSECURE_REMOTE === "1" || Flag.OPENCODE_ALLOW_INSECURE_REMOTE === "true") return undefined
+  return `Refusing to bind to non-loopback hostname "${hostname}" without OPENCODE_SERVER_PASSWORD. Set OPENCODE_SERVER_PASSWORD, use --hostname 127.0.0.1, or set OPENCODE_ALLOW_INSECURE_REMOTE=1 to accept the risk.`
 }

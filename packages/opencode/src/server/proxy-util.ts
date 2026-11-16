@@ -12,8 +12,12 @@ const hop = new Set([
 ])
 
 // Headers that expose internal routing or allow spoofing — never forward upstream.
+// authorization/cookie carry the client's local server credentials; forwarding
+// them to a remote workspace or UI upstream would leak them across trust domains.
 const securitySensitive = new Set([
   "set-cookie",
+  "authorization",
+  "cookie",
   "x-forwarded-for",
   "x-forwarded-host",
   "x-forwarded-proto",
