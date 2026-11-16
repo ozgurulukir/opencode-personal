@@ -472,11 +472,11 @@ export const layer: Layer.Layer<
               const apply = Effect.gen(function* () {
                 const single = Effect.fnUntraced(function* (op: (typeof ops)[number]) {
                   log.info("reverting", { file: op.file, hash: op.hash })
-                  const result = yield* git([...core, ...args(["checkout", op.hash, "--", op.file])], {
+                  const result = yield* git([...quote, ...args(["checkout", op.hash, "--", op.file])], {
                     cwd: state.worktree,
                   })
                   if (result.code === 0) return
-                  const tree = yield* git([...core, ...args(["ls-tree", op.hash, "--", op.rel])], {
+                  const tree = yield* git([...quote, ...args(["ls-tree", op.hash, "--", op.rel])], {
                     cwd: state.worktree,
                   })
                   if (tree.code !== 0) {
@@ -523,7 +523,7 @@ export const layer: Layer.Layer<
                   }
 
                   const tree = yield* git(
-                    [...core, ...args(["ls-tree", "--name-only", first.hash, "--", ...run.map((item) => item.rel)])],
+                    [...quote, ...args(["ls-tree", "--name-only", first.hash, "--", ...run.map((item) => item.rel)])],
                     {
                       cwd: state.worktree,
                     },
@@ -552,7 +552,7 @@ export const layer: Layer.Layer<
                   if (list.length) {
                     log.info("reverting", { hash: first.hash, files: list.length })
                     const result = yield* git(
-                      [...core, ...args(["checkout", first.hash, "--", ...list.map((item) => item.file)])],
+                      [...quote, ...args(["checkout", first.hash, "--", ...list.map((item) => item.file)])],
                       {
                         cwd: state.worktree,
                       },

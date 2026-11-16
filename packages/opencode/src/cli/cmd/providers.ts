@@ -14,6 +14,7 @@ import { Plugin } from "../../plugin"
 import type { AuthOAuthResult, Hooks } from "@opencode-ai/plugin"
 import { Process } from "@/util/process"
 import { errorMessage } from "@/util/error"
+import { assertSafeRemoteUrl, safeFetchJson } from "@/util/network"
 import { text } from "node:stream/consumers"
 import { Effect, Option } from "effect"
 
@@ -34,17 +35,6 @@ const cliTry = <Value>(message: string, fn: () => PromiseLike<Value>) =>
     try: fn,
     catch: (error) => new CliError({ message: message + errorMessage(error) }),
   })
-
-// `.well-known` metadata drives process execution below; only accept https (or localhost)
-// and reject payloads whose `auth` section is not the exact expected shape.
-function isSecureWellKnownUrl(url: string) {
-  try {
-    const parsed = new URL(url)
-    return parsed.protocol === "https:" || parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1"
-  } catch {
-    return false
-  }
-}
 
 function isValidWellKnownAuth(value: unknown): value is { auth: { command: string[]; env: string } } {
   if (typeof value !== "object" || value === null) return false
@@ -340,15 +330,21 @@ export const ProvidersLoginCommand = effectCmd({
     yield* Prompt.intro("Add credential")
     if (args.url) {
       const url = args.url.replace(/\/+$/, "")
-      if (!isSecureWellKnownUrl(url)) {
-        yield* Prompt.log.error(
-          `Refusing to fetch auth provider metadata over plain HTTP: ${url}. Use an https:// URL (http:// is only allowed for localhost).`,
-        )
+      const check = yield* Effect.promise(async () => {
+        try {
+          await assertSafeRemoteUrl(url, "auth provider URL", { allowLocalhost: true })
+          return null
+        } catch (error) {
+          return error instanceof Error ? error : new Error(String(error))
+        }
+      })
+      if (check instanceof Error) {
+        yield* Prompt.log.error(`Refusing to fetch auth provider metadata: ${errorMessage(check)}`)
         yield* Prompt.outro("Done")
         return
       }
       const wellknown = (yield* cliTry(`Failed to load auth provider metadata from ${url}: `, () =>
-        fetch(`${url}/.well-known/opencode`).then((x) => x.json()),
+        safeFetchJson(`${url}/.well-known/opencode`, "auth provider metadata", { allowLocalhost: true }),
       )) as {
         auth: { command: string[]; env: string }
       }

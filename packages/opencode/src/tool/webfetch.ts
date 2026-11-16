@@ -5,95 +5,14 @@ import * as Tool from "./tool"
 import TurndownService from "turndown"
 import DESCRIPTION from "./webfetch.txt"
 import { isImageAttachment } from "@/util/media"
+import { isPrivateIP, isPrivateIPv4, normalizeHostname } from "@/util/network"
 import dns from "dns"
+
+export { isPrivateIP, isPrivateIPv4 }
 
 const MAX_RESPONSE_SIZE = 5 * 1024 * 1024 // 5MB
 const DEFAULT_TIMEOUT = 30 * 1000 // 30 seconds
 const MAX_TIMEOUT = 120 * 1000 // 2 minutes
-
-function ipv4ToInt(ip: string): number {
-  const parts = ip.split(".").map(Number)
-  if (parts.length !== 4 || parts.some((p) => !Number.isInteger(p) || p < 0 || p > 255)) return -1
-  return parts[0] * 16777216 + parts[1] * 65536 + parts[2] * 256 + parts[3]
-}
-
-export function isPrivateIPv4(ip: string): boolean {
-  // Returns true for any non-global-public IPv4 range so the SSRF guard fails
-  // closed on malformed input (ipv4ToInt returns -1) as well as private/reserved ranges.
-  const num = ipv4ToInt(ip)
-  if (num === -1) return true
-  return (
-    (num >= 0x00000000 && num <= 0x00ffffff) || // 0.0.0.0/8 "this network"
-    (num >= 0x0a000000 && num <= 0x0affffff) || // 10.0.0.0/8
-    (num >= 0x64400000 && num <= 0x647fffff) || // 100.64.0.0/10 CGNAT
-    (num >= 0x7f000000 && num <= 0x7fffffff) || // 127.0.0.0/8 loopback
-    (num >= 0xa9fe0000 && num <= 0xa9feffff) || // 169.254.0.0/16 link-local (incl. 169.254.169.254 IMDS)
-    (num >= 0xac100000 && num <= 0xac1fffff) || // 172.16.0.0/12
-    (num >= 0xc0000000 && num <= 0xc00000ff) || // 192.0.0.0/24 IETF protocol assignments
-    (num >= 0xc0000200 && num <= 0xc00002ff) || // 192.0.2.0/24 TEST-NET-1
-    (num >= 0xc0586300 && num <= 0xc05863ff) || // 192.88.99.0/24 deprecated 6to4 relay anycast
-    (num >= 0xc0a80000 && num <= 0xc0a8ffff) || // 192.168.0.0/16
-    (num >= 0xc6120000 && num <= 0xc613ffff) || // 198.18.0.0/15 benchmarking
-    (num >= 0xc6336400 && num <= 0xc63364ff) || // 198.51.100.0/24 TEST-NET-2
-    (num >= 0xcb007100 && num <= 0xcb0071ff) || // 203.0.113.0/24 TEST-NET-3
-    (num >= 0xe0000000 && num <= 0xefffffff) || // 224.0.0.0/4 multicast
-    (num >= 0xf0000000 && num <= 0xffffffff) // 240.0.0.0/4 reserved
-  )
-}
-
-function isPrivateIPv6(ip: string): boolean {
-  const lower = ip.toLowerCase()
-  if (lower === "::" || lower === "::1") return true // unspecified + loopback
-  // Expanded or zero-padded unspecified (0:0:0:0:0:0:0:0) and loopback (0:0:0:0:0:0:0:1)
-  if (/^(?:0{1,4}:){7}0{0,3}[01]$/.test(lower)) return true
-  if (lower.startsWith("fe8") || lower.startsWith("fe9") || lower.startsWith("fea") || lower.startsWith("feb"))
-    return true // fe80::/10 link-local
-  if (lower.startsWith("fc") || lower.startsWith("fd")) return true // fc00::/7 unique local
-  if (lower.startsWith("ff")) return true // ff00::/8 multicast
-  if (lower.startsWith("::ffff:0:")) return true // ::ffff:0:0/96 (IPv4-mapped with leading zero)
-  if (lower.startsWith("100::")) return true // 100::/64 discard-only
-  if (lower.startsWith("2001:db8:")) return true // 2001:db8::/32 documentation
-  if (lower.startsWith("64:ff9b::")) return true // 64:ff9b::/96 NAT64 well-known prefix
-  if (lower.startsWith("2001::")) return true // 2001::/32 Teredo
-  if (lower.startsWith("2002:")) return true // 2002::/16 6to4 (embeds IPv4)
-  if (lower.startsWith("2001:10:") || lower.startsWith("2001:20:")) return true // ORCHID prefixes
-  return false
-}
-
-function embeddedIPv4(ip: string): string | undefined {
-  // IPv4-compatible/mapped forms embed a dotted-quad in the last 32 bits,
-  // e.g. ::ffff:a.b.c.d, 64:ff9b::a.b.c.d, 2002::a.b.c.d, ::a.b.c.d.
-  return ip.match(/(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/)?.[1]
-}
-
-export function isPrivateIP(ip: string): boolean {
-  const lower = ip.toLowerCase()
-  if (lower.startsWith("::ffff:")) {
-    const v4 = lower.slice(7)
-    if (!v4.includes(":")) return isPrivateIPv4(v4)
-    const hex = v4.match(/^([0-9a-f]{1,4}):([0-9a-f]{1,4})$/)
-    if (hex) {
-      const hi = parseInt(hex[1], 16)
-      const lo = parseInt(hex[2], 16)
-      return isPrivateIPv4(`${(hi >> 8) & 0xff}.${hi & 0xff}.${(lo >> 8) & 0xff}.${lo & 0xff}`)
-    }
-  }
-  if (lower.includes(":")) {
-    const v4 = embeddedIPv4(lower)
-    if (v4 && isPrivateIPv4(v4)) return true
-    return isPrivateIPv6(lower)
-  }
-  return isPrivateIPv4(lower)
-}
-
-/**
- * Normalizes a hostname by stripping IPv6 brackets.
- * URL.hostname retains brackets for IPv6 (e.g. "[::1]"), but dns.promises.lookup
- * requires the bare address ("::1").
- */
-function normalizeHostname(hostname: string): string {
-  return hostname.replace(/^\[(.*?)\]$/, "$1")
-}
 
 export const Parameters = Schema.Struct({
   url: Schema.String.annotate({ description: "The URL to fetch content from" }),
