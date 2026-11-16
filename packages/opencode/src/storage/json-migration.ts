@@ -147,7 +147,14 @@ export async function run(db: SQLiteBunDatabase<any, any> | NodeSQLiteDatabase<a
 
   progress?.({ current, total, label: "starting" })
 
+  // Manual transaction on the shared live connection: BEGIN is followed by a
+  // ROLLBACK on any failure and the bulk-import PRAGMAs are restored in all
+  // cases — without this, a mid-import throw would leave the process-wide
+  // connection inside an open transaction with degraded crash durability.
+  // (Drizzle's transaction() is sync-only, so it can't wrap this async body.)
+  // The try block body keeps the original indentation to minimize the diff.
   db.run("BEGIN TRANSACTION")
+  try {
 
   // Migrate projects first (no FK deps)
   // Derive all IDs from file paths, not JSON content
@@ -406,6 +413,15 @@ export async function run(db: SQLiteBunDatabase<any, any> | NodeSQLiteDatabase<a
   }
 
   db.run("COMMIT")
+  } catch (error) {
+    db.run("ROLLBACK")
+    throw error
+  } finally {
+    // Restore the connection defaults (see src/storage/db.ts): WAL is kept.
+    db.run("PRAGMA synchronous = NORMAL")
+    db.run("PRAGMA cache_size = -64000")
+    db.run("PRAGMA temp_store = 0")
+  }
 
   log.info("json migration complete", {
     projects: stats.projects,

@@ -173,8 +173,15 @@ export const layer: Layer.Layer<
 
     const readCachedProjectId = Effect.fnUntraced(function* (dir: string) {
       return yield* fs.readFileString(pathSvc.join(dir, "opencode")).pipe(
-        Effect.map((x) => x.trim()),
-        Effect.map((x) => ProjectID.make(x)),
+        Effect.map((x) => {
+          const trimmed = x.trim()
+          // The cache is written by this module only: a git root-commit hash.
+          // The ID is interpolated into path.join(Global.Path.data, ...) sinks
+          // (snapshot/, worktree/), and path.join normalizes "..", so a crafted
+          // .git/opencode would otherwise escape the data dir. Require the
+          // literal hash format; discovery falls back to recomputing it.
+          return /^[0-9a-f]{40,64}$/i.test(trimmed) ? ProjectID.make(trimmed) : undefined
+        }),
         Effect.catch(() => Effect.void),
       )
     })
@@ -451,33 +458,47 @@ export const layer: Layer.Layer<
     })
 
     const addSandbox = Effect.fn("Project.addSandbox")(function* (id: ProjectID, directory: string) {
-      const row = yield* db((d) => d.select().from(ProjectTable).where(eq(ProjectTable.id, id)).get())
-      if (!row) throw new Error(`Project not found: ${id}`)
-      const sboxes = [...row.sandboxes]
-      if (!sboxes.includes(directory)) sboxes.push(directory)
-      const result = yield* db((d) =>
-        d
-          .update(ProjectTable)
-          .set({ sandboxes: sboxes, time_updated: Date.now() })
-          .where(eq(ProjectTable.id, id))
-          .returning()
-          .get(),
+      // Select + mutate + update inside one immediate transaction: concurrent
+      // worktree creation can otherwise interleave and permanently drop a
+      // sandbox entry from the list.
+      const result = yield* Effect.sync(() =>
+        Database.transaction(
+          (trx) => {
+            const row = trx.select().from(ProjectTable).where(eq(ProjectTable.id, id)).get()
+            if (!row) throw new Error(`Project not found: ${id}`)
+            const sboxes = [...row.sandboxes]
+            if (!sboxes.includes(directory)) sboxes.push(directory)
+            return trx
+              .update(ProjectTable)
+              .set({ sandboxes: sboxes, time_updated: Date.now() })
+              .where(eq(ProjectTable.id, id))
+              .returning()
+              .get()
+          },
+          { behavior: "immediate" },
+        ),
       )
       if (!result) throw new Error(`Project not found: ${id}`)
       yield* emitUpdated(fromRow(result))
     })
 
     const removeSandbox = Effect.fn("Project.removeSandbox")(function* (id: ProjectID, directory: string) {
-      const row = yield* db((d) => d.select().from(ProjectTable).where(eq(ProjectTable.id, id)).get())
-      if (!row) throw new Error(`Project not found: ${id}`)
-      const sboxes = row.sandboxes.filter((s) => s !== directory)
-      const result = yield* db((d) =>
-        d
-          .update(ProjectTable)
-          .set({ sandboxes: sboxes, time_updated: Date.now() })
-          .where(eq(ProjectTable.id, id))
-          .returning()
-          .get(),
+      // Select + mutate + update inside one immediate transaction (see addSandbox).
+      const result = yield* Effect.sync(() =>
+        Database.transaction(
+          (trx) => {
+            const row = trx.select().from(ProjectTable).where(eq(ProjectTable.id, id)).get()
+            if (!row) throw new Error(`Project not found: ${id}`)
+            const sboxes = row.sandboxes.filter((s) => s !== directory)
+            return trx
+              .update(ProjectTable)
+              .set({ sandboxes: sboxes, time_updated: Date.now() })
+              .where(eq(ProjectTable.id, id))
+              .returning()
+              .get()
+          },
+          { behavior: "immediate" },
+        ),
       )
       if (!result) throw new Error(`Project not found: ${id}`)
       yield* emitUpdated(fromRow(result))

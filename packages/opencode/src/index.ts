@@ -123,8 +123,13 @@ const cli = yargs(args)
       run_id: processMetadata.runID,
     })
 
-    const marker = path.join(Global.Path.data, "opencode.db")
-    if (!(await Filesystem.exists(marker))) {
+    // Gate the one-shot import on the actual database file this process uses —
+    // not a hardcoded name: non-prod channels resolve opencode-<channel>.db
+    // (or OPENCODE_DB), so a hardcoded marker either re-runs the import on
+    // every boot or silently skips it when a prod DB already exists. An
+    // ephemeral :memory: DB skips the migration entirely.
+    const marker = Database.Path === ":memory:" ? undefined : Database.Path
+    if (marker && !(await Filesystem.exists(marker))) {
       const tty = process.stderr.isTTY
       process.stderr.write("Performing one time database migration, may take a few minutes..." + EOL)
       const width = 36
@@ -133,8 +138,9 @@ const cli = yargs(args)
       const reset = "\x1b[0m"
       let last = -1
       if (tty) process.stderr.write("\x1b[?25l")
+      let stats: Awaited<ReturnType<typeof JsonMigration.run>>
       try {
-        await JsonMigration.run(drizzle({ client: Database.Client().$client }), {
+        stats = await JsonMigration.run(drizzle({ client: Database.Client().$client }), {
           progress: (event) => {
             const percent = Math.floor((event.current / event.total) * 100)
             if (percent === last && event.current !== event.total) return
@@ -158,6 +164,11 @@ const cli = yargs(args)
         }
       }
       process.stderr.write("Database migration complete." + EOL)
+      if (stats.errors.length > 0) {
+        process.stderr.write(
+          `Warning: ${stats.errors.length} item(s) could not be migrated and could not be retried on the next boot; see the log file for details.` + EOL,
+        )
+      }
     }
   })
   .usage("")
