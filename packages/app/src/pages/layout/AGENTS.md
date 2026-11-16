@@ -6,4 +6,8 @@ The reactive cleanup effect (`layout.tsx`) only runs when `visibleSessionDirs()`
 
 ## Queue state lives in `prefetch-queue.ts` so the lifecycle is unit-testable
 
-The queue state machine (`queueFor`, `cleanupInvisible`, `completeInflight`) is extracted to `src/pages/layout/prefetch-queue.ts` (pure, no SolidJS). `completeInflight` returns `true` when it deletes the queue so the caller skips re-pumping. Scheduling, concurrency limits, and the actual prefetch work stay in the Layout component. Add lifecycle tests there, not by mounting the Layout component.
+The queue state machine (`queueFor`, `cleanupInvisible`, `completeInflight`) is extracted to `src/pages/layout/prefetch-queue.ts` (pure, no SolidJS). `completeInflight` returns `true` when it deletes the queue so the caller skips re-pumping. Scheduling, concurrency limits, and the actual prefetch work live in `prefetch-pump.ts` (`createSessionPrefetchPump`), which the Layout page instantiates with its reactive accessors. Add lifecycle tests in `prefetch-queue.test.ts` and scheduling/merge tests in `prefetch-pump.test.ts`, not by mounting the Layout component.
+
+## Workspace dialog + drag wiring live in their own modules
+
+`createWorkspaceDialogWiring` (`workspace-dialog-wiring.tsx`) builds the reset/delete dialog openers from the page's existing operations, and `createWorkspaceDragController` (`workspace-drag.ts`) owns the workspace reorder handlers. Both keep `layout.tsx` free of inline wiring; `reorderWorkspaceIds` is pure and tested in `workspace-drag.test.ts`.

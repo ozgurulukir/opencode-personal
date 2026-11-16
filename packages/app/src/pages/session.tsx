@@ -54,6 +54,7 @@ import {
 } from "@/pages/session/helpers"
 import { changeModes, newSessionWorktreeFor, resolveVcsMode, reviewDiffsFor, reviewIsReady, type ChangeMode, type VcsMode } from "@/pages/session/review"
 import { deepActiveElement, isEditableTarget, isScrollGestureKey, sessionKeyGuardBlocked, shouldFocusComposer } from "@/pages/session/keyboard"
+import { computeScrollState, scrollStateChanged } from "@/pages/session/scroll-state"
 import { createSessionHistoryWindow, emptyUserMessages } from "@/pages/session/history-window"
 import { MessageTimeline } from "@/pages/session/message-timeline"
 import { type DiffStyle, SessionReviewTab, type SessionReviewTabProps } from "@/pages/session/review-tab"
@@ -1044,17 +1045,14 @@ export default function Page() {
   let scrollStateTarget: HTMLDivElement | undefined
   let fillFrame: number | undefined
 
-  const jumpThreshold = (el: HTMLDivElement) => Math.max(400, el.clientHeight)
-
   const updateScrollState = (el: HTMLDivElement) => {
-    const max = el.scrollHeight - el.clientHeight
-    const distance = max - el.scrollTop
-    const overflow = max > 1
-    const bottom = !overflow || distance <= 2
-    const jump = overflow && distance > jumpThreshold(el)
-
-    if (ui.scroll.overflow === overflow && ui.scroll.bottom === bottom && ui.scroll.jump === jump) return
-    setUi("scroll", { overflow, bottom, jump })
+    const next = computeScrollState({
+      scrollHeight: el.scrollHeight,
+      clientHeight: el.clientHeight,
+      scrollTop: el.scrollTop,
+    })
+    if (!scrollStateChanged(ui.scroll, next)) return
+    setUi("scroll", next)
   }
 
   const scheduleScrollState = (el: HTMLDivElement) => {
