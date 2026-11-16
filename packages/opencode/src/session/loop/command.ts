@@ -83,7 +83,10 @@ export const command = Effect.fn("SessionPrompt.command")(function* (deps: Comma
     return args[argIndex]
   })
   const usesArgumentsPlaceholder = templateCommand.includes("$ARGUMENTS")
-  let template = withArgs.replaceAll("$ARGUMENTS", input.arguments)
+  // Callback form: a string replacement value interprets `$&`, `$'`, `` $` ``
+  // and `$n` as replacement patterns, so user text containing `$&` would
+  // re-insert the literal "$ARGUMENTS" placeholder.
+  let template = withArgs.replaceAll("$ARGUMENTS", () => input.arguments)
 
   if (placeholders.length === 0 && !usesArgumentsPlaceholder && input.arguments.trim()) {
     template = template + "\n\n" + input.arguments

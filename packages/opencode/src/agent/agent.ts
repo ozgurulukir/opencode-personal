@@ -58,7 +58,9 @@ export const Info = Schema.Struct({
 export type Info = DeepMutable<Schema.Schema.Type<typeof Info>>
 
 export interface Interface {
-  readonly get: (agent: string) => Effect.Effect<Info>
+  // undefined for unknown names (including prototype keys like "constructor"
+  // or "toString" — get() uses Object.hasOwn so those no longer resolve).
+  readonly get: (agent: string) => Effect.Effect<Info | undefined>
   readonly list: () => Effect.Effect<Info[]>
   readonly defaultAgent: () => Effect.Effect<string>
   readonly generate: (input: {
@@ -393,7 +395,10 @@ export const layer = Layer.effect(
         }
 
         const get = Effect.fnUntraced(function* (agent: string) {
-          return agents[agent]
+          // Object.hasOwn guards against prototype keys ("constructor",
+          // "toString", "__proto__") resolving as agents and not-found guards
+          // downstream being bypassed. Same pattern as Skill.get().
+          return Object.hasOwn(agents, agent) ? agents[agent] : undefined
         })
 
         const list = Effect.fnUntraced(function* () {

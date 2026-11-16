@@ -311,12 +311,25 @@ export const ApplyPatchTool = Tool.define<
         movePath: change.movePath,
       }))
 
-      // Check permissions if needed
-      const relativePaths = fileChanges.map((c) => path.relative(instance.worktree, c.filePath).replaceAll("\\", "/"))
+      // Check permissions if needed. Evaluate BOTH endpoints of a move: the
+      // destination is the path actually written, so edit deny rules must
+      // cover it too — a rule like `secrets/*: deny` is otherwise bypassed by
+      // moving a permitted source file into secrets/. `always` now carries the
+      // actual paths so an "always allow" reply does not persist a blanket `*`
+      // edit rule.
+      const relativePaths = Array.from(
+        new Set(
+          fileChanges.flatMap((change) =>
+            [change.filePath, ...(change.movePath ? [change.movePath] : [])].map((endpoint) =>
+              path.relative(instance.worktree, endpoint).replaceAll("\\", "/"),
+            ),
+          ),
+        ),
+      )
       yield* ctx.ask({
         permission: "edit",
         patterns: relativePaths,
-        always: ["*"],
+        always: relativePaths,
         metadata: {
           filepath: relativePaths.join(", "),
           diff: totalDiff,

@@ -882,18 +882,13 @@ export const layer = Layer.effect(
       wait: Effect.fn("V2Session.wait")(function* (sessionID) {
         // Block until the session's agent loop goes idle. V1 has no explicit
         // "wait" primitive — it uses Runner.ensureRunning to join in-flight runs.
-        // Here we subscribe to the SessionStatus bus: if currently busy, wait for
-        // the next idle event for this session.
+        // Delegates to SessionStatus.waitIdle: waiting on the bus Idle event
+        // here had a lost-wakeup TOCTOU (an Idle published between the status
+        // read and the stream subscription had no subscriber and the fiber
+        // hung forever).
         const status = Option.isSome(statusV1) ? statusV1.value : null
-        const busSvc = Option.isSome(bus) ? bus.value : null
-        if (!status || !busSvc) return // no status service available — nothing to wait on
-        const current = yield* status.get(sessionID)
-        if (current.type === "idle") return
-        yield* busSvc.subscribe(SessionStatus.Event.Idle).pipe(
-          Stream.filter((e) => e.properties.sessionID === sessionID),
-          Stream.take(1),
-          Stream.runDrain,
-        )
+        if (!status) return // no status service available — nothing to wait on
+        yield* status.waitIdle(sessionID)
       }),
       children: Effect.fn("V2Session.children")(function* (sessionID) {
         const sessions = yield* requireV1(sessionsV1, "Session")

@@ -124,11 +124,51 @@ export const layer = Layer.effect(
       }))
     })
     const autoclose = Effect.fn("Todo.autoclose")(function* (sessionID: SessionID, fileChanges: Array<{ filePath: string; diff: string }>) {
-      const currentTodos = yield* get(sessionID)
-      const nextTodos = applyAutoclose(currentTodos, fileChanges)
-      if (nextTodos !== currentTodos) {
-        yield* update({ sessionID, todos: nextTodos })
-      }
+      // Read-modify-write inside one immediate transaction: two autocloses for
+      // the same session can otherwise read the same snapshot and the second
+      // update clobbers the first (tools execute concurrently per LLM step).
+      const nextTodos = yield* Effect.sync(() =>
+        Database.transaction(
+          (db) => {
+            const rows = db
+              .select()
+              .from(TodoTable)
+              .where(eq(TodoTable.session_id, sessionID))
+              .orderBy(asc(TodoTable.position))
+              .all()
+            const current = rows.map((row) => ({
+              content: row.content,
+              status: normalizeStatus(row.status),
+              priority: normalizePriority(row.priority),
+            }))
+            const next = applyAutoclose(current, fileChanges)
+            if (next === current) return undefined
+            db.delete(TodoTable).where(eq(TodoTable.session_id, sessionID)).run()
+            if (next.length > 0) {
+              db.insert(TodoTable)
+                .values(
+                  next.map((todo, position) => ({
+                    session_id: sessionID,
+                    content: todo.content,
+                    status: todo.status,
+                    priority: todo.priority,
+                    position,
+                  })),
+                )
+                .run()
+            }
+            return next
+          },
+          { behavior: "immediate" },
+        ),
+      )
+      if (nextTodos === undefined) return
+      yield* bus.publish(Event.Updated, { sessionID, todos: nextTodos })
+      yield* sync.run(SessionEvent.TodoUpdated.Sync, {
+        sessionID,
+        timestamp: DateTime.makeUnsafe(Date.now()),
+        todos: nextTodos,
+      })
     })
 
     return Service.of({ update, get, autoclose })

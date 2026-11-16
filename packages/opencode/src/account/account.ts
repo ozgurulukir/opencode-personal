@@ -1,4 +1,5 @@
 import { Cache, Clock, Duration, Effect, Layer, Option, Schema, SchemaGetter, Context } from "effect"
+import { Flock } from "@opencode-ai/core/util/flock"
 import {
   FetchHttpClient,
   HttpClient,
@@ -244,18 +245,29 @@ export const layer: Layer.Layer<Service, never, AccountRepo.Service | HttpClient
       capacity: Number.POSITIVE_INFINITY,
       timeToLive: Duration.zero,
       lookup: Effect.fnUntraced(function* (accountID) {
-        const maybeAccount = yield* repo.getRow(accountID)
-        if (Option.isNone(maybeAccount)) {
-          return yield* Effect.fail(new AccountServiceError({ message: "Account not found during token refresh" }))
-        }
+        // Cross-process lock: two opencode instances sharing the account DB
+        // could otherwise POST the same single-use refresh token concurrently
+        // (the in-process Cache dedup below is process-local). Same pattern as
+        // models.ts's models.dev cache refresh.
+        return yield* Effect.scoped(
+          Effect.gen(function* () {
+            yield* Flock.effect(`account-refresh:${accountID}`)
+            // Re-check freshness under the lock: another process may have
+            // refreshed the token while we waited for the lock.
+            const maybeAccount = yield* repo.getRow(accountID)
+            if (Option.isNone(maybeAccount)) {
+              return yield* Effect.fail(new AccountServiceError({ message: "Account not found during token refresh" }))
+            }
 
-        const account = maybeAccount.value
-        const now = yield* Clock.currentTimeMillis
-        if (isTokenFresh(account.token_expiry, now)) {
-          return account.access_token
-        }
+            const account = maybeAccount.value
+            const now = yield* Clock.currentTimeMillis
+            if (isTokenFresh(account.token_expiry, now)) {
+              return account.access_token
+            }
 
-        return yield* refreshToken(account)
+            return yield* refreshToken(account)
+          }),
+        )
       }),
     })
 

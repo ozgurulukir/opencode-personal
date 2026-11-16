@@ -304,6 +304,15 @@ export const runLoop: (deps: RunLoopDeps, sessionID: SessionID) => Effect.Effect
         MessageV2.toModelMessagesEffect(msgs, model),
       ])
       const format = lastUser.format ?? { type: "text" as const }
+      // Hard-enforce the agent step budget: on the last step the tool map is
+      // emptied so the model cannot keep emitting tool calls past the limit.
+      // The MAX_STEPS reminder text claims tools are disabled — make that true.
+      // StructuredOutput survives when json_schema formatting needs it.
+      const effectiveTools = !isLastStep
+        ? tools
+        : format.type === "json_schema"
+          ? { StructuredOutput: tools["StructuredOutput"] }
+          : {}
       const suffix = assemblePromptSuffix({
         env,
         skills: skills || undefined,
@@ -330,7 +339,7 @@ export const runLoop: (deps: RunLoopDeps, sessionID: SessionID) => Effect.Effect
           ...modelMsgs,
           ...(isLastStep ? [{ role: "assistant" as const, content: MAX_STEPS }] : []),
         ],
-        tools,
+        tools: effectiveTools,
         model,
         toolChoice: format.type === "json_schema" && model.capabilities.toolcall ? "required" : undefined,
       })

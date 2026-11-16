@@ -164,7 +164,19 @@ export const layer: Layer.Layer<Service, never, Auth.Service | Plugin.Service> =
       input: { providerID: ProviderID } & AuthorizeInput,
     ) {
       const { hooks, pending } = yield* InstanceState.get(state)
-      const method = hooks[input.providerID].methods[input.method]
+      // Guard both lookups: unknown providerIDs and out-of-range methods pass
+      // payload validation (ProviderID is just a branded string, method is a
+      // Finite) and would otherwise surface as a TypeError defect / 500.
+      const providerHooks = hooks[input.providerID]
+      if (!providerHooks?.methods?.[input.method]) {
+        return yield* Effect.fail(
+          new ValidationFailed({
+            field: "providerID",
+            message: `No auth method "${input.method}" is registered for provider "${input.providerID}"`,
+          }),
+        )
+      }
+      const method = providerHooks.methods[input.method]
       if (method.type !== "oauth") return
 
       if (method.prompts && input.inputs) {

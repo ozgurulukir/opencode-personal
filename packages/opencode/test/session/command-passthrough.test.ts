@@ -39,7 +39,11 @@ const dummyModel: Provider.Model = {
 
 // Captures the parts array that command() assembles and passes to deps.prompt.
 // mode controls agent.mode so the isSubtask branch can be exercised both ways.
-function makeDeps(captured: { input?: PromptInput }, mode: Agent.Info["mode"] = "subagent"): CommandDeps {
+function makeDeps(
+  captured: { input?: PromptInput },
+  mode: Agent.Info["mode"] = "subagent",
+  template = "Review the changes",
+): CommandDeps {
   const buildAgent: Agent.Info = {
     name: "build",
     mode,
@@ -50,7 +54,7 @@ function makeDeps(captured: { input?: PromptInput }, mode: Agent.Info["mode"] = 
     name: "review",
     description: "review changes",
     source: "command",
-    template: "Review the changes", // no !`...` blocks, no $placeholders
+    template, // no !`...` blocks, no $placeholders (unless a test overrides it)
     hints: [],
     // subtask intentionally undefined → isSubtask via agent.mode === "subagent"
   }
@@ -168,5 +172,23 @@ describe("session.loop.command", () => {
     expect(parts[2]).toBe(callerParts[1])
     // Synthetic subtask part must be ABSENT on the non-subtask branch
     expect(parts.some((p) => p.type === "subtask")).toBe(false)
+  })
+
+  test("$ARGUMENTS is inserted literally even when the arguments contain replacement patterns", async () => {
+    const captured: { input?: PromptInput } = {}
+    const input: CommandInput = {
+      sessionID: SessionID.make("ses_cmd_test"),
+      command: "review",
+      // "$&" is a replacement pattern that would re-insert the matched
+      // "$ARGUMENTS" placeholder when passed as a string replacement value.
+      arguments: "$& works",
+      agent: "build",
+      model: "test/test-model",
+    }
+
+    await Effect.runPromise(command(makeDeps(captured, "primary", "Review $ARGUMENTS"), input))
+
+    const parts = captured.input!.parts
+    expect(parts[0]).toMatchObject({ type: "text", text: "Review $& works" })
   })
 })
