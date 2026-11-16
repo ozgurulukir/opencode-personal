@@ -440,7 +440,21 @@ if (Script.release) {
       await $`zip -r ../../${key}.zip *`.cwd(`dist/${key}/bin`)
     }
   }
-  await $`gh release upload v${Script.version} ./dist/*.zip ./dist/*.tar.gz --clobber --repo ${process.env.GH_REPO}`
+  // Publish a checksum manifest next to the archives so installers can verify
+  // integrity before executing the downloaded binary.
+  const archives = [
+    ...new Bun.Glob("*.zip").scanSync({ cwd: "./dist" }),
+    ...new Bun.Glob("*.tar.gz").scanSync({ cwd: "./dist" }),
+  ].sort()
+  const manifest = await Promise.all(
+    archives.map(async (name) => {
+      const hasher = new Bun.CryptoHasher("sha256")
+      hasher.update(new Uint8Array(await Bun.file(`./dist/${name}`).arrayBuffer()))
+      return `${hasher.digest("hex")}  ${name}`
+    }),
+  )
+  await Bun.file("./dist/SHA256SUMS").write(manifest.join("\n") + "\n")
+  await $`gh release upload v${Script.version} ./dist/*.zip ./dist/*.tar.gz ./dist/SHA256SUMS --clobber --repo ${process.env.GH_REPO}`
 }
 
 export { binaries }

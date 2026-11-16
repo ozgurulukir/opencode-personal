@@ -1,0 +1,29 @@
+name: setup-wasm-pack
+description: Install a pinned, checksum-verified wasm-pack (replaces curl | sh)
+
+inputs:
+  version:
+    description: wasm-pack version to install
+    required: false
+    default: "0.13.1"
+
+runs:
+  using: composite
+  steps:
+    - name: Install wasm-pack
+      shell: bash
+      run: |
+        set -euo pipefail
+        version="${{ inputs.version }}"
+        target="x86_64-unknown-linux-musl"
+        url="https://github.com/rustwasm/wasm-pack/releases/download/v${version}/wasm-pack-v${version}-${target}.tar.gz"
+        curl -fsSL "$url" -o /tmp/wasm-pack.tar.gz
+
+        # Pinned version + sha256 check: the previous step piped a mutable
+        # installer URL into `sh` in jobs holding contents:write.
+        echo "c539d91ccab2591a7e975bcf82c82e1911b03335c80aa83d67ad25ed2ad06539  /tmp/wasm-pack.tar.gz" | sha256sum -c -
+
+        tar -xzf /tmp/wasm-pack.tar.gz -C /tmp
+        install -m 0755 "/tmp/wasm-pack-v${version}-${target}/wasm-pack" /usr/local/bin/wasm-pack
+        rm -rf /tmp/wasm-pack.tar.gz "/tmp/wasm-pack-v${version}-${target}"
+        wasm-pack --version

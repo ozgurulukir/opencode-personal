@@ -37,7 +37,19 @@ runs:
         git config --local --unset-all http.https://github.com/.extraheader || true
       shell: bash
 
-    - name: Configure git remote
+    - name: Configure git credential helper
       run: |
-        git remote set-url origin https://x-access-token:${{ steps.apptoken.outputs.token }}@github.com/${{ github.repository }}
+        helper="$HOME/.git-credential-opencode-app"
+        cat > "$helper" <<'SH'
+        #!/usr/bin/env bash
+        if [ "$1" = "get" ] && [ -n "$GIT_APP_TOKEN" ]; then
+          printf "protocol=https\nhost=github.com\nusername=x-access-token\npassword=%s\n" "$GIT_APP_TOKEN"
+        fi
+        SH
+        chmod 700 "$helper"
+        git config --global credential.https://github.com.helper "!$helper"
+        # The token travels via the environment and is read at credential-helper
+        # call time — previously it was embedded in the origin URL and persisted
+        # in .git/config for the rest of the job.
+        echo "GIT_APP_TOKEN=${{ steps.apptoken.outputs.token }}" >> "$GITHUB_ENV"
       shell: bash
