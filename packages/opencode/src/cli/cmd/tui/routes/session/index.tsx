@@ -231,6 +231,9 @@ export function Session() {
     void (async () => {
       const previousWorkspace = project.workspace.current()
       const result = await sdk.client.v2.session.get({ sessionID }, { throwOnError: true })
+      // Re-check after every await: navigating A→B quickly must not let A's
+      // late completion reset B's workspace/editor state.
+      if (route.sessionID !== sessionID) return
       if (!result.data) {
         toast.show({
           message: `Session not found: ${sessionID}`,
@@ -251,10 +254,12 @@ export function Session() {
         try {
           await sync.bootstrap({ fatal: false })
         } catch {}
+        if (route.sessionID !== sessionID) return
       }
       editor.reconnect(result.data.directory)
       await sync.session.sync(sessionID)
-      if (route.sessionID === sessionID && scroll) scroll.scrollBy(100_000)
+      if (route.sessionID !== sessionID) return
+      if (scroll) scroll.scrollBy(100_000)
     })().catch((error) => {
       if (route.sessionID !== sessionID) return
       toast.show({
@@ -284,13 +289,22 @@ export function Session() {
   })
 
   let seeded = false
+  let seededSessionID: string | undefined
   let scroll: ScrollBoxRenderable
   let prompt: PromptRef | undefined
   const bind = (r: PromptRef | undefined) => {
     prompt = r
     promptRef.set(r)
+    // Reset the seed when navigating to a different session: the Session
+    // component persists across session→session navigation (SolidJS treats
+    // the <Match when={...}> boolean as equal), so fork/restore flows that
+    // pass a prompt payload were silently ignored.
+    if (seeded && seededSessionID !== route.sessionID) {
+      seeded = false
+    }
     if (seeded || !route.prompt || !r) return
     seeded = true
+    seededSessionID = route.sessionID
     r.set(route.prompt)
   }
   const command = useCommandPalette()
