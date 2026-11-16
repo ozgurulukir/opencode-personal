@@ -71,12 +71,12 @@ function createMockFetch(chunks: string[], status = 200) {
   })
 }
 
-function createModel(fetchFn: ReturnType<typeof mock>) {
+function createModel(fetchFn: typeof globalThis.fetch) {
   return new OpenAIResponsesLanguageModel("gpt-4o", {
     provider: "copilot.responses",
     url: () => "https://api.test.com/responses",
     headers: () => ({ Authorization: "Bearer test-token" }),
-    fetch: fetchFn as any,
+    fetch: fetchFn,
   })
 }
 
@@ -150,12 +150,14 @@ describe("OpenAIResponsesLanguageModel doStream", () => {
       },
     ])
 
-    const finishPart = parts.find((p) => p.type === "finish") as any
+    const finishPart = parts.find((p) => p.type === "finish")
     expect(finishPart).toBeDefined()
-    expect(finishPart.usage).toMatchObject({
-      inputTokens: { total: 30 },
-      outputTokens: { total: 20, reasoning: 10 },
-    })
+    if (finishPart && finishPart.type === "finish") {
+      expect(finishPart.usage).toMatchObject({
+        inputTokens: { total: 30 },
+        outputTokens: { total: 20, reasoning: 10 },
+      })
+    }
   })
 
   test("should handle error in event stream", async () => {
@@ -209,12 +211,14 @@ describe("OpenAIResponsesLanguageModel doStream", () => {
     })
 
     const parts = await convertReadableStreamToArray(stream)
-    const startPart = parts.find((p) => p.type === "stream-start") as any
+    const startPart = parts.find((p) => p.type === "stream-start")
     expect(startPart).toBeDefined()
-    expect(startPart.warnings).toEqual([
-      { type: "unsupported", feature: "topK" },
-      { type: "unsupported", feature: "seed" },
-    ])
+    if (startPart && startPart.type === "stream-start") {
+      expect(startPart.warnings).toEqual([
+        { type: "unsupported", feature: "topK" },
+        { type: "unsupported", feature: "seed" },
+      ])
+    }
   })
 
   test("should format tools into OpenAI Responses format", async () => {

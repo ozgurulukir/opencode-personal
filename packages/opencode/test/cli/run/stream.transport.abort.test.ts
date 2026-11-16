@@ -66,15 +66,23 @@ function trackSignal(ctrl: AbortController) {
   const origAdd = ctrl.signal.addEventListener.bind(ctrl.signal)
   const origRemove = ctrl.signal.removeEventListener.bind(ctrl.signal)
 
-  ctrl.signal.addEventListener = ((type: string, listener: any, opts: any) => {
+  ctrl.signal.addEventListener = ((
+    type: string,
+    listener: EventListenerOrEventListenerObject,
+    opts?: boolean | AddEventListenerOptions,
+  ) => {
     if (type === "abort") added++
     return origAdd(type, listener, opts)
-  }) as any
+  }) as typeof ctrl.signal.addEventListener
 
-  ctrl.signal.removeEventListener = ((type: string, listener: any, opts: any) => {
+  ctrl.signal.removeEventListener = ((
+    type: string,
+    listener: EventListenerOrEventListenerObject,
+    opts?: boolean | EventListenerOptions,
+  ) => {
     if (type === "abort") removed++
     return origRemove(type, listener, opts)
-  }) as any
+  }) as typeof ctrl.signal.removeEventListener
 
   return {
     get added() {
