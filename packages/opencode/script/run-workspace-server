@@ -12,9 +12,11 @@
 // Afterwards, run `./packages/opencode/script/run-workspace-server`
 
 import { stat } from "node:fs/promises"
+import { tmpdir } from "node:os"
+import path from "node:path"
 import { setTimeout as sleep } from "node:timers/promises"
 
-const DEV_DATA_FILE = "/tmp/opencode-workspace-dev-data.json"
+const DEV_DATA_FILE = path.join(tmpdir(), `opencode-workspace-dev-data-${process.getuid?.() ?? "u"}.json`)
 const RESTART_POLL_INTERVAL = 250
 
 async function readData() {

@@ -35,6 +35,32 @@ const cliTry = <Value>(message: string, fn: () => PromiseLike<Value>) =>
     catch: (error) => new CliError({ message: message + errorMessage(error) }),
   })
 
+// `.well-known` metadata drives process execution below; only accept https (or localhost)
+// and reject payloads whose `auth` section is not the exact expected shape.
+function isSecureWellKnownUrl(url: string) {
+  try {
+    const parsed = new URL(url)
+    return parsed.protocol === "https:" || parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1"
+  } catch {
+    return false
+  }
+}
+
+function isValidWellKnownAuth(value: unknown): value is { auth: { command: string[]; env: string } } {
+  if (typeof value !== "object" || value === null) return false
+  const auth = (value as { auth?: unknown }).auth
+  if (typeof auth !== "object" || auth === null) return false
+  const { command, env } = auth as { command?: unknown; env?: unknown }
+  return (
+    Array.isArray(command) &&
+    command.length > 0 &&
+    command.length <= 16 &&
+    command.every((arg) => typeof arg === "string" && arg.length > 0 && !/[\0\r\n]/.test(arg)) &&
+    typeof env === "string" &&
+    env.length > 0
+  )
+}
+
 type OAuthCallbackSuccess = Extract<
   Awaited<ReturnType<Extract<AuthOAuthResult, { method: "auto" }>["callback"]>>,
   { type: "success" }
@@ -314,10 +340,24 @@ export const ProvidersLoginCommand = effectCmd({
     yield* Prompt.intro("Add credential")
     if (args.url) {
       const url = args.url.replace(/\/+$/, "")
+      if (!isSecureWellKnownUrl(url)) {
+        yield* Prompt.log.error(
+          `Refusing to fetch auth provider metadata over plain HTTP: ${url}. Use an https:// URL (http:// is only allowed for localhost).`,
+        )
+        yield* Prompt.outro("Done")
+        return
+      }
       const wellknown = (yield* cliTry(`Failed to load auth provider metadata from ${url}: `, () =>
         fetch(`${url}/.well-known/opencode`).then((x) => x.json()),
       )) as {
         auth: { command: string[]; env: string }
+      }
+      if (!isValidWellKnownAuth(wellknown)) {
+        yield* Prompt.log.error(
+          `The auth provider metadata from ${url} does not have a valid \`auth\` section (expected \`command\` as a non-empty array of strings and \`env\` as a string).`,
+        )
+        yield* Prompt.outro("Done")
+        return
       }
       yield* Prompt.log.info(`Running \`${wellknown.auth.command.join(" ")}\``)
       const abort = new AbortController()

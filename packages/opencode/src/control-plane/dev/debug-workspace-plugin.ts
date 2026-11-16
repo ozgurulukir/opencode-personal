@@ -1,10 +1,14 @@
 import type { Plugin } from "@opencode-ai/plugin"
-import { rename, writeFile } from "node:fs/promises"
+import { mkdtemp, rename, rm, writeFile } from "node:fs/promises"
 import { randomInt } from "node:crypto"
+import { tmpdir } from "node:os"
+import path from "node:path"
 import { setTimeout as sleep } from "node:timers/promises"
 
-const DEV_DATA_FILE = "/tmp/opencode-workspace-dev-data.json"
-const DEV_DATA_TEMP_FILE = `${DEV_DATA_FILE}.tmp`
+// The dev-data file carries environment secrets, so keep it out of the shared
+// /tmp namespace: uid-qualify the final path and stage writes in a private
+// mkdtemp directory with 0600 permissions.
+const DEV_DATA_FILE = path.join(tmpdir(), `opencode-workspace-dev-data-${process.getuid?.() ?? "u"}.json`)
 
 async function waitForHealth(port: number) {
   const url = `http://127.0.0.1:${port}/global/health`
@@ -27,8 +31,10 @@ async function waitForHealth(port: number) {
 let PORT: number | undefined
 
 async function writeDebugData(port: number, id: string, env: Record<string, string | undefined>) {
+  const stagingDir = await mkdtemp(path.join(tmpdir(), "opencode-workspace-dev-"))
+  const stagingFile = path.join(stagingDir, "data.json")
   await writeFile(
-    DEV_DATA_TEMP_FILE,
+    stagingFile,
     JSON.stringify(
       {
         port,
@@ -38,9 +44,11 @@ async function writeDebugData(port: number, id: string, env: Record<string, stri
       null,
       2,
     ),
+    { mode: 0o600 },
   )
 
-  await rename(DEV_DATA_TEMP_FILE, DEV_DATA_FILE)
+  await rename(stagingFile, DEV_DATA_FILE)
+  await rm(stagingDir, { recursive: true, force: true })
 }
 
 export const DebugWorkspacePlugin: Plugin = async ({ experimental_workspace }) => {
