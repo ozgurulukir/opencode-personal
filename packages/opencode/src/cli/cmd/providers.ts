@@ -14,6 +14,7 @@ import { Plugin } from "../../plugin"
 import type { AuthOAuthResult, Hooks } from "@opencode-ai/plugin"
 import { Process } from "@/util/process"
 import { errorMessage } from "@/util/error"
+import { assertSafeRemoteUrl, safeFetchJson } from "@/util/network"
 import { text } from "node:stream/consumers"
 import { Effect, Option } from "effect"
 
@@ -340,15 +341,23 @@ export const ProvidersLoginCommand = effectCmd({
     yield* Prompt.intro("Add credential")
     if (args.url) {
       const url = args.url.replace(/\/+$/, "")
-      if (!isSecureWellKnownUrl(url)) {
+      const check = yield* Effect.promise(async () => {
+        try {
+          await assertSafeRemoteUrl(url, "auth provider URL", { allowLocalhost: true })
+          return null
+        } catch (error) {
+          return error instanceof Error ? error : new Error(String(error))
+        }
+      })
+      if (check instanceof Error) {
         yield* Prompt.log.error(
-          `Refusing to fetch auth provider metadata over plain HTTP: ${url}. Use an https:// URL (http:// is only allowed for localhost).`,
+          `Refusing to fetch auth provider metadata: ${errorMessage(check)}. Use an https:// URL (http:// is only allowed for localhost).`,
         )
         yield* Prompt.outro("Done")
         return
       }
       const wellknown = (yield* cliTry(`Failed to load auth provider metadata from ${url}: `, () =>
-        fetch(`${url}/.well-known/opencode`).then((x) => x.json()),
+        safeFetchJson(`${url}/.well-known/opencode`, "auth provider metadata", { allowLocalhost: true }),
       )) as {
         auth: { command: string[]; env: string }
       }

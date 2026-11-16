@@ -446,7 +446,7 @@ test("unicode filenames", async () => {
   })
 })
 
-test.skip("unicode filenames modification and restore", async () => {
+test("unicode filenames modification and restore", async () => {
   await using tmp = await bootstrap()
   await WithInstance.provide({
     directory: tmp.path,

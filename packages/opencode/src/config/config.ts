@@ -25,6 +25,7 @@ import { containsPath } from "../project/instance-context"
 import { zod } from "@opencode-ai/core/effect-zod"
 import { NonNegativeInt, PositiveInt, withStatics, type DeepMutable } from "@opencode-ai/core/schema"
 import { ConfigAgent } from "./agent"
+import { assertSafeRemoteUrl, safeFetchJson } from "@/util/network"
 import { toolsToPermissions } from "@/permission/tools"
 import { ConfigAttachment } from "./attachment"
 import { ConfigCommand } from "./command"
@@ -129,17 +130,10 @@ function normalizeLoadedConfig(data: unknown, source: string) {
 }
 
 // Well-known config is fetched with credentials attached and its result merges into
-// user config, so only allow https (http is tolerated for loopback development).
-function assertSecureFetchUrl(url: string, what: string) {
-  let parsed: URL
-  try {
-    parsed = new URL(url)
-  } catch {
-    throw new Error(`invalid ${what}: ${url}`)
-  }
-  if (parsed.protocol !== "https:" && parsed.hostname !== "localhost" && parsed.hostname !== "127.0.0.1") {
-    throw new Error(`${what} must use https:// (http is only allowed for localhost): ${url}`)
-  }
+// user config, so only allow https (http is tolerated for loopback development) and
+// refuse targets resolving to private/internal network addresses.
+async function assertSecureFetchUrl(url: string, what: string) {
+  await assertSafeRemoteUrl(url, what, { allowLocalhost: true })
 }
 
 async function substituteWellKnownRemoteConfig(input: { value: unknown; dir: string; source: string }) {
@@ -648,14 +642,14 @@ export const layer = Layer.effect(
         for (const [key, value] of Object.entries(auth)) {
           if (value.type === "wellknown") {
             const url = key.replace(/\/+$/, "")
-            assertSecureFetchUrl(url, "well-known auth provider URL")
+            yield* Effect.promise(() => assertSafeRemoteUrl(url, "well-known auth provider URL", { allowLocalhost: true }))
             process.env[value.key] = value.token
             log.debug("fetching remote config", { url: `${url}/.well-known/opencode` })
-            const response = yield* Effect.promise(() => fetch(`${url}/.well-known/opencode`))
-            if (!response.ok) {
-              throw new Error(`failed to fetch remote config from ${url}: ${response.status}`)
-            }
-            const wellknown = (yield* Effect.promise(() => response.json())) as {
+            const wellknown = (yield* Effect.promise(() =>
+              safeFetchJson<Record<string, unknown>>(`${url}/.well-known/opencode`, "well-known auth provider metadata", {
+                allowLocalhost: true,
+              }),
+            )) as {
               config?: Record<string, unknown>
               remote_config?: unknown
             }
@@ -668,12 +662,11 @@ export const layer = Layer.effect(
             )
             const fetchedConfig = remote
               ? ((yield* Effect.promise(async () => {
-                  assertSecureFetchUrl(remote.url, "well-known remote_config.url")
                   log.debug("fetching remote config", { url: remote.url })
-                  const response = await fetch(remote.url, { headers: remote.headers })
-                  if (!response.ok)
-                    throw new Error(`failed to fetch remote config from ${remote.url}: ${response.status}`)
-                  const data = await response.json()
+                  const data = await safeFetchJson<unknown>(remote.url, "well-known remote_config.url", {
+                    headers: remote.headers,
+                    allowLocalhost: true,
+                  })
                   return isRecord(data) && isRecord(data.config) ? data.config : data
                 })) as Record<string, unknown>)
               : {}
