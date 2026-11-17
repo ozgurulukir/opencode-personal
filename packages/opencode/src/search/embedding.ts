@@ -3,6 +3,7 @@ import fs from "fs"
 import os from "os"
 import path from "path"
 import { Config } from "@/config/config"
+import { EMBEDDING_DEFAULTS } from "@/config/search"
 // Pure-WASM ONNX Runtime. Native .so-free, so it loads inside compiled binaries.
 // Type-only import so module load does not pull in onnxruntime-web eagerly.
 import type * as ort from "onnxruntime-web"
@@ -200,7 +201,11 @@ function createLocalProvider(_modelId: string, dimension: number): EmbeddingProv
 
 // --- OpenAI provider using AI SDK ---
 
-function createOpenAIProvider(apiKey: string, model = "text-embedding-3-small", dimension = 1536): EmbeddingProvider {
+function createOpenAIProvider(
+  apiKey: string,
+  model = "text-embedding-3-small",
+  dimension: number = EMBEDDING_DEFAULTS.openai_dimension,
+): EmbeddingProvider {
   const embed = (texts: string[]): Effect.Effect<number[][], Error> =>
     Effect.tryPromise({
       try: async () => {
@@ -228,7 +233,7 @@ export const layer = Layer.effect(
   Effect.gen(function* () {
     const config = yield* Config.Service
     let backend: EmbeddingProvider | null = null
-    let dimension = 384
+    let dimension: number = EMBEDDING_DEFAULTS.local_dimension
 
     const resolve: Effect.Effect<void, Error> = Effect.gen(function* () {
       if (backend) return
@@ -239,7 +244,9 @@ export const layer = Layer.effect(
       const modelId = (embeddingCfg?.model as string) ?? HF_REPO
       // openai's default model (text-embedding-3-small) emits 1536-dim vectors;
       // the local ONNX model (all-MiniLM-L6-v2) emits 384.
-      dimension = (embeddingCfg?.dimension as number) ?? (provider === "openai" ? 1536 : 384)
+      dimension =
+        (embeddingCfg?.dimension as number) ??
+        (provider === "openai" ? EMBEDDING_DEFAULTS.openai_dimension : EMBEDDING_DEFAULTS.local_dimension)
       const apiKey =
         provider === "openai" ? ((embeddingCfg?.openaiApiKey as string) ?? process.env.OPENAI_API_KEY ?? "") : ""
       backend =

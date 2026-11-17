@@ -2,6 +2,12 @@ import { Schema } from "effect"
 import { zod } from "@opencode-ai/core/effect-zod"
 import { PositiveInt, withStatics } from "@opencode-ai/core/schema"
 
+// Single source of truth for MCP defaults, shared with the MCP client and OAuth provider.
+export const MCP_DEFAULTS = {
+  timeout: 30_000,
+  oauth_callback_port: 19876,
+} as const
+
 export const Local = Schema.Struct({
   type: Schema.Literal("local").annotate({ description: "Type of MCP server connection" }),
   command: Schema.mutable(Schema.Array(Schema.String)).annotate({
@@ -14,7 +20,7 @@ export const Local = Schema.Struct({
     description: "Enable or disable the MCP server on startup",
   }),
   timeout: Schema.optional(PositiveInt).annotate({
-    description: "Timeout in ms for MCP server requests. Defaults to 30000 (30 seconds) if not specified.",
+    description: `Timeout in ms for MCP server requests. Defaults to ${MCP_DEFAULTS.timeout} (30 seconds) if not specified.`,
   }),
 })
   .annotate({ identifier: "McpLocalConfig" })
@@ -30,7 +36,7 @@ export const OAuth = Schema.Struct({
   }),
   scope: Schema.optional(Schema.String).annotate({ description: "OAuth scopes to request during authorization" }),
   redirectUri: Schema.optional(Schema.String).annotate({
-    description: "OAuth redirect URI (default: http://127.0.0.1:19876/mcp/oauth/callback).",
+    description: `OAuth redirect URI (default: http://127.0.0.1:${MCP_DEFAULTS.oauth_callback_port}/mcp/oauth/callback).`,
   }),
 })
   .annotate({ identifier: "McpOAuthConfig" })
@@ -50,7 +56,7 @@ export const Remote = Schema.Struct({
     description: "OAuth authentication configuration for the MCP server. Set to false to disable OAuth auto-detection.",
   }),
   timeout: Schema.optional(PositiveInt).annotate({
-    description: "Timeout in ms for MCP server requests. Defaults to 30000 (30 seconds) if not specified.",
+    description: `Timeout in ms for MCP server requests. Defaults to ${MCP_DEFAULTS.timeout} (30 seconds) if not specified.`,
   }),
 })
   .annotate({ identifier: "McpRemoteConfig" })

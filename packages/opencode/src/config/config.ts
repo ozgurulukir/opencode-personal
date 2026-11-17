@@ -46,6 +46,7 @@ import { SearchInfo } from "./search"
 import { ConfigSkills } from "./skills"
 import { ConfigVariable } from "./variable"
 import { Npm } from "@opencode-ai/core/npm"
+import { DEFAULTS as COMPACTION_DEFAULTS } from "@opencode-ai/sdk/v2/context-budget"
 
 const log = Log.create({ service: "config" })
 
@@ -55,6 +56,12 @@ export const WEBFETCH_DEFAULTS = {
   max_response_bytes: 5 * 1024 * 1024, // 5MB
   default_timeout: 30_000, // 30 seconds
   max_timeout: 120_000, // 2 minutes
+} as const
+
+// Single source of truth for tool-output truncation defaults, shared with tool/truncate.ts.
+export const TOOL_OUTPUT_DEFAULTS = {
+  max_lines: 2000,
+  max_bytes: 50 * 1024,
 } as const
 
 // Custom merge function that concatenates array fields instead of replacing them
@@ -313,10 +320,10 @@ export const Info = Schema.Struct({
   tool_output: Schema.optional(
     Schema.Struct({
       max_lines: Schema.optional(PositiveInt).annotate({
-        description: "Maximum lines of tool output before it is truncated and saved to disk (default: 2000)",
+        description: `Maximum lines of tool output before it is truncated and saved to disk (default: ${TOOL_OUTPUT_DEFAULTS.max_lines})`,
       }),
       max_bytes: Schema.optional(PositiveInt).annotate({
-        description: "Maximum bytes of tool output before it is truncated and saved to disk (default: 51200)",
+        description: `Maximum bytes of tool output before it is truncated and saved to disk (default: ${TOOL_OUTPUT_DEFAULTS.max_bytes})`,
       }),
     }),
   ).annotate({
@@ -349,39 +356,35 @@ export const Info = Schema.Struct({
         description: "Enable pruning of old tool outputs (default: true)",
       }),
       tail_turns: Schema.optional(NonNegativeInt).annotate({
-        description:
-          "Number of recent user turns, including their following assistant/tool responses, to keep verbatim during compaction (default: 2)",
+        description: `Number of recent user turns, including their following assistant/tool responses, to keep verbatim during compaction (default: ${COMPACTION_DEFAULTS.defaultTailTurns})`,
       }),
       preserve_recent_tokens: Schema.optional(NonNegativeInt).annotate({
         description: "Maximum number of tokens from recent turns to preserve verbatim after compaction",
       }),
       reserved: Schema.optional(NonNegativeInt).annotate({
-        description:
-          "Token buffer for compaction headroom across all models and context limits (default: 20000). Clamped to at least the model's maxOutputTokens.",
+        description: `Token buffer for compaction headroom across all models and context limits (default: ${COMPACTION_DEFAULTS.compactionBuffer}). Clamped to at least the model's maxOutputTokens.`,
       }),
       prune_minimum_tokens: Schema.optional(NonNegativeInt).annotate({
-        description: "Minimum token savings required before pruning old tool outputs (default: 20000)",
+        description: `Minimum token savings required before pruning old tool outputs (default: ${COMPACTION_DEFAULTS.pruneMinimumTokens})`,
       }),
       prune_protect_tokens: Schema.optional(NonNegativeInt).annotate({
-        description: "Number of recent tool-output tokens to protect from pruning (default: 40000)",
+        description: `Number of recent tool-output tokens to protect from pruning (default: ${COMPACTION_DEFAULTS.pruneProtectTokens})`,
       }),
       tool_output_max_chars: Schema.optional(NonNegativeInt).annotate({
-        description:
-          "Maximum characters of each tool output used during compaction tail size estimation and summarizer context truncation (default: 2000)",
+        description: `Maximum characters of each tool output used during compaction tail size estimation and summarizer context truncation (default: ${COMPACTION_DEFAULTS.toolOutputMaxChars})`,
       }),
       min_preserve_recent_tokens: Schema.optional(NonNegativeInt).annotate({
-        description: "Minimum tokens to preserve from recent turns when auto-calculating the budget (default: 2000)",
+        description: `Minimum tokens to preserve from recent turns when auto-calculating the budget (default: ${COMPACTION_DEFAULTS.minPreserveRecentTokens})`,
       }),
       max_preserve_recent_tokens: Schema.optional(NonNegativeInt).annotate({
-        description: "Maximum tokens to preserve from recent turns when auto-calculating the budget (default: 8000)",
+        description: `Maximum tokens to preserve from recent turns when auto-calculating the budget (default: ${COMPACTION_DEFAULTS.maxPreserveRecentTokens})`,
       }),
       prune_protected_tools: Schema.optional(Schema.Array(Schema.String)).annotate({
-        description:
-          "Tool names whose output is never pruned during compaction (default: [\"skill\"])",
+        description: `Tool names whose output is never pruned during compaction (default: ${JSON.stringify(COMPACTION_DEFAULTS.pruneProtectedTools)})`,
       }),
       summary_max_tokens: Schema.optional(NonNegativeInt).annotate({
         description:
-          "Maximum token budget for the compaction summary, passed both as maxOutputTokens to the compaction LLM call and as the target length hint in the summary prompt. Defaults to min(model output limit, 8000).",
+          `Maximum token budget for the compaction summary, passed both as maxOutputTokens to the compaction LLM call and as the target length hint in the summary prompt. Defaults to min(model output limit, ${COMPACTION_DEFAULTS.maxSummaryTokens}).`,
       }),
       autocontinue: Schema.optional(Schema.Boolean).annotate({
         description:

@@ -51,6 +51,8 @@ export function maxOutputTokens(model: { limit: { output?: number } }): number {
   return Math.min(model.limit.output ?? 0, OUTPUT_TOKEN_MAX) || OUTPUT_TOKEN_MAX
 }
 
+const PRUNE_PROTECTED_TOOLS: string[] = ["skill"]
+
 export const DEFAULTS = {
   compactionBuffer: 20_000,
   pruneMinimumTokens: 20_000,
@@ -60,6 +62,7 @@ export const DEFAULTS = {
   minPreserveRecentTokens: 2_000,
   maxPreserveRecentTokens: 8_000,
   maxSummaryTokens: 8_000,
+  pruneProtectedTools: PRUNE_PROTECTED_TOOLS,
 } as const
 
 export function compactionConfig(cfg: CompactionSettingsInput) {
@@ -74,7 +77,7 @@ export function compactionConfig(cfg: CompactionSettingsInput) {
     toolOutputMaxChars: cfg.compaction?.tool_output_max_chars ?? DEFAULTS.toolOutputMaxChars,
     minPreserveRecentTokens: cfg.compaction?.min_preserve_recent_tokens ?? DEFAULTS.minPreserveRecentTokens,
     maxPreserveRecentTokens: cfg.compaction?.max_preserve_recent_tokens ?? DEFAULTS.maxPreserveRecentTokens,
-    pruneProtectedTools: cfg.compaction?.prune_protected_tools ?? ["skill"],
+    pruneProtectedTools: cfg.compaction?.prune_protected_tools ?? DEFAULTS.pruneProtectedTools,
     summaryMaxTokens: cfg.compaction?.summary_max_tokens,
     maxSummaryTokens: DEFAULTS.maxSummaryTokens,
     autocontinue: cfg.compaction?.autocontinue !== false,

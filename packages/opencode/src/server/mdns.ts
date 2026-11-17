@@ -1,5 +1,6 @@
 import * as Log from "@opencode-ai/core/util/log"
 import { Bonjour } from "bonjour-service"
+import { SERVER_DEFAULTS } from "@/config/server"
 
 const log = Log.create({ service: "mdns" })
 
@@ -23,7 +24,7 @@ export function publish(port: number, domain?: string) {
   const attempt = (retriesLeft: number) => {
     if (unpublished) return
     try {
-      const host = domain ?? "opencode.local"
+      const host = domain ?? SERVER_DEFAULTS.mdns_domain
       const name = `opencode-${port}`
       bonjour = new Bonjour()
       const service = bonjour.publish({

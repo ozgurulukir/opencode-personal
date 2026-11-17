@@ -8,10 +8,11 @@ import type {
 import { Effect } from "effect"
 import { McpAuth } from "./auth"
 import * as Log from "@opencode-ai/core/util/log"
+import { MCP_DEFAULTS } from "@/config/mcp"
 
 const log = Log.create({ service: "mcp.oauth" })
 
-const OAUTH_CALLBACK_PORT = 19876
+const OAUTH_CALLBACK_PORT: number = MCP_DEFAULTS.oauth_callback_port
 const OAUTH_CALLBACK_PATH = "/mcp/oauth/callback"
 
 export interface McpOAuthConfig {

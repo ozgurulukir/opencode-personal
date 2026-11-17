@@ -1,12 +1,9 @@
 import { Config } from "@/config/config"
+import { IMAGE_ATTACHMENT_DEFAULTS } from "@/config/attachment"
 import type { MessageV2 } from "@/session/message-v2"
 import * as Log from "@opencode-ai/core/util/log"
 import { Context, Effect, Layer, Schema } from "effect"
 
-const MAX_BASE64_BYTES = 4.5 * 1024 * 1024
-const MAX_WIDTH = 2000
-const MAX_HEIGHT = 2000
-const AUTO_RESIZE = true
 const JPEG_QUALITIES = [80, 85, 70, 55, 40]
 const log = Log.create({ service: "image" })
 
@@ -76,10 +73,10 @@ export const layer = Layer.effect(
     const normalize = Effect.fn("Image.normalize")(function* (input: MessageV2.FilePart) {
       const image = (yield* config.get()).attachment?.image
       const info = {
-        autoResize: image?.auto_resize ?? AUTO_RESIZE,
-        maxWidth: image?.max_width ?? MAX_WIDTH,
-        maxHeight: image?.max_height ?? MAX_HEIGHT,
-        maxBase64Bytes: image?.max_base64_bytes ?? MAX_BASE64_BYTES,
+        autoResize: image?.auto_resize ?? IMAGE_ATTACHMENT_DEFAULTS.auto_resize,
+        maxWidth: image?.max_width ?? IMAGE_ATTACHMENT_DEFAULTS.max_width,
+        maxHeight: image?.max_height ?? IMAGE_ATTACHMENT_DEFAULTS.max_height,
+        maxBase64Bytes: image?.max_base64_bytes ?? IMAGE_ATTACHMENT_DEFAULTS.max_base64_bytes,
       }
       if (!input.url.startsWith("data:") || !input.url.includes(";base64,"))
         return yield* new InvalidDataUrlError({ url: input.url })

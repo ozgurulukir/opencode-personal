@@ -1,5 +1,6 @@
 import type { Argv, InferredOptionTypes } from "yargs"
 import { Config } from "@/config/config"
+import { SERVER_DEFAULTS } from "@/config/server"
 import { Flag } from "@opencode-ai/core/flag/flag"
 import { Effect } from "effect"
 
@@ -21,8 +22,8 @@ const options = {
   },
   "mdns-domain": {
     type: "string" as const,
-    describe: "custom domain name for mDNS service (default: opencode.local)",
-    default: "opencode.local",
+    describe: `custom domain name for mDNS service (default: ${SERVER_DEFAULTS.mdns_domain})`,
+    default: SERVER_DEFAULTS.mdns_domain,
   },
   cors: {
     type: "string" as const,

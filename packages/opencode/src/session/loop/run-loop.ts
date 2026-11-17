@@ -14,6 +14,7 @@ import { Agent } from "@/agent/agent"
 import { Provider } from "@/provider/provider"
 import { Bus } from "@/bus"
 import { Config } from "@/config/config"
+import { SKILLS_DEFAULTS } from "@/config/skills"
 import { Plugin } from "@/plugin"
 import { Permission } from "@/permission"
 import { SessionStatus } from "../status"
@@ -292,8 +293,8 @@ export const runLoop: (deps: RunLoopDeps, sessionID: SessionID) => Effect.Effect
       const autoMatchOpts = cfg.skills?.autoMatch
         ? {
             autoMatch: true,
-            count: cfg.skills.autoMatchCount ?? 3,
-            threshold: cfg.skills.autoMatchThreshold ?? 0.25,
+            count: cfg.skills.autoMatchCount ?? SKILLS_DEFAULTS.autoMatchCount,
+            threshold: cfg.skills.autoMatchThreshold ?? SKILLS_DEFAULTS.autoMatchThreshold,
           }
         : undefined
 

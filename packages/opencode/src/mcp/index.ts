@@ -11,7 +11,7 @@ import {
   ToolListChangedNotificationSchema,
 } from "@modelcontextprotocol/sdk/types.js"
 import { Config } from "@/config/config"
-import { ConfigMCP } from "../config/mcp"
+import { ConfigMCP, MCP_DEFAULTS } from "../config/mcp"
 import * as Log from "@opencode-ai/core/util/log"
 import { NamedError } from "@opencode-ai/core/util/error"
 import z from "zod/v4"
@@ -35,7 +35,7 @@ import { zod as effectZod } from "@opencode-ai/core/effect-zod"
 import { withStatics } from "@opencode-ai/core/schema"
 
 const log = Log.create({ service: "mcp" })
-const DEFAULT_TIMEOUT = 30_000
+const DEFAULT_TIMEOUT = MCP_DEFAULTS.timeout
 
 const TolerantToolSchema = ToolSchema.extend({
   outputSchema: z.unknown().optional(),

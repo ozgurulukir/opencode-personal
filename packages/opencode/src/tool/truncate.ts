@@ -4,7 +4,7 @@ import path from "path"
 import type { Agent } from "../agent/agent"
 import { AppFileSystem } from "@opencode-ai/core/filesystem"
 import { evaluate } from "@/permission/evaluate"
-import { Config } from "@/config/config"
+import { Config, TOOL_OUTPUT_DEFAULTS } from "@/config/config"
 import { Identifier } from "../id/id"
 import * as Log from "@opencode-ai/core/util/log"
 import { ToolID } from "./schema"
@@ -13,8 +13,8 @@ import { TRUNCATION_DIR } from "./truncation-dir"
 const log = Log.create({ service: "truncation" })
 const RETENTION = Duration.days(7)
 
-export const MAX_LINES = 2000
-export const MAX_BYTES = 50 * 1024
+export const MAX_LINES = TOOL_OUTPUT_DEFAULTS.max_lines
+export const MAX_BYTES = TOOL_OUTPUT_DEFAULTS.max_bytes
 export const DIR = TRUNCATION_DIR
 export const GLOB = path.join(TRUNCATION_DIR, "*")
 
