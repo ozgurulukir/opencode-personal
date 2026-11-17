@@ -1,4 +1,5 @@
-- **Origin:** `ozgurulukir/opencode-personal` — default branch `main`. Fork of `anomalyco/opencode`.
+- **Origin:** `ozgurulukir/opencode-personal` — default branch `main`. Independent fork of `anomalyco/opencode`.
+- **Independent fork invariant:** NEVER introduce or hardcode `anomalyco/opencode` or `sst/opencode` in workflows, scripts, installers, or source code. Use `./github` for the GitHub Action, `github.repository == 'ozgurulukir/opencode-personal'` (or `needs.<job>.result == 'success'`) for workflow guards, and `ozgurulukir/opencode-personal` for release/install URLs.
 - ALWAYS USE PARALLEL TOOLS WHEN APPLICABLE.
 - Prefer automation: execute requested actions without confirmation unless blocked by missing info or safety/irreversibility.
 - `.jules/bolt.md` is the canonical Bolt performance log. Read it BEFORE any perf refactor — documents "when to optimize" patterns and the "do not micro-optimize typical UI components" guardrail.
