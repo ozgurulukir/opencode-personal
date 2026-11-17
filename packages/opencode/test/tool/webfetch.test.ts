@@ -6,8 +6,9 @@ import { Agent } from "../../src/agent/agent"
 import { Truncate } from "@/tool/truncate"
 import { Instance } from "../../src/project/instance"
 import { WithInstance } from "../../src/project/with-instance"
-import { WebFetchTool } from "../../src/tool/webfetch"
+import { resolveLimits, WebFetchTool } from "../../src/tool/webfetch"
 import { SessionID, MessageID } from "../../src/session/schema"
+import { TestConfig } from "../fixture/config"
 
 const projectRoot = path.join(import.meta.dir, "../..")
 
@@ -90,6 +91,60 @@ async function exec(args: { url: string; format: "text" | "markdown" | "html" })
     Effect.runPromise,
   )
 }
+
+describe("webfetch limits", () => {
+  test("uses domain defaults when config is unset", () => {
+    expect(resolveLimits()).toEqual({
+      maxResponseBytes: 5 * 1024 * 1024,
+      defaultTimeout: 30_000,
+      maxTimeout: 120_000,
+    })
+  })
+
+  test("honors configured overrides independently", () => {
+    expect(resolveLimits({ max_response_bytes: 1024 })).toEqual({
+      maxResponseBytes: 1024,
+      defaultTimeout: 30_000,
+      maxTimeout: 120_000,
+    })
+    expect(resolveLimits({ default_timeout: 5_000, max_timeout: 10_000 })).toEqual({
+      maxResponseBytes: 5 * 1024 * 1024,
+      defaultTimeout: 5_000,
+      maxTimeout: 10_000,
+    })
+  })
+
+  test("applies the configured response size limit to fetches", async () => {
+    await WithInstance.provide({
+      directory: projectRoot,
+      fn: async () => {
+        const client = HttpClient.make((request: HttpClientRequest.HttpClientRequest) =>
+          Effect.succeed(
+            HttpClientResponse.fromWeb(
+              request,
+              new Response("x".repeat(64), { status: 200, headers: { "content-type": "text/plain" } }),
+            ),
+          ),
+        )
+        const config = TestConfig.layer({
+          get: () => Effect.succeed({ webfetch: { max_response_bytes: 8 } }),
+        })
+        const { WebFetchTool } = await import("../../src/tool/webfetch")
+        await expect(
+          WebFetchTool.pipe(
+            Effect.flatMap((info) => info.init()),
+            Effect.flatMap((tool) =>
+              tool.execute({ url: "http://localhost/large", format: "text" }, ctx),
+            ),
+            Effect.provideService(HttpClient.HttpClient, client),
+            Effect.provide(Layer.mergeAll(Truncate.defaultLayer, Agent.defaultLayer, config)),
+            Effect.runPromise,
+          ),
+        ).rejects.toThrow("exceeds 8 byte limit")
+      },
+    })
+  })
+})
 
 describe("tool.webfetch", () => {
   test("returns image responses as file attachments", async () => {

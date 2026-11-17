@@ -1,14 +1,26 @@
-import { Effect, Schema } from "effect"
+import { Effect, Option, Schema } from "effect"
 import { PositiveInt } from "@opencode-ai/core/schema"
 import * as Tool from "./tool"
 import TurndownService from "turndown"
 import DESCRIPTION from "./webfetch.txt"
 import { isImageAttachment } from "@/util/media"
 import { guardedFetch } from "@/util/network"
+import { Config } from "@/config/config"
 
+// Domain defaults: webfetch pulls remote content into the model's context, so the response is
+// capped to keep context bounded and requests are time-boxed so a slow server cannot stall a
+// turn. Operators can override each value via the `webfetch` config section.
 const MAX_RESPONSE_SIZE = 5 * 1024 * 1024 // 5MB
 const DEFAULT_TIMEOUT = 30 * 1000 // 30 seconds
 const MAX_TIMEOUT = 120 * 1000 // 2 minutes
+
+export function resolveLimits(config?: Config.Info["webfetch"]) {
+  return {
+    maxResponseBytes: config?.max_response_bytes ?? MAX_RESPONSE_SIZE,
+    defaultTimeout: config?.default_timeout ?? DEFAULT_TIMEOUT,
+    maxTimeout: config?.max_timeout ?? MAX_TIMEOUT,
+  }
+}
 
 export const Parameters = Schema.Struct({
   url: Schema.String.annotate({ description: "The URL to fetch content from" }),
@@ -18,7 +30,8 @@ export const Parameters = Schema.Struct({
       description: "The format to return the content in (text, markdown, or html). Defaults to markdown.",
     }),
   timeout: Schema.optional(PositiveInt).annotate({
-    description: "Optional positive timeout in seconds. Values above 120 are capped at 120.",
+    description:
+      "Optional positive timeout in seconds. Values above the configured maximum (default: 120) are capped.",
   }),
 })
 
@@ -45,7 +58,13 @@ export const WebFetchTool = Tool.define(
             },
           })
 
-          const timeout = Math.min((params.timeout ?? DEFAULT_TIMEOUT / 1000) * 1000, MAX_TIMEOUT)
+          const configSvc = yield* Effect.serviceOption(Config.Service)
+          const webfetchConfig =
+            Option.isSome(configSvc)
+              ? yield* configSvc.value.get().pipe(Effect.catch(() => Effect.succeed(undefined)))
+              : undefined
+          const { maxResponseBytes, defaultTimeout, maxTimeout } = resolveLimits(webfetchConfig?.webfetch)
+          const timeout = Math.min((params.timeout ?? defaultTimeout / 1000) * 1000, maxTimeout)
 
           // Build Accept header based on requested format with q parameters for fallbacks
           let acceptHeader = "*/*"
@@ -102,13 +121,13 @@ export const WebFetchTool = Tool.define(
 
           // Check content length
           const contentLength = response.headers.get("content-length")
-          if (contentLength && parseInt(contentLength) > MAX_RESPONSE_SIZE) {
-            throw new Error("Response too large (exceeds 5MB limit)")
+          if (contentLength && parseInt(contentLength) > maxResponseBytes) {
+            throw new Error(`Response too large (exceeds ${maxResponseBytes} byte limit)`)
           }
 
           const arrayBuffer = yield* Effect.promise(() => response.arrayBuffer())
-          if (arrayBuffer.byteLength > MAX_RESPONSE_SIZE) {
-            throw new Error("Response too large (exceeds 5MB limit)")
+          if (arrayBuffer.byteLength > maxResponseBytes) {
+            throw new Error(`Response too large (exceeds ${maxResponseBytes} byte limit)`)
           }
 
           const contentType = response.headers.get("content-type") || ""
