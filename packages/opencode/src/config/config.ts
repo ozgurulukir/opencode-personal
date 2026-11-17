@@ -315,6 +315,25 @@ export const Info = Schema.Struct({
     description:
       "Thresholds for truncating tool output. When output exceeds either limit, the full text is written to the truncation directory and a preview is returned.",
   }),
+  webfetch: Schema.optional(
+    Schema.Struct({
+      max_response_bytes: Schema.optional(PositiveInt).annotate({
+        description:
+          "Maximum response size in bytes accepted by the webfetch tool. Larger responses are rejected (default: 5242880, i.e. 5MB).",
+      }),
+      default_timeout: Schema.optional(PositiveInt).annotate({
+        description:
+          "Timeout in milliseconds used when a webfetch call does not specify one (default: 30000). Bounded by max_timeout.",
+      }),
+      max_timeout: Schema.optional(PositiveInt).annotate({
+        description:
+          "Hard upper bound in milliseconds for webfetch timeouts, including per-call overrides (default: 120000).",
+      }),
+    }),
+  ).annotate({
+    description:
+      "Limits for the webfetch tool. Bounds response size and request timeouts so fetched content stays safe for model context and slow servers cannot hang a turn.",
+  }),
   compaction: Schema.optional(
     Schema.Struct({
       auto: Schema.optional(Schema.Boolean).annotate({

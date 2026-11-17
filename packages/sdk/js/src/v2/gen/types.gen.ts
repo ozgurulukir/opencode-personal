@@ -1254,6 +1254,11 @@ export type Config = {
     max_lines?: number
     max_bytes?: number
   }
+  webfetch?: {
+    max_response_bytes?: number
+    default_timeout?: number
+    max_timeout?: number
+  }
   compaction?: {
     auto?: boolean
     prune?: boolean
