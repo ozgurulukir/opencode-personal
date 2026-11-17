@@ -63,6 +63,8 @@ export function ScrollView(props: ScrollViewProps) {
   const thumbTop = () => state.thumbTop
   const showThumb = () => state.showThumb
 
+  const TRACK_PADDING = 8
+
   const updateThumb = () => {
     if (!viewportRef) return
     const { scrollTop, scrollHeight, clientHeight } = viewportRef
@@ -73,8 +75,7 @@ export function ScrollView(props: ScrollViewProps) {
     }
 
     setState("showThumb", true)
-    const trackPadding = 8
-    const trackHeight = clientHeight - trackPadding * 2
+    const trackHeight = clientHeight - TRACK_PADDING * 2
 
     const minThumbHeight = 32
     // Calculate raw thumb height based on ratio
@@ -87,7 +88,7 @@ export function ScrollView(props: ScrollViewProps) {
     const top = maxScrollTop > 0 ? (scrollTop / maxScrollTop) * maxThumbTop : 0
 
     // Ensure thumb stays within bounds (shouldn't be necessary due to math above, but good for safety)
-    const boundedTop = trackPadding + Math.max(0, Math.min(top, maxThumbTop))
+    const boundedTop = TRACK_PADDING + Math.max(0, Math.min(top, maxThumbTop))
 
     setState("thumbHeight", height)
     setState("thumbTop", boundedTop)
@@ -123,7 +124,7 @@ export function ScrollView(props: ScrollViewProps) {
       const deltaY = e.clientY - startY
       const { scrollHeight, clientHeight } = viewportRef
       const maxScrollTop = scrollHeight - clientHeight
-      const maxThumbTop = clientHeight - thumbHeight()
+      const maxThumbTop = clientHeight - TRACK_PADDING * 2 - thumbHeight()
 
       if (maxThumbTop > 0) {
         const scrollDelta = deltaY * (maxScrollTop / maxThumbTop)

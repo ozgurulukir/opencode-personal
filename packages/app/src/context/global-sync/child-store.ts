@@ -137,9 +137,40 @@ export function createChildStoreManager(input: {
     }
   }
 
+  const emptyChild = createStore<State>({
+    status: "loading",
+    agent: [],
+    command: [],
+    project: "",
+    projectMeta: undefined,
+    icon: undefined,
+    provider: { all: [], default: {}, connected: [] },
+    provider_ready: false,
+    config: {},
+    path: { state: "", config: "", worktree: "", directory: "", home: "" },
+    session: [],
+    sessionTotal: 0,
+    session_status: {},
+    session_diff: {},
+    todo: {},
+    permission: {},
+    question: {},
+    mcp: {},
+    mcp_ready: false,
+    lsp: [],
+    lsp_ready: false,
+    vcs: undefined,
+    limit: 5,
+    message: {},
+    part: {},
+  })
+
   function ensureChild(directory: string) {
     const key = directoryKey(directory)
-    if (!key) console.error("No directory provided")
+    if (!key) {
+      console.error("No directory provided")
+      return emptyChild
+    }
     if (!children[key]) {
       const vcs = runWithOwner(input.owner, () =>
         persisted(

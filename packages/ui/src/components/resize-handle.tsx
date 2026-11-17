@@ -1,4 +1,4 @@
-import { splitProps, type JSX } from "solid-js"
+import { onCleanup, splitProps, type JSX } from "solid-js"
 
 export interface ResizeHandleProps extends Omit<JSX.HTMLAttributes<HTMLDivElement>, "onResize"> {
   direction: "horizontal" | "vertical"
@@ -25,13 +25,19 @@ export function ResizeHandle(props: ResizeHandleProps) {
     "classList",
   ])
 
+  let stopDrag: (() => void) | undefined
+  onCleanup(() => stopDrag?.())
+
   const handleMouseDown = (e: MouseEvent) => {
     e.preventDefault()
+    stopDrag?.()
     const edge = local.edge ?? (local.direction === "vertical" ? "start" : "end")
     const start = local.direction === "horizontal" ? e.clientX : e.clientY
     const startSize = local.size
     let current = startSize
 
+    const previousUserSelect = document.body.style.userSelect
+    const previousOverflow = document.body.style.overflow
     document.body.style.userSelect = "none"
     document.body.style.overflow = "hidden"
 
@@ -50,11 +56,16 @@ export function ResizeHandle(props: ResizeHandleProps) {
       local.onResize(clamped)
     }
 
-    const onMouseUp = () => {
-      document.body.style.userSelect = ""
-      document.body.style.overflow = ""
+    const teardown = () => {
+      document.body.style.userSelect = previousUserSelect
+      document.body.style.overflow = previousOverflow
       document.removeEventListener("mousemove", onMouseMove)
       document.removeEventListener("mouseup", onMouseUp)
+      stopDrag = undefined
+    }
+
+    const onMouseUp = () => {
+      teardown()
 
       const threshold = local.collapseThreshold ?? 0
       if (local.onCollapse && threshold > 0 && current < threshold) {
@@ -62,6 +73,7 @@ export function ResizeHandle(props: ResizeHandleProps) {
       }
     }
 
+    stopDrag = teardown
     document.addEventListener("mousemove", onMouseMove)
     document.addEventListener("mouseup", onMouseUp)
   }

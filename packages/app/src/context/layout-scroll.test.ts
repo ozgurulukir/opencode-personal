@@ -61,4 +61,27 @@ describe("createScrollPersistence", () => {
     expect(scroll.scroll("session", "review")).toEqual({ x: 12, y: 34 })
     scroll.dispose()
   })
+
+  test("dispose flushes pending dirty scroll state before dropping", () => {
+    const snapshot = {
+      session: {},
+    } as Record<string, Record<string, { x: number; y: number }>>
+    const writes: Array<Record<string, { x: number; y: number }>> = []
+
+    const scroll = createScrollPersistence({
+      debounceMs: 250,
+      getSnapshot: (sessionKey) => snapshot[sessionKey],
+      onFlush: (sessionKey, next) => {
+        snapshot[sessionKey] = next
+        writes.push(next)
+      },
+    })
+
+    scroll.setScroll("session", "review", { x: 4, y: 99 })
+    expect(writes).toHaveLength(0)
+
+    scroll.dispose()
+    expect(writes).toHaveLength(1)
+    expect(writes[0]?.review).toEqual({ x: 4, y: 99 })
+  })
 })
