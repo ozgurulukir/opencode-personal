@@ -24,6 +24,7 @@ Options:
     -v, --version <version> Install a specific version (e.g., 1.14.48-p.1)
     -b, --binary <path>     Install from a local binary instead of downloading
         --no-modify-path    Don't modify shell config files (.zshrc, .bashrc, etc.)
+        --skip-checksum     Skip SHA256SUMS verification (not recommended)
 
 Examples:
     curl -fsSL https://raw.githubusercontent.com/ozgurulukir/opencode-personal/main/install.sh | bash
@@ -39,6 +40,7 @@ EOF
 requested_version=${VERSION:-}
 no_modify_path=false
 binary_path=""
+skip_checksum=false
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -66,6 +68,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --no-modify-path)
             no_modify_path=true
+            shift
+            ;;
+        --skip-checksum)
+            skip_checksum=true
             shift
             ;;
         *)
@@ -289,7 +295,7 @@ download_with_progress() {
     trap "trap - RETURN; rm -f \"$tracefile\"; printf '\033[?25h' >&4; exec 4>&-" RETURN
 
     (
-        curl --trace-ascii "$tracefile" -s -L -o "$output" "$url"
+        curl --trace-ascii "$tracefile" -fsSL -o "$output" "$url"
     ) &
     local curl_pid=$!
 
@@ -333,13 +339,15 @@ download_and_install() {
 
     if [[ "$os" == "windows" ]] || ! [ -t 2 ] || ! download_with_progress "$url" "$tmp_dir/$filename"; then
         # Fallback to standard curl on Windows, non-TTY environments, or if custom progress fails
-        curl -# -L -o "$tmp_dir/$filename" "$url"
+        curl -f# -L -o "$tmp_dir/$filename" "$url"
     fi
 
     # Verify integrity against the release's SHA256SUMS manifest before the
-    # archive is extracted and its binary executed. The manifest is published
-    # by the release build; older releases without one skip with a warning.
-    if curl -fsSL -o "$tmp_dir/SHA256SUMS" "${url%$filename}SHA256SUMS"; then
+    # archive is extracted and its binary executed. Fail closed unless the
+    # caller explicitly opted out with --skip-checksum.
+    if [ "$skip_checksum" = true ]; then
+        print_message warning "Skipping checksum verification (--skip-checksum)"
+    elif curl -fsSL -o "$tmp_dir/SHA256SUMS" "${url%$filename}SHA256SUMS"; then
         local expected actual
         expected=$(grep -E " ${filename}\$" "$tmp_dir/SHA256SUMS" | head -1 | awk '{print $1}')
         if command -v sha256sum >/dev/null 2>&1; then
@@ -359,7 +367,9 @@ download_and_install() {
             exit 1
         fi
     else
-        print_message warning "No SHA256SUMS manifest for this release — skipping checksum verification"
+        rm -rf "$tmp_dir"
+        echo -e "${RED}Error: failed to download SHA256SUMS manifest for $specific_version (pass --skip-checksum to bypass)${NC}" >&2
+        exit 1
     fi
 
     # Extract into a subdirectory so the archive file itself is never copied into INSTALL_DIR.
