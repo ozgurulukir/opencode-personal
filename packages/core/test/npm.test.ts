@@ -79,6 +79,33 @@ describe("Npm.add", () => {
     const error = await Effect.runPromise(run)
     expect(error._tag).toBe("NpmInstallFailedError")
   })
+
+  test("rejects path traversal and absolute specs without writing outside cache", async () => {
+    await using tmp = await tmpdir()
+    const outside = path.join(tmp.path, "outside")
+    await fs.mkdir(outside, { recursive: true })
+
+    for (const spec of ["../../outside", "../outside", "/tmp/evil", ""]) {
+      const error = await Effect.gen(function* () {
+        const npm = yield* Npm.Service
+        return yield* npm.add(spec)
+      }).pipe(
+        Effect.scoped,
+        Effect.provide(npmLayer(path.join(tmp.path, "cache"))),
+        Effect.flip,
+        Effect.runPromise,
+      )
+      expect(error._tag).toBe("NpmInstallFailedError")
+
+      const bin = await Effect.gen(function* () {
+        const npm = yield* Npm.Service
+        return yield* npm.which(spec)
+      }).pipe(Effect.scoped, Effect.provide(npmLayer(path.join(tmp.path, "cache"))), Effect.runPromise)
+      expect(Option.isNone(bin)).toBe(true)
+    }
+
+    expect(await fs.readdir(outside)).toEqual([])
+  })
 })
 
 describe("Npm.install", () => {

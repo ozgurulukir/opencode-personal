@@ -74,7 +74,14 @@ export const layer = Layer.effect(
     const global = yield* Global.Service
     const fs = yield* FileSystem.FileSystem
     const flock = yield* EffectFlock.Service
-    const directory = (pkg: string) => path.join(global.cache, "packages", sanitize(pkg))
+    const baseDir = () => path.resolve(global.cache, "packages")
+    const safeDirectory = (pkg: string) => {
+      if (!pkg || path.isAbsolute(pkg) || /(^|[\\/])\.\.([\\/]|$)/.test(pkg)) return
+      const base = baseDir()
+      const resolved = path.resolve(base, sanitize(pkg))
+      if (resolved === base || !resolved.startsWith(base + path.sep)) return
+      return resolved
+    }
     const reify = (input: { dir: string; add?: string[] }) =>
       Effect.gen(function* () {
         yield* flock.acquire(`npm-install:${input.dir}`)
@@ -111,7 +118,16 @@ export const layer = Layer.effect(
       )
 
     const add = Effect.fn("Npm.add")(function* (pkg: string) {
-      const dir = directory(pkg)
+      const dir = safeDirectory(pkg)
+      if (!dir) {
+        return yield* Effect.fail(
+          new InstallFailedError({
+            add: [pkg],
+            dir: baseDir(),
+            cause: new Error(`Invalid package spec: ${pkg}`),
+          }),
+        )
+      }
       const name = (() => {
         try {
           return npa(pkg).name ?? pkg
@@ -199,7 +215,8 @@ export const layer = Layer.effect(
     }, Effect.scoped)
 
     const which = Effect.fn("Npm.which")(function* (pkg: string, bin?: string) {
-      const dir = directory(pkg)
+      const dir = safeDirectory(pkg)
+      if (!dir) return Option.none<string>()
       const binDir = path.join(dir, "node_modules", ".bin")
 
       const pick = Effect.fnUntraced(function* () {
