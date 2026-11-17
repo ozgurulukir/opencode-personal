@@ -11,8 +11,8 @@ export type TuiRequest = Schema.Schema.Type<typeof TuiRequest>
 const request = new AsyncQueue<TuiRequest>()
 const response = new AsyncQueue<unknown>()
 
-export function nextTuiRequest() {
-  return request.next()
+export function nextTuiRequest(signal?: AbortSignal) {
+  return request.next(signal)
 }
 
 export function submitTuiRequest(body: TuiRequest) {

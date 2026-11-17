@@ -1,17 +1,13 @@
 import { Workspace } from "@/control-plane/workspace"
 import * as InstanceState from "@/effect/instance-state"
 import { Session } from "@/session/session"
+import { SessionTable } from "@/session/session.sql"
 import { Database } from "@/storage/db"
 import { SyncEvent } from "@/sync"
 import { EventTable } from "@/sync/event.sql"
-import { asc } from "drizzle-orm"
-import { and } from "drizzle-orm"
-import { eq } from "drizzle-orm"
-import { lte } from "drizzle-orm"
-import { not } from "drizzle-orm"
-import { or } from "drizzle-orm"
+import { and, asc, eq, inArray, lte, not, or } from "drizzle-orm"
 import { Effect, Scope } from "effect"
-import { HttpApiBuilder } from "effect/unstable/httpapi"
+import { HttpApiBuilder, HttpApiError } from "effect/unstable/httpapi"
 import { InstanceHttpApi } from "../api"
 import { HistoryPayload, ReplayPayload, SessionPayload } from "../groups/sync"
 import * as Log from "@opencode-ai/core/util/log"
@@ -64,8 +60,16 @@ export const syncHandlers = HttpApiBuilder.group(InstanceHttpApi, "sync", (handl
     })
 
     const steal = Effect.fn("SyncHttpApi.steal")(function* (ctx: { payload: typeof SessionPayload.Type }) {
+      const instance = yield* InstanceState.context
       const workspaceID = yield* InstanceState.workspaceID
       if (!workspaceID) throw new Error("Cannot steal session without workspace context")
+
+      const sessionRow = Database.use((db) =>
+        db.select({ projectID: SessionTable.project_id }).from(SessionTable).where(eq(SessionTable.id, ctx.payload.sessionID)).get(),
+      )
+      if (!sessionRow || sessionRow.projectID !== instance.project.id) {
+        return yield* new HttpApiError.NotFound({})
+      }
 
       yield* sync.run(Session.Event.Updated, {
         sessionID: ctx.payload.sessionID,
@@ -82,20 +86,29 @@ export const syncHandlers = HttpApiBuilder.group(InstanceHttpApi, "sync", (handl
       return { sessionID: ctx.payload.sessionID }
     })
 
+    const HISTORY_LIMIT = 1000
+
     const history = Effect.fn("SyncHttpApi.history")(function* (ctx: { payload: typeof HistoryPayload.Type }) {
+      const instance = yield* InstanceState.context
       const exclude = Object.entries(ctx.payload)
-      return Database.use((db) =>
-        db
+      return Database.use((db) => {
+        const projectSessions = db
+          .select({ id: SessionTable.id })
+          .from(SessionTable)
+          .where(eq(SessionTable.project_id, instance.project.id))
+        const projectFilter = inArray(EventTable.aggregate_id, projectSessions)
+        const excludeFilter =
+          exclude.length > 0
+            ? not(or(...exclude.map(([id, seq]) => and(eq(EventTable.aggregate_id, id), lte(EventTable.seq, seq))))!)
+            : undefined
+        return db
           .select()
           .from(EventTable)
-          .where(
-            exclude.length > 0
-              ? not(or(...exclude.map(([id, seq]) => and(eq(EventTable.aggregate_id, id), lte(EventTable.seq, seq))))!)
-              : undefined,
-          )
+          .where(excludeFilter ? and(projectFilter, excludeFilter) : projectFilter)
           .orderBy(asc(EventTable.seq))
-          .all(),
-      )
+          .limit(HISTORY_LIMIT)
+          .all()
+      })
     })
 
     return handlers.handle("start", start).handle("replay", replay).handle("steal", steal).handle("history", history)

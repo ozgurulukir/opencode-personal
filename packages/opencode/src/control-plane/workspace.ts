@@ -620,11 +620,13 @@ export const layer = Layer.effect(
 
       const createExit = yield* Effect.exit(EffectBridge.fromPromise(() => adapter.create(config, env)))
       if (Exit.isFailure(createExit)) {
+        yield* stopSync(info.id).pipe(Effect.ignore)
         yield* deleteRow().pipe(Effect.ignore)
         return yield* Effect.failCause(createExit.cause)
       }
       const bootExit = yield* Effect.exit(boot)
       if (Exit.isFailure(bootExit)) {
+        yield* stopSync(info.id).pipe(Effect.ignore)
         yield* deleteRow().pipe(Effect.ignore)
         return yield* Effect.failCause(bootExit.cause)
       }

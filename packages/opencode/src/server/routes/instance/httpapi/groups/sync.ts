@@ -71,7 +71,7 @@ export const SyncApi = HttpApi.make("sync")
           query: WorkspaceRoutingQuery,
           payload: SessionPayload,
           success: described(SessionPayload, "Session stolen into workspace"),
-          error: HttpApiError.BadRequest,
+          error: [HttpApiError.BadRequest, HttpApiError.NotFound],
         }).annotateMerge(
           OpenApi.annotations({
             identifier: "sync.steal",

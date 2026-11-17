@@ -385,7 +385,6 @@ export const layer = Layer.effect(
     })
 
     const remove = Effect.fn("ShareNext.remove")(function* (sessionID: SessionID) {
-      if (disabled) return
       log.info("removing share", { sessionID })
       const s = yield* InstanceState.get(state)
       const share = yield* getCached(sessionID)
@@ -395,12 +394,17 @@ export const layer = Layer.effect(
         return
       }
 
-      const req = yield* request()
-      yield* HttpClientRequest.delete(`${req.baseUrl}${req.api.remove(share.id)}`).pipe(
-        HttpClientRequest.setHeaders(req.headers),
-        HttpClientRequest.bodyJson({ secret: share.secret }),
-        Effect.flatMap((r) => httpOk.execute(r)),
-      )
+      if (!disabled) {
+        const req = yield* request()
+        const res = yield* HttpClientRequest.delete(`${req.baseUrl}${req.api.remove(share.id)}`).pipe(
+          HttpClientRequest.setHeaders(req.headers),
+          HttpClientRequest.bodyJson({ secret: share.secret }),
+          Effect.flatMap((r) => http.execute(r)),
+        )
+        if (res.status !== 404 && (res.status < 200 || res.status >= 300)) {
+          return yield* Effect.fail(new Error(`Failed to remove share: ${res.status}`))
+        }
+      }
 
       yield* db((db) => db.delete(SessionShareTable).where(eq(SessionShareTable.session_id, sessionID)).run())
       s.shared.delete(sessionID)

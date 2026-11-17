@@ -1,7 +1,10 @@
 import { listAdapters } from "@/control-plane/adapters"
 import { Workspace } from "@/control-plane/workspace"
+import { WorkspaceTable } from "@/control-plane/workspace.sql"
 import * as InstanceState from "@/effect/instance-state"
 import { Vcs } from "@/project/vcs"
+import { SessionTable } from "@/session/session.sql"
+import { Database, eq } from "@/storage/db"
 import { Effect } from "effect"
 import { HttpApiBuilder, HttpApiError } from "effect/unstable/httpapi"
 import { InstanceHttpApi } from "../api"
@@ -42,10 +45,33 @@ export const workspaceHandlers = HttpApiBuilder.group(InstanceHttpApi, "workspac
     })
 
     const remove = Effect.fn("WorkspaceHttpApi.remove")(function* (ctx: { params: { id: Workspace.Info["id"] } }) {
+      const instance = yield* InstanceState.context
+      const row = Database.use((db) =>
+        db.select({ projectID: WorkspaceTable.project_id }).from(WorkspaceTable).where(eq(WorkspaceTable.id, ctx.params.id)).get(),
+      )
+      if (!row || row.projectID !== instance.project.id) {
+        return yield* new HttpApiError.NotFound({})
+      }
       return yield* workspace.remove(ctx.params.id)
     })
 
     const warp = Effect.fn("WorkspaceHttpApi.warp")(function* (ctx: { payload: typeof WarpPayload.Type }) {
+      const instance = yield* InstanceState.context
+      const sessionRow = Database.use((db) =>
+        db.select({ projectID: SessionTable.project_id }).from(SessionTable).where(eq(SessionTable.id, ctx.payload.sessionID)).get(),
+      )
+      if (!sessionRow || sessionRow.projectID !== instance.project.id) {
+        return yield* new HttpApiError.NotFound({})
+      }
+      if (ctx.payload.id !== null) {
+        const workspaceID = ctx.payload.id
+        const workspaceRow = Database.use((db) =>
+          db.select({ projectID: WorkspaceTable.project_id }).from(WorkspaceTable).where(eq(WorkspaceTable.id, workspaceID)).get(),
+        )
+        if (!workspaceRow || workspaceRow.projectID !== instance.project.id) {
+          return yield* new HttpApiError.NotFound({})
+        }
+      }
       yield* workspace
         .sessionWarp({
           workspaceID: ctx.payload.id,
