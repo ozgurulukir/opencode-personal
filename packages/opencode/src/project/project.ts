@@ -268,72 +268,72 @@ export const layer: Layer.Layer<
         return { id, sandbox, worktree, vcs: "git" as const }
       })
 
-      // Phase 2: upsert
-      const row = yield* db((d) => d.select().from(ProjectTable).where(eq(ProjectTable.id, data.id)).get())
-      const existing = row
-        ? fromRow(row)
-        : {
-            id: data.id,
-            worktree: data.worktree,
-            vcs: data.vcs,
-            sandboxes: [] as string[],
-            time: { created: Date.now(), updated: Date.now() },
-          }
+      // Phase 2: atomic select + upsert inside an immediate transaction so
+      // concurrent addSandbox/update calls cannot be clobbered, and without
+      // persisting transient fs.exists failures that would drop sandboxes.
+      const { result, discoveredTarget } = yield* Effect.sync(() =>
+        Database.transaction(
+          (trx) => {
+            const row = trx.select().from(ProjectTable).where(eq(ProjectTable.id, data.id)).get()
+            const existing = row
+              ? fromRow(row)
+              : {
+                  id: data.id,
+                  worktree: data.worktree,
+                  vcs: data.vcs,
+                  sandboxes: [] as string[],
+                  time: { created: Date.now(), updated: Date.now() },
+                }
 
-      if (Flag.OPENCODE_EXPERIMENTAL_ICON_DISCOVERY) yield* discover(existing).pipe(Effect.ignore, Effect.forkIn(scope))
+            const sandboxes = [...existing.sandboxes]
+            if (data.sandbox !== existing.worktree && !sandboxes.includes(data.sandbox)) {
+              sandboxes.push(data.sandbox)
+            }
 
-      const result: Info = {
-        ...existing,
-        worktree: data.worktree,
-        vcs: data.vcs,
-        time: { ...existing.time, updated: Date.now() },
-      }
-      if (data.sandbox !== result.worktree && !result.sandboxes.includes(data.sandbox))
-        result.sandboxes.push(data.sandbox)
-      result.sandboxes = yield* Effect.forEach(
-        result.sandboxes,
-        (s) =>
-          fs.exists(s).pipe(
-            Effect.orDie,
-            Effect.map((exists) => (exists ? s : undefined)),
-          ),
-        { concurrency: "unbounded" },
-      ).pipe(Effect.map((arr) => arr.filter((x): x is string => x !== undefined)))
+            const next: Info = {
+              ...existing,
+              worktree: data.worktree,
+              vcs: data.vcs,
+              sandboxes,
+              time: { ...existing.time, updated: Date.now() },
+            }
 
-      yield* db((d) =>
-        d
-          .insert(ProjectTable)
-          .values({
-            id: result.id,
-            worktree: result.worktree,
-            vcs: result.vcs ?? null,
-            name: result.name,
-            icon_url: result.icon?.url,
-            icon_url_override: result.icon?.override,
-            icon_color: result.icon?.color,
-            time_created: result.time.created,
-            time_updated: result.time.updated,
-            time_initialized: result.time.initialized,
-            sandboxes: result.sandboxes,
-            commands: result.commands,
-          })
-          .onConflictDoUpdate({
-            target: ProjectTable.id,
-            set: {
-              worktree: result.worktree,
-              vcs: result.vcs ?? null,
-              name: result.name,
-              icon_url: result.icon?.url,
-              icon_url_override: result.icon?.override,
-              icon_color: result.icon?.color,
-              time_updated: result.time.updated,
-              time_initialized: result.time.initialized,
-              sandboxes: result.sandboxes,
-              commands: result.commands,
-            },
-          })
-          .run(),
+            trx
+              .insert(ProjectTable)
+              .values({
+                id: next.id,
+                worktree: next.worktree,
+                vcs: next.vcs ?? null,
+                name: next.name,
+                icon_url: next.icon?.url,
+                icon_url_override: next.icon?.override,
+                icon_color: next.icon?.color,
+                time_created: next.time.created,
+                time_updated: next.time.updated,
+                time_initialized: next.time.initialized,
+                sandboxes: next.sandboxes,
+                commands: next.commands,
+              })
+              .onConflictDoUpdate({
+                target: ProjectTable.id,
+                set: {
+                  worktree: next.worktree,
+                  vcs: next.vcs ?? null,
+                  time_updated: next.time.updated,
+                  sandboxes: next.sandboxes,
+                },
+              })
+              .run()
+
+            return { result: next, discoveredTarget: existing }
+          },
+          { behavior: "immediate" },
+        ),
       )
+
+      if (Flag.OPENCODE_EXPERIMENTAL_ICON_DISCOVERY) {
+        yield* discover(discoveredTarget).pipe(Effect.ignore, Effect.forkIn(scope))
+      }
 
       if (data.id !== ProjectID.global) {
         yield* db((d) =>

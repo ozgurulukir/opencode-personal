@@ -866,4 +866,26 @@ describe("JSON to SQLite migration", () => {
     expect((sqlite.query("PRAGMA synchronous").get() as { synchronous: number }).synchronous).toBe(1)
     expect((sqlite.query("PRAGMA cache_size").get() as { cache_size: number }).cache_size).toBe(-64000)
   })
+
+  test("falls back to per-row inserts via SAVEPOINT so one bad record does not drop the batch", async () => {
+    await writeProject(storageDir, { ...fixtures.project, id: "proj_good_1", time: { created: 1, updated: 1 } })
+    await writeProject(storageDir, {
+      ...fixtures.project,
+      id: "proj_bad",
+      // Non-primitive object in time.created is rejected by SQLite binding
+      time: { created: { invalid: true }, updated: 1 },
+    })
+    await writeProject(storageDir, { ...fixtures.project, id: "proj_good_2", time: { created: 2, updated: 2 } })
+
+    const stats = await JsonMigration.run(db)
+    expect(stats?.projects).toBe(2)
+    expect(stats?.errors.length).toBe(1)
+    const ids = db
+      .select({ id: ProjectTable.id })
+      .from(ProjectTable)
+      .all()
+      .map((r) => r.id)
+      .sort()
+    expect(ids).toEqual([ProjectID.make("proj_good_1"), ProjectID.make("proj_good_2")])
+  })
 })

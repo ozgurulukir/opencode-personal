@@ -429,8 +429,9 @@ export const layer: Layer.Layer<
       if (branch) {
         const deleted = yield* git(["branch", "-D", branch], { cwd: ctx.worktree })
         if (deleted.code !== 0) {
-          throw new RemoveFailedError({
-            message: deleted.stderr || deleted.text || "Failed to delete worktree branch",
+          log.warn("failed to delete worktree branch", {
+            branch,
+            stderr: deleted.stderr || deleted.text,
           })
         }
       }

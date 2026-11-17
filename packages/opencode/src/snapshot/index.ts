@@ -218,7 +218,7 @@ export const layer: Layer.Layer<
           const target = path.join(state.gitdir, "info", "exclude")
           const text = [
             file ? (yield* read(file)).trimEnd() : "",
-            ...list.map((item) => `/${item.replaceAll("\\", "/")}`),
+            ...list.filter((item) => !/[\r\n]/.test(item)).map((item) => `/${item.replaceAll("\\", "/")}`),
           ]
             .filter(Boolean)
             .join("\n")
@@ -246,7 +246,7 @@ export const layer: Layer.Layer<
               otherCode: other.code,
               otherStderr: other.stderr,
             })
-            return 0
+            return undefined
           }
 
           const tracked = diff.text.split("\0").filter(Boolean)
@@ -330,6 +330,10 @@ export const layer: Layer.Layer<
                 log.info("initialized")
               }
               const changed = yield* add()
+              if (changed === undefined) {
+                state.lastHash = undefined
+                return undefined
+              }
               // Skip the expensive write-tree call when nothing changed since the
               // last track(). This avoids a git process spawn on every LLM step
               // when the worktree is idle — critical for large repos where
