@@ -5,20 +5,16 @@ import TurndownService from "turndown"
 import DESCRIPTION from "./webfetch.txt"
 import { isImageAttachment } from "@/util/media"
 import { guardedFetch } from "@/util/network"
-import { Config } from "@/config/config"
+import { Config, WEBFETCH_DEFAULTS } from "@/config/config"
 
-// Domain defaults: webfetch pulls remote content into the model's context, so the response is
-// capped to keep context bounded and requests are time-boxed so a slow server cannot stall a
-// turn. Operators can override each value via the `webfetch` config section.
-const MAX_RESPONSE_SIZE = 5 * 1024 * 1024 // 5MB
-const DEFAULT_TIMEOUT = 30 * 1000 // 30 seconds
-const MAX_TIMEOUT = 120 * 1000 // 2 minutes
-
+// Domain defaults (5MB / 30s / 120s) live in WEBFETCH_DEFAULTS so the documented and applied
+// limits share one definition. They bound remote content for model context and time-box slow
+// servers; operators can override each via the `webfetch` config section.
 export function resolveLimits(config?: Config.Info["webfetch"]) {
   return {
-    maxResponseBytes: config?.max_response_bytes ?? MAX_RESPONSE_SIZE,
-    defaultTimeout: config?.default_timeout ?? DEFAULT_TIMEOUT,
-    maxTimeout: config?.max_timeout ?? MAX_TIMEOUT,
+    maxResponseBytes: config?.max_response_bytes ?? WEBFETCH_DEFAULTS.max_response_bytes,
+    defaultTimeout: config?.default_timeout ?? WEBFETCH_DEFAULTS.default_timeout,
+    maxTimeout: config?.max_timeout ?? WEBFETCH_DEFAULTS.max_timeout,
   }
 }
 

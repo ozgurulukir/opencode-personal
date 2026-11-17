@@ -49,6 +49,14 @@ import { Npm } from "@opencode-ai/core/npm"
 
 const log = Log.create({ service: "config" })
 
+// Single source of truth for webfetch defaults. Used both in the schema descriptions below
+// and by the tool at runtime, so documented and applied limits cannot drift apart.
+export const WEBFETCH_DEFAULTS = {
+  max_response_bytes: 5 * 1024 * 1024, // 5MB
+  default_timeout: 30_000, // 30 seconds
+  max_timeout: 120_000, // 2 minutes
+} as const
+
 // Custom merge function that concatenates array fields instead of replacing them
 // Keep remeda's deep conditional merge type out of hot config-loading paths; TS profiling showed it dominates here.
 function mergeConfig(target: Info, source: Info): Info {
@@ -318,16 +326,13 @@ export const Info = Schema.Struct({
   webfetch: Schema.optional(
     Schema.Struct({
       max_response_bytes: Schema.optional(PositiveInt).annotate({
-        description:
-          "Maximum response size in bytes accepted by the webfetch tool. Larger responses are rejected (default: 5242880, i.e. 5MB).",
+        description: `Maximum response size in bytes accepted by the webfetch tool. Larger responses are rejected (default: ${WEBFETCH_DEFAULTS.max_response_bytes}).`,
       }),
       default_timeout: Schema.optional(PositiveInt).annotate({
-        description:
-          "Timeout in milliseconds used when a webfetch call does not specify one (default: 30000). Bounded by max_timeout.",
+        description: `Timeout in milliseconds used when a webfetch call does not specify one (default: ${WEBFETCH_DEFAULTS.default_timeout}). Bounded by max_timeout.`,
       }),
       max_timeout: Schema.optional(PositiveInt).annotate({
-        description:
-          "Hard upper bound in milliseconds for webfetch timeouts, including per-call overrides (default: 120000).",
+        description: `Hard upper bound in milliseconds for webfetch timeouts, including per-call overrides (default: ${WEBFETCH_DEFAULTS.max_timeout}).`,
       }),
     }),
   ).annotate({
