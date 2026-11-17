@@ -26,10 +26,19 @@ export const PrCommand = effectCmd({
 
     const prNumber = args.number
     const localBranchName = `pr/${prNumber}`
+    const existingBranch = yield* git.run(["show-ref", "--verify", "--quiet", `refs/heads/${localBranchName}`], {
+      cwd: worktree,
+    })
+    if (existingBranch.exitCode === 0) {
+      return yield* fail(
+        `Local branch '${localBranchName}' already exists. Delete or rename it before checking out PR #${prNumber}.`,
+      )
+    }
+
     UI.println(`Fetching and checking out PR #${prNumber}...`)
 
     const checkout = yield* Effect.promise(() =>
-      Process.run(["gh", "pr", "checkout", `${prNumber}`, "--branch", localBranchName, "--force"], { nothrow: true }),
+      Process.run(["gh", "pr", "checkout", `${prNumber}`, "--branch", localBranchName], { nothrow: true }),
     )
     if (checkout.code !== 0) {
       return yield* fail(`Failed to checkout PR #${prNumber}. Make sure you have gh CLI installed and authenticated.`)
@@ -71,19 +80,23 @@ export const PrCommand = effectCmd({
       if (prInfo?.isCrossRepository && prInfo.headRepository && prInfo.headRepositoryOwner) {
         const forkOwner = prInfo.headRepositoryOwner.login
         const forkName = prInfo.headRepository.name
-        const remoteName = forkOwner
+        const remoteName = `pr-${forkOwner}`
+        const forkUrl = `https://github.com/${forkOwner}/${forkName}.git`
 
-        const remotes = (yield* git.run(["remote"], { cwd: worktree })).text().trim()
-        if (!remotes.split("\n").includes(remoteName)) {
-          yield* git.run(["remote", "add", remoteName, `https://github.com/${forkOwner}/${forkName}.git`], {
+        const remotes = (yield* git.run(["remote"], { cwd: worktree })).text().trim().split("\n").filter(Boolean)
+        if (!remotes.includes(remoteName)) {
+          yield* git.run(["remote", "add", remoteName, forkUrl], {
             cwd: worktree,
           })
           UI.println(`Added fork remote: ${remoteName}`)
         }
-
-        yield* git.run(["branch", `--set-upstream-to=${remoteName}/${prInfo.headRefName}`, localBranchName], {
-          cwd: worktree,
-        })
+        const remoteUrl = (yield* git.run(["remote", "get-url", remoteName], { cwd: worktree })).text().trim()
+        if (remoteUrl === forkUrl && prInfo.headRefName) {
+          yield* git.run(["fetch", remoteName, prInfo.headRefName], { cwd: worktree })
+          yield* git.run(["branch", `--set-upstream-to=${remoteName}/${prInfo.headRefName}`, localBranchName], {
+            cwd: worktree,
+          })
+        }
       }
 
       if (prInfo?.body) {

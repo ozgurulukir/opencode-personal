@@ -291,7 +291,7 @@ export const layer = Layer.effect(
 
           const existing = s.clients.get(key)
           if (existing) {
-            await Process.stop(handle.process)
+            await client.shutdown()
             return existing
           }
 
@@ -302,7 +302,10 @@ export const layer = Layer.effect(
         for (const server of Object.values(s.servers)) {
           if (server.extensions.length && !server.extensions.includes(extension)) continue
 
-          const root = await server.root(file, ctx)
+          const root = await server.root(file, ctx).catch((err) => {
+            log.warn("failed to resolve LSP root", { serverID: server.id, error: err })
+            return undefined
+          })
           if (!root) continue
           if (isInBackoff(s, root + server.id)) continue
 
