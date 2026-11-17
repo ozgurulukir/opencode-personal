@@ -214,7 +214,7 @@ jobs:
       - version
       - build-cli
       - sign-cli-windows
-    if: github.repository == 'anomalyco/opencode' && always() && !failure() && !cancelled()
+    if: needs.version.result == 'success' && !failure() && !cancelled()
     runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - uses: actions/checkout@v7
