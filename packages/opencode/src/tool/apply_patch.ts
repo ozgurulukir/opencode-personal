@@ -311,6 +311,20 @@ export const ApplyPatchTool = Tool.define<
         movePath: change.movePath,
       }))
 
+      if (fileChanges.length === 0) {
+        const reason = failedHunks.map((h) => `- ${h.path}: ${h.error}`).join("\n")
+        return {
+          title: "Patch failed",
+          metadata: {
+            diff: "",
+            files: [],
+            diagnostics: {},
+            failedHunks,
+          },
+          output: reason ? `Failed to apply patch:\n${reason}` : "Failed to apply patch: no changes applied.",
+        }
+      }
+
       // Check permissions if needed. Evaluate BOTH endpoints of a move: the
       // destination is the path actually written, so edit deny rules must
       // cover it too — a rule like `secrets/*: deny` is otherwise bypassed by

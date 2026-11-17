@@ -51,7 +51,7 @@ function parseLimitItem(raw: unknown): ZaiLimitItem | null {
 
 function formatDate(d: Date): string {
   const p = (n: number) => String(n).padStart(2, "0")
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}+${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`
 }
 
 async function fetchZaiUsage(credential: UsageCredential): Promise<UsageReport | null> {

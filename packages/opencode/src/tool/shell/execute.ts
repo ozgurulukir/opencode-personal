@@ -177,23 +177,38 @@ export function createShellTool(
         always: new Set<string>(),
       }
       const shellKind = ShellID.toKind(Shell.name(shell))
+      const transparent = new Set(["builtin", "command", "exec"])
+      let effectiveCwd = cwd
 
       for (const node of commands(root)) {
-        const command = parts(node)
+        let command = parts(node)
+        if (!ps && shellKind !== "cmd") {
+          while (command.length > 1 && transparent.has(command[0]?.text ?? "")) {
+            command = command.slice(1)
+          }
+        }
         const tokens = command.map((item) => item.text)
         const cmd = ps || shellKind === "cmd" ? tokens[0]?.toLowerCase() : tokens[0]
 
+        let dynamicCwd = false
         if (cmd && (FILES.has(cmd) || (shellKind === "cmd" && CMD_FILES.has(cmd)))) {
           for (const arg of pathArgs(command, ps, shellKind === "cmd")) {
-            const resolved = yield* argPath(arg, cwd, ps, shell)
+            const resolved = yield* argPath(arg, effectiveCwd, ps, shell)
             log.info("resolved path", { arg, resolved })
-            if (!resolved || containsPath(resolved, instance)) continue
+            if (!resolved) {
+              if (CWD.has(cmd)) dynamicCwd = true
+              continue
+            }
+            if (CWD.has(cmd)) {
+              effectiveCwd = resolved
+            }
+            if (containsPath(resolved, instance)) continue
             const dir = (yield* fs.isDir(resolved)) ? resolved : path.dirname(resolved)
             scan.dirs.add(dir)
           }
         }
 
-        if (tokens.length && (!cmd || !CWD.has(cmd))) {
+        if (tokens.length && (!cmd || !CWD.has(cmd) || dynamicCwd)) {
           scan.patterns.add(source(node))
           scan.always.add(BashArity.prefix(tokens).join(" ") + " *")
         }
@@ -291,6 +306,9 @@ export function createShellTool(
         )
         const output = terminalOutput.output || "(no output)"
         const metadata = [
+          ...(result.exitCode !== undefined && result.exitCode !== null && result.exitCode !== 0
+            ? [`Exit code: ${result.exitCode}`]
+            : []),
           ...(exit.kind === "timeout" ? [`shell tool terminated command after exceeding timeout ${input.timeout} ms.`] : []),
           ...(exit.kind === "abort" ? ["User aborted the command"] : []),
         ]
@@ -402,6 +420,7 @@ export function createShellTool(
           `shell tool terminated command after exceeding timeout ${input.timeout} ms. If this command is expected to take longer and is not waiting for interactive input, retry with a larger timeout value in milliseconds.`,
         )
       }
+      if (code !== null && code !== 0) meta.push(`Exit code: ${code}`)
       if (aborted) meta.push("User aborted the command")
       const raw = list.map((item) => item.text).join("")
       const end = tail(raw, limits.maxLines, limits.maxBytes)

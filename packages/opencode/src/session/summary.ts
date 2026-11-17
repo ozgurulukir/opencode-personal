@@ -103,37 +103,42 @@ export const layer = Layer.effect(
       return []
     })
 
+    const inFlight = new Set<MessageID>()
     const summarize = Effect.fn("SessionSummary.summarize")(function* (input: {
       sessionID: SessionID
       messageID: MessageID
     }) {
-      if (!MessageV2.hasMessages(input.sessionID)) return
+      if (inFlight.has(input.messageID)) return
+      inFlight.add(input.messageID)
+      return yield* Effect.gen(function* () {
+        if (!MessageV2.hasMessages(input.sessionID)) return
 
-      const { from, to } = MessageV2.boundarySnapshots(input.sessionID)
-      const diffs = from && to ? yield* snapshot.diffFull(from, to) : []
-      yield* sessions.setSummary({
-        sessionID: input.sessionID,
-        summary: {
-          additions: diffs.reduce((sum, x) => sum + x.additions, 0),
-          deletions: diffs.reduce((sum, x) => sum + x.deletions, 0),
-          files: diffs.length,
-        },
-      })
-      yield* storage.write(["session_diff", input.sessionID], diffs).pipe(Effect.ignore)
-      yield* bus.publish(Session.Event.Diff, { sessionID: input.sessionID, diff: diffs })
-      // Native V2 lifecycle emission is published alongside the V1 event
-      yield* sync.run(SessionEvent.DiffUpdated.Sync, {
-        sessionID: input.sessionID,
-        timestamp: DateTime.makeUnsafe(Date.now()),
-        diff: diffs,
-      })
+        const { from, to } = MessageV2.boundarySnapshots(input.sessionID)
+        const diffs = from && to ? yield* snapshot.diffFull(from, to) : []
+        yield* sessions.setSummary({
+          sessionID: input.sessionID,
+          summary: {
+            additions: diffs.reduce((sum, x) => sum + x.additions, 0),
+            deletions: diffs.reduce((sum, x) => sum + x.deletions, 0),
+            files: diffs.length,
+          },
+        })
+        yield* storage.write(["session_diff", input.sessionID], diffs).pipe(Effect.ignore)
+        yield* bus.publish(Session.Event.Diff, { sessionID: input.sessionID, diff: diffs })
+        // Native V2 lifecycle emission is published alongside the V1 event
+        yield* sync.run(SessionEvent.DiffUpdated.Sync, {
+          sessionID: input.sessionID,
+          timestamp: DateTime.makeUnsafe(Date.now()),
+          diff: diffs,
+        })
 
-      const messages = MessageV2.messagesForSummary(input)
-      const target = messages.find((m) => m.info.id === input.messageID)
-      if (!target || target.info.role !== "user") return
-      const msgDiffs = yield* computeDiff({ messages })
-      target.info.summary = { ...target.info.summary, diffs: msgDiffs }
-      yield* sessions.updateMessage(target.info)
+        const messages = MessageV2.messagesForSummary(input)
+        const target = messages.find((m) => m.info.id === input.messageID)
+        if (!target || target.info.role !== "user") return
+        const msgDiffs = yield* computeDiff({ messages })
+        target.info.summary = { ...target.info.summary, diffs: msgDiffs }
+        yield* sessions.updateMessage(target.info)
+      }).pipe(Effect.ensuring(Effect.sync(() => inFlight.delete(input.messageID))))
     })
 
     const diff = Effect.fn("SessionSummary.diff")(function* (input: { sessionID: SessionID; messageID?: MessageID }) {

@@ -648,7 +648,12 @@ export const layer = Layer.effect(
           // the caller's result is built. The queue guard makes concurrent
           // drains idempotent; a message staged while the loop is busy is
           // consumed by the running loop's continuation check.
-          yield* runDeferred(input.sessionID).pipe(Effect.forkIn(scope))
+          yield* runDeferred(input.sessionID).pipe(
+            Effect.catchCause((cause) =>
+              Effect.logError("deferred prompt drain failed", { sessionID: input.sessionID, cause }),
+            ),
+            Effect.forkIn(scope),
+          )
         }
 
         return { user, assistant }
@@ -1051,12 +1056,15 @@ export const layer = Layer.effect(
      * Delegates to `SessionPromptEngine.loop`; the V1 service is only a
      * compatibility facade.
      */
+    const drainingDeferred = new Set<SessionID>()
     const runDeferred = (sessionID: SessionID): Effect.Effect<void> =>
       Effect.gen(function* () {
-        if (!deferredQueue.delete(sessionID)) return
+        if (!deferredQueue.has(sessionID) || drainingDeferred.has(sessionID)) return
+        drainingDeferred.add(sessionID)
         const engine = yield* requireV1(promptEngine, "SessionPromptEngine")
         yield* engine.loop({ sessionID })
-      })
+        deferredQueue.delete(sessionID)
+      }).pipe(Effect.ensuring(Effect.sync(() => drainingDeferred.delete(sessionID))))
 
     return Service.of(Object.assign(result, { runDeferred }))
   }),

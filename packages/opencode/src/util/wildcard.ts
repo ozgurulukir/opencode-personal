@@ -9,6 +9,10 @@ const MAX_WILDCARDS = 10
  * and `/` interchangeable in patterns. This is intentional for Windows path
  * compatibility but also affects non-path patterns.
  */
+export function exceedsLimit(pattern: string) {
+  return (pattern.match(/\*/g) ?? []).length > MAX_WILDCARDS
+}
+
 export function match(str: string, pattern: string) {
   if (str) str = str.replaceAll("\\", "/")
   if (pattern) pattern = pattern.replaceAll("\\", "/")
