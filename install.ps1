@@ -9,7 +9,8 @@
 #>
 param(
     [string]$Version = "",   # pin a release, e.g. -Version 1.14.48-p.1
-    [string]$Binary = ""     # install from a local binary instead of downloading
+    [string]$Binary = "",    # install from a local binary instead of downloading
+    [switch]$SkipChecksum    # skip SHA256SUMS verification (not recommended)
 )
 
 $ErrorActionPreference = "Stop"
@@ -83,24 +84,25 @@ try {
         }
 
         # Verify integrity against the release's SHA256SUMS manifest before the
-        # archive is extracted and its binary executed. Older releases without
-        # a manifest skip with a warning.
-        $manifestOk = $true
-        try {
-            $sumsUrl = "https://github.com/$Repo/releases/download/v$Version/SHA256SUMS"
+        # archive is extracted and its binary executed. Fail closed unless
+        # -SkipChecksum is explicitly passed.
+        if ($SkipChecksum) {
+            Write-Warning "Skipping SHA256SUMS verification (-SkipChecksum)"
+        } else {
             $sums = Join-Path $tmp "SHA256SUMS"
-            Invoke-WebRequest -Uri $sumsUrl -OutFile $sums -UseBasicParsing
-        } catch {
-            $manifestOk = $false
-        }
-        if ($manifestOk) {
+            if ($token) {
+                $sumsAssetId = $rel.assets | Where-Object name -eq "SHA256SUMS" | Select-Object -First 1 -ExpandProperty id
+                if (-not $sumsAssetId) { throw "SHA256SUMS manifest not found in release v$Version of $Repo (pass -SkipChecksum to bypass)" }
+                Invoke-WebRequest -Uri "https://api.github.com/repos/$Repo/releases/assets/$sumsAssetId" -OutFile $sums -UseBasicParsing -Headers ($authHeaders + @{ Accept = "application/octet-stream" })
+            } else {
+                $sumsUrl = "https://github.com/$Repo/releases/download/v$Version/SHA256SUMS"
+                Invoke-WebRequest -Uri $sumsUrl -OutFile $sums -UseBasicParsing
+            }
             $expected = (Get-Content $sums | Where-Object { $_ -match [regex]::Escape($asset) } | Select-Object -First 1) -split '\s+' | Select-Object -First 1
             if (-not $expected) { throw "SHA256SUMS manifest does not list $asset" }
             $actual = (Get-FileHash -Algorithm SHA256 -Path $zip).Hash.ToLower()
             if ($actual -ne $expected.ToLower()) { throw "Checksum verification failed for $asset" }
             Write-Host "Checksum verified"
-        } else {
-            Write-Warning "No SHA256SUMS verification for $asset (manifest unavailable for this release)"
         }
         $x = Join-Path $tmp "x"
         Expand-Archive -Path $zip -DestinationPath $x -Force
