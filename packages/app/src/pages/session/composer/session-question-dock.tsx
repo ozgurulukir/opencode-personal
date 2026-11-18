@@ -234,19 +234,38 @@ export const SessionQuestionDock: Component<{ request: QuestionRequest; onSubmit
 
   const reply = async (answers: QuestionAnswer[]) => {
     if (sending()) return
-    await replyMutation.mutateAsync(answers)
+    try {
+      await replyMutation.mutateAsync(answers)
+    } catch {
+      // Handled by mutation onError
+    }
   }
 
   const reject = async () => {
     if (sending()) return
-    await rejectMutation.mutateAsync()
+    try {
+      await rejectMutation.mutateAsync()
+    } catch {
+      // Handled by mutation onError
+    }
   }
-
-  const submit = () => void reply(questions().map((_, i) => store.answers[i] ?? []))
 
   const answered = (i: number) => {
     if ((store.answers[i]?.length ?? 0) > 0) return true
     return store.customOn[i] === true && (store.custom[i] ?? "").trim().length > 0
+  }
+
+  const allAnswered = createMemo(() => questions().every((_, i) => answered(i)))
+
+  const submit = () => {
+    const firstUnanswered = questions().findIndex((_, i) => !answered(i))
+    if (firstUnanswered !== -1) {
+      setStore("tab", firstUnanswered)
+      setStore("editing", false)
+      focus(pickFocus(firstUnanswered))
+      return
+    }
+    void reply(questions().map((_, i) => store.answers[i] ?? []))
   }
 
   const picked = (answer: string) => store.answers[store.tab]?.includes(answer) ?? false
@@ -450,7 +469,13 @@ export const SessionQuestionDock: Component<{ request: QuestionRequest; onSubmit
       }
       footer={
         <>
-          <Button variant="ghost" size="large" disabled={sending()} onClick={reject} aria-keyshortcuts="Escape">
+          <Button
+            variant="ghost"
+            size="large"
+            disabled={sending()}
+            onClick={() => void reject()}
+            aria-keyshortcuts="Escape"
+          >
             {language.t("ui.common.dismiss")}
           </Button>
           <div data-slot="question-footer-actions">
@@ -462,7 +487,7 @@ export const SessionQuestionDock: Component<{ request: QuestionRequest; onSubmit
             <Button
               variant={last() ? "primary" : "secondary"}
               size="large"
-              disabled={sending()}
+              disabled={sending() || (last() && !allAnswered())}
               onClick={next}
               aria-keyshortcuts="Meta+Enter Control+Enter"
             >

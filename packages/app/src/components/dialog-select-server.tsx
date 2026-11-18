@@ -89,12 +89,15 @@ function useServerPreview() {
     }
   }
 
+  let previewToken = 0
+
   const previewStatus = async (
     value: string,
     username: string,
     password: string,
     setStatus: (value: boolean | undefined) => void,
   ) => {
+    const token = ++previewToken
     setStatus(undefined)
     if (!looksComplete(value)) return
     const normalized = normalizeServerUrl(value)
@@ -103,6 +106,7 @@ function useServerPreview() {
     if (username) http.username = username
     if (password) http.password = password
     const result = await checkServerHealth(http)
+    if (token !== previewToken) return
     setStatus(result.healthy)
   }
 

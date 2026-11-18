@@ -73,30 +73,45 @@ export const { use: usePermission, provider: PermissionProvider } = createSimple
               typeof data.autoAcceptEdits === "object" && data.autoAcceptEdits && !Array.isArray(data.autoAcceptEdits)
                 ? data.autoAcceptEdits
                 : {},
+            configAutoAccept: {},
           }
         },
       },
       createStore({
         autoAccept: {} as Record<string, boolean>,
+        configAutoAccept: {} as Record<string, boolean>,
       }),
     )
 
-    // When config has permission: "allow", auto-enable directory-level auto-accept
+    // Sync directory-level auto-accept with config.permission === "allow",
+    // revoking config-derived entries when permission config tightens.
     createEffect(() => {
       if (!ready()) return
       const directory = decode64(params.dir)
       if (!directory) return
       const [childStore] = globalSync.child(directory)
+      if (childStore.status === "loading") return
       const perm = childStore.config.permission
+      const key = directoryAcceptKey(directory)
       if (typeof perm === "string" && perm === "allow") {
-        const key = directoryAcceptKey(directory)
         if (store.autoAccept[key] === undefined) {
           setStore(
             produce((draft) => {
               draft.autoAccept[key] = true
+              draft.configAutoAccept ??= {}
+              draft.configAutoAccept[key] = true
             }),
           )
         }
+        return
+      }
+      if (store.configAutoAccept?.[key]) {
+        setStore(
+          produce((draft) => {
+            delete draft.autoAccept[key]
+            delete draft.configAutoAccept[key]
+          }),
+        )
       }
     })
 
@@ -175,6 +190,7 @@ export const { use: usePermission, provider: PermissionProvider } = createSimple
       setStore(
         produce((draft) => {
           draft.autoAccept[key] = true
+          if (draft.configAutoAccept) delete draft.configAutoAccept[key]
         }),
       )
 
@@ -196,6 +212,7 @@ export const { use: usePermission, provider: PermissionProvider } = createSimple
       setStore(
         produce((draft) => {
           draft.autoAccept[key] = false
+          if (draft.configAutoAccept) delete draft.configAutoAccept[key]
         }),
       )
     }
