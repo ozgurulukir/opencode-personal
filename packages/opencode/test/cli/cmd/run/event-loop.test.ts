@@ -1042,4 +1042,21 @@ describe("loop integration", () => {
 
     expect(completed).toHaveLength(1)
   })
+
+  test("returns accumulated session.error message when session becomes idle", async () => {
+    const ctx = makeCtx()
+    const events = [
+      makeEvent("session.error", {
+        sessionID: "ses_1",
+        error: { name: "UnknownError", data: { message: "provider 500" } },
+      }),
+      makeEvent("session.status", {
+        sessionID: "ses_1",
+        status: { type: "idle" },
+      }),
+    ]
+
+    const err = await loop(ctx, { stream: asyncStream(events) })
+    expect(err).toContain("provider 500")
+  })
 })

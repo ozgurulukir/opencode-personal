@@ -171,7 +171,7 @@ export async function loop(
       if (event.type === "session.status") {
         const props = event.properties as { sessionID: string; status: { type: string } }
         if (handleSessionStatus(ctx, props)) {
-          return
+          return error
         }
       }
 
@@ -181,4 +181,5 @@ export async function loop(
       }
     }
   }
+  return error
 }

@@ -179,7 +179,7 @@ export const layer = Layer.effect(
       const cfg = yield* config.get()
       const id = PtyID.ascending()
       const command = input.command || Shell.preferred(cfg.shell)
-      const args = input.args || []
+      const args = [...(input.args || [])]
       if (Shell.login(command)) {
         args.push("-l")
       }

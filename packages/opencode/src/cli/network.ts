@@ -65,7 +65,7 @@ export function resolveNetworkOptionsNoConfig(args: NetworkOptions, config?: Con
 
 function isLoopbackHostname(hostname: string) {
   const bare = hostname.replace(/^\[|\]$/g, "").toLowerCase()
-  return bare === "localhost" || bare === "::1" || bare === "::" || bare.startsWith("127.")
+  return bare === "localhost" || bare === "::1" || bare.startsWith("127.")
 }
 
 /**

@@ -625,10 +625,15 @@ export const RunCommand = effectCmd({
           // Await the event drain before returning: the top-level finally runs
           // process.exit(), which would otherwise kill the still-draining SSE
           // consumer and truncate buffered output/tool events.
-          const drain = loop(ctx, events, { native: true }).catch((e) => {
-            console.error(e)
-            process.exit(1)
-          })
+          const drain = loop(ctx, events, { native: true }).then(
+            (err) => {
+              if (err) process.exit(1)
+            },
+            (e) => {
+              console.error(e)
+              process.exit(1)
+            },
+          )
 
           if (args.command) {
             await client.v2.session.command({

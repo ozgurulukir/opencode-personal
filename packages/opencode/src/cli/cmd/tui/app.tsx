@@ -1,4 +1,5 @@
 import { Log } from "@opencode-ai/core/util/log"
+import stripAnsi from "strip-ansi"
 import { render, TimeToFirstDraw, useRenderer, useTerminalDimensions } from "@opentui/solid"
 import { createDefaultOpenTuiKeymap } from "@opentui/keymap/opentui"
 import * as Clipboard from "@tui/util/clipboard"
@@ -334,13 +335,15 @@ function App(props: { onSnapshot?: () => Promise<string[]> }) {
         return
       }
 
-      const title = session.title.length > 40 ? session.title.slice(0, 37) + "..." : session.title
+      const sanitize = (value: string) => stripAnsi(value).replace(/[\x00-\x1f\x7f-\x9f]/g, "")
+      const clean = sanitize(session.title)
+      const title = clean.length > 40 ? clean.slice(0, 37) + "..." : clean
       renderer.setTerminalTitle(`OC | ${title}`)
       return
     }
 
     if (route.data.type === "plugin") {
-      renderer.setTerminalTitle(`OC | ${route.data.id}`)
+      renderer.setTerminalTitle(`OC | ${stripAnsi(route.data.id).replace(/[\x00-\x1f\x7f-\x9f]/g, "")}`)
     }
   })
 

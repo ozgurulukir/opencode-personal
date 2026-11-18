@@ -732,8 +732,11 @@ export const GithubRunCommand = effectCmd({
       }
 
       async function restoreGitConfig() {
-        if (gitConfig === undefined) return
         const config = "http.https://github.com/.extraheader"
+        if (gitConfig === undefined) {
+          await gitRun(["config", "--local", "--unset-all", config]).catch(() => {})
+          return
+        }
         await gitRun(["config", "--local", config, gitConfig])
       }
 
