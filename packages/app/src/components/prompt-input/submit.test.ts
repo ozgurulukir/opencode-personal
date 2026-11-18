@@ -2,8 +2,18 @@ import { afterAll, beforeAll, beforeEach, describe, expect, mock, test } from "b
 import type { Prompt } from "@/context/prompt"
 
 let createPromptSubmit: typeof import("./submit").createPromptSubmit
+const restorers: Array<() => void> = []
 
-afterAll(() => mock.restore())
+async function mockModule(specifier: string, factory: (actual: Record<string, unknown>) => Record<string, unknown>) {
+  const actual = { ...(await import(specifier)) }
+  mock.module(specifier, () => factory(actual))
+  restorers.push(() => mock.module(specifier, () => actual))
+}
+
+afterAll(() => {
+  mock.restore()
+  for (const restore of restorers) restore()
+})
 
 const createdClients: string[] = []
 const createdSessions: string[] = []
@@ -70,23 +80,27 @@ beforeAll(async () => {
     useParams: () => params,
   }))
 
-  mock.module("@opencode-ai/sdk/v2/client", () => ({
+  await mockModule("@opencode-ai/sdk/v2/client", (actual) => ({
+    ...actual,
     createOpencodeClient: (input: { directory: string }) => {
       createdClients.push(input.directory)
       return clientFor(input.directory)
     },
   }))
 
-  mock.module("@opencode-ai/ui/toast", () => ({
+  await mockModule("@opencode-ai/ui/toast", (actual) => ({
+    ...actual,
     showToast: () => 0,
     toaster: { dismiss: () => {} },
   }))
 
-  mock.module("@opencode-ai/core/util/encode", () => ({
+  await mockModule("@opencode-ai/core/util/encode", (actual) => ({
+    ...actual,
     base64Encode: (value: string) => value,
   }))
 
-  mock.module("@/context/local", () => ({
+  await mockModule("@/context/local", (actual) => ({
+    ...actual,
     useLocal: () => ({
       model: {
         current: () => ({ id: "model", provider: { id: "provider" } }),
@@ -103,7 +117,8 @@ beforeAll(async () => {
     }),
   }))
 
-  mock.module("@/context/permission", () => ({
+  await mockModule("@/context/permission", (actual) => ({
+    ...actual,
     usePermission: () => ({
       enableAutoAccept(sessionID: string, directory: string) {
         enabledAutoAccept.push({ sessionID, directory })
@@ -111,7 +126,8 @@ beforeAll(async () => {
     }),
   }))
 
-  mock.module("@/context/prompt", () => ({
+  await mockModule("@/context/prompt", (actual) => ({
+    ...actual,
     usePrompt: () => ({
       current: () => promptValue,
       reset: () => undefined,
@@ -124,7 +140,8 @@ beforeAll(async () => {
     }),
   }))
 
-  mock.module("@/context/layout", () => ({
+  await mockModule("@/context/layout", (actual) => ({
+    ...actual,
     useLayout: () => ({
       handoff: {
         setTabs: () => undefined,
@@ -132,7 +149,8 @@ beforeAll(async () => {
     }),
   }))
 
-  mock.module("@/context/sdk", () => ({
+  await mockModule("@/context/sdk", (actual) => ({
+    ...actual,
     useSDK: () => {
       const sdk = {
         directory: "/repo/main",
@@ -146,7 +164,8 @@ beforeAll(async () => {
     },
   }))
 
-  mock.module("@/context/sync", () => ({
+  await mockModule("@/context/sync", (actual) => ({
+    ...actual,
     useSync: () => ({
       data: { command: [] },
       session: {
@@ -170,7 +189,8 @@ beforeAll(async () => {
     }),
   }))
 
-  mock.module("@/context/global-sync", () => ({
+  await mockModule("@/context/global-sync", (actual) => ({
+    ...actual,
     useGlobalSync: () => ({
       todo: {
         set: (sessionID: string, value: unknown) => {
@@ -198,13 +218,15 @@ beforeAll(async () => {
     }),
   }))
 
-  mock.module("@/context/platform", () => ({
+  await mockModule("@/context/platform", (actual) => ({
+    ...actual,
     usePlatform: () => ({
       fetch: fetch,
     }),
   }))
 
-  mock.module("@/context/language", () => ({
+  await mockModule("@/context/language", (actual) => ({
+    ...actual,
     useLanguage: () => ({
       t: (key: string) => key,
     }),

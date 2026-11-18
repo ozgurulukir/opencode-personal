@@ -8,3 +8,5 @@ import * as solid from "solid-js/dist/solid.js"
 await mock.module("solid-js", () => solid)
 const store = await import("solid-js/store/dist/store.js")
 await mock.module("solid-js/store", () => store)
+const web = await import("solid-js/web/dist/web.js")
+await mock.module("solid-js/web", () => web)
