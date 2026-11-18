@@ -221,6 +221,35 @@ describe("ShareNext", () => {
     ),
   )
 
+  it.live("remove treats remote 404 as success and deletes the local share row", () =>
+    provideTmpdirInstance(
+      () =>
+        Effect.gen(function* () {
+          const session = yield* Session.Service.use((svc) => svc.create({ title: "test" }))
+          const client = HttpClient.make((req) => {
+            if (req.method === "POST") {
+              return Effect.succeed(
+                json(req, {
+                  id: "shr_abc",
+                  url: "https://legacy-share.example.com/share/abc",
+                  secret: "sec_123",
+                }),
+              )
+            }
+            return Effect.succeed(HttpClientResponse.fromWeb(req, new Response(null, { status: 404 })))
+          })
+
+          yield* Effect.gen(function* () {
+            yield* ShareNext.Service.use((svc) => svc.create(session.id))
+            yield* ShareNext.Service.use((svc) => svc.remove(session.id))
+          }).pipe(Effect.provide(live(client)))
+
+          expect(share(session.id)).toBeUndefined()
+        }),
+      { config: { enterprise: { url: "https://legacy-share.example.com" } } },
+    ),
+  )
+
   it.live("create fails on a non-ok response and does not persist a share", () =>
     provideTmpdirInstance(() =>
       Effect.gen(function* () {

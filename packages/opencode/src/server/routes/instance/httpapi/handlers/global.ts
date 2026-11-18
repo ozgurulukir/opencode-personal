@@ -25,13 +25,16 @@ function eventData(data: unknown): Sse.Event {
 
 function eventResponse() {
   log.info("global event connected")
-  const events = Stream.callback<GlobalBusEvent>((queue) => {
-    const handler = (event: GlobalBusEvent) => Queue.offerUnsafe(queue, event)
-    return Effect.acquireRelease(
-      Effect.sync(() => GlobalBus.on("event", handler)),
-      () => Effect.sync(() => GlobalBus.off("event", handler)),
-    )
-  })
+  const events = Stream.callback<GlobalBusEvent>(
+    (queue) => {
+      const handler = (event: GlobalBusEvent) => Queue.offerUnsafe(queue, event)
+      return Effect.acquireRelease(
+        Effect.sync(() => GlobalBus.on("event", handler)),
+        () => Effect.sync(() => GlobalBus.off("event", handler)),
+      )
+    },
+    { bufferSize: 1024, strategy: "sliding" },
+  )
   const heartbeat = Stream.tick("10 seconds").pipe(
     Stream.drop(1),
     Stream.map(() => ({ payload: { id: Bus.createID(), type: "server.heartbeat", properties: {} } })),

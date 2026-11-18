@@ -104,7 +104,7 @@ export const tuiHandlers = HttpApiBuilder.group(InstanceHttpApi, "tui", (handler
     })
 
     const controlNext = Effect.fn("TuiHttpApi.controlNext")(function* () {
-      return yield* Effect.promise(() => nextTuiRequest())
+      return yield* Effect.promise((signal) => nextTuiRequest(signal))
     })
 
     const controlResponse = Effect.fn("TuiHttpApi.controlResponse")(function* (ctx: { payload: unknown }) {
