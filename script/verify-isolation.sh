@@ -76,10 +76,13 @@ printf '#!/bin/sh\necho 1.14.48-p.1\n' > "$ARCH/opencode"
 printf 'native-lib-stub\n' > "$ARCH/libopentui.so"
 tar -czf "$WORK/opencode-linux-x64.tar.gz" -C "$ARCH" .
 
-# curl shim: serves the local archive / canned API responses instead of the network
+# install.sh verifies archives against a fail-closed SHA256SUMS manifest, so the
+# shim must serve a matching manifest alongside the archive.
 SHIM_VERSION="1.14.48-p.1"
 SHIM_ARCHIVE="$WORK/opencode-linux-x64.tar.gz"
-export SHIM_VERSION SHIM_ARCHIVE
+SHIM_SUMS="$WORK/SHA256SUMS"
+printf '%s  %s\n' "$(sha256 "$SHIM_ARCHIVE")" "opencode-linux-x64.tar.gz" > "$SHIM_SUMS"
+export SHIM_VERSION SHIM_ARCHIVE SHIM_SUMS
 mkdir -p "$WORK/shim"
 cat > "$WORK/shim/curl" <<'SH'
 #!/bin/sh
@@ -90,6 +93,8 @@ for arg in "$@"; do
     prev="$arg"
 done
 case "$url" in
+    *"SHA256SUMS"*)
+        cat "$SHIM_SUMS" > "${out:-/dev/null}" ;;
     *"/releases/download/"*|*"/releases/latest/download/"*)
         cat "$SHIM_ARCHIVE" > "${out:-/dev/null}" ;;
     *"api.github.com/repos/"*"releases/latest"*)
