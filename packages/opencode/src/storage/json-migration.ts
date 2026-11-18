@@ -97,12 +97,28 @@ export async function run(db: SQLiteBunDatabase<any, any> | NodeSQLiteDatabase<a
 
   function insert(values: unknown[], table: Parameters<typeof db.insert>[0], label: string) {
     if (values.length === 0) return 0
+    db.run("SAVEPOINT migration_batch")
     try {
       db.insert(table).values(values).onConflictDoNothing().run()
+      db.run("RELEASE SAVEPOINT migration_batch")
       return values.length
-    } catch (e) {
-      errs.push(`failed to migrate ${label} batch: ${e}`)
-      return 0
+    } catch {
+      db.run("ROLLBACK TO SAVEPOINT migration_batch")
+      db.run("RELEASE SAVEPOINT migration_batch")
+      let inserted = 0
+      for (const value of values) {
+        db.run("SAVEPOINT migration_row")
+        try {
+          db.insert(table).values([value]).onConflictDoNothing().run()
+          db.run("RELEASE SAVEPOINT migration_row")
+          inserted++
+        } catch (rowErr) {
+          db.run("ROLLBACK TO SAVEPOINT migration_row")
+          db.run("RELEASE SAVEPOINT migration_row")
+          errs.push(`failed to migrate ${label} row: ${rowErr}`)
+        }
+      }
+      return inserted
     }
   }
 

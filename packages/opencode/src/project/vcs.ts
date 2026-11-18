@@ -117,12 +117,13 @@ const batchPatches = Effect.fnUntraced(function* (git: Git.Interface, cwd: strin
 const nativePatch = Effect.fnUntraced(function* (
   git: Git.Interface,
   cwd: string,
+  worktree: string,
   ref: string | undefined,
   item: Git.Item,
 ) {
   const result =
     item.code === "??" || !ref
-      ? yield* git.patchUntracked(cwd, item.file, { context: PATCH_CONTEXT_LINES, maxOutputBytes: MAX_PATCH_BYTES })
+      ? yield* git.patchUntracked(worktree, item.file, { context: PATCH_CONTEXT_LINES, maxOutputBytes: MAX_PATCH_BYTES })
       : yield* git.patch(cwd, ref, item.file, { context: PATCH_CONTEXT_LINES, maxOutputBytes: MAX_PATCH_BYTES })
   if (!result.truncated && result.text) return result.text
 
@@ -139,6 +140,7 @@ const totalPatch = (file: string, patch: string, total: number) => {
 const patchForItem = Effect.fnUntraced(function* (
   git: Git.Interface,
   cwd: string,
+  worktree: string,
   ref: string | undefined,
   item: Git.Item,
   batch: { patches: Map<string, string>; capped: boolean },
@@ -149,12 +151,13 @@ const patchForItem = Effect.fnUntraced(function* (
   const batched = batch.patches.get(item.file)
   if (batched !== undefined) return batched
   if (item.code !== "??" && batch.capped) return yield* emptyPatch(item.file)
-  return yield* nativePatch(git, cwd, ref, item)
+  return yield* nativePatch(git, cwd, worktree, ref, item)
 })
 
 const files = Effect.fnUntraced(function* (
   git: Git.Interface,
   cwd: string,
+  worktree: string,
   ref: string | undefined,
   list: Git.Item[],
   map: Map<string, { additions: number; deletions: number }>,
@@ -165,8 +168,8 @@ const files = Effect.fnUntraced(function* (
   let capped = false
 
   for (const item of list.toSorted((a, b) => a.file.localeCompare(b.file))) {
-    const stat = map.get(item.file) ?? (item.status === "added" ? yield* git.statUntracked(cwd, item.file) : undefined)
-    const patch = yield* patchForItem(git, cwd, ref, item, batch, capped)
+    const stat = map.get(item.file) ?? (item.status === "added" ? yield* git.statUntracked(worktree, item.file) : undefined)
+    const patch = yield* patchForItem(git, cwd, worktree, ref, item, batch, capped)
     const result: { patch: string; capped: boolean } = capped
       ? { patch, capped: true }
       : yield* totalPatch(item.file, patch, total)
@@ -187,13 +190,14 @@ const files = Effect.fnUntraced(function* (
   return next
 })
 
-const diffAgainstRef = Effect.fnUntraced(function* (git: Git.Interface, cwd: string, ref: string) {
+const diffAgainstRef = Effect.fnUntraced(function* (git: Git.Interface, cwd: string, worktree: string, ref: string) {
   const [list, stats, extra] = yield* Effect.all([git.diff(cwd, ref), git.stats(cwd, ref), git.status(cwd)], {
     concurrency: 3,
   })
   return yield* files(
     git,
     cwd,
+    worktree,
     ref,
     merge(
       list,
@@ -204,9 +208,14 @@ const diffAgainstRef = Effect.fnUntraced(function* (git: Git.Interface, cwd: str
   )
 })
 
-const track = Effect.fnUntraced(function* (git: Git.Interface, cwd: string, ref: string | undefined) {
-  if (!ref) return yield* files(git, cwd, ref, yield* git.status(cwd), new Map(), emptyBatch())
-  return yield* diffAgainstRef(git, cwd, ref)
+const track = Effect.fnUntraced(function* (
+  git: Git.Interface,
+  cwd: string,
+  worktree: string,
+  ref: string | undefined,
+) {
+  if (!ref) return yield* files(git, cwd, worktree, ref, yield* git.status(cwd), new Map(), emptyBatch())
+  return yield* diffAgainstRef(git, cwd, worktree, ref)
 })
 
 export const Mode = Schema.Literals(["git", "branch"]).pipe(withStatics((s) => ({ zod: zod(s) })))
@@ -331,14 +340,19 @@ export const layer: Layer.Layer<Service, never, Git.Service | Bus.Service> = Lay
       const ctx = yield* InstanceState.context
       if (ctx.project.vcs !== "git") return []
       if (mode === "git") {
-        return yield* track(git, ctx.directory, (yield* git.hasHead(ctx.directory)) ? "HEAD" : undefined)
+        return yield* track(
+          git,
+          ctx.directory,
+          ctx.worktree,
+          (yield* git.hasHead(ctx.directory)) ? "HEAD" : undefined,
+        )
       }
 
       if (!value.root) return []
       if (value.current && value.current === value.root.name) return []
       const ref = yield* git.mergeBase(ctx.directory, value.root.ref)
       if (!ref) return []
-      return yield* diffAgainstRef(git, ctx.directory, ref)
+      return yield* diffAgainstRef(git, ctx.directory, ctx.worktree, ref)
     })
 
     return Service.of({
@@ -386,7 +400,7 @@ export const layer: Layer.Layer<Service, never, Git.Service | Bus.Service> = Lay
         const tracked = hasHead ? (yield* git.patchAll(ctx.directory, "HEAD")).text : ""
         const untracked = yield* Effect.forEach(
           status.filter((item) => item.code === "??"),
-          (item) => git.patchUntracked(ctx.directory, item.file).pipe(Effect.map((patch) => patch.text)),
+          (item) => git.patchUntracked(ctx.worktree, item.file).pipe(Effect.map((patch) => patch.text)),
         )
         return [tracked, ...untracked].filter(Boolean).join("\n")
       }),
