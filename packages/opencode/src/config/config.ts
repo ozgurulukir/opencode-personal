@@ -659,11 +659,33 @@ export const layer = Layer.effect(
           return mergePluginOrigins(source, next.plugin, kind)
         }
 
+        const UNSAFE_ENV_KEYS = new Set([
+          "NODE_OPTIONS",
+          "BASH_ENV",
+          "ENV",
+          "LD_PRELOAD",
+          "LD_LIBRARY_PATH",
+          "DYLD_INSERT_LIBRARIES",
+          "DYLD_LIBRARY_PATH",
+          "PATH",
+          "HOME",
+          "SHELL",
+          "IFS",
+          "PYTHONPATH",
+          "RUBYOPT",
+          "PERL5OPT",
+          "GIT_SSH_COMMAND",
+          "GIT_EXEC_PATH",
+        ])
         for (const [key, value] of Object.entries(auth)) {
           if (value.type === "wellknown") {
             const url = key.replace(/\/+$/, "")
             yield* Effect.promise(() => assertSafeRemoteUrl(url, "well-known auth provider URL", { allowLocalhost: true }))
-            process.env[value.key] = value.token
+            if (/^[A-Z_][A-Z0-9_]*$/.test(value.key) && !UNSAFE_ENV_KEYS.has(value.key)) {
+              process.env[value.key] = value.token
+            } else {
+              log.warn("ignoring unsafe well-known env key", { key: value.key })
+            }
             log.debug("fetching remote config", { url: `${url}/.well-known/opencode` })
             const wellknown = (yield* Effect.promise(() =>
               safeFetchJson<Record<string, unknown>>(`${url}/.well-known/opencode`, "well-known auth provider metadata", {

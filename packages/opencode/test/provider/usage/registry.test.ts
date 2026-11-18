@@ -31,8 +31,8 @@ test("dispatches injected auth, resolves aliases, and isolates provider failures
   expect(reports[0].limits[0].amount.usedFraction).toBe(0.25)
   expect(calls.map((x) => x.authorization)).toEqual([
     "Bearer claude-token",
-    "zai-key",
-    "zai-key",
+    "token",
+    "token",
     "Bearer openai-token",
   ])
 })

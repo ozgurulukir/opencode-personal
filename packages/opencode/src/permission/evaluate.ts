@@ -6,11 +6,19 @@ type Rule = {
   action: "allow" | "deny" | "ask"
 }
 
+function ruleMatches(permission: string, pattern: string, rule: Rule) {
+  if (
+    rule.action === "deny" &&
+    (Wildcard.exceedsLimit(rule.permission) || Wildcard.exceedsLimit(rule.pattern))
+  ) {
+    return true
+  }
+  return Wildcard.match(permission, rule.permission) && Wildcard.match(pattern, rule.pattern)
+}
+
 export function evaluate(permission: string, pattern: string, ...rulesets: Rule[][]): Rule {
   const rules = rulesets.flat()
-  const match = rules.findLast(
-    (rule) => Wildcard.match(permission, rule.permission) && Wildcard.match(pattern, rule.pattern),
-  )
+  const match = rules.findLast((rule) => ruleMatches(permission, pattern, rule))
   return match ?? { action: "ask", permission, pattern: "*" }
 }
 
@@ -30,8 +38,6 @@ export function evaluateWithSource(
       flat.push({ ...rule, source: rs.source })
     }
   }
-  const match = flat.findLast(
-    (rule) => Wildcard.match(permission, rule.permission) && Wildcard.match(pattern, rule.pattern),
-  )
+  const match = flat.findLast((rule) => ruleMatches(permission, pattern, rule))
   return match ?? { action: "ask", permission, pattern: "*" }
 }

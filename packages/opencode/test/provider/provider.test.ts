@@ -3110,6 +3110,47 @@ test("toPublicInfo fallback path also strips credentials", () => {
   expect(JSON.stringify(result)).not.toContain(fakeKey)
 })
 
+test("toPublicInfo strips nested headers/credentials and header-style api keys", () => {
+  const provider = {
+    id: ProviderID.make("nested-secrets"),
+    name: "Nested Secrets Provider",
+    source: "api" as const,
+    env: [],
+    options: {
+      baseURL: "https://example.internal",
+      headers: {
+        "x-api-key": "secret-x-api-key",
+        "x-goog-api-key": "secret-goog-key",
+        "api-key": "secret-api-key",
+        "x-safe": "ok",
+      },
+      credentials: {
+        private_key: "secret-private-key",
+        client_secret: "secret-client",
+      },
+      nested: {
+        privateKey: "secret-camel-private-key",
+        safe: "keep-me",
+      },
+    },
+    models: {},
+  } as unknown as Provider.Info
+  const result = Provider.toPublicInfo(provider)
+  const serialized = JSON.stringify(result)
+  for (const secret of [
+    "secret-x-api-key",
+    "secret-goog-key",
+    "secret-api-key",
+    "secret-private-key",
+    "secret-client",
+    "secret-camel-private-key",
+  ]) {
+    expect(serialized).not.toContain(secret)
+  }
+  expect(result.options.headers).toEqual({ "x-safe": "ok" })
+  expect(result.options.nested).toEqual({ safe: "keep-me" })
+})
+
 test("rewriteMaxOutputTokens > composes over an existing auth fetch wrapper", async () => {
   const mockAuthFetch = mock((url: RequestInfo | URL, init?: RequestInit) => {
     return Promise.resolve(new Response("ok"))

@@ -55,7 +55,7 @@ export const DEFAULT_CHUNK_TIMEOUT = 60_000
 // resolves to the documented default. Guards a genuinely stuck request.
 export function resolveHttpTimeout(t: unknown): number | false {
   if (t === false) return false
-  if (typeof t === "number") return t
+  if (typeof t === "number" && t > 0) return t
   return DEFAULT_HTTP_TIMEOUT
 }
 
@@ -982,10 +982,20 @@ export type ConfigProvidersResult = Types.DeepMutable<Schema.Schema.Type<typeof 
 const SECRET_OPTION_KEYS = new Set([
   "apikey",
   "api_key",
+  "api-key",
+  "x-api-key",
+  "x-goog-api-key",
   "token",
   "accesstoken",
+  "access_token",
   "refreshtoken",
+  "refresh_token",
   "secret",
+  "clientsecret",
+  "client_secret",
+  "privatekey",
+  "private_key",
+  "credentials",
   "password",
   "authorization",
 ])
@@ -996,7 +1006,13 @@ function redactSecretOptions(options: Record<string, any>) {
       delete options[name]
       continue
     }
-    if (name.toLowerCase() === "headers" && value && typeof value === "object") {
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        if (item && typeof item === "object") redactSecretOptions(item)
+      }
+      continue
+    }
+    if (value && typeof value === "object") {
       redactSecretOptions(value)
     }
   }

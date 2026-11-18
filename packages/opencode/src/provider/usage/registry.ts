@@ -28,10 +28,15 @@ function authCredentials(auth: Record<string, Auth.Info>): { providerId: string;
         providerId: usageProviderId,
         credential: { type: "oauth", accessToken: entry.access, accountId: entry.accountId },
       })
-    } else if ((entry.type === "api" || entry.type === "wellknown") && entry.key) {
+    } else if (entry.type === "api" && entry.key) {
       result.push({
         providerId: usageProviderId,
         credential: { type: "api_key", apiKey: entry.key },
+      })
+    } else if (entry.type === "wellknown" && entry.token) {
+      result.push({
+        providerId: usageProviderId,
+        credential: { type: "api_key", apiKey: entry.token },
       })
     }
   }

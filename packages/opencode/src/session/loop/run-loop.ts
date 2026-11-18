@@ -5,7 +5,7 @@
 // handleSubtask, resolveTools, insertReminders, lastAssistant) are imported
 // from this directory and called with their own deps forwarded from `deps`.
 // InstanceState.context resolves from the layer context.
-import { Effect, Scope } from "effect"
+import { Effect, Exit, Scope } from "effect"
 import * as EffectLogger from "@opencode-ai/core/effect/logger"
 import { MessageV2 } from "../message-v2"
 import { MessageID, SessionID } from "../schema"
@@ -90,9 +90,12 @@ export const runLoop: (deps: RunLoopDeps, sessionID: SessionID) => Effect.Effect
   let structured: unknown
   let step = 0
   let consecutiveAutoCompactions = 0
+  let lastPrunedId: MessageID | undefined
   const session = yield* deps.sessions.get(sessionID).pipe(Effect.orDie)
+  const runScope = yield* Scope.make()
 
-  while (true) {
+  yield* Effect.gen(function* () {
+    while (true) {
     yield* deps.status.set(sessionID, { type: "busy" })
     yield* slog.info("loop", { step })
 
@@ -142,7 +145,7 @@ export const runLoop: (deps: RunLoopDeps, sessionID: SessionID) => Effect.Effect
           providerID: lastUser.model.providerID,
           history: msgs,
         },
-      ).pipe(Effect.ignore, Effect.forkIn(deps.scope))
+      ).pipe(Effect.ignore, Effect.forkIn(runScope))
 
     const model = yield* getModel(
       { provider: deps.provider, bus: deps.bus },
@@ -188,7 +191,8 @@ export const runLoop: (deps: RunLoopDeps, sessionID: SessionID) => Effect.Effect
       consecutiveAutoCompactions = 0
     }
 
-    if (lastFinished && !isCurrentTurnContinue) {
+    if (lastFinished && lastFinished.id !== lastPrunedId && !isCurrentTurnContinue) {
+      lastPrunedId = lastFinished.id
       const compacted = yield* pruneAndCheckTurnCompaction(
         { compaction: deps.compaction, config: deps.config, bus: deps.bus },
         {
@@ -280,7 +284,7 @@ export const runLoop: (deps: RunLoopDeps, sessionID: SessionID) => Effect.Effect
       if (step === 1)
         yield* deps.summary
           .summarize({ sessionID, messageID: lastUser.id })
-          .pipe(Effect.ignore, Effect.forkIn(deps.scope))
+          .pipe(Effect.ignore, Effect.forkIn(runScope))
 
       if (step > 1 && lastFinished) {
         msgs = wrapMessageContinuation(msgs, lastFinished.id)
@@ -390,6 +394,7 @@ export const runLoop: (deps: RunLoopDeps, sessionID: SessionID) => Effect.Effect
     if (outcome === "break") break
     continue
   }
+  }).pipe(Effect.ensuring(Scope.close(runScope, Exit.void)))
 
   yield* deps.compaction.prune({ sessionID }).pipe(Effect.ignore)
   return yield* lastAssistant({ sessions: deps.sessions }, sessionID)

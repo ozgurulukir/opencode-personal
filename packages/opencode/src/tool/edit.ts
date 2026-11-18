@@ -101,10 +101,11 @@ export const EditTool = Tool.define<
                       ),
                   })) as string,
                 )
+                const relPath = path.relative(instance.worktree, resolvedFilePath)
                 yield* ctx.ask({
                   permission: "edit",
-                  patterns: [path.relative(instance.worktree, resolvedFilePath)],
-                  always: ["*"],
+                  patterns: [relPath],
+                  always: [relPath],
                   metadata: {
                     filepath: resolvedFilePath,
                     diff,
@@ -152,10 +153,11 @@ export const EditTool = Tool.define<
                     ),
                 })) as string,
               )
+              const relPath = path.relative(instance.worktree, resolvedFilePath)
               yield* ctx.ask({
                 permission: "edit",
-                patterns: [path.relative(instance.worktree, resolvedFilePath)],
-                always: ["*"],
+                patterns: [relPath],
+                always: [relPath],
                 metadata: {
                   filepath: resolvedFilePath,
                   diff,

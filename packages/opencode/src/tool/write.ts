@@ -71,10 +71,11 @@ export const WriteTool = Tool.define<
                 ),
             })) as string,
           )
+          const relPath = path.relative(instance.worktree, resolvedFilepath)
           yield* ctx.ask({
             permission: "edit",
-            patterns: [path.relative(instance.worktree, resolvedFilepath)],
-            always: ["*"],
+            patterns: [relPath],
+            always: [relPath],
             metadata: {
               filepath: resolvedFilepath,
               diff,

@@ -512,7 +512,16 @@ export const layer: Layer.Layer<
             }
             ctx.assistantMessage.finish = value.finishReason
             ctx.assistantMessage.cost += usage.cost
-            ctx.assistantMessage.tokens = usage.tokens
+            ctx.assistantMessage.tokens = {
+              total: (ctx.assistantMessage.tokens.total ?? 0) + (usage.tokens.total ?? 0),
+              input: ctx.assistantMessage.tokens.input + usage.tokens.input,
+              output: ctx.assistantMessage.tokens.output + usage.tokens.output,
+              reasoning: ctx.assistantMessage.tokens.reasoning + usage.tokens.reasoning,
+              cache: {
+                read: ctx.assistantMessage.tokens.cache.read + usage.tokens.cache.read,
+                write: ctx.assistantMessage.tokens.cache.write + usage.tokens.cache.write,
+              },
+            }
             yield* session.updatePart({
               id: PartID.ascending(),
               reason: value.finishReason,
