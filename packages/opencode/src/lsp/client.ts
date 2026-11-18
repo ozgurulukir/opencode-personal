@@ -352,6 +352,7 @@ export async function create(input: { serverID: string; server: LSPServer.Handle
     })
   }
 
+  let accessTick = 0
   const files: Record<string, { version: number; text: string; lastUsed: number }> = {}
 
   // --- Diagnostic helpers ---
@@ -679,7 +680,7 @@ export async function create(input: { serverID: string; server: LSPServer.Handle
           })
 
           const next = document.version + 1
-          files[request.path] = { version: next, text, lastUsed: Date.now() }
+          files[request.path] = { version: next, text, lastUsed: ++accessTick }
           logger.info("textDocument/didChange", {
             path: request.path,
             version: next,
@@ -727,7 +728,7 @@ export async function create(input: { serverID: string; server: LSPServer.Handle
             text,
           },
         })
-        files[request.path] = { version: 0, text, lastUsed: Date.now() }
+        files[request.path] = { version: 0, text, lastUsed: ++accessTick }
         return 0
       },
       async close(request: { path: string }) {

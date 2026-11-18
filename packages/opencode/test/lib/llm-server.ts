@@ -415,7 +415,7 @@ function modelFrom(body: unknown) {
   return body.model
 }
 
-function send(item: Sse) {
+function send(item: Sse, closed: Deferred.Deferred<void>) {
   const head = bytes(item.head)
   const tail = bytes([...item.tail, ...(item.hang || item.error ? [] : [done])])
   const empty = Stream.fromIterable<Uint8Array>([])
@@ -425,7 +425,7 @@ function send(item: Sse) {
     : Stream.concat(head, tail)
   let end: Stream.Stream<Uint8Array, unknown> = empty
   if (item.error) end = Stream.concat(empty, Stream.fail(item.error))
-  else if (item.hang) end = Stream.concat(empty, Stream.never)
+  else if (item.hang) end = Stream.concat(empty, Stream.fromEffect(Deferred.await(closed)).pipe(Stream.drain))
 
   return HttpServerResponse.stream(Stream.concat(body, end), { contentType: "text/event-stream" })
 }
@@ -627,10 +627,14 @@ namespace TestLLMServer {
 }
 
 export class TestLLMServer extends Context.Service<TestLLMServer, TestLLMServer.Service>()("@test/LLMServer") {
-  static readonly layer = Layer.effect(
-    TestLLMServer,
-    Effect.gen(function* () {
-      const server = yield* HttpServer.HttpServer
+  static readonly layer = Layer.unwrap(
+    Effect.sync(() => {
+      const httpServer = Http.createServer()
+      return Layer.effect(
+        TestLLMServer,
+        Effect.gen(function* () {
+          const closed = yield* Deferred.make<void>()
+          const server = yield* HttpServer.HttpServer
       const router = yield* HttpRouter.HttpRouter
 
       let hits: Hit[] = []
@@ -669,32 +673,38 @@ export class TestLLMServer extends Context.Service<TestLLMServer, TestLLMServer.
           hits = [...hits, current]
           yield* notify()
           const auto: Sse = { type: "sse", head: [role()], tail: [textLine("E2E Title"), finishLine("stop")] }
-          if (mode === "responses") return send(responses(auto, modelFrom(body)))
-          return send(auto)
+          if (mode === "responses") return send(responses(auto, modelFrom(body)), closed)
+          return send(auto, closed)
         }
         const next = pull(current)
         if (!next) {
           hits = [...hits, current]
           yield* notify()
           const auto: Sse = { type: "sse", head: [role()], tail: [textLine("ok"), finishLine("stop")] }
-          if (mode === "responses") return send(responses(auto, modelFrom(body)))
-          return send(auto)
+          if (mode === "responses") return send(responses(auto, modelFrom(body)), closed)
+          return send(auto, closed)
         }
         hits = [...hits, current]
         yield* notify()
         if (next.type !== "sse") return fail(next)
-        if (mode === "responses") return send(responses(next, modelFrom(body)))
+        if (mode === "responses") return send(responses(next, modelFrom(body)), closed)
         if (next.reset) {
           yield* reset(next)
           return HttpServerResponse.empty()
         }
-        return send(next)
+        return send(next, closed)
       })
 
       yield* router.add("POST", "/v1/chat/completions", handle("chat"))
       yield* router.add("POST", "/v1/responses", handle("responses"))
 
       yield* server.serve(router.asHttpEffect())
+      yield* Effect.addFinalizer(() =>
+        Deferred.succeed(closed, void 0).pipe(
+          Effect.andThen(Effect.sync(() => httpServer.closeAllConnections())),
+          Effect.ignore,
+        ),
+      )
 
       return TestLLMServer.of({
         url:
@@ -766,6 +776,11 @@ export class TestLLMServer extends Context.Service<TestLLMServer, TestLLMServer.
         pending: Effect.sync(() => list.length),
         misses: Effect.sync(() => [...misses]),
       })
+        }),
+      ).pipe(
+        Layer.provide(HttpRouter.layer),
+        Layer.provide(NodeHttpServer.layer(() => httpServer, { port: 0, gracefulShutdownTimeout: 50 })),
+      )
     }),
-  ).pipe(Layer.provide(HttpRouter.layer), Layer.provide(NodeHttpServer.layer(() => Http.createServer(), { port: 0 })))
+  )
 }

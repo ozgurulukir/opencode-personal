@@ -59,7 +59,7 @@ describe("SystemPrompt.provider — matchDelta", () => {
 
   test("claude-sonnet-4 matches anthropic delta", () => {
     const result = SystemPrompt.provider(modelWith("claude-sonnet-4"))
-    expect(result.prefix).toContain("TodoWrite")
+    expect(result.prefix).toContain("todowrite")
   })
 
   test("trinity matches trinity delta", () => {

@@ -832,6 +832,14 @@ describe("session.llm.stream", () => {
     process.env.OPENCODE_AUTH_CONTENT = JSON.stringify({
       openai: { type: "oauth", refresh: "dummy", access: "dummy", expires: 9999999999999 },
     })
+    const originalFetch = globalThis.fetch
+    globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url
+      if (url.startsWith("https://chatgpt.com/backend-api/codex/responses")) {
+        return originalFetch(`${server.url.origin}/responses`, init)
+      }
+      return originalFetch(input, init)
+    }) as typeof fetch
 
     try {
       await WithInstance.provide({
@@ -879,6 +887,7 @@ describe("session.llm.stream", () => {
         },
       })
     } finally {
+      globalThis.fetch = originalFetch
       if (previous === undefined) delete process.env.OPENCODE_AUTH_CONTENT
       else process.env.OPENCODE_AUTH_CONTENT = previous
     }

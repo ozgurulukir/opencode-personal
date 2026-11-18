@@ -44,42 +44,45 @@ async function waitFor<T>(check: () => T | undefined, timeout = 1_000): Promise<
 function busy(sessionID = "session-1") {
   return {
     id: `evt-${sessionID}-busy`,
-    type: "session.status",
+    type: "session.next.status",
     properties: {
       sessionID,
+      timestamp: 1,
       status: {
         type: "busy",
       },
     },
-  } satisfies SdkEvent
+  } as unknown as SdkEvent
 }
 
 function idle(sessionID = "session-1") {
   return {
     id: `evt-${sessionID}-idle`,
-    type: "session.status",
+    type: "session.next.status",
     properties: {
       sessionID,
+      timestamp: 1,
       status: {
         type: "idle",
       },
     },
-  } satisfies SdkEvent
+  } as unknown as SdkEvent
 }
 
-function assistant(id: string) {
+function assistant(id: string, sessionID = "session-1") {
   return {
-    id: `evt-${id}`,
-    type: "message.updated",
+    id,
+    type: "session.next.step.started",
     properties: {
-      sessionID: "session-1",
-      info: assistantMessage({
-        sessionID: "session-1",
-        id,
-        parts: [],
-      }).info,
+      sessionID,
+      timestamp: 1,
+      agent: "build",
+      model: {
+        id: "gpt-5",
+        providerID: "openai",
+      },
     },
-  } satisfies SdkEvent
+  } as unknown as SdkEvent
 }
 
 function feed<T>() {
@@ -267,41 +270,68 @@ function textPart(id: string, messageID: string, text: string, sessionID = "sess
 }
 
 function textUpdated(part: TextPart): SdkEvent {
+  if (part.text === "") {
+    return {
+      id: part.id,
+      type: "session.next.text.started",
+      properties: {
+        sessionID: part.sessionID,
+        timestamp: 1,
+      },
+    } as unknown as SdkEvent
+  }
   return {
-    id: `evt-${part.id}-updated`,
-    type: "message.part.updated",
+    id: part.id,
+    type: "session.next.text.ended",
     properties: {
       sessionID: part.sessionID,
-      part,
-      time: 1,
+      timestamp: 1,
+      text: part.text,
     },
-  }
+  } as unknown as SdkEvent
 }
 
 function toolUpdated(part: SessionToolPart): SdkEvent {
+  if (part.state.status === "completed") {
+    return {
+      id: `evt-${part.id}-completed`,
+      type: "session.next.tool.success",
+      properties: {
+        sessionID: part.sessionID,
+        timestamp: 2,
+        callID: part.callID,
+        content: [{ type: "text", text: part.state.output ?? "" }],
+        structured: part.state.metadata,
+      },
+    } as unknown as SdkEvent
+  }
   return {
-    id: `evt-${part.id}-updated`,
-    type: "message.part.updated",
+    id: `evt-${part.id}-called`,
+    type: "session.next.tool.called",
     properties: {
       sessionID: part.sessionID,
-      part,
-      time: 1,
+      timestamp: 1,
+      callID: part.callID,
+      tool: part.tool,
+      input: part.state.input,
+      provider: {
+        itemID: part.callID,
+        ...(part.state.status === "running" && part.state.metadata ? { metadata: part.state.metadata } : {}),
+      },
     },
-  }
+  } as unknown as SdkEvent
 }
 
-function textDelta(messageID: string, partID: string, delta: string): SdkEvent {
+function textDelta(_messageID: string, partID: string, delta: string): SdkEvent {
   return {
     id: `evt-${partID}-delta`,
-    type: "message.part.delta",
+    type: "session.next.text.delta",
     properties: {
       sessionID: "session-1",
-      messageID,
-      partID,
-      field: "text",
+      timestamp: 1,
       delta,
     },
-  }
+  } as unknown as SdkEvent
 }
 
 function child(id: string): SessionChild {
@@ -391,6 +421,51 @@ function sdk(
   spyOn(client.session, "status").mockImplementation(status)
   spyOn(client.session, "messages").mockImplementation(messages)
   spyOn(client.session, "children").mockImplementation(children)
+  spyOn(client.v2.session, "promptAsync").mockImplementation(promptAsync as unknown as OpencodeClient["v2"]["session"]["promptAsync"])
+  spyOn(client.v2.session, "status").mockImplementation(status as unknown as OpencodeClient["v2"]["session"]["status"])
+  spyOn(client.v2.session, "messages").mockImplementation((async (params: { sessionID: string }) => {
+    const res = await messages(params as unknown as Parameters<OpencodeClient["session"]["messages"]>[0])
+    const items = (res.data ?? []).map((entry) => ({
+      id: entry.info.id,
+      type: "assistant" as const,
+      agent: entry.info.agent,
+      model: {
+        id: entry.info.role === "assistant" ? entry.info.modelID : entry.info.model.modelID,
+        providerID: entry.info.role === "assistant" ? entry.info.providerID : entry.info.model.providerID,
+      },
+      time: entry.info.time,
+      content: entry.parts.flatMap<unknown>((part) => {
+        if (part.type === "text") return [{ type: "text" as const, text: part.text }]
+        if (part.type === "tool") {
+          const state =
+            part.state.status === "running"
+              ? { status: "running" as const, input: part.state.input, structured: part.state.metadata }
+              : part.state.status === "completed"
+                ? {
+                    status: "completed" as const,
+                    input: part.state.input,
+                    content: [{ type: "text" as const, text: part.state.output ?? "" }],
+                    structured: part.state.metadata,
+                  }
+                : part.state
+          return [{
+            type: "tool" as const,
+            id: part.callID,
+            name: part.tool,
+            time: {
+              created: 1,
+              ran: 1,
+              ...(part.state.status === "completed" ? { completed: 2 } : {}),
+            },
+            state,
+          }]
+        }
+        return []
+      }),
+    }))
+    return { ...res, data: { items: items.slice().reverse() } }
+  }) as unknown as OpencodeClient["v2"]["session"]["messages"])
+  spyOn(client.v2.session, "children").mockImplementation(children as unknown as OpencodeClient["v2"]["session"]["children"])
   spyOn(client.permission, "list").mockImplementation(permissions)
   spyOn(client.question, "list").mockImplementation(questions)
 
@@ -478,7 +553,7 @@ describe("run stream transport", () => {
         const item = ui.events.findLast((event) => event.type === "stream.subagent")
         const state = item?.type === "stream.subagent" ? item.state : undefined
         return state?.tabs.some((tab) => tab.sessionID === "child-1") &&
-          state.permissions.some((req) => req.id === "perm-1")
+          state.permissions.some((req) => req.id === "perm-1" && "input" in (req.metadata ?? {}))
           ? state
           : undefined
       })
@@ -756,21 +831,19 @@ describe("run stream transport", () => {
 
       transport.selectSubagent("child-1")
 
+      global.push(globalEvent(assistant("msg-child-1", "child-1")))
+      global.push(globalEvent(textUpdated(textPart("txt-child-1", "msg-child-1", "", "child-1"))))
       global.push(
         globalEvent({
-          id: "evt-child-message",
-          type: "message.updated",
+          id: "evt-txt-child-1-delta",
+          type: "session.next.text.delta",
           properties: {
             sessionID: "child-1",
-            info: assistantMessage({
-              sessionID: "child-1",
-              id: "msg-child-1",
-              parts: [],
-            }).info,
+            timestamp: 1,
+            delta: "hello",
           },
-        }),
+        } as unknown as SdkEvent),
       )
-      global.push(globalEvent(textUpdated(textPart("txt-child-1", "msg-child-1", "hello", "child-1"))))
 
       expect(
         await waitFor(() => {
@@ -1038,7 +1111,7 @@ describe("run stream transport", () => {
       )
       await waitFor(() => {
         const commit = ui.commits.findLast(
-          (item) => item.kind === "tool" && item.partID === "question-race-tool-1" && item.toolState === "completed",
+          (item) => item.kind === "tool" && item.partID === "msg-1:tool:call-question-race-1" && item.toolState === "completed",
         )
         return commit ? true : undefined
       })
@@ -1214,7 +1287,7 @@ describe("run stream transport", () => {
           phase: "progress",
           source: "assistant",
           messageID: "msg-1",
-          partID: "txt-1",
+          partID: "msg-1:text:txt-1",
         },
         {
           kind: "assistant",
@@ -1222,7 +1295,7 @@ describe("run stream transport", () => {
           phase: "final",
           source: "assistant",
           messageID: "msg-1",
-          partID: "txt-1",
+          partID: "msg-1:text:txt-1",
           interrupted: true,
         },
       ])

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test, spyOn, mock } from "bun:test"
 import { z } from "zod"
+import * as Log from "@opencode-ai/core/util/log"
 import { fn } from "../../src/util/fn"
 
 afterEach(() => mock.restore())
@@ -32,25 +33,20 @@ describe("util.fn", () => {
   })
 
   test("logs error and rethrows when validation fails with ZodError", () => {
-    const traceSpy = spyOn(console, "trace").mockImplementation(() => {})
-    const errorSpy = spyOn(console, "error").mockImplementation(() => {})
+    const logSpy = spyOn(Log.create({ service: "fn" }), "error").mockImplementation(() => {})
 
     const schema = z.object({ email: z.string().email() })
     const wrapper = fn(schema, (input) => input.email)
 
     expect(() => wrapper({ email: "not-an-email" })).toThrow(z.ZodError)
 
-    expect(traceSpy).toHaveBeenCalledWith("schema validation failure stack trace:")
-    expect(errorSpy).toHaveBeenCalledWith("schema validation issues:", expect.any(String))
-    expect(errorSpy.mock.calls[0][1]).toContain("email")
+    expect(logSpy).toHaveBeenCalledWith("schema validation failure", { issues: expect.stringContaining("email") })
 
-    traceSpy.mockRestore()
-    errorSpy.mockRestore()
+    logSpy.mockRestore()
   })
 
-  test("rethrows non-Zod errors thrown during schema parse without calling console.error", () => {
-    const traceSpy = spyOn(console, "trace").mockImplementation(() => {})
-    const errorSpy = spyOn(console, "error").mockImplementation(() => {})
+  test("logs error and rethrows non-Zod errors thrown during schema parse", () => {
+    const logSpy = spyOn(Log.create({ service: "fn" }), "error").mockImplementation(() => {})
 
     const customError = new Error("Custom parsing failure")
     const schema = z.string().transform<string>(() => {
@@ -59,11 +55,9 @@ describe("util.fn", () => {
     const wrapper = fn(schema, (input) => input)
 
     expect(() => wrapper("test")).toThrow("Custom parsing failure")
-    expect(traceSpy).toHaveBeenCalledWith("schema validation failure stack trace:")
-    expect(errorSpy).not.toHaveBeenCalled()
+    expect(logSpy).toHaveBeenCalledWith("schema validation failure", { issues: String(customError) })
 
-    traceSpy.mockRestore()
-    errorSpy.mockRestore()
+    logSpy.mockRestore()
   })
 
   test("force bypasses schema validation", () => {

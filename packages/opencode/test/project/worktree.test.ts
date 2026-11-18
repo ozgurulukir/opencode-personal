@@ -230,13 +230,28 @@ describe("Worktree", () => {
   })
 
   describe("remove edge cases", () => {
-    it.live("remove non-existent directory succeeds silently", () =>
+    it.live("remove non-existent directory inside managed root succeeds silently", () =>
+      provideTmpdirInstance(
+        () =>
+          Effect.gen(function* () {
+            const svc = yield* Worktree.Service
+            const info = yield* svc.makeWorktreeInfo("does-not-exist")
+            const ok = yield* svc.remove({ directory: info.directory })
+            expect(ok).toBe(true)
+          }),
+        { git: true },
+      ),
+    )
+
+    it.live("refuses to remove unregistered directory outside managed root", () =>
       provideTmpdirInstance(
         (dir) =>
           Effect.gen(function* () {
             const svc = yield* Worktree.Service
-            const ok = yield* svc.remove({ directory: path.join(dir, "does-not-exist") })
-            expect(ok).toBe(true)
+            const exit = yield* Effect.exit(svc.remove({ directory: path.join(dir, "does-not-exist") }))
+
+            expect(Exit.isFailure(exit)).toBe(true)
+            if (Exit.isFailure(exit)) expect(Cause.squash(exit.cause)).toBeInstanceOf(Worktree.RemoveFailedError)
           }),
         { git: true },
       ),

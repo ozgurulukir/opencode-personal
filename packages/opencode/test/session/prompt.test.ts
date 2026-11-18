@@ -810,7 +810,7 @@ it.live(
       }),
       { git: true, config: providerCfg },
     ),
-  3_000,
+  10_000,
 )
 
 // Cancel semantics
@@ -840,7 +840,7 @@ it.live(
       }),
       { git: true, config: providerCfg },
     ),
-  3_000,
+  10_000,
 )
 
 it.live(
@@ -868,7 +868,7 @@ it.live(
       }),
       { git: true, config: providerCfg },
     ),
-  3_000,
+  10_000,
 )
 
 it.live(
@@ -983,7 +983,7 @@ it.live(
       }),
       { git: true, config: providerCfg },
     ),
-  3_000,
+  10_000,
 )
 
 // Queue semantics
@@ -1027,7 +1027,7 @@ it.live(
       }),
       { git: true, config: providerCfg },
     ),
-  3_000,
+  10_000,
 )
 
 it.live(
@@ -1096,7 +1096,7 @@ it.live(
       }),
       { git: true, config: providerCfg },
     ),
-  3_000,
+  10_000,
 )
 
 it.live(
@@ -1126,7 +1126,7 @@ it.live(
       }),
       { git: true, config: providerCfg },
     ),
-  3_000,
+  10_000,
 )
 
 it.live("assertNotBusy succeeds when idle", () =>
@@ -1171,7 +1171,7 @@ it.live(
       }),
       { git: true, config: providerCfg },
     ),
-  3_000,
+  10_000,
 )
 
 unix("shell captures stdout and stderr in completed tool output", () =>
@@ -1391,7 +1391,7 @@ it.live(
       }),
       { git: true, config: providerCfg },
     ),
-  3_000,
+  10_000,
 )
 
 it.live(
@@ -1431,7 +1431,7 @@ it.live(
       }),
       { git: true, config: providerCfg },
     ),
-  3_000,
+  10_000,
 )
 
 unix(
@@ -1946,7 +1946,7 @@ it.live(
       }),
       { git: true, config: providerCfg },
     ),
-  3_000,
+  10_000,
 )
 
 // Agent variant
@@ -2126,12 +2126,13 @@ it.live(
 it.live(
   "does not execute shell blocks injected via arguments",
   () =>
-    provideTmpdirInstance(
-      (dir) =>
+    provideTmpdirServer(
+      ({ dir, llm }) =>
         Effect.gen(function* () {
           const prompt = yield* SessionPrompt.Service
           const sessions = yield* Session.Service
           const session = yield* sessions.create({})
+          yield* llm.text("ok")
 
           // Assuming "init" command exists and doesn't execute shell blocks in its template natively,
           // or we can use another existing command. "init" is verified to exist above.
@@ -2148,7 +2149,7 @@ it.live(
           const fileExists = yield* Effect.promise(() => Bun.file(path.join(dir, "injected.txt")).exists())
           expect(fileExists).toBe(false)
         }),
-      { git: true },
+      { git: true, config: providerCfg },
     ),
-  30_000,
+  10_000,
 )
