@@ -191,7 +191,7 @@ export function formatPatch(diff: ParsedDiff): string {
   return jsFormatPatch(diff as unknown as Parameters<typeof jsFormatPatch>[0])
 }
 
-export function parsePatch(diffStr: string, options?: { timeout?: number }): ParsedDiff[] {
+export function parsePatch(diffStr: string): ParsedDiff[] {
   return jsParsePatch(diffStr) as unknown as ParsedDiff[]
 }
 
