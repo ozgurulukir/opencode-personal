@@ -108,30 +108,29 @@ export const WebFetchTool = Tool.define(
             Effect.timeoutOrElse({ duration: timeout, orElse: () => Effect.die(new Error("Request timed out")) }),
           )
           // Retry with honest UA if blocked by Cloudflare bot detection (TLS fingerprint mismatch)
-          const response =
-            first.status === 403 && first.headers.get("cf-mitigated") === "challenge"
-              ? yield* guarded({ "User-Agent": "opencode" }).pipe(
-                  Effect.timeoutOrElse({ duration: timeout, orElse: () => Effect.die(new Error("Request timed out")) }),
-                )
-              : first
-
-          // Check content length
-          const contentLength = response.headers.get("content-length")
-          if (contentLength && parseInt(contentLength) > maxResponseBytes) {
-            throw new Error(`Response too large (exceeds ${maxResponseBytes} byte limit)`)
+          const retry = first.status === 403 && first.headers.get("cf-mitigated") === "challenge"
+          if (retry) {
+            // The first response body is never consumed on the retry path. Cancel
+            // it so the connection is released instead of left hanging open.
+            void first.body?.cancel().catch(() => {})
           }
+          const response = retry
+            ? yield* guarded({ "User-Agent": "opencode" }).pipe(
+                Effect.timeoutOrElse({ duration: timeout, orElse: () => Effect.die(new Error("Request timed out")) }),
+              )
+            : first
 
-          const arrayBuffer = yield* Effect.promise(() => response.arrayBuffer())
-          if (arrayBuffer.byteLength > maxResponseBytes) {
-            throw new Error(`Response too large (exceeds ${maxResponseBytes} byte limit)`)
-          }
+          // Enforce the byte cap while streaming. arrayBuffer() would buffer the
+          // entire body first, which is unbounded for chunked responses that
+          // omit content-length.
+          const bytes = yield* Effect.promise(() => readResponseBytes(response, maxResponseBytes))
 
           const contentType = response.headers.get("content-type") || ""
           const mime = contentType.split(";")[0]?.trim().toLowerCase() || ""
           const title = `${params.url} (${contentType})`
 
           if (isImageAttachment(mime)) {
-            const base64Content = Buffer.from(arrayBuffer).toString("base64")
+            const base64Content = Buffer.from(bytes).toString("base64")
             return {
               title,
               output: "Image fetched successfully",
@@ -146,7 +145,7 @@ export const WebFetchTool = Tool.define(
             }
           }
 
-          const content = decodeBody(new Uint8Array(arrayBuffer), contentType)
+          const content = decodeBody(bytes, contentType)
 
           // Handle content based on requested format and actual content type
           switch (params.format) {
@@ -178,6 +177,55 @@ export const WebFetchTool = Tool.define(
     }
   }),
 )
+
+/**
+ * Reads a response body incrementally and cancels as soon as the byte cap is
+ * exceeded. Chunked responses have no content-length, so checking the header
+ * alone is not enough to bound memory usage.
+ */
+async function readResponseBytes(response: Response, maxBytes: number): Promise<Uint8Array> {
+  const contentLength = response.headers.get("content-length")
+  if (contentLength) {
+    const declared = parseInt(contentLength, 10)
+    if (Number.isFinite(declared) && declared > maxBytes) {
+      throw new Error(`Response too large (exceeds ${maxBytes} byte limit)`)
+    }
+  }
+
+  const reader = response.body?.getReader()
+  if (!reader) {
+    const bytes = new Uint8Array(await response.arrayBuffer())
+    if (bytes.byteLength > maxBytes) {
+      throw new Error(`Response too large (exceeds ${maxBytes} byte limit)`)
+    }
+    return bytes
+  }
+
+  const chunks: Uint8Array[] = []
+  let total = 0
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      total += value.byteLength
+      if (total > maxBytes) {
+        await reader.cancel()
+        throw new Error(`Response too large (exceeds ${maxBytes} byte limit)`)
+      }
+      chunks.push(value)
+    }
+  } finally {
+    reader.releaseLock?.()
+  }
+
+  const out = new Uint8Array(total)
+  let offset = 0
+  for (const chunk of chunks) {
+    out.set(chunk, offset)
+    offset += chunk.byteLength
+  }
+  return out
+}
 
 async function extractTextFromHTML(html: string) {
   let text = ""

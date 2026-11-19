@@ -1,12 +1,15 @@
 import { afterEach, describe, test, expect } from "bun:test"
 import { $ } from "bun"
-import { Effect } from "effect"
+import { Deferred, Effect, Layer, Stream } from "effect"
 import path from "path"
 import fs from "fs/promises"
 import { File } from "../../src/file"
 import { Instance } from "../../src/project/instance"
 import { WithInstance } from "../../src/project/with-instance"
 import { Filesystem } from "@/util/filesystem"
+import { Ripgrep } from "../../src/file/ripgrep"
+import { AppFileSystem } from "@opencode-ai/core/filesystem"
+import { Git } from "../../src/git"
 import { disposeAllInstances, provideInstance, tmpdir } from "../fixture/fixture"
 
 afterEach(async () => {
@@ -889,6 +892,62 @@ describe("file/index Filesystem patterns", () => {
           expect(result.content).toBe("unchanged")
           expect(result.diff).toBeUndefined()
           expect(result.patch).toBeUndefined()
+        },
+      })
+    })
+  })
+
+  describe("ensure() snapshot caching", () => {
+    test("serves the previous snapshot without awaiting the background rescan", async () => {
+      await using tmp = await tmpdir()
+      await fs.writeFile(path.join(tmp.path, "stable.txt"), "stable", "utf-8")
+
+      // First scan yields "stable.txt". Every later scan blocks on the gate and,
+      // if released, would yield "fresh.txt". ensure() must serve the first
+      // snapshot and prime the next scan in the background without waiting for it.
+      const gate = Deferred.makeUnsafe<void>()
+      const rescanStarted = Deferred.makeUnsafe<void>()
+      let scanCount = 0
+      const mockRipgrep = Layer.succeed(
+        Ripgrep.Service,
+        Ripgrep.Service.of({
+          files: () => {
+            scanCount++
+            if (scanCount === 1) return Stream.succeed("stable.txt")
+            Deferred.doneUnsafe(rescanStarted, Effect.void)
+            return Stream.fromEffect(Deferred.await(gate)).pipe(Stream.flatMap(() => Stream.succeed("fresh.txt")))
+          },
+          tree: () => Effect.succeed(""),
+          search: () => Effect.succeed({ items: [], partial: false }),
+        }),
+      )
+      const fileLayer = File.layer.pipe(
+        Layer.provide(mockRipgrep),
+        Layer.provide(AppFileSystem.defaultLayer),
+        Layer.provide(Git.defaultLayer),
+      )
+
+      await WithInstance.provide({
+        directory: tmp.path,
+        fn: async () => {
+          const results = await Effect.runPromise(
+            provideInstance(tmp.path)(
+              File.Service.use((svc) =>
+                Effect.gen(function* () {
+                  const found = yield* svc.search({ query: "stable", type: "file" })
+                  // The search already returned while the rescan is still blocked
+                  // on the gate. Wait here (scope still open) for the background
+                  // rescan to start, proving ensure() primed it without awaiting
+                  // it. If ensure() awaited the rescan, the search would hang.
+                  yield* Deferred.await(rescanStarted)
+                  return found
+                }),
+              ).pipe(Effect.provide(fileLayer)),
+            ),
+          )
+          expect(results).toContain("stable.txt")
+          expect(results).not.toContain("fresh.txt")
+          expect(scanCount).toBe(2)
         },
       })
     })

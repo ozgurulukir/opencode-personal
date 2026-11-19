@@ -417,8 +417,13 @@ export const layer = Layer.effect(
     let cachedScan = yield* Effect.cached(scan().pipe(Effect.catchCause(() => Effect.void)))
 
     const ensure = Effect.fn("File.ensure")(function* () {
-      yield* cachedScan
+      // Serve the snapshot produced by the previous scan and prime the next one
+      // in the background. The old code awaited a fresh `rg --files` walk on
+      // every call, so each keystroke in File.search re-ran the full scan.
+      const previous = cachedScan
       cachedScan = yield* Effect.cached(scan().pipe(Effect.catchCause(() => Effect.void)))
+      yield* cachedScan.pipe(Effect.forkIn(scope), Effect.asVoid)
+      yield* previous
     })
 
     const gitText = Effect.fnUntraced(function* (args: string[]) {

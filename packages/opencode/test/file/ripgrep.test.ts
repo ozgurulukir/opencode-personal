@@ -4,12 +4,22 @@ import * as Stream from "effect/Stream"
 import fs from "fs/promises"
 import path from "path"
 import { tmpdir } from "../fixture/fixture"
-import { Ripgrep } from "../../src/file/ripgrep"
+import { createHash } from "node:crypto"
+import { Ripgrep, verifyChecksum } from "../../src/file/ripgrep"
 
 const run = <A>(effect: Effect.Effect<A, unknown, Ripgrep.Service>) =>
   effect.pipe(Effect.provide(Ripgrep.defaultLayer), Effect.runPromise)
 
 describe("file.ripgrep", () => {
+  test("verifies pinned checksum before executing downloaded binary", () => {
+    const payload = new TextEncoder().encode("ripgrep archive bytes")
+    const expected = createHash("sha256").update(payload).digest("hex")
+
+    expect(() => verifyChecksum(payload, expected, "test.tar.gz")).not.toThrow()
+    expect(() => verifyChecksum(payload, "0".repeat(64), "test.tar.gz")).toThrow("checksum mismatch")
+    expect(() => verifyChecksum(payload, undefined, "test.tar.gz")).toThrow("no pinned SHA-256")
+  })
+
   test("defaults to include hidden", async () => {
     await using tmp = await tmpdir({
       init: async (dir) => {

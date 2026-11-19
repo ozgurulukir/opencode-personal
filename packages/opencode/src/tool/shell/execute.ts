@@ -1,4 +1,4 @@
-import { DateTime, Effect, Stream } from "effect"
+import { DateTime, Effect, Fiber, Stream } from "effect"
 import { createWriteStream } from "node:fs"
 import * as Tool from "../tool"
 import path from "path"
@@ -337,7 +337,7 @@ export function createShellTool(
         Effect.gen(function* () {
           const handle = yield* spawner.spawn(cmd(input.shell, input.command, input.cwd, input.env))
 
-          yield* Effect.forkScoped(
+          const outputFiber = yield* Effect.forkScoped(
             Stream.runForEach(Stream.decodeText(handle.all), (chunk) => {
               const size = Buffer.byteLength(chunk, "utf-8")
               list.push({ text: chunk, size })
@@ -409,6 +409,16 @@ export function createShellTool(
             expired = true
             yield* handle.kill({ forceKillAfter: "3 seconds" }).pipe(Effect.orDie)
           }
+
+          // Node can emit "exit" before stdio "close", so output buffered after
+          // exitCode resolves would be dropped when the scope closes. Give the
+          // consumer a bounded, non-failing grace period to drain trailing output.
+          // A stream that never closes (e.g. a detached child holding the pipe
+          // open) must not stall the tool call, and a timeout must never become a
+          // defect through the enclosing orDie — timeoutOption keeps the error
+          // channel empty on expiry. Normal runs drain immediately and pay none
+          // of this grace period.
+          yield* Fiber.join(outputFiber).pipe(Effect.timeoutOption("2 seconds"))
 
           return exit.kind === "exit" ? exit.code : null
         }),

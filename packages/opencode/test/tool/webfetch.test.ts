@@ -114,6 +114,96 @@ describe("webfetch limits", () => {
     })
   })
 
+  test("enforces the byte cap incrementally for chunked responses without content-length", async () => {
+    await WithInstance.provide({
+      directory: projectRoot,
+      fn: async () => {
+        // A ReadableStream body has no content-length. Enforcing the cap only
+        // after arrayBuffer() would buffer all chunks; the reader must cancel
+        // as soon as the cap is crossed.
+        let pulled = 0
+        let cancelled = false
+        const chunk = new TextEncoder().encode("x".repeat(16))
+        const stream = new ReadableStream<Uint8Array>({
+          pull(controller) {
+            pulled++
+            if (pulled > 8) {
+              controller.close()
+              return
+            }
+            controller.enqueue(chunk)
+          },
+          cancel() {
+            cancelled = true
+          },
+        })
+        const originalFetch = globalThis.fetch
+        ;(globalThis as any).fetch = async () =>
+          new Response(stream, { status: 200, headers: { "content-type": "text/plain" } })
+        try {
+          const config = TestConfig.layer({
+            get: () => Effect.succeed({ webfetch: { max_response_bytes: 32 } }),
+          })
+          const { WebFetchTool } = await import("../../src/tool/webfetch")
+          await expect(
+            WebFetchTool.pipe(
+              Effect.flatMap((info) => info.init()),
+              Effect.flatMap((tool) => tool.execute({ url: "http://localhost/chunked", format: "text" }, ctx)),
+              Effect.provide(Layer.mergeAll(Truncate.defaultLayer, Agent.defaultLayer, config)),
+              Effect.runPromise,
+            ),
+          ).rejects.toThrow("exceeds 32 byte limit")
+          // Only enough chunks to cross 32 bytes were consumed, and the reader
+          // cancelled the stream instead of draining all 8 chunks.
+          expect(pulled).toBeLessThan(8)
+          expect(cancelled).toBe(true)
+        } finally {
+          ;(globalThis as any).fetch = originalFetch
+        }
+      },
+    })
+  })
+
+  test("cancels the first response body when retrying a Cloudflare challenge", async () => {
+    await WithInstance.provide({
+      directory: projectRoot,
+      fn: async () => {
+        let calls = 0
+        let firstBodyCancelled = false
+        const originalFetch = globalThis.fetch
+        ;(globalThis as any).fetch = async () => {
+          calls++
+          if (calls === 1) {
+            // Cloudflare challenge response: 403 with the cf-mitigated header.
+            // Its body is never consumed on the retry path, so the tool must
+            // cancel it to release the connection.
+            const body = new ReadableStream<Uint8Array>({
+              start(controller) {
+                controller.enqueue(new TextEncoder().encode("challenge"))
+              },
+              cancel() {
+                firstBodyCancelled = true
+              },
+            })
+            return new Response(body, {
+              status: 403,
+              headers: { "content-type": "text/plain", "cf-mitigated": "challenge" },
+            })
+          }
+          return new Response("retried ok", { status: 200, headers: { "content-type": "text/plain" } })
+        }
+        try {
+          const result = await exec({ url: "http://localhost/cf-challenge", format: "text" })
+          expect(result.output).toContain("retried ok")
+          expect(calls).toBe(2)
+          expect(firstBodyCancelled).toBe(true)
+        } finally {
+          ;(globalThis as any).fetch = originalFetch
+        }
+      },
+    })
+  })
+
   test("applies the configured response size limit to fetches", async () => {
     await WithInstance.provide({
       directory: projectRoot,

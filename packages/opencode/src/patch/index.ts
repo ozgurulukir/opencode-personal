@@ -270,6 +270,9 @@ function computeReplacements(
     // must be unique in the rest of the file to avoid silent wrong-location
     // edits.
     let requireUnique = !chunk.change_context
+    // Whether a @@ context was located for this chunk. Pure additions use it
+    // to insert at the anchored position instead of blindly appending at EOF.
+    let contextFound = false
 
     // Handle context-based seeking
     if (chunk.change_context) {
@@ -284,12 +287,16 @@ function computeReplacements(
         throw new Error(`Failed to find context '${chunk.change_context}' in ${filePath}`)
       }
       lineIndex = contextIdx + 1
+      contextFound = true
     }
 
-    // Handle pure addition (no old lines)
+    // Handle pure addition (no old lines). When a @@ context was found, insert
+    // immediately after it; only context-less chunks fall back to appending at
+    // EOF. Previously every pure addition landed at EOF regardless of context.
     if (chunk.old_lines.length === 0) {
-      const insertionIdx =
-        originalLines.length > 0 && originalLines[originalLines.length - 1] === ""
+      const insertionIdx = contextFound
+        ? lineIndex
+        : originalLines.length > 0 && originalLines[originalLines.length - 1] === ""
           ? originalLines.length - 1
           : originalLines.length
       replacements.push([insertionIdx, 0, chunk.new_lines])
