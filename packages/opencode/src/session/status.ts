@@ -140,7 +140,17 @@ export const layer = Layer.effect(
         waiters.delete(deferred)
         return
       }
-      yield* Deferred.await(deferred)
+      yield* Deferred.await(deferred).pipe(
+        Effect.ensuring(
+          Effect.sync(() => {
+            // On interruption the idle transition never opens this waiter; drop
+            // it so it cannot linger in the map until a later idle transition.
+            const remaining = data.waiters.get(sessionID)
+            remaining?.delete(deferred)
+            if (remaining?.size === 0) data.waiters.delete(sessionID)
+          }),
+        ),
+      )
     })
 
     return Service.of({ get, list, set, waitIdle })

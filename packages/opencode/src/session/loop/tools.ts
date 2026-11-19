@@ -96,7 +96,7 @@ export const resolveTools = Effect.fn("SessionPrompt.resolveTools")(function* (
               metadata: val.metadata,
               status: "running",
               input: args,
-              time: { start: Date.now() },
+              time: { start: "time" in match.state ? match.state.time.start : Date.now() },
             },
           }
         })

@@ -30,6 +30,17 @@ const log = Log.create({ service: "llm" })
 export const OUTPUT_TOKEN_MAX = ProviderTransform.OUTPUT_TOKEN_MAX
 type Result = Awaited<ReturnType<typeof streamText>>
 
+/**
+ * Derives per-approval keys for a workflow tool-approval request. Each key
+ * encodes the tool name plus its FULL argument string, so approving one call
+ * never whitelists the same tool with different arguments — even when two calls
+ * share a title/name. Unparsable args still get a distinct key from the raw
+ * string rather than collapsing to the bare tool name.
+ */
+export function approvalPatterns(approvalTools: { name: string; args: string }[]): string[] {
+  return [...new Set(approvalTools.map((t) => `${t.name}: ${t.args}`))]
+}
+
 // Extracted to merge-options.ts for testability
 
 /**
@@ -303,10 +314,11 @@ const live: Layer.Layer<
         const bridge = yield* EffectBridge.make()
         const approvedToolsForSession = new Set<string>()
         workflowModel.approvalHandler = InstanceState.bind(async (approvalTools) => {
-          const uniqueNames = [...new Set(approvalTools.map((t: { name: string }) => t.name))] as string[]
-          // Auto-approve tools that were already approved in this session
-          // (prevents infinite approval loops for server-side MCP tools)
-          if (uniqueNames.every((name) => approvedToolsForSession.has(name))) {
+          const uniquePatterns = approvalPatterns(approvalTools)
+          // Auto-approve only invocations whose exact (name, full args) key was
+          // already approved this session (prevents infinite approval loops for
+          // server-side MCP tools without widening our own approval to new args).
+          if (uniquePatterns.every((pattern) => approvedToolsForSession.has(pattern))) {
             return { approved: true }
           }
 
@@ -316,16 +328,6 @@ const live: Layer.Layer<
             unsub = Bus.subscribe(Permission.Event.Replied, (evt) => {
               if (evt.properties.requestID === id) void evt.properties.reply
             })
-            const toolPatterns = approvalTools.map((t: { name: string; args: string }) => {
-              try {
-                const parsed = JSON.parse(t.args) as Record<string, unknown>
-                const title = (parsed?.title ?? parsed?.name ?? "") as string
-                return title ? `${t.name}: ${title}` : t.name
-              } catch {
-                return t.name
-              }
-            })
-            const uniquePatterns = [...new Set(toolPatterns)] as string[]
             await bridge.promise(
               perm.ask({
                 id,
@@ -337,8 +339,13 @@ const live: Layer.Layer<
                 ruleset: [],
               }),
             )
-            for (const name of uniqueNames) approvedToolsForSession.add(name)
-            workflowModel.sessionPreapprovedTools = [...(workflowModel.sessionPreapprovedTools ?? []), ...uniqueNames]
+            for (const pattern of uniquePatterns) approvedToolsForSession.add(pattern)
+            // Our local Set keys on the full args, so a repeat call with
+            // different arguments still prompts here. Residual limitation: the
+            // third-party workflow provider's approveAndResume adds the approved
+            // tool NAMES to DWS `preapproved_tools` itself, so the DWS server may
+            // auto-approve later calls of the same name regardless of arguments.
+            // That behavior lives in the provider and is out of our control.
             return { approved: true }
           } catch {
             return { approved: false }

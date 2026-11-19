@@ -329,6 +329,32 @@ export const layer = Layer.effect(
       })
     }
 
+    // Bounded latest-per-type read for the prompt/command/subagent paths.
+    // `messages()` decodes the entire history only so callers can findLast() the
+    // newest of each type; a per-type DESC LIMIT 1 avoids that full-history
+    // decode. The (session_id, type) index is not ordered by id, so this still
+    // sorts the rows of that type — it is not claimed to be O(1). MessageID is
+    // monotonic, so id DESC = latest.
+    const latestMessages = (sessionID: SessionID) => {
+      const rows = Database.use((db) =>
+        (["user", "assistant"] as const).flatMap((type) =>
+          db
+            .select()
+            .from(SessionMessageTable)
+            .where(and(eq(SessionMessageTable.session_id, sessionID), eq(SessionMessageTable.type, type)))
+            .orderBy(desc(SessionMessageTable.id))
+            .limit(1)
+            .all(),
+        ),
+      )
+      const defaults = legacyMessageDefaults(sessionID)
+      const decoded = rows.map((row) => decode(row, defaults))
+      return {
+        user: decoded.findLast((m): m is SessionMessage.User => m.type === "user"),
+        assistant: decoded.findLast((m): m is SessionMessage.Assistant => m.type === "assistant"),
+      }
+    }
+
     function fromRows(rows: (typeof SessionTable.$inferSelect)[]): Info[] {
       const reverted = rows.flatMap((row) =>
         row.revert?.messageID.startsWith("msg_") ? [{ row, messageID: row.revert.messageID }] : [],
@@ -635,9 +661,7 @@ export const layer = Layer.effect(
         // event wrote, plus the final assistant message (the loop ran
         // synchronously for immediate delivery) so callers like ACP can
         // report per-turn usage without an extra round-trip.
-        const messages = yield* result.messages({ sessionID: input.sessionID, order: "asc" })
-        const user = messages.findLast((m): m is SessionMessage.User => m.type === "user")
-        const assistant = messages.findLast((m): m is SessionMessage.Assistant => m.type === "assistant")
+        const { user, assistant } = latestMessages(input.sessionID)
 
         if (delivery === "deferred") {
           deferredQueue.add(input.sessionID)
@@ -824,14 +848,11 @@ export const layer = Layer.effect(
               // can see the result. The `subagent()` interface returns void by
               // design — callers read the synthetic message from the parent's
               // `messages()`. @see v2/AGENTS.md "V2 subagent() posts results synthetically".
-              const messages = yield* result.messages({ sessionID: session.id, order: "desc" })
-              // V2 messages() returns DB rows ordered by id DESC; find() gives
-              // the chronologically latest assistant. No compaction reordering
-              // in V2, so array position matches id order (MessageID is monotonic).
-              // No assistant → generic no-text fallback (not subagentResultText's
-              // "no parts" fallback — that one means "assistant existed but was
-              // empty", preserved inside subagentResultText).
-              const assistant = messages.find((msg) => msg.type === "assistant")
+              // Bounded latest-assistant read (id DESC LIMIT 1). No assistant →
+              // generic no-text fallback (not subagentResultText's "no parts"
+              // fallback — that one means "assistant existed but was empty",
+              // preserved inside subagentResultText).
+              const { assistant } = latestMessages(session.id)
               if (!assistant || assistant.type !== "assistant") {
                 yield* sync.run(SessionEvent.Synthetic.Sync, {
                   sessionID: input.parentID,
@@ -984,9 +1005,7 @@ export const layer = Layer.effect(
         // user + final assistant messages for per-turn usage reporting.
         const engine = yield* requireV1(promptEngine, "SessionPromptEngine")
         yield* engine.command(input)
-        const messages = yield* result.messages({ sessionID: input.sessionID, order: "asc" })
-        const user = messages.findLast((m): m is SessionMessage.User => m.type === "user")
-        const assistant = messages.findLast((m): m is SessionMessage.Assistant => m.type === "assistant")
+        const { user, assistant } = latestMessages(input.sessionID)
         return { user, assistant }
       }),
       revert: Effect.fn("V2Session.revert")(function* (input) {

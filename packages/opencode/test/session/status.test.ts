@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { Effect } from "effect"
+import { Effect, Fiber } from "effect"
 import { SessionStatus } from "../../src/session/status"
 import { AppRuntime } from "../../src/effect/app-runtime"
 import { WithInstance } from "../../src/project/with-instance"
@@ -57,6 +57,42 @@ describe("session status waitIdle", () => {
         await new Promise((resolve) => setTimeout(resolve, 50))
         await AppRuntime.runPromise(svc.set(sessionID, { type: "idle" }))
         await withTimeout(Promise.all([first, second]), 2_000, "all waiters must resolve on set(idle)")
+      },
+    })
+  })
+
+  test("a waiter interrupted before idle does not block later waiters", async () => {
+    await using tmp = await tmpdir()
+    await WithInstance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        const svc = await AppRuntime.runPromise(SessionStatus.Service.use((s) => Effect.succeed(s)))
+        await AppRuntime.runPromise(svc.set(sessionID, { type: "busy" }))
+
+        let cleanedUp = false
+        const fiber = AppRuntime.runFork(
+          svc.waitIdle(sessionID).pipe(
+            Effect.ensuring(
+              Effect.sync(() => {
+                cleanedUp = true
+              }),
+            ),
+          ),
+        )
+        // Let the waiter register its deferred, then interrupt it before any
+        // idle transition opens it. The internal Effect.ensuring drops the
+        // deferred from the waiter map on this interruption path.
+        await new Promise((resolve) => setTimeout(resolve, 50))
+        await AppRuntime.runPromise(Fiber.interrupt(fiber))
+        expect(cleanedUp).toBe(true)
+
+        // A fresh waiter registered afterwards must still be opened by the
+        // next idle transition (no lingering interrupted waiter interferes).
+        const later = AppRuntime.runPromise(svc.waitIdle(sessionID))
+        await new Promise((resolve) => setTimeout(resolve, 50))
+        await AppRuntime.runPromise(svc.set(sessionID, { type: "idle" }))
+        await withTimeout(later, 2_000, "fresh waiter must resolve after a prior interruption")
+        expect((await AppRuntime.runPromise(svc.get(sessionID))).type).toBe("idle")
       },
     })
   })

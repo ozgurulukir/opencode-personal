@@ -314,3 +314,74 @@ describe("projectors-next shell callID dedupe", () => {
     ),
   )
 })
+
+// A retry re-runs the whole LLM stream. The V1 PartTable cleanup (processor.ts)
+// alone leaves the failed attempt's projected text in SessionMessageTable, so
+// the V2 read model must clear the in-flight assistant's content on `retried`.
+describe("projectors-next retry projection", () => {
+  const testModel = {
+    id: Modelv2.ID.make("test-model"),
+    providerID: Modelv2.ProviderID.make("test-provider"),
+    variant: Modelv2.VariantID.make("default"),
+  }
+
+  effectIt.live(
+    "a mid-stream retry leaves no duplicate partial text in SessionMessageTable",
+    provideTmpdirInstance(() =>
+      Effect.gen(function* () {
+        Flag.OPENCODE_EXPERIMENTAL_WORKSPACES = true
+        const sessions = yield* Session.Service
+        const sync = yield* SyncEvent.Service
+        const info = yield* sessions.create({ title: "retry" })
+        const ts = () => DateTime.makeUnsafe(Date.now())
+
+        // Attempt 1: a completed partial text block, then a retryable failure.
+        yield* sync.run(SessionEvent.Step.Started.Sync, {
+          sessionID: info.id,
+          timestamp: ts(),
+          agent: "build",
+          model: testModel,
+        })
+        yield* sync.run(SessionEvent.Text.Started.Sync, { sessionID: info.id, timestamp: ts() })
+        yield* sync.run(SessionEvent.Text.Ended.Sync, { sessionID: info.id, timestamp: ts(), text: "partial" })
+        yield* sync.run(SessionEvent.Retried.Sync, {
+          sessionID: info.id,
+          timestamp: ts(),
+          attempt: 1,
+          error: { message: "boom", isRetryable: true },
+        })
+
+        // Attempt 2: a fresh step with the successful text.
+        yield* sync.run(SessionEvent.Step.Started.Sync, {
+          sessionID: info.id,
+          timestamp: ts(),
+          agent: "build",
+          model: testModel,
+        })
+        yield* sync.run(SessionEvent.Text.Started.Sync, { sessionID: info.id, timestamp: ts() })
+        yield* sync.run(SessionEvent.Text.Ended.Sync, { sessionID: info.id, timestamp: ts(), text: "after" })
+
+        const rows = Database.use((db) =>
+          db
+            .select()
+            .from(SessionMessageTable)
+            .where(eq(SessionMessageTable.session_id, info.id))
+            .all()
+            .filter((row) => row.type === "assistant"),
+        )
+        const texts = rows.flatMap((row) => {
+          const message = Schema.decodeUnknownSync(SessionMessage.Message)(
+            SessionMessage.normalizeForDecode({ ...row.data, id: row.id, type: row.type }),
+          )
+          if (message.type !== "assistant") return []
+          return message.content
+            .filter((item): item is Extract<typeof item, { type: "text" }> => item.type === "text")
+            .map((item) => item.text)
+        })
+
+        expect(texts).toContain("after")
+        expect(texts).not.toContain("partial")
+      }),
+    ),
+  )
+})

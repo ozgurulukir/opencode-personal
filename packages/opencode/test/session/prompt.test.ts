@@ -1,6 +1,7 @@
 import { NodeFileSystem } from "@effect/platform-node"
 import { FetchHttpClient } from "effect/unstable/http"
-import { expect } from "bun:test"
+import { ChildProcessSpawner } from "effect/unstable/process"
+import { expect, test } from "bun:test"
 import { Cause, Effect, Exit, Fiber, Layer } from "effect"
 import path from "path"
 import { fileURLToPath } from "url"
@@ -49,10 +50,13 @@ import { Format } from "../../src/format"
 import { Reference } from "../../src/reference/reference"
 import { SearchService } from "@/search/search"
 import { EmbeddingService } from "@/search/embedding"
-import { provideTmpdirInstance, provideTmpdirServer } from "../fixture/fixture"
+import { provideTmpdirInstance, provideTmpdirServer, tmpdir } from "../fixture/fixture"
 import { testEffect } from "../lib/effect"
 import { reply, TestLLMServer } from "../lib/llm-server"
 import { SyncEvent } from "@/sync"
+import { shellImpl } from "../../src/session/loop/shell"
+import { AppRuntime } from "../../src/effect/app-runtime"
+import { WithInstance } from "../../src/project/with-instance"
 
 void Log.init({ print: false })
 
@@ -1321,6 +1325,49 @@ unix("shell captures stderr from a failing command", () =>
     { git: true, config: cfg },
   ),
 )
+
+test("shell persists status:error on a non-abort spawn failure", async () => {
+  await using tmp = await tmpdir()
+  await WithInstance.provide({
+    directory: tmp.path,
+    fn: async () => {
+      await AppRuntime.runPromise(
+        Effect.gen(function* () {
+          const sessions = yield* Session.Service
+          const revert = yield* SessionRevert.Service
+          const agents = yield* AgentSvc.Service
+          const bus = yield* Bus.Service
+          const plugin = yield* Plugin.Service
+          const config = yield* Config.Service
+          const provider = yield* ProviderSvc.Service
+          const sync = yield* SyncEvent.Service
+
+          const chat = yield* sessions.create({ title: "spawn-failure" })
+          // A spawn failure is a non-abort defect: shellImpl must persist an error
+          // part (not "completed") before re-raising the cause.
+          const failingSpawner = ChildProcessSpawner.make(() => Effect.die(new Error("spawn failed")))
+          const deps = { sessions, revert, agents, bus, plugin, config, provider, spawner: failingSpawner, sync }
+
+          const exit = yield* shellImpl(deps, {
+            sessionID: chat.id,
+            agent: "build",
+            command: "echo hi",
+          }).pipe(Effect.exit)
+          expect(Exit.isFailure(exit)).toBe(true)
+
+          const tool = Array.from(MessageV2.stream(chat.id))
+            .flatMap((message) => (message.info.role === "assistant" ? message.parts : []))
+            .find((part) => part.type === "tool")
+          expect(tool?.type).toBe("tool")
+          if (tool?.type !== "tool") return
+          expect(tool.state.status).toBe("error")
+          if (tool.state.status !== "error") return
+          expect(tool.state.error).toContain("spawn failed")
+        }),
+      )
+    },
+  })
+})
 
 unix(
   "shell updates running metadata before process exit",
