@@ -35,10 +35,12 @@ const apiLayer = HttpRouter.serve(
 const noAuthLayer = ServerAuth.Config.layer({ password: Option.none(), username: "opencode" })
 const secretLayer = ServerAuth.Config.layer({ password: Option.some("secret"), username: "opencode" })
 const kitSecretLayer = ServerAuth.Config.layer({ password: Option.some("secret"), username: "kit" })
+const colonSecretLayer = ServerAuth.Config.layer({ password: Option.some("sec:ret"), username: "opencode" })
 
 const it = testEffect(apiLayer.pipe(Layer.provide(noAuthLayer)))
 const itSecret = testEffect(apiLayer.pipe(Layer.provide(secretLayer)))
 const itKitSecret = testEffect(apiLayer.pipe(Layer.provide(kitSecretLayer)))
+const itColonSecret = testEffect(apiLayer.pipe(Layer.provide(colonSecretLayer)))
 
 const basic = (username: string, password: string) => ServerAuth.header({ username, password }) ?? ""
 
@@ -133,6 +135,14 @@ describe("HttpApi authorization middleware", () => {
       const response = yield* HttpClient.get("/probe?auth_token=not-base64")
 
       expect(response.status).toBe(401)
+    }),
+  )
+
+  itColonSecret.live("accepts passwords containing a colon", () =>
+    Effect.gen(function* () {
+      const response = yield* getProbe({ authorization: basic("opencode", "sec:ret") })
+
+      expect(response.status).toBe(200)
     }),
   )
 })

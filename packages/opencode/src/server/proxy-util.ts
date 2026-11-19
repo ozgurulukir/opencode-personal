@@ -44,6 +44,13 @@ export function headers(input: Request | HeadersInit | Record<string, string>, e
   return out
 }
 
+// Upstream responses carry the same sensitive headers as requests; strip them
+// before forwarding so a remote cannot set cookies or spoof client IP/routing.
+export function sanitizeResponseHeaders(headers: Headers) {
+  for (const key of securitySensitive) headers.delete(key)
+  return headers
+}
+
 export function websocketProtocols(input: Request | Record<string, string | undefined>) {
   const value = input instanceof Request ? input.headers.get("sec-websocket-protocol") : input["sec-websocket-protocol"]
   if (!value) return []

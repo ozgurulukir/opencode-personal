@@ -374,9 +374,7 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "v2.session
             payload.messageID !== ctx.params.messageID ||
             payload.sessionID !== ctx.params.sessionID
           ) {
-            throw new Error(
-              `Part mismatch: body.id='${payload.id}' vs partID='${ctx.params.partID}', body.messageID='${payload.messageID}' vs messageID='${ctx.params.messageID}', body.sessionID='${payload.sessionID}' vs sessionID='${ctx.params.sessionID}'`,
-            )
+            return yield* new HttpApiError.BadRequest({})
           }
           return yield* sessionV1.updatePart(payload)
         }),

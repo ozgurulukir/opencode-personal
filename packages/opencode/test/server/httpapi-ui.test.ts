@@ -226,6 +226,69 @@ describe("HttpApi UI fallback", () => {
     expect(await response.text()).toBe("<html>opencode</html>")
   })
 
+  test("strips sensitive upstream response headers", async () => {
+    Flag.OPENCODE_DISABLE_EMBEDDED_WEB_UI = true
+
+    const response = await Effect.runPromise(
+      Effect.gen(function* () {
+        const fs = yield* AppFileSystem.Service
+        const client = yield* HttpClient.HttpClient
+        return yield* serveUIEffect(HttpServerRequest.fromWeb(new Request("http://localhost/")), { fs, client })
+      }).pipe(
+        Effect.provide(
+          Layer.mergeAll(
+            AppFileSystem.defaultLayer,
+            Layer.succeed(
+              HttpClient.HttpClient,
+              HttpClient.make((request) =>
+                Effect.succeed(
+                  HttpClientResponse.fromWeb(
+                    request,
+                    new Response("<html>opencode</html>", {
+                      headers: {
+                        "content-type": "text/html",
+                        "set-cookie": "session=leak",
+                        "x-forwarded-for": "1.2.3.4",
+                        "x-forwarded-host": "evil.example",
+                        "x-forwarded-proto": "https",
+                        forwarded: "for=1.2.3.4",
+                        "x-real-ip": "1.2.3.4",
+                        "x-remote": "kept",
+                      },
+                    }),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+        Effect.map(HttpServerResponse.toWeb),
+      ),
+    )
+
+    expect(response.headers.get("set-cookie")).toBeNull()
+    expect(response.headers.get("x-forwarded-for")).toBeNull()
+    expect(response.headers.get("x-forwarded-host")).toBeNull()
+    expect(response.headers.get("x-forwarded-proto")).toBeNull()
+    expect(response.headers.get("forwarded")).toBeNull()
+    expect(response.headers.get("x-real-ip")).toBeNull()
+    expect(response.headers.get("x-remote")).toBe("kept")
+  })
+
+  test("preserves the upstream query string without forwarding auth_token", async () => {
+    Flag.OPENCODE_DISABLE_EMBEDDED_WEB_UI = true
+    let proxiedUrl: string | undefined
+
+    const response = await uiApp({
+      client: httpClient(new Response("ui", { headers: { "content-type": "text/plain" } }), (request) => {
+        proxiedUrl = request.url
+      }),
+    }).request("/assets/app.js?v=2&auth_token=secret&foo=bar")
+
+    expect(response.status).toBe(200)
+    expect(proxiedUrl).toBe("https://app.opencode.ai/assets/app.js?v=2&foo=bar")
+  })
+
   test("serves embedded UI assets when Bun can read them but access reports missing", async () => {
     let readPath: string | undefined
 

@@ -122,6 +122,14 @@ describe("pty HttpApi bridge", () => {
     })
     expect(response.status).toBe(404)
   })
+
+  test("returns 403 for missing PTY with a ticket instead of leaking existence", async () => {
+    await using tmp = await tmpdir({ git: true, config: { formatter: false, lsp: false } })
+    const response = await app().request(`${PtyPaths.connect.replace(":ptyID", PtyID.ascending())}?ticket=bogus`, {
+      headers: { "x-opencode-directory": tmp.path },
+    })
+    expect(response.status).toBe(403)
+  })
   ;(process.platform === "win32" ? effectIt.live.skip : effectIt.live)(
     "serves PTY websocket output and input through Effect routes",
     () =>

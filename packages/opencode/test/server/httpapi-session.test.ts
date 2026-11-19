@@ -563,6 +563,32 @@ describe("session HttpApi", () => {
   )
 
   it.live(
+    "rejects updatePart with mismatched identifiers as bad request",
+    withTmp({ git: true, config: { formatter: false, lsp: false } }, (tmp) =>
+      Effect.gen(function* () {
+        const headers = { "x-opencode-directory": tmp.path, "content-type": "application/json" }
+        const session = yield* createSession(tmp.path, { title: "messages" })
+        const first = yield* createTextMessage(tmp.path, session.id, "first")
+
+        const response = yield* request(
+          pathFor(SessionPaths.updatePart, {
+            sessionID: session.id,
+            messageID: first.info.id,
+            partID: first.part.id,
+          }),
+          {
+            method: "PATCH",
+            headers,
+            body: JSON.stringify({ ...first.part, id: PartID.ascending() }),
+          },
+        )
+
+        expect(response.status).toBe(400)
+      }),
+    ),
+  )
+
+  it.live(
     "serves remaining non-LLM session mutation routes",
     withTmp({ git: true, config: { formatter: false, lsp: false } }, (tmp) =>
       Effect.gen(function* () {

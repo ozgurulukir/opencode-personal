@@ -97,17 +97,20 @@ export const ptyConnectRoute = HttpRouter.use((router) =>
       PtyPaths.connect,
       Effect.gen(function* () {
         const params = yield* HttpRouter.schemaPathParams(Params)
-        if (!(yield* pty.get(params.ptyID))) return HttpServerResponse.empty({ status: 404 })
-
-        const query = yield* HttpServerRequest.schemaSearchParams(CursorQuery)
         const request = yield* HttpServerRequest.HttpServerRequest
         const ticket = new URL(request.url, "http://localhost").searchParams.get(PTY_CONNECT_TICKET_QUERY)
+        // Consume the ticket before the existence check: with any ticket value,
+        // skipping Basic auth must not let callers distinguish existing PTY IDs
+        // via 403 (exists) vs 404 (missing). Without a ticket, keep the 404.
         if (ticket) {
           const valid = validOrigin(request, cors)
             ? yield* tickets.consume({ ticket, ptyID: params.ptyID, ...(yield* PtyTicket.scope) })
             : false
           if (!valid) return HttpServerResponse.empty({ status: 403 })
         }
+        if (!(yield* pty.get(params.ptyID))) return HttpServerResponse.empty({ status: 404 })
+
+        const query = yield* HttpServerRequest.schemaSearchParams(CursorQuery)
         const parsedCursor = query.cursor === undefined ? undefined : Number(query.cursor)
         const cursor =
           parsedCursor !== undefined && Number.isSafeInteger(parsedCursor) && parsedCursor >= -1
