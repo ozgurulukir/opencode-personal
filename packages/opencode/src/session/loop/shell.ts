@@ -28,6 +28,7 @@ import { ShellID } from "@/tool/shell/id"
 import { currentModel } from "./model"
 import type { ShellInput } from "../prompt"
 import { createClientTerminal, releaseClientTerminal, terminateClientTerminal } from "@/acp/terminal-backend"
+import { errorMessage } from "@/util/error"
 
 export interface ShellImplDeps {
   sessions: Session.Interface
@@ -140,6 +141,8 @@ export const shellImpl = Effect.fn("SessionPrompt.shellImpl")(
         let output = ""
         let aborted = false
         let terminalExited = false
+        let failed = false
+        let failureError = ""
 
         const finish = Effect.uninterruptible(
           Effect.gen(function* () {
@@ -158,14 +161,21 @@ export const shellImpl = Effect.fn("SessionPrompt.shellImpl")(
               yield* deps.sessions.updateMessage(msg)
             }
             if (part.state.status === "running") {
-              part.state = {
-                status: "completed",
-                time: { ...part.state.time, end: completed },
-                input: part.state.input,
-                title: "",
-                metadata: { output, description: "" },
-                output,
-              }
+              part.state = failed
+                ? {
+                    status: "error",
+                    time: { start: part.state.time.start, end: completed },
+                    input: part.state.input,
+                    error: failureError,
+                  }
+                : {
+                    status: "completed",
+                    time: { ...part.state.time, end: completed },
+                    input: part.state.input,
+                    title: "",
+                    metadata: { output, description: "" },
+                    output,
+                  }
               yield* deps.sessions.updatePart(part)
             }
           }),
@@ -213,6 +223,10 @@ export const shellImpl = Effect.fn("SessionPrompt.shellImpl")(
         if (Exit.isFailure(exit) && Cause.hasInterrupts(exit.cause) && !Cause.hasDies(exit.cause)) {
           aborted = true
         }
+        // A non-abort spawn/exit failure must be persisted as an error part,
+        // not "completed", before the cause is re-raised.
+        failed = Exit.isFailure(exit) && !aborted && !Cause.hasInterruptsOnly(exit.cause)
+        if (failed && Exit.isFailure(exit)) failureError = errorMessage(Cause.squash(exit.cause))
         yield* finish
 
         if (Exit.isFailure(exit) && !aborted && !Cause.hasInterruptsOnly(exit.cause)) {

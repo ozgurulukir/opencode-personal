@@ -781,10 +781,32 @@ export const layer: Layer.Layer<
         ctx.needsCompaction = false
         ctx.shouldBreak = (yield* config.get()).experimental?.continue_loop_on_deny !== true
 
+        // Effect.retry re-runs the stream effect but `cleanup()` only runs after
+        // all attempts finish. A mid-stream failure leaves the failed attempt's
+        // parts (fresh PartID.ascending() IDs) persisted; the retry emits new
+        // parts, duplicating/garbling history. Snapshot the parts present before
+        // the first attempt and remove every part created since before each
+        // retry re-executes the stream.
+        const initialPartIDs = new Set(MessageV2.parts(ctx.assistantMessage.id).map((part) => part.id))
+        const discardFailedAttemptParts = Effect.gen(function* () {
+          const created = MessageV2.parts(ctx.assistantMessage.id).filter((part) => !initialPartIDs.has(part.id))
+          yield* Effect.forEach(
+            created,
+            (part) =>
+              session.removePart({
+                sessionID: ctx.sessionID,
+                messageID: ctx.assistantMessage.id,
+                partID: part.id,
+              }),
+            { concurrency: "unbounded" },
+          )
+        })
+
         return yield* Effect.gen(function* () {
           yield* Effect.gen(function* () {
             ctx.currentText = undefined
             ctx.reasoningMap = {}
+            ctx.toolcalls = {}
             const stream = llm.stream(streamInput)
 
             yield* stream.pipe(
@@ -809,10 +831,12 @@ export const layer: Layer.Layer<
               SessionRetry.policy({
                 provider: input.model.providerID,
                 parse,
-                set: (info) => {
-                  // V2 read-model projection: emit the SessionEvent so V2 projectors populate SessionMessageTable.
-                  return sync
-                    .run(SessionEvent.Retried.Sync, {
+                set: (info) =>
+                  Effect.gen(function* () {
+                    // Drop the failed attempt's parts before the retry re-runs the stream.
+                    yield* discardFailedAttemptParts
+                    // V2 read-model projection: emit the SessionEvent so V2 projectors populate SessionMessageTable.
+                    yield* sync.run(SessionEvent.Retried.Sync, {
                       sessionID: ctx.sessionID,
                       attempt: info.attempt,
                       error: {
@@ -821,18 +845,14 @@ export const layer: Layer.Layer<
                       },
                       timestamp: DateTime.makeUnsafe(Date.now()),
                     })
-                    .pipe(
-                      Effect.andThen(
-                        status.set(ctx.sessionID, {
-                          type: "retry",
-                          attempt: info.attempt,
-                          message: info.message,
-                          action: info.action,
-                          next: info.next,
-                        }),
-                      ),
-                    )
-                },
+                    yield* status.set(ctx.sessionID, {
+                      type: "retry",
+                      attempt: info.attempt,
+                      message: info.message,
+                      action: info.action,
+                      next: info.next,
+                    })
+                  }),
               }),
             ),
             Effect.catch(halt),

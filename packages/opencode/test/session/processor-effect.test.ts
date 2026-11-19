@@ -553,6 +553,59 @@ it.live("session.processor effect tests retry recognized structured json errors"
   ),
 )
 
+it.live("session.processor retries discard parts persisted by the failed attempt", () =>
+  provideTmpdirServer(
+    ({ dir, llm }) =>
+      Effect.gen(function* () {
+        const { processors, session, provider } = yield* boot()
+
+        // First attempt emits partial text, then fails with a retryable server error.
+        yield* llm.push(
+          reply().text("partial").streamError({ type: "error", error: { code: "server_error", message: "boom" } }),
+        )
+        // Second attempt succeeds.
+        yield* llm.text("after")
+
+        const chat = yield* session.create({})
+        const parent = yield* user(chat.id, "retry parts")
+        const msg = yield* assistant(chat.id, parent.id, path.resolve(dir))
+        const mdl = yield* provider.getModel(ref.providerID, ref.modelID)
+        const handle = yield* processors.create({
+          assistantMessage: msg,
+          sessionID: chat.id,
+          model: mdl,
+        })
+
+        const value = yield* handle.process({
+          user: {
+            id: parent.id,
+            sessionID: chat.id,
+            role: "user",
+            time: parent.time,
+            agent: parent.agent,
+            model: { providerID: ref.providerID, modelID: ref.modelID },
+          } satisfies MessageV2.User,
+          sessionID: chat.id,
+          model: mdl,
+          agent: agent(),
+          system: { prefix: "", suffix: "" },
+          messages: [{ role: "user", content: "retry parts" }],
+          tools: {},
+        })
+
+        const parts = MessageV2.parts(msg.id)
+        const texts = parts.filter((part) => part.type === "text").map((part) => (part as MessageV2.TextPart).text)
+
+        expect(value).toBe("continue")
+        expect(yield* llm.calls).toBe(2)
+        expect(texts).toContain("after")
+        // The failed attempt's partial text part must not survive the retry.
+        expect(texts).not.toContain("partial")
+      }),
+    { git: true, config: (url) => providerCfg(url) },
+  ),
+)
+
 it.live("session.processor effect tests publish retry status updates", () =>
   provideTmpdirServer(
     ({ dir, llm }) =>

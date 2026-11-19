@@ -4,7 +4,7 @@ import { tool, type ModelMessage } from "ai"
 import { Cause, Effect, Exit, Stream } from "effect"
 import z from "zod"
 import { makeRuntime } from "../../src/effect/run-service"
-import { LLM } from "../../src/session/llm"
+import { LLM, approvalPatterns } from "../../src/session/llm"
 import { Instance } from "../../src/project/instance"
 import { WithInstance } from "../../src/project/with-instance"
 import { Provider } from "@/provider/provider"
@@ -32,6 +32,28 @@ const llm = makeRuntime(LLM.Service, LLM.defaultLayer)
 async function drain(input: LLM.StreamInput) {
   return llm.runPromise((svc) => svc.stream(input).pipe(Stream.runDrain))
 }
+
+describe("session.llm.approvalPatterns", () => {
+  test("keys the approval on tool name plus argument pattern", () => {
+    const a = approvalPatterns([{ name: "bash", args: JSON.stringify({ title: "list files" }) }])
+    const b = approvalPatterns([{ name: "bash", args: JSON.stringify({ title: "delete files" }) }])
+    expect(a).not.toEqual(b)
+  })
+
+  test("produces the same key for identical name and arguments", () => {
+    const tool = { name: "bash", args: JSON.stringify({ title: "list files" }) }
+    expect(approvalPatterns([tool])).toEqual(approvalPatterns([tool]))
+  })
+
+  test("falls back to the bare name for unparsable arguments", () => {
+    expect(approvalPatterns([{ name: "bash", args: "not json" }])).toEqual(["bash"])
+  })
+
+  test("deduplicates identical patterns", () => {
+    const tool = { name: "bash", args: JSON.stringify({ title: "list files" }) }
+    expect(approvalPatterns([tool, tool])).toEqual(["bash: list files"])
+  })
+})
 
 describe("session.llm.hasToolCalls", () => {
   test("returns false for empty messages array", () => {
