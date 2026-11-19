@@ -360,17 +360,20 @@ function stopOAuthServer() {
   }
 }
 
-function waitForOAuthCallback(pkce: PkceCodes, state: string): Promise<TokenResponse> {
+export function waitForOAuthCallback(pkce: PkceCodes, state: string): Promise<TokenResponse> {
   return new Promise((resolve, reject) => {
     const timeout = setTimeout(
       () => {
-        if (pendingOAuth) {
-          pendingOAuth = undefined
-          // Stop the server so we don't leak a listening socket when the
-          // user never completes the OAuth flow.
-          stopOAuthServer()
-          reject(new Error("OAuth callback timeout - authorization took too long"))
-        }
+        // Only the flow that is still pending owns the shared state and
+        // server. A stale timer from a superseded authorize() must be a
+        // no-op — otherwise it clears the newer flow's pendingOAuth, stops
+        // the shared server and leaves the newer login hanging forever.
+        if (pendingOAuth?.state !== state) return
+        pendingOAuth = undefined
+        // Stop the server so we don't leak a listening socket when the
+        // user never completes the OAuth flow.
+        stopOAuthServer()
+        reject(new Error("OAuth callback timeout - authorization took too long"))
       },
       5 * 60 * 1000,
     ) // 5 minute timeout
