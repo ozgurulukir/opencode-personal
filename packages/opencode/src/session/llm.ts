@@ -32,20 +32,13 @@ type Result = Awaited<ReturnType<typeof streamText>>
 
 /**
  * Derives per-approval keys for a workflow tool-approval request. Each key
- * encodes both the tool name and its argument pattern (parsed `title`/`name`),
- * so approving one call never whitelists the same tool with different args.
+ * encodes the tool name plus its FULL argument string, so approving one call
+ * never whitelists the same tool with different arguments — even when two calls
+ * share a title/name. Unparsable args still get a distinct key from the raw
+ * string rather than collapsing to the bare tool name.
  */
 export function approvalPatterns(approvalTools: { name: string; args: string }[]): string[] {
-  const patterns = approvalTools.map((t) => {
-    try {
-      const parsed = JSON.parse(t.args) as Record<string, unknown>
-      const title = (parsed?.title ?? parsed?.name ?? "") as string
-      return title ? `${t.name}: ${title}` : t.name
-    } catch {
-      return t.name
-    }
-  })
-  return [...new Set(patterns)]
+  return [...new Set(approvalTools.map((t) => `${t.name}: ${t.args}`))]
 }
 
 // Extracted to merge-options.ts for testability
@@ -322,9 +315,9 @@ const live: Layer.Layer<
         const approvedToolsForSession = new Set<string>()
         workflowModel.approvalHandler = InstanceState.bind(async (approvalTools) => {
           const uniquePatterns = approvalPatterns(approvalTools)
-          // Auto-approve only invocations whose exact (name, args pattern) was
+          // Auto-approve only invocations whose exact (name, full args) key was
           // already approved this session (prevents infinite approval loops for
-          // server-side MCP tools without whitelisting arbitrary new arguments).
+          // server-side MCP tools without widening our own approval to new args).
           if (uniquePatterns.every((pattern) => approvedToolsForSession.has(pattern))) {
             return { approved: true }
           }
@@ -347,9 +340,12 @@ const live: Layer.Layer<
               }),
             )
             for (const pattern of uniquePatterns) approvedToolsForSession.add(pattern)
-            // Do NOT add bare tool names to sessionPreapprovedTools here — that
-            // whitelists the name (with any args) at the DWS server. The
-            // pattern-based Set above handles repeat approvals safely.
+            // Our local Set keys on the full args, so a repeat call with
+            // different arguments still prompts here. Residual limitation: the
+            // third-party workflow provider's approveAndResume adds the approved
+            // tool NAMES to DWS `preapproved_tools` itself, so the DWS server may
+            // auto-approve later calls of the same name regardless of arguments.
+            // That behavior lives in the provider and is out of our control.
             return { approved: true }
           } catch {
             return { approved: false }

@@ -34,9 +34,15 @@ async function drain(input: LLM.StreamInput) {
 }
 
 describe("session.llm.approvalPatterns", () => {
-  test("keys the approval on tool name plus argument pattern", () => {
+  test("keys the approval on tool name plus full arguments", () => {
     const a = approvalPatterns([{ name: "bash", args: JSON.stringify({ title: "list files" }) }])
     const b = approvalPatterns([{ name: "bash", args: JSON.stringify({ title: "delete files" }) }])
+    expect(a).not.toEqual(b)
+  })
+
+  test("distinguishes calls that share a title but differ in other args", () => {
+    const a = approvalPatterns([{ name: "bash", args: JSON.stringify({ title: "run", command: "ls" }) }])
+    const b = approvalPatterns([{ name: "bash", args: JSON.stringify({ title: "run", command: "rm -rf /" }) }])
     expect(a).not.toEqual(b)
   })
 
@@ -45,13 +51,14 @@ describe("session.llm.approvalPatterns", () => {
     expect(approvalPatterns([tool])).toEqual(approvalPatterns([tool]))
   })
 
-  test("falls back to the bare name for unparsable arguments", () => {
-    expect(approvalPatterns([{ name: "bash", args: "not json" }])).toEqual(["bash"])
+  test("keeps unparsable arguments distinct instead of collapsing to the bare name", () => {
+    expect(approvalPatterns([{ name: "bash", args: "not json" }])).toEqual(["bash: not json"])
+    expect(approvalPatterns([{ name: "bash", args: "other args" }])).toEqual(["bash: other args"])
   })
 
   test("deduplicates identical patterns", () => {
     const tool = { name: "bash", args: JSON.stringify({ title: "list files" }) }
-    expect(approvalPatterns([tool, tool])).toEqual(["bash: list files"])
+    expect(approvalPatterns([tool, tool])).toEqual([`bash: ${tool.args}`])
   })
 })
 

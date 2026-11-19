@@ -329,10 +329,12 @@ export const layer = Layer.effect(
       })
     }
 
-    // Bounded read of the latest user + assistant messages for the prompt/command/
-    // subagent paths. `messages()` decodes the entire history (O(n)) only for the
-    // callers to findLast() the newest of each type; an indexed DESC LIMIT 1 per
-    // type keeps these hot paths O(1). MessageID is monotonic, so id DESC = latest.
+    // Bounded latest-per-type read for the prompt/command/subagent paths.
+    // `messages()` decodes the entire history only so callers can findLast() the
+    // newest of each type; a per-type DESC LIMIT 1 avoids that full-history
+    // decode. The (session_id, type) index is not ordered by id, so this still
+    // sorts the rows of that type — it is not claimed to be O(1). MessageID is
+    // monotonic, so id DESC = latest.
     const latestMessages = (sessionID: SessionID) => {
       const rows = Database.use((db) =>
         (["user", "assistant"] as const).flatMap((type) =>

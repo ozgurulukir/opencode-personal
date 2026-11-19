@@ -451,7 +451,22 @@ export function update<Result>(adapter: Adapter<Result>, event: SessionEvent.Eve
         )
       }
     },
-    "session.next.retried": () => {},
+    "session.next.retried": () => {
+      // A retry re-runs the whole stream from the start. The failed attempt's
+      // projected content (partial text / tool / reasoning items) is still on
+      // the in-flight assistant; leaving it there makes the retry's fresh items
+      // duplicate it in SessionMessageTable. Mirror the V1 part cleanup
+      // (processor.ts discardFailedAttemptParts): drop everything the failed
+      // attempt projected so the retry starts from empty content.
+      const current = adapter.getCurrentAssistant()
+      if (current) {
+        adapter.updateAssistant(
+          produce(current, (draft) => {
+            draft.content = []
+          }),
+        )
+      }
+    },
     "session.next.compaction.started": (event) => {
       adapter.appendMessage(
         new SessionMessage.Compaction({

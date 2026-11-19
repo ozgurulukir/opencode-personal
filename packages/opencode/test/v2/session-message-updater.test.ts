@@ -561,3 +561,70 @@ test("compaction ended with failed status projects to message", () => {
   })
 })
 
+test("retried clears the failed attempt's content so the retry does not duplicate it", () => {
+  const state: SessionMessageUpdater.MemoryState = { messages: [] }
+  const sessionID = SessionID.make("session")
+  const update = (event: SessionEvent.Event) => SessionMessageUpdater.update(SessionMessageUpdater.memory(state), event)
+  const model = {
+    id: Modelv2.ID.make("model"),
+    providerID: Modelv2.ProviderID.make("provider"),
+    variant: Modelv2.VariantID.make("default"),
+  }
+  const isText = (
+    item: SessionMessage.Assistant["content"][number],
+  ): item is Extract<SessionMessage.Assistant["content"][number], { type: "text" }> => item.type === "text"
+
+  // Attempt 1: a step with completed partial text that fails mid-stream.
+  update({
+    id: EventV2.ID.create(),
+    type: "session.next.step.started",
+    data: { sessionID, timestamp: DateTime.makeUnsafe(1), agent: "build", model },
+  } satisfies SessionEvent.Event)
+  update({
+    id: EventV2.ID.create(),
+    type: "session.next.text.started",
+    data: { sessionID, timestamp: DateTime.makeUnsafe(2) },
+  } satisfies SessionEvent.Event)
+  update({
+    id: EventV2.ID.create(),
+    type: "session.next.text.ended",
+    data: { sessionID, timestamp: DateTime.makeUnsafe(3), text: "partial" },
+  } satisfies SessionEvent.Event)
+
+  // Retry scheduled: the failed attempt's content must be dropped.
+  update({
+    id: EventV2.ID.create(),
+    type: "session.next.retried",
+    data: {
+      sessionID,
+      timestamp: DateTime.makeUnsafe(4),
+      attempt: 1,
+      error: { message: "boom", isRetryable: true },
+    },
+  } satisfies SessionEvent.Event)
+
+  // Attempt 2: a fresh step with the successful text.
+  update({
+    id: EventV2.ID.create(),
+    type: "session.next.step.started",
+    data: { sessionID, timestamp: DateTime.makeUnsafe(5), agent: "build", model },
+  } satisfies SessionEvent.Event)
+  update({
+    id: EventV2.ID.create(),
+    type: "session.next.text.started",
+    data: { sessionID, timestamp: DateTime.makeUnsafe(6) },
+  } satisfies SessionEvent.Event)
+  update({
+    id: EventV2.ID.create(),
+    type: "session.next.text.ended",
+    data: { sessionID, timestamp: DateTime.makeUnsafe(7), text: "after" },
+  } satisfies SessionEvent.Event)
+
+  const texts = state.messages
+    .flatMap((message) => (message.type === "assistant" ? message.content : []))
+    .filter(isText)
+    .map((item) => item.text)
+
+  expect(texts).toContain("after")
+  expect(texts).not.toContain("partial")
+})
