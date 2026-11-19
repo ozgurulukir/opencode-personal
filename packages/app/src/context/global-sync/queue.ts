@@ -31,7 +31,7 @@ export function createRefreshQueue(input: QueueInput) {
     return items
   }
 
-  const schedule = (delay = backoff) => {
+  const schedule = (delay = 0) => {
     if (timer) return
     timer = setTimeout(() => {
       timer = undefined
@@ -55,7 +55,7 @@ export function createRefreshQueue(input: QueueInput) {
   async function drain() {
     if (running) return
     running = true
-    let taken: string[] = []
+    let retry: string[] = []
     let failed = false
     try {
       while (true) {
@@ -67,25 +67,36 @@ export function createRefreshQueue(input: QueueInput) {
           await tick()
           continue
         }
-        taken = take(2)
+        const taken = take(2)
         if (taken.length === 0) return
-        await Promise.all(taken.map((dir) => input.bootstrapInstance(dir)))
-        taken = []
+        const results = await Promise.allSettled(taken.map(async (dir) => input.bootstrapInstance(dir)))
+        retry = taken.filter((_, index) => results[index].status === "rejected")
+        const rejected = results.find((result): result is PromiseRejectedResult => result.status === "rejected")
+        if (rejected) throw rejected.reason
         backoff = 0
         await tick()
       }
     } catch (err) {
       failed = true
       console.error("Refresh queue drain failed", err)
-      // Restore directories taken before the failure so they are retried, and
-      // leave `root` set so a rejected global refresh is not silently dropped.
-      for (const dir of taken) queued.set(key(dir), dir)
+      // Restore only the directories that failed so successful ones are not
+      // bootstrapped twice, and leave `root` set so a rejected global refresh
+      // is not silently dropped.
+      for (const dir of retry) queued.set(key(dir), dir)
       backoff = Math.min(backoff ? backoff * 2 : retryBase, RETRY_MAX_MS)
     } finally {
       running = false
       // oxlint-disable-next-line no-unsafe-finally -- intentional: early return skips schedule() when paused
       if (input.paused()) return
-      if (root || queued.size) schedule(failed ? backoff : 0)
+      if (root || queued.size) {
+        // A push/refresh during the failed await may have left a 0-delay timer
+        // pending. Replace it so the retry honors the backoff instead of firing immediately.
+        if (failed && timer) {
+          clearTimeout(timer)
+          timer = undefined
+        }
+        schedule(failed ? backoff : 0)
+      }
     }
   }
 
