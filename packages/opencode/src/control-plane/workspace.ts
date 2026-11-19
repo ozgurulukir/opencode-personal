@@ -204,9 +204,13 @@ export const layer = Layer.effect(
         }),
       )
       if (response.status < 200 || response.status >= 300) {
+        // Consume the error body so the underlying connection is released
+        // instead of leaking an unconsumed SSE socket on every failed connect.
+        const body = yield* response.text.pipe(Effect.catch(() => Effect.succeed("")))
         return yield* new SyncHttpError({
-          message: `Workspace sync HTTP failure: ${response.status}`,
+          message: `Workspace sync HTTP failure: ${response.status} ${body}`,
           status: response.status,
+          body,
         })
       }
       return response.stream
@@ -416,7 +420,16 @@ export const layer = Layer.effect(
         setStatus(space.id, "connecting")
 
         const stream = yield* connectSSE(target.url, target.headers).pipe(
-          Effect.tap(() => syncHistory(space, target.url, target.headers)),
+          Effect.tap((stream) =>
+            syncHistory(space, target.url, target.headers).pipe(
+              Effect.tapError(() =>
+                // syncHistory failed after the SSE connection was established.
+                // Pull/cancel the stream so its socket is released before we
+                // back off and retry, instead of abandoning it to leak.
+                Stream.runHead(stream).pipe(Effect.timeout("1 second"), Effect.ignore),
+              ),
+            ),
+          ),
           Effect.catch((err) =>
             Effect.sync(() => {
               setStatus(space.id, "error")
@@ -618,15 +631,22 @@ export const layer = Layer.effect(
         { concurrency: 2, discard: true },
       )
 
+      // Best-effort removal of the adapter-created resource (git worktree /
+      // branch or remote workspace). Without it a failed create leaves an
+      // orphan behind. Kept best-effort so the original failure is preserved.
+      const removeAdapter = () => EffectBridge.fromPromise(() => adapter.remove(config)).pipe(Effect.ignore)
+
       const createExit = yield* Effect.exit(EffectBridge.fromPromise(() => adapter.create(config, env)))
       if (Exit.isFailure(createExit)) {
         yield* stopSync(info.id).pipe(Effect.ignore)
+        yield* removeAdapter()
         yield* deleteRow().pipe(Effect.ignore)
         return yield* Effect.failCause(createExit.cause)
       }
       const bootExit = yield* Effect.exit(boot)
       if (Exit.isFailure(bootExit)) {
         yield* stopSync(info.id).pipe(Effect.ignore)
+        yield* removeAdapter()
         yield* deleteRow().pipe(Effect.ignore)
         return yield* Effect.failCause(bootExit.cause)
       }
@@ -692,10 +712,12 @@ export const layer = Layer.effect(
             : ""
 
         if (sourcePatch) {
-          // Attempt to apply the file changes to the new workspace.
-          // We intentionally do first so if it fails we don't warp
-          // the session.
-          yield* runInWorkspace({
+          // Attempt to apply the file changes to the new workspace first, so a
+          // failure aborts the warp instead of silently dropping copyChanges.
+          // The local path fails with PatchApplyError on a bad patch; the remote
+          // path swallows transport/HTTP/decode errors into { applied: false },
+          // so the result must be checked explicitly here too.
+          const applied = yield* runInWorkspace({
             workspaceID: input.workspaceID ?? undefined,
             local: () => vcs.apply({ patch: sourcePatch }),
             remote: ({ target }) =>
@@ -705,6 +727,12 @@ export const layer = Layer.effect(
               }),
             fallback: { applied: false },
           }).pipe(Effect.provide(InstanceStore.defaultLayer.pipe(Layer.provide(InstanceBootstrap.defaultLayer))))
+          if (!applied.applied) {
+            return yield* new Vcs.PatchApplyError({
+              message: `Failed to apply workspace changes for session ${input.sessionID}; refusing to warp`,
+              reason: "not-clean",
+            })
+          }
         }
 
         if (input.workspaceID === null) {

@@ -231,6 +231,36 @@ function convertMcpTool(mcpTool: MCPToolDef, client: MCPClient, serverKey: strin
   })
 }
 
+/**
+ * Builds the AI-SDK tool map from connected MCP servers. `sanitize()` maps
+ * several distinct names onto the same string (e.g. `get.weather` and
+ * `get_weather`), so two different tools can produce the same `mcp_<server>_<tool>`
+ * key. Keep the first definition and warn about the rest instead of silently
+ * overwriting it (mirrors `pushCustom` in tool/registry.ts).
+ */
+export function buildToolMap(
+  entries: Array<{ clientName: string; client: MCPClient; tools: MCPToolDef[]; timeout?: number }>,
+): Record<string, Tool> {
+  const result: Record<string, Tool> = {}
+  const seen = new Set<string>()
+  for (const { clientName, client, tools, timeout } of entries) {
+    for (const mcpTool of tools) {
+      const key = "mcp_" + sanitize(clientName) + "_" + sanitize(mcpTool.name)
+      if (seen.has(key)) {
+        log.warn("duplicate MCP tool key ignored (name collision after sanitization)", {
+          key,
+          server: clientName,
+          tool: mcpTool.name,
+        })
+        continue
+      }
+      seen.add(key)
+      result[key] = convertMcpTool(mcpTool, client, clientName, timeout)
+    }
+  }
+  return result
+}
+
 function defs(key: string, client: MCPClient, timeout?: number) {
   return listTools(key, client, timeout ?? DEFAULT_TIMEOUT).pipe(
     Effect.catch((err) => {
@@ -809,7 +839,6 @@ export const layer = Layer.effect(
     })
 
     const tools = Effect.fn("MCP.tools")(function* () {
-      const result: Record<string, Tool> = {}
       const s = yield* InstanceState.get(state)
 
       const cfg = yield* cfgSvc.get()
@@ -820,7 +849,7 @@ export const layer = Layer.effect(
         ([clientName]) => s.status[clientName]?.status === "connected",
       )
 
-      yield* Effect.forEach(
+      const entries = yield* Effect.forEach(
         connectedClients,
         ([clientName, client]) =>
           Effect.gen(function* () {
@@ -830,17 +859,19 @@ export const layer = Layer.effect(
             const listed = s.defs[clientName]
             if (!listed) {
               log.warn("missing cached tools for connected server", { clientName })
-              return
+              return undefined
             }
 
-            const timeout = entry?.timeout ?? defaultTimeout
-            for (const mcpTool of listed) {
-              result["mcp_" + sanitize(clientName) + "_" + sanitize(mcpTool.name)] = convertMcpTool(mcpTool, client, clientName, timeout)
+            return {
+              clientName,
+              client,
+              tools: listed,
+              timeout: entry?.timeout ?? defaultTimeout,
             }
           }),
         { concurrency: "unbounded" },
       )
-      return result
+      return buildToolMap(entries.flatMap((entry) => (entry ? [entry] : [])))
     })
 
     function collectFromConnected<T extends { name: string }>(

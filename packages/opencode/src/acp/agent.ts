@@ -117,6 +117,10 @@ export class Agent implements ACPAgent {
   private shellSnapshots = new Map<string, string>()
   private toolStarts = new Set<string>()
   private toolCalls = new Map<string, ToolCallInfo>()
+  // The per-session call maps above are keyed by callID only. Track which
+  // callIDs belong to each session so closeSession can release entries left
+  // behind by tools that were still running when the session closed.
+  private sessionCallIDs = new Map<string, Set<string>>()
   private permissionQueues = new Map<string, Promise<void>>()
   private clientTerminalCapability = false
   private permissionOptions: PermissionOption[] = [
@@ -161,7 +165,10 @@ export class Agent implements ACPAgent {
               log.error("failed to handle event", { error, type: payload.type })
             })
           }
-          return
+          // A clean stream end (graceful server close/restart) used to return
+          // here, permanently stopping all event delivery. Treat it like an
+          // error so the retry/backoff below resubscribes.
+          throw new Error("event stream ended")
         } catch (error) {
           if (this.eventAbort.signal.aborted) return
           log.error("event subscription failed; retrying", { error })
@@ -171,6 +178,19 @@ export class Agent implements ACPAgent {
     } finally {
       await unregisterConnectionTerminals(this.connection)
     }
+  }
+
+  private trackCall(sessionID: string, callID: string) {
+    let ids = this.sessionCallIDs.get(sessionID)
+    if (!ids) this.sessionCallIDs.set(sessionID, (ids = new Set()))
+    ids.add(callID)
+  }
+
+  private untrackCall(sessionID: string, callID: string) {
+    const ids = this.sessionCallIDs.get(sessionID)
+    if (!ids) return
+    ids.delete(callID)
+    if (ids.size === 0) this.sessionCallIDs.delete(sessionID)
   }
 
   private async handleEvent(rawEvent: Event) {
@@ -240,6 +260,7 @@ export class Agent implements ACPAgent {
         const props = event.properties as { sessionID: string; callID: string; command: string }
         const session = await this.sessionManager.tryGetOrLoad(props.sessionID)
         if (!session) return
+        this.trackCall(session.id, props.callID)
         await handleShellStarted(
           this.connection,
           this.shellSnapshots,
@@ -255,6 +276,7 @@ export class Agent implements ACPAgent {
         const props = event.properties as { sessionID: string; callID: string; output: string }
         const session = await this.sessionManager.tryGetOrLoad(props.sessionID)
         if (!session) return
+        this.untrackCall(session.id, props.callID)
         await handleShellEnded(
           this.connection,
           this.shellSnapshots,
@@ -270,6 +292,7 @@ export class Agent implements ACPAgent {
         const props = event.properties as { sessionID: string; callID: string; tool: string; input: Record<string, unknown> }
         const session = await this.sessionManager.tryGetOrLoad(props.sessionID)
         if (!session) return
+        this.trackCall(session.id, props.callID)
         await handleToolCalled(this.connection, this.shellSnapshots, this.toolStarts, this.toolCalls, session.id, props)
         return
       }
@@ -283,6 +306,7 @@ export class Agent implements ACPAgent {
         }
         const session = await this.sessionManager.tryGetOrLoad(props.sessionID)
         if (!session) return
+        this.trackCall(session.id, props.callID)
         await handleToolProgress(this.connection, this.shellSnapshots, this.toolCalls, session.id, props)
         return
       }
@@ -296,6 +320,7 @@ export class Agent implements ACPAgent {
         }
         const session = await this.sessionManager.tryGetOrLoad(props.sessionID)
         if (!session) return
+        this.untrackCall(session.id, props.callID)
         await handleToolSuccess(this.connection, this.shellSnapshots, this.toolStarts, this.toolCalls, session.id, props)
         return
       }
@@ -304,6 +329,7 @@ export class Agent implements ACPAgent {
         const props = event.properties as { sessionID: string; callID: string; error: { message: string } }
         const session = await this.sessionManager.tryGetOrLoad(props.sessionID)
         if (!session) return
+        this.untrackCall(session.id, props.callID)
         await handleToolFailed(this.connection, this.shellSnapshots, this.toolStarts, this.toolCalls, session.id, props)
         return
       }
@@ -455,12 +481,13 @@ export class Agent implements ACPAgent {
 
   async newSession(params: NewSessionRequest) {
     const directory = params.cwd
+    let sessionId: string | undefined
     try {
       const model = await defaultModel(this.config, directory)
 
       // Store ACP session state
       const state = await this.sessionManager.create(params.cwd, params.mcpServers, model)
-      const sessionId = state.id
+      sessionId = state.id
       registerConnection(sessionId, this.connection, this.clientTerminalCapability)
 
       log.info("creating_session", { sessionId, mcpServers: params.mcpServers.length })
@@ -479,6 +506,7 @@ export class Agent implements ACPAgent {
         _meta: load._meta,
       }
     } catch (e) {
+      if (sessionId) await unregisterConnection(sessionId)
       rethrowAuthAware(e, this.config.defaultModel?.providerID)
     }
   }
@@ -514,13 +542,22 @@ export class Agent implements ACPAgent {
 
       return result
     } catch (e) {
+      await unregisterConnection(sessionId)
       rethrowAuthAware(e, this.config.defaultModel?.providerID)
     }
   }
 
   async listSessions(params: ListSessionsRequest): Promise<ListSessionsResponse> {
     try {
-      const cursor = params.cursor ? Number(params.cursor) : undefined
+      // Cursor is "<updated>:<sessionId>". The id is the tiebreaker so sessions
+      // sharing a millisecond timestamp are not dropped between pages.
+      let cursor: { updated: number; id: string } | undefined
+      if (params.cursor) {
+        const [updatedPart, id] = params.cursor.split(":")
+        const updated = Number(updatedPart)
+        if (!Number.isFinite(updated) || !id) throw RequestError.invalidParams("Invalid cursor")
+        cursor = { updated, id }
+      }
       const limit = 100
 
       const sessions = await this.sdk.v2.session
@@ -534,8 +571,12 @@ export class Agent implements ACPAgent {
         )
         .then((x) => x.data?.items ?? [])
 
-      const sorted = sessions.toSorted((a, b) => b.time.updated - a.time.updated)
-      const filtered = cursor ? sorted.filter((s) => s.time.updated < cursor) : sorted
+      const sorted = sessions.toSorted((a, b) => b.time.updated - a.time.updated || b.id.localeCompare(a.id))
+      const filtered = cursor
+        ? sorted.filter(
+            (s) => s.time.updated < cursor.updated || (s.time.updated === cursor.updated && s.id < cursor.id),
+          )
+        : sorted
       const page = filtered.slice(0, limit)
 
       const entries: SessionInfo[] = page.map((session) => ({
@@ -546,7 +587,7 @@ export class Agent implements ACPAgent {
       }))
 
       const last = page[page.length - 1]
-      const next = filtered.length > limit && last ? String(last.time.updated) : undefined
+      const next = filtered.length > limit && last ? `${last.time.updated}:${last.id}` : undefined
 
       const response: ListSessionsResponse = {
         sessions: entries,
@@ -561,6 +602,7 @@ export class Agent implements ACPAgent {
   async unstable_forkSession(params: ForkSessionRequest): Promise<ForkSessionResponse> {
     const directory = params.cwd
     const mcpServers = params.mcpServers ?? []
+    let sessionId: string | undefined
 
     try {
       const model = await defaultModel(this.config, directory)
@@ -579,7 +621,7 @@ export class Agent implements ACPAgent {
         throw new Error("Fork session returned no data")
       }
 
-      const sessionId = forked.id
+      sessionId = forked.id
       await this.sessionManager.load(sessionId, directory, mcpServers, model)
       registerConnection(sessionId, this.connection, this.clientTerminalCapability)
 
@@ -603,6 +645,7 @@ export class Agent implements ACPAgent {
 
       return mode
     } catch (e) {
+      if (sessionId) await unregisterConnection(sessionId)
       rethrowAuthAware(e, this.config.defaultModel?.providerID)
     }
   }
@@ -632,6 +675,7 @@ export class Agent implements ACPAgent {
 
       return result
     } catch (e) {
+      await unregisterConnection(sessionId)
       rethrowAuthAware(e, this.config.defaultModel?.providerID)
     }
   }
@@ -654,6 +698,14 @@ export class Agent implements ACPAgent {
         log.error("failed to abort session while closing ACP session", { error, sessionID: params.sessionId })
       })
 
+    // Release per-session tool state left behind by calls that were still
+    // running when the session closed (the maps are keyed by callID only).
+    for (const callID of this.sessionCallIDs.get(params.sessionId) ?? []) {
+      this.toolCalls.delete(callID)
+      this.shellSnapshots.delete(callID)
+      this.toolStarts.delete(callID)
+    }
+    this.sessionCallIDs.delete(params.sessionId)
     this.permissionQueues.delete(params.sessionId)
     await unregisterConnection(params.sessionId)
     log.info("close_session", { sessionId: params.sessionId })

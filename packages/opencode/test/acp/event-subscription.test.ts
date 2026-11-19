@@ -167,7 +167,7 @@ function createEventStream() {
   return { controller: { push, close } satisfies EventController, stream }
 }
 
-function createFakeAgent() {
+function createFakeAgent(options?: { closeFirstEventStream?: boolean }) {
   const updates = new Map<string, string[]>()
   const chunks = new Map<string, string>()
   const sessionUpdates: SessionUpdateParams[] = []
@@ -207,6 +207,10 @@ function createFakeAgent() {
     event: async function (this: object, opts?: { signal?: AbortSignal }) {
       if (this !== global) throw new Error("global event receiver lost")
       calls.eventSubscribe++
+      if (options?.closeFirstEventStream && calls.eventSubscribe === 1) {
+        // Simulate a graceful server close: an empty stream that ends cleanly.
+        return { stream: (async function* () {})() }
+      }
       return { stream: stream(opts?.signal) }
     },
   }
@@ -334,6 +338,45 @@ describe("acp.agent event subscription", () => {
             (update) => update.sessionId === sessionId && update.update.sessionUpdate === "available_commands_update",
           ),
         ).toBe(true)
+        stop()
+      },
+    })
+  })
+
+  test("resubscribes after the event stream ends cleanly", async () => {
+    await using tmp = await tmpdir()
+    await WithInstance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        const { agent, controller, calls, chunks, stop } = createFakeAgent({ closeFirstEventStream: true })
+        const cwd = "/tmp/opencode-acp-test"
+        const sessionId = await agent.newSession({ cwd, mcpServers: [] } as any).then((x) => x.sessionId)
+
+        // The first (empty) stream closes immediately; the agent must back off
+        // and open a second subscription instead of stopping permanently.
+        await new Promise<void>((resolve, reject) => {
+          const started = Date.now()
+          const check = () => {
+            if (calls.eventSubscribe >= 2) return resolve()
+            if (Date.now() - started > 2000) return reject(new Error("no resubscribe after clean close"))
+            setTimeout(check, 10)
+          }
+          check()
+        })
+
+        // Events delivered on the new subscription must be handled again.
+        controller.push({
+          directory: cwd,
+          payload: {
+            type: "session.next.text.delta",
+            properties: { sessionID: sessionId, delta: "after-reconnect" },
+          },
+        } as any)
+        await new Promise((r) => setTimeout(r, 20))
+
+        expect(calls.eventSubscribe).toBeGreaterThanOrEqual(2)
+        expect(chunks.get(sessionId) ?? "").toContain("after-reconnect")
+
         stop()
       },
     })
