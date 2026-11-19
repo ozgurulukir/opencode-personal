@@ -33,6 +33,10 @@ export const layer: Layer.Layer<Service, never, HttpClient.HttpClient | ChildPro
             cwd: opts?.cwd,
             env: opts?.env,
             extendEnv: true,
+            // The probes discard stderr. Leaving the pipe undrained deadlocks
+            // any child that writes more than the pipe buffer (~64KB) before
+            // exiting, so `exitCode` would never resolve.
+            stderr: "ignore",
           })
           const handle = yield* spawner.spawn(proc)
           const out = yield* Stream.mkString(Stream.decodeText(handle.stdout))
@@ -48,8 +52,9 @@ export const layer: Layer.Layer<Service, never, HttpClient.HttpClient | ChildPro
           if (process.execPath.includes(path.join(".opencode", "bin"))) return "curl" as Method
           if (process.execPath.includes(path.join(".local", "bin"))) return "curl" as Method
           const exec = process.execPath.toLowerCase()
+          const windows = process.platform === "win32"
 
-          const checks: Array<{ name: Method; command: () => Effect.Effect<string> }> = [
+          const allChecks: Array<{ name: Method; command: () => Effect.Effect<string> }> = [
             { name: "npm", command: () => text(["npm", "list", "-g", "--depth=0"]) },
             { name: "yarn", command: () => text(["yarn", "global", "list"]) },
             { name: "pnpm", command: () => text(["pnpm", "list", "-g", "--depth=0"]) },
@@ -58,6 +63,11 @@ export const layer: Layer.Layer<Service, never, HttpClient.HttpClient | ChildPro
             { name: "scoop", command: () => text(["scoop", "list", "opencode"]) },
             { name: "choco", command: () => text(["choco", "list", "--limit-output", "opencode"]) },
           ]
+          const checks = allChecks.filter((check) => {
+            if (check.name === "scoop" || check.name === "choco") return windows
+            if (check.name === "brew") return !windows
+            return true
+          })
 
           checks.sort((a, b) => {
             const aMatches = exec.includes(a.name)
@@ -67,12 +77,22 @@ export const layer: Layer.Layer<Service, never, HttpClient.HttpClient | ChildPro
             return 0
           })
 
-          for (const check of checks) {
-            const output = yield* check.command()
+          // Run the remaining probes concurrently. Effect.all preserves input
+          // order, so the execPath-sorted priority is kept when selecting a match.
+          const results = yield* Effect.all(
+            checks.map((check) =>
+              check.command().pipe(Effect.map((output) => ({ name: check.name, output }))),
+            ),
+            { concurrency: "unbounded" },
+          )
+
+          for (const result of results) {
             const installedName =
-              check.name === "brew" || check.name === "choco" || check.name === "scoop" ? "opencode" : "opencode-ai"
-            if (output.includes(installedName)) {
-              return check.name
+              result.name === "brew" || result.name === "choco" || result.name === "scoop"
+                ? "opencode"
+                : "opencode-ai"
+            if (result.output.includes(installedName)) {
+              return result.name
             }
           }
 

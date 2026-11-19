@@ -887,8 +887,18 @@ const reconnect = Effect.fn("RunStreamTransport.reconnect")(function* () {
 
           const attemptReconnect = Effect.fn("RunStreamTransport.reconnectAttempt")(function* () {
             yield* recover()
-            const newEvents = yield* Effect.promise(() =>
-              input.sdk.global.event({ signal: abort.signal }),
+            // Register the replacement stream's teardown in the same scope as the
+            // initial subscription. acquireRelease masks interruption between
+            // resolving the stream and registering its finalizer, so a stream is
+            // never left open if this fiber is interrupted mid-reconnect.
+            const newEvents = yield* Scope.provide(scope)(
+              Effect.acquireRelease(
+                Effect.promise(() => input.sdk.global.event({ signal: abort.signal })),
+                (events) =>
+                  Effect.sync(() => {
+                    void events.stream.return(undefined).catch(ignoreAbort("stream.teardown"))
+                  }),
+              ),
             )
             closeStream = () => {
               void newEvents.stream.return(undefined).catch(ignoreAbort("stream.teardown"))

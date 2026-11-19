@@ -8,6 +8,7 @@ import { cmd } from "./cmd"
 import { JsonMigration } from "@/storage/json-migration"
 import { EOL } from "os"
 import { errorMessage } from "../../util/error"
+import { existsSync } from "node:fs"
 
 const QueryCommand = cmd({
   command: "$0 [query]",
@@ -38,8 +39,13 @@ const QueryCommand = cmd({
         UI.error("Only read queries are allowed in this command. Use the sqlite3 shell (no --query) for full access.")
         process.exit(1)
       }
-      const db = new BunDatabase(Database.Path, { readonly: true })
+      if (!existsSync(Database.Path)) {
+        UI.error("No database found. Start opencode once to create it, then try again.")
+        process.exit(1)
+      }
+      let db: BunDatabase | undefined
       try {
+        db = new BunDatabase(Database.Path, { readonly: true })
         const result = db.query(query).all() as Record<string, unknown>[]
         if (args.format === "json") {
           console.log(JSON.stringify(result, null, 2))
@@ -53,8 +59,9 @@ const QueryCommand = cmd({
       } catch (err) {
         UI.error(errorMessage(err))
         process.exit(1)
+      } finally {
+        db?.close()
       }
-      db.close()
       return
     }
     const child = spawn("sqlite3", [Database.Path], {

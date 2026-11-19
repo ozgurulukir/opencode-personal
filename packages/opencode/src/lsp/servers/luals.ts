@@ -84,12 +84,16 @@ export const LuaLS: Info = {
 
       const assets = release.assets ?? []
       const asset = assets.find((a) => a.name === assetName)
-      if (!asset?.browser_download_url) {
+      if (!asset) {
         log.error(`Could not find asset ${assetName} in latest lua-language-server release`)
         return
       }
 
-      const downloadUrl = asset.browser_download_url
+      // Construct the URL from the locally validated tag and asset name instead
+      // of trusting the GitHub API's browser_download_url: both parts are
+      // allowlisted above, so the download can only come from the canonical
+      // LuaLS release CDN. The API response is user-manipulable content.
+      const downloadUrl = `https://github.com/LuaLS/lua-language-server/releases/download/${encodeURIComponent(tag)}/${encodeURIComponent(assetName)}`
       const downloadResponse = await fetch(downloadUrl)
       if (!downloadResponse.ok) {
         log.error("Failed to download lua-language-server")
