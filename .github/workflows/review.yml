@@ -13,7 +13,6 @@ jobs:
     runs-on: blacksmith-4vcpu-ubuntu-2404
     permissions:
       contents: read
-      pull-requests: write
     steps:
       - name: Get PR number
         id: pr-number
