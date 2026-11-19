@@ -103,6 +103,7 @@ export function http(
     const headers = new Headers(response.headers as HeadersInit)
     headers.delete("content-encoding")
     headers.delete("content-length")
+    ProxyUtil.sanitizeResponseHeaders(headers)
 
     return HttpServerResponse.stream(response.stream.pipe(Stream.catchCause(() => Stream.empty)), {
       status: response.status,

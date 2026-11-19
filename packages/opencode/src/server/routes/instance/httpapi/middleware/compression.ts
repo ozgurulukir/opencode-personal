@@ -1,6 +1,10 @@
-import { deflateSync, gzipSync } from "node:zlib"
+import { promisify } from "node:util"
+import { deflate, gzip } from "node:zlib"
 import { Effect } from "effect"
 import { HttpBody, HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
+
+const gzipAsync = promisify(gzip)
+const deflateAsync = promisify(deflate)
 
 // Mirror of Hono's compressible content-type set so wire behavior matches.
 const COMPRESSIBLE_CONTENT_TYPE_REGEX =
@@ -54,7 +58,9 @@ export const compressionLayer = HttpRouter.middleware<{ handles: unknown }>()((e
     const encoding = pickEncoding(request.headers["accept-encoding"])
     if (!encoding) return response
 
-    const compressed = encoding === "gzip" ? gzipSync(body.body) : deflateSync(body.body)
+    const compressed = yield* Effect.promise(() =>
+      encoding === "gzip" ? gzipAsync(body.body) : deflateAsync(body.body),
+    )
     return HttpServerResponse.setHeader(
       HttpServerResponse.setBody(response, HttpBody.uint8Array(compressed, contentType)),
       "content-encoding",

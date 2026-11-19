@@ -97,15 +97,20 @@ function proxyResponseHeaders(headers: Record<string, string>) {
   result.delete("content-encoding")
   result.delete("content-length")
   result.delete("transfer-encoding")
-  return result
+  return ProxyUtil.sanitizeResponseHeaders(result)
 }
 
-export function upstreamURL(path: string) {
+export function upstreamURL(requestURL: URL) {
   // Assign the pathname on a fresh copy of the upstream base instead of using
   // the two-argument URL constructor: `new URL("//evil.com/x", base)` treats a
   // protocol-relative path as an authority and rebinds the host (SSRF).
   const url = new URL(UI_UPSTREAM)
-  url.pathname = path
+  url.pathname = requestURL.pathname
+  url.search = requestURL.search
+  url.hash = requestURL.hash
+  // The local server credential is consumed by the auth middleware; never
+  // forward it to the remote UI upstream (mirrors workspaceProxyURL).
+  url.searchParams.delete("auth_token")
   return url.toString()
 }
 
@@ -181,12 +186,13 @@ export function serveUIEffect(
 ) {
   return Effect.gen(function* () {
     const embeddedWebUI = yield* Effect.promise(() => embeddedUI())
-    const path = new URL(request.url, "http://localhost").pathname
+    const requestURL = new URL(request.url, "http://localhost")
+    const path = requestURL.pathname
 
     if (embeddedWebUI) return yield* serveEmbeddedUIEffect(path, services.fs, embeddedWebUI, request)
 
     const response = yield* services.client.execute(
-      HttpClientRequest.make(request.method)(upstreamURL(path), {
+      HttpClientRequest.make(request.method)(upstreamURL(requestURL), {
         headers: ProxyUtil.headers(request.headers, { host: UI_UPSTREAM.host }),
         body: requestBody(request),
       }),

@@ -2,7 +2,14 @@ import { NodeHttpServer, NodeServices } from "@effect/platform-node"
 import Http from "node:http"
 import { describe, expect } from "bun:test"
 import { Context, Effect, Layer, Queue } from "effect"
-import { FetchHttpClient, HttpClient, HttpServer, HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
+import {
+  FetchHttpClient,
+  HttpClient,
+  HttpClientResponse,
+  HttpServer,
+  HttpServerRequest,
+  HttpServerResponse,
+} from "effect/unstable/http"
 import * as Socket from "effect/unstable/socket/Socket"
 import { HttpApiProxy } from "../../src/server/routes/instance/httpapi/middleware/proxy"
 import { testEffect } from "../lib/effect"
@@ -99,6 +106,39 @@ describe("HttpApi workspace proxy", () => {
       expect(response.headers["x-remote"]).toBe("yes")
       expect(response.headers["content-encoding"]).toBeUndefined()
       expect(response.headers["content-length"]).toBeUndefined()
+    }),
+  )
+
+  it.live("strips sensitive response headers from upstream", () =>
+    Effect.gen(function* () {
+      const request = HttpServerRequest.fromWeb(new Request("http://localhost/test"))
+      const client = HttpClient.make((req) =>
+        Effect.succeed(
+          HttpClientResponse.fromWeb(
+            req,
+            new Response("ok", {
+              headers: {
+                "set-cookie": "session=leak",
+                "x-forwarded-for": "1.2.3.4",
+                "x-forwarded-host": "evil.example",
+                "x-forwarded-proto": "https",
+                forwarded: "for=1.2.3.4",
+                "x-real-ip": "1.2.3.4",
+                "x-remote": "kept",
+              },
+            }),
+          ),
+        ),
+      )
+      const response = yield* HttpApiProxy.http(client, "http://upstream/test", undefined, request)
+
+      expect(response.headers["set-cookie"]).toBeUndefined()
+      expect(response.headers["x-forwarded-for"]).toBeUndefined()
+      expect(response.headers["x-forwarded-host"]).toBeUndefined()
+      expect(response.headers["x-forwarded-proto"]).toBeUndefined()
+      expect(response.headers["forwarded"]).toBeUndefined()
+      expect(response.headers["x-real-ip"]).toBeUndefined()
+      expect(response.headers["x-remote"]).toBe("kept")
     }),
   )
 

@@ -464,6 +464,7 @@ export const SessionGroup = HttpApiGroup.make("v2.session")
       query: WorkspaceRoutingQuery,
       payload: MessageV2.Part,
       success: MessageV2.Part,
+      error: HttpApiError.BadRequest,
     }).annotateMerge(
       OpenApi.annotations({
         identifier: "v2.session.updatePart",
