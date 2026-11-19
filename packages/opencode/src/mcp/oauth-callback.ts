@@ -170,7 +170,10 @@ export async function ensureRunning(redirectUri?: string): Promise<void> {
   server = createServer(handleRequest)
   try {
     await new Promise<void>((resolve, reject) => {
-      server!.listen(currentPort, () => {
+      // The redirect URI is loopback-only (http://127.0.0.1:<port>...). Binding
+      // without a host listens on 0.0.0.0, exposing the callback endpoint to the
+      // network. Pin it to loopback.
+      server!.listen(currentPort, "127.0.0.1", () => {
         log.info("oauth callback server started", { port: currentPort, path: currentPath })
         resolve()
       })

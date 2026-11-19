@@ -240,7 +240,9 @@ export const layer: Layer.Layer<
           workspace: workspaceID,
           payload: { type: Event.Failed.type, properties: { message } },
         })
-        return
+        // Fail boot so createFromInfo can compensate (remove the worktree and
+        // its sandbox) rather than registering an unpopulated worktree.
+        throw new CreateFailedError({ message })
       }
 
       const booted = yield* store.load({ directory: info.directory }).pipe(
@@ -277,7 +279,14 @@ export const layer: Layer.Layer<
     const createFromInfo = Effect.fn("Worktree.createFromInfo")(function* (info: Info, startCommand?: string) {
       yield* setup(info)
       yield* boot(info, startCommand).pipe(
-        Effect.catchCause((cause) => Effect.sync(() => log.error("worktree bootstrap failed", { cause }))),
+        Effect.catchCause((cause) =>
+          Effect.gen(function* () {
+            log.error("worktree bootstrap failed; compensating", { cause })
+            // Remove the worktree and the sandbox registered by setup() so a
+            // failed boot does not leave an unpopulated worktree behind.
+            yield* remove({ directory: info.directory }).pipe(Effect.ignore)
+          }),
+        ),
         Effect.forkIn(scope),
       )
     })

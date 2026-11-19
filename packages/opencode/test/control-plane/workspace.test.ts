@@ -532,10 +532,12 @@ describe("workspace CRUD", () => {
       ).rejects.toThrow("create exploded")
 
       // The compensating delete keeps list/get honest: no orphan row for a
-      // workspace whose backing instance never came up.
+      // workspace whose backing instance never came up. The adapter-created
+      // resource is removed too so no worktree/branch is orphaned.
       const rows = await listWorkspaces(Instance.project)
       expect(rows).toHaveLength(0)
       expect(recorded.calls.target).toHaveLength(0)
+      expect(recorded.calls.remove).toHaveLength(1)
     })
   })
 
@@ -969,6 +971,79 @@ describe("workspace CRUD", () => {
             expect(calls[4].json).toEqual({ sessionID: session.id })
             expect((yield* sessionSvc.get(session.id)).title).toBe("from source history")
             expect(sessionSequenceOwner(session.id)).toBe(target.id)
+          }),
+        { git: true },
+      )
+    })
+  })
+
+  it.live("sessionWarp aborts when a remote apply reports applied: false", () => {
+    const calls: FetchCall[] = []
+    return Effect.gen(function* () {
+      yield* HttpServer.serveEffect()(
+        Effect.gen(function* () {
+          const req = yield* HttpServerRequest.HttpServerRequest
+          const bodyText = yield* req.text
+          const call = {
+            url: new URL(req.url, "http://localhost"),
+            method: req.method,
+            headers: new Headers(req.headers),
+            bodyText,
+            json: bodyText ? JSON.parse(bodyText) : undefined,
+          }
+          calls.push(call)
+          if (call.url.pathname === "/apply-fail-source/sync/history") return yield* HttpServerResponse.json([])
+          if (call.url.pathname === "/apply-fail-source/vcs/diff/raw") return HttpServerResponse.text("remote patch")
+          if (call.url.pathname === "/apply-fail-target/vcs/apply")
+            return yield* HttpServerResponse.json({ applied: false })
+          return HttpServerResponse.text("unexpected", { status: 500 })
+        }),
+      )
+      const url = yield* serverUrl()
+      yield* provideTmpdirInstance(
+        () =>
+          Effect.gen(function* () {
+            const workspace = yield* Workspace.Service
+            const sessionSvc = yield* SessionNs.Service
+            const previousType = unique("apply-fail-source")
+            const targetType = unique("apply-fail-target")
+            const previous = workspaceInfo(Instance.project.id, previousType)
+            const target = workspaceInfo(Instance.project.id, targetType, { directory: "remote-target-dir" })
+            insertWorkspace(previous)
+            insertWorkspace(target)
+            registerAdapter(Instance.project.id, previousType, remoteAdapter(`${url}/apply-fail-source`).adapter)
+            registerAdapter(Instance.project.id, targetType, remoteAdapter(`${url}/apply-fail-target`).adapter)
+            const session = yield* sessionSvc.create({})
+            attachSessionToWorkspace(session.id, previous.id)
+            // The session is owned by its source workspace before the warp. A
+            // failed apply must leave this ownership untouched, otherwise every
+            // future source event is rejected as foreign and the session is
+            // silently stranded on the source.
+            SyncEvent.claim(session.id, previous.id)
+            const ownerBefore = sessionSequenceOwner(session.id)
+            expect(ownerBefore).toBe(previous.id)
+
+            const exit = yield* Effect.exit(
+              workspace.sessionWarp({ workspaceID: target.id, sessionID: session.id, copyChanges: true }),
+            )
+
+            // The failing apply must abort the warp: no replay, no steal.
+            expect(exit._tag).toBe("Failure")
+            expect(calls.map((call) => `${call.method} ${call.url.pathname}`)).toEqual([
+              "POST /apply-fail-source/sync/history",
+              "GET /apply-fail-source/vcs/diff/raw",
+              "POST /apply-fail-target/vcs/apply",
+            ])
+            expect(
+              Database.use((db) =>
+                db
+                  .select({ workspaceID: SessionTable.workspace_id })
+                  .from(SessionTable)
+                  .where(eq(SessionTable.id, session.id))
+                  .get(),
+              )?.workspaceID,
+            ).toBe(previous.id)
+            expect(sessionSequenceOwner(session.id)).toBe(ownerBefore)
           }),
         { git: true },
       )
