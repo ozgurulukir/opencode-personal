@@ -1,5 +1,6 @@
 import { test, expect } from "bun:test"
 import { normalizeServerUrl } from "../../src/account/url"
+import { InvalidServerUrlError } from "../../src/account/schema"
 
 test("passes through a clean URL", () => {
   expect(normalizeServerUrl("https://example.com")).toBe("https://example.com")
@@ -35,4 +36,12 @@ test("removes both query and hash", () => {
 
 test("strips trailing slash before a query string", () => {
   expect(normalizeServerUrl("https://example.com/?foo=bar")).toBe("https://example.com")
+})
+
+test("rejects a scheme-less server URL with a typed error", () => {
+  expect(() => normalizeServerUrl("example.com")).toThrow(InvalidServerUrlError)
+})
+
+test("rejects unsupported schemes with a typed error", () => {
+  expect(() => normalizeServerUrl("ftp://example.com")).toThrow(InvalidServerUrlError)
 })

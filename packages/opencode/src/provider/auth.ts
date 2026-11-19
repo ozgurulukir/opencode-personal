@@ -188,7 +188,10 @@ export const layer: Layer.Layer<Service, never, Auth.Service | Plugin.Service> =
         }
       }
 
-      const result = yield* Effect.promise(() => method.authorize(input.inputs))
+      const result = yield* Effect.tryPromise({
+        try: () => method.authorize(input.inputs),
+        catch: (cause) => new ValidationFailed({ field: "authorize", message: "Authorization failed" }, { cause }),
+      })
       pending.set(input.providerID, result)
       return {
         url: result.url,
@@ -205,10 +208,16 @@ export const layer: Layer.Layer<Service, never, Auth.Service | Plugin.Service> =
         return yield* Effect.fail(new OauthCodeMissing({ providerID: input.providerID }))
       }
 
-      const result = yield* Effect.promise(() =>
-        match.method === "code" ? match.callback(input.code!) : match.callback(),
-      )
+      const result = yield* Effect.tryPromise({
+        try: () => (match.method === "code" ? match.callback(input.code!) : match.callback()),
+        catch: (cause) => new OauthCallbackFailed({}, { cause }),
+      })
       if (!result || result.type !== "success") return yield* Effect.fail(new OauthCallbackFailed({}))
+
+      // Consume the pending authorization only after a valid, successful exchange.
+      // A malformed/early callback or a transient exchange failure must not destroy
+      // the in-flight login; a completed callback cannot be replayed.
+      pending.delete(input.providerID)
 
       if ("key" in result) {
         yield* auth.set(input.providerID, {

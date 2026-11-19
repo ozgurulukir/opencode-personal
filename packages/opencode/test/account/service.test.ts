@@ -454,3 +454,37 @@ it.live("poll returns poll error for other OAuth errors", () =>
     }
   }),
 )
+
+it.live("login joins an absolute verification URI without mangling it", () =>
+  Effect.gen(function* () {
+    const client = HttpClient.make((req) =>
+      Effect.succeed(
+        req.url === "https://one.example.com/auth/device/code"
+          ? json(req, {
+              device_code: "device-code",
+              user_code: "user-code",
+              verification_uri_complete: "https://verify.example.com/device?user_code=user-code",
+              expires_in: 600,
+              interval: 5,
+            })
+          : json(req, {}, 404),
+      ),
+    )
+
+    const result = yield* Account.Service.use((s) => s.login("https://one.example.com")).pipe(
+      Effect.provide(live(client)),
+    )
+
+    expect(result.url).toBe("https://verify.example.com/device?user_code=user-code")
+  }),
+)
+
+it.live("login rejects a scheme-less server with a typed account error", () =>
+  Effect.gen(function* () {
+    const client = HttpClient.make((req) => Effect.succeed(json(req, {}, 404)))
+    const error = yield* Effect.flip(
+      Account.Service.use((s) => s.login("one.example.com")).pipe(Effect.provide(live(client))),
+    )
+    expect(error).toBeInstanceOf(Account.InvalidServerUrlError)
+  }),
+)

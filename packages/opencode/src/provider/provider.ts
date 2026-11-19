@@ -116,6 +116,52 @@ function wrapSSE(res: Response, ms: number, ctl: AbortController) {
   })
 }
 
+/**
+ * Defers `cleanup` until the response body is fully consumed, cancelled, or
+ * errors. The combined abort signal (including the HTTP timeout) must remain
+ * live while the body is in flight: tearing it down when `fetch` resolves at
+ * headers would leave a stalled non-SSE download unbounded.
+ */
+function withCleanupOnBodyDone(res: Response, cleanup: () => void): Response {
+  // Null-body statuses cannot be reconstructed with a stream across runtimes.
+  if (!res.body || [101, 103, 204, 205, 304].includes(res.status)) {
+    cleanup()
+    return res
+  }
+  const reader = res.body.getReader()
+  let finished = false
+  const finish = () => {
+    if (finished) return
+    finished = true
+    cleanup()
+  }
+  const body = new ReadableStream<Uint8Array>({
+    async pull(ctrl) {
+      try {
+        const part = await reader.read()
+        if (part.done) {
+          finish()
+          ctrl.close()
+          return
+        }
+        ctrl.enqueue(part.value)
+      } catch (err) {
+        finish()
+        ctrl.error(err)
+      }
+    },
+    async cancel(reason) {
+      finish()
+      await reader.cancel(reason)
+    },
+  })
+  return new Response(body, {
+    headers: new Headers(res.headers),
+    status: res.status,
+    statusText: res.statusText,
+  })
+}
+
 type BundledSDK = {
   languageModel(modelId: string): LanguageModelV3
 }
@@ -232,18 +278,20 @@ export const __exportTestFetchFn = (options: any, model: any, customFetch: any, 
       }
     }
 
+    let res: Response
     try {
-      const res = await fetchFn(input, {
+      res = await fetchFn(input, {
         ...opts,
         // @ts-ignore see here: https://github.com/oven-sh/bun/issues/16682
         timeout: false,
       })
-
-      if (chunkTimeout === false) return res
-      return wrapSSE(res, chunkTimeout, chunkAbortCtl!)
-    } finally {
+    } catch (err) {
       cleanup()
+      throw err
     }
+
+    const wrapped = chunkTimeout === false ? res : wrapSSE(res, chunkTimeout, chunkAbortCtl!)
+    return withCleanupOnBodyDone(wrapped, cleanup)
   }
 }
 
@@ -998,6 +1046,10 @@ const SECRET_OPTION_KEYS = new Set([
   "credentials",
   "password",
   "authorization",
+  "key",
+  "authtoken",
+  "bearer",
+  "sessionkey",
 ])
 
 function redactSecretOptions(options: Record<string, any>) {
@@ -1442,10 +1494,12 @@ const layer: Layer.Layer<
           if (!stored) continue
           if (!plugin.auth.loader) continue
 
+          const provider = getDatabaseProvider(plugin.auth!.provider)
+          if (!provider) continue
           const options = yield* Effect.promise(() =>
             plugin.auth!.loader!(
               () => bridge.promise(auth.get(providerID).pipe(Effect.orDie)) as Promise<PluginAuth>,
-              toPublicInfo(getDatabaseProvider(plugin.auth!.provider)!),
+              toPublicInfo(provider),
             ),
           )
           const opts = options ?? {}

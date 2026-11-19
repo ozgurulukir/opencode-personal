@@ -3253,3 +3253,80 @@ test("provider merge > openai custom rewrite composes over plugin OAuth fetch (c
     },
   })
 })
+
+test("provider init survives credentials for a provider absent from the catalog", async () => {
+  await using tmp = await tmpdir({
+    init: async (dir) => {
+      await Bun.write(
+        path.join(dir, "opencode.json"),
+        JSON.stringify({ $schema: "https://opencode.ai/config.json" }),
+      )
+      const root = path.join(dir, ".opencode", "plugin")
+      await mkdir(root, { recursive: true })
+      await markPluginDependenciesReady(path.join(dir, ".opencode"))
+      await markPluginDependenciesReady(Global.Path.config)
+      await Bun.write(
+        path.join(root, "ghost-auth.ts"),
+        [
+          "export default {",
+          '  id: "test.ghost-auth",',
+          "  server: async () => ({",
+          "    auth: {",
+          '      provider: "ghost-provider",',
+          "      loader: async () => ({}),",
+          "      methods: [{ type: 'api', label: 'API key' }],",
+          "    },",
+          "  }),",
+          "}",
+          "",
+        ].join("\n"),
+      )
+    },
+  })
+
+  const authPath = path.join(Global.Path.data, "auth.json")
+  let prev: string | undefined
+  try {
+    prev = await Filesystem.readText(authPath)
+  } catch {}
+  try {
+    await Filesystem.write(
+      authPath,
+      JSON.stringify({ "ghost-provider": { type: "api", key: "test-ghost-key" } }),
+    )
+    await WithInstance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        const providers = await list()
+        expect(providers[ProviderID.make("ghost-provider")]).toBeUndefined()
+      },
+    })
+  } finally {
+    if (prev !== undefined) {
+      await Filesystem.write(authPath, prev)
+    } else {
+      try {
+        await unlink(authPath)
+      } catch {}
+    }
+  }
+})
+
+test("toPublicInfo strips bare secret option names", () => {
+  const provider = {
+    id: ProviderID.make("bare-secrets"),
+    name: "Bare Secrets Provider",
+    source: "config" as const,
+    env: [],
+    options: {
+      key: "secret-key",
+      authToken: "secret-auth-token",
+      bearer: "secret-bearer",
+      sessionKey: "secret-session-key",
+      baseURL: "https://example.internal",
+    },
+    models: {},
+  } as unknown as Provider.Info
+  const result = Provider.toPublicInfo(provider)
+  expect(result.options).toEqual({ baseURL: "https://example.internal" })
+})

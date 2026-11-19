@@ -690,13 +690,13 @@ export function variants(model: Model): Record<string, Record<string, any>> {
         high: {
           thinking: {
             type: "enabled",
-            budgetTokens: Math.min(16_000, Math.floor(model.limit.output / 2 - 1)),
+            budgetTokens: Math.max(1024, Math.min(16_000, Math.floor(model.limit.output / 2 - 1))),
           },
         },
         max: {
           thinking: {
             type: "enabled",
-            budgetTokens: Math.min(31_999, model.limit.output - 1),
+            budgetTokens: Math.max(1024, Math.min(31_999, model.limit.output - 1)),
           },
         },
       }
@@ -915,7 +915,7 @@ export function options(input: {
   ) {
     result["thinking"] = {
       type: "enabled",
-      budgetTokens: Math.min(16_000, Math.floor(input.model.limit.output / 2 - 1)),
+      budgetTokens: Math.max(1024, Math.min(16_000, Math.floor(input.model.limit.output / 2 - 1))),
     }
   }
 

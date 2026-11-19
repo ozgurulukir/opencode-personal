@@ -2358,6 +2358,43 @@ describe("ProviderTransform.message - cache control on gateway", () => {
   })
 })
 
+describe("ProviderTransform thinking budget minimum", () => {
+  const base = {
+    id: "anthropic/claude-sonnet-4",
+    providerID: "anthropic",
+    api: { id: "claude-sonnet-4", url: "https://api.anthropic.com", npm: "@ai-sdk/anthropic" },
+    name: "Claude Sonnet 4",
+    capabilities: {
+      temperature: true,
+      reasoning: true,
+      attachment: true,
+      toolcall: true,
+      input: { text: true, audio: false, image: true, video: false, pdf: true },
+      output: { text: true, audio: false, image: false, video: false, pdf: false },
+      interleaved: false,
+    },
+    cost: { input: 0, output: 0, cache: { read: 0, write: 0 } },
+    limit: { context: 200_000, output: 0 },
+    status: "active",
+    options: {},
+    headers: {},
+  } as any
+
+  test("variants never emit budget_tokens below 1024 when the output limit is 0", () => {
+    const result = ProviderTransform.variants(base)
+    expect(Object.keys(result)).toEqual(["high", "max"])
+    for (const variant of Object.values(result)) {
+      expect(variant.thinking.budgetTokens).toBeGreaterThanOrEqual(1024)
+    }
+  })
+
+  test("options never emit budget_tokens below 1024 for kimi models when the output limit is 0", () => {
+    const model = { ...base, api: { ...base.api, id: "kimi-k2.5" }, providerID: "moonshot" }
+    const result = ProviderTransform.options({ model, sessionID: "test" })
+    expect(result.thinking.budgetTokens).toBeGreaterThanOrEqual(1024)
+  })
+})
+
 describe("ProviderTransform.variants", () => {
   const createMockModel = (overrides: Partial<any> = {}): any => ({
     id: "test/test-model",

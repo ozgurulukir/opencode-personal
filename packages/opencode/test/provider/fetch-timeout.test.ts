@@ -1,7 +1,8 @@
-import { describe, expect, test } from "bun:test"
+import { describe, expect, mock, test } from "bun:test"
 import {
   DEFAULT_CHUNK_TIMEOUT,
   DEFAULT_HTTP_TIMEOUT,
+  __exportTestFetchFn,
   resolveChunkTimeout,
   resolveHttpTimeout,
 } from "../../src/provider/provider"
@@ -58,5 +59,75 @@ describe("ProviderConfig chunkTimeout/timeout schema (false opt-outs)", () => {
 
   test("accepts omitted fields", () => {
     expect(parse({}).success).toBe(true)
+  })
+})
+
+describe("__exportTestFetchFn abort lifetime", () => {
+  test("keeps the combined signal active after headers until the body completes", async () => {
+    let observed: AbortSignal | undefined
+    const customFetch = mock(async (_input: any, init?: any) => {
+      observed = init?.signal
+      return new Response(
+        new ReadableStream<Uint8Array>({
+          pull() {
+            // Stall forever: never enqueue, never close.
+            return new Promise<void>(() => {})
+          },
+        }),
+        { headers: { "content-type": "application/json" } },
+      )
+    }) as any
+
+    const external = new AbortController()
+    const fetchFn = __exportTestFetchFn({ timeout: 25 }, { api: { npm: "@ai-sdk/anthropic" } }, customFetch, false)
+    const res = await fetchFn("https://example.com", { method: "POST", signal: external.signal })
+    expect(res).toBeDefined()
+    await Bun.sleep(60)
+    expect(observed?.aborted).toBe(true)
+  })
+
+  test("keeps the combined signal active while an SSE stream is in flight", async () => {
+    let observed: AbortSignal | undefined
+    let emitted = false
+    const customFetch = mock(async (_input: any, init?: any) => {
+      observed = init?.signal
+      return new Response(
+        new ReadableStream<Uint8Array>({
+          pull(ctrl) {
+            if (!emitted) {
+              emitted = true
+              ctrl.enqueue(new TextEncoder().encode("data: hi\n\n"))
+            }
+            return new Promise<void>(() => {})
+          },
+        }),
+        { headers: { "content-type": "text/event-stream" } },
+      )
+    }) as any
+
+    const external = new AbortController()
+    const fetchFn = __exportTestFetchFn({ timeout: 25 }, { api: { npm: "@ai-sdk/anthropic" } }, customFetch, 5000)
+    const res = await fetchFn("https://example.com", { method: "POST", signal: external.signal })
+    const reader = res.body!.getReader()
+    await reader.read()
+    await Bun.sleep(60)
+    expect(observed?.aborted).toBe(true)
+  })
+
+  test("body chunks pass through intact", async () => {
+    const customFetch = mock(async () =>
+      new Response(
+        new ReadableStream<Uint8Array>({
+          start(ctrl) {
+            ctrl.enqueue(new TextEncoder().encode("hello"))
+            ctrl.close()
+          },
+        }),
+        { headers: { "content-type": "application/json" } },
+      ),
+    ) as any
+    const fetchFn = __exportTestFetchFn({ timeout: 1000 }, { api: { npm: "@ai-sdk/anthropic" } }, customFetch, false)
+    const res = await fetchFn("https://example.com", { method: "POST" })
+    expect(await res.text()).toBe("hello")
   })
 })

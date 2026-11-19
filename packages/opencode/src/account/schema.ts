@@ -41,6 +41,11 @@ export class AccountServiceError extends Schema.TaggedErrorClass<AccountServiceE
   cause: Schema.optional(Schema.Defect),
 }) {}
 
+export class InvalidServerUrlError extends Schema.TaggedErrorClass<InvalidServerUrlError>()("InvalidServerUrlError", {
+  message: Schema.String,
+  cause: Schema.optional(Schema.Defect),
+}) {}
+
 export class AccountTransportError extends Schema.TaggedErrorClass<AccountTransportError>()("AccountTransportError", {
   method: Schema.String,
   url: Schema.String,
@@ -68,7 +73,7 @@ export class AccountTransportError extends Schema.TaggedErrorClass<AccountTransp
   }
 }
 
-export type AccountError = AccountRepoError | AccountServiceError | AccountTransportError
+export type AccountError = AccountRepoError | AccountServiceError | AccountTransportError | InvalidServerUrlError
 
 export class Login extends Schema.Class<Login>("Login")({
   code: DeviceCode,
