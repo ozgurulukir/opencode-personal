@@ -341,8 +341,10 @@ export function displayStats(stats: SessionStats, toolLimit?: number, modelLimit
     console.log("│                      MODEL USAGE                       │")
     console.log("├────────────────────────────────────────────────────────┤")
 
+    const maxModelLength = 54
     for (const [model, usage] of modelsToDisplay) {
-      console.log(`│ ${model.padEnd(54)} │`)
+      const truncatedModel = model.length > maxModelLength ? model.substring(0, maxModelLength - 2) + ".." : model
+      console.log(`│ ${truncatedModel.padEnd(maxModelLength)} │`)
       console.log(renderRow("  Messages", usage.messages.toLocaleString()))
       console.log(renderRow("  Input Tokens", formatNumber(usage.tokens.input)))
       console.log(renderRow("  Output Tokens", formatNumber(usage.tokens.output)))

@@ -319,6 +319,10 @@ async function cleanShellConfig(file: string) {
   }
 
   const output = filtered.join("\n") + "\n"
+  if (output === content) return
+
+  // Keep a copy of the original before modifying the user's shell config.
+  await Filesystem.write(file + ".opencode-uninstall.bak", content)
   await Filesystem.write(file, output)
 }
 

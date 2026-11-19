@@ -12,13 +12,13 @@
 
 `lsp.touchFile` calls `client.notify.open()` but never calls `notify.close()`. Over a long session this unbounds the diagnostic maps. The fix is an LRU guard inside `notify.open`: when `Object.keys(files).length >= MAX_OPEN_FILES` and the file isn't already open, close the oldest entry before opening the new one. This bounds memory growth without requiring callers to track close events.
 
-## `typescript-language-server` memory cap via `maxTsServerMemory`
+## No `typescript-language-server` memory cap is configured
 
-`typescript-language-server` reads `maxTsServerMemory` from LSP `initializationOptions` and passes it as `--max-old-space-size=<MB>` to the spawned `tsserver.js` process (`cli.mjs:18730`). opencode's builtin Typescript server sets this in `lsp/server.ts:119` — override with `OPENCODE_TSSERVER_MAX_MEMORY` env var. Without it, tsserver runs with Node's default (~4 GB on 64-bit), which can cause swap thrashing on large monorepos.
+opencode's builtin Typescript server does not set a `maxTsServerMemory` initialization option, and there is no `OPENCODE_TSSERVER_MAX_MEMORY` env var. `typescript-language-server` runs `tsserver.js` with Node's default heap limit. Do not assume a memory cap is applied here.
 
-## `broken` Set permanently blacklists server+root combinations
+## `broken` Map uses TTL + exponential backoff, not a permanent blacklist
 
-`lsp/lsp.ts:208` — once an LSP server fails to spawn for a given root, `root + server.id` is added to `s.broken` and never retried for the instance lifetime. This is intentional (avoid repeated spawn failures), but the Set must be cleared on instance finalizer or stale failures prevent future LSP features from working after a transient error resolves.
+`lsp/lsp.ts:21-33,145` — `s.broken` is a `Map<string, { attempts, lastAttempt }>`, not a Set. A failed server+root is recorded with an attempt count and a retry backoff (`1s * 2^(attempts-1)`, capped at 30s via `brokenConfig.maxBackoff`). After a 5-minute TTL (`brokenConfig.ttl`) the entry is deleted and the server is retried; a successful spawn also deletes the entry (`lsp/lsp.ts:290`). The map is cleared on instance disposal (`lsp/lsp.ts:234`). A transient failure therefore does not permanently disable LSP for that root.
 
 ## LSP client `files` record is the SSOT for open document state
 
