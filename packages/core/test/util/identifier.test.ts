@@ -32,6 +32,16 @@ describe("Identifier", () => {
     expect(b < c).toBe(true)
   })
 
+  test("ascending IDs stay strictly increasing past the 12-bit counter limit within one millisecond", () => {
+    const ts = 1_700_000_000_000
+    let previous = Identifier.create(false, ts)
+    for (let i = 0; i < 5000; i++) {
+      const id = Identifier.create(false, ts)
+      expect(id > previous).toBe(true)
+      previous = id
+    }
+  })
+
   test("descending IDs are monotonic within same timestamp", () => {
     const ts = 1_700_000_000_000
     const a = Identifier.create(true, ts)

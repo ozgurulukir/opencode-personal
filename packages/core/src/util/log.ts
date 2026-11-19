@@ -85,12 +85,14 @@ export async function init(options: Options) {
   )
   await fs.truncate(logpath).catch(() => {})
   const stream = createWriteStream(logpath, { flags: "a" })
+  // Logging must never crash the process: keep a persistent error listener on the
+  // stream and make write() always resolve so callers cannot create unhandled rejections.
+  stream.on("error", (error) => {
+    process.stderr.write(`log stream error: ${error}\n`)
+  })
   write = async (msg: any) => {
-    return new Promise((resolve, reject) => {
-      stream.write(msg, (err) => {
-        if (err) reject(err)
-        else resolve(msg.length)
-      })
+    return new Promise((resolve) => {
+      stream.write(msg, () => resolve(msg.length))
     })
   }
 }
@@ -139,7 +141,13 @@ export function create(tags?: Record<string, any>) {
       .map(([key, value]) => {
         const prefix = `${key}=`
         if (value instanceof Error) return prefix + formatError(value)
-        if (typeof value === "object") return prefix + JSON.stringify(value)
+        if (typeof value === "object") {
+          try {
+            return prefix + JSON.stringify(value)
+          } catch {
+            return prefix + "[circular]"
+          }
+        }
         return prefix + value
       })
       .join(" ")

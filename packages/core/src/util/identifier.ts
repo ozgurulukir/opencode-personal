@@ -33,13 +33,22 @@ export namespace Identifier {
   export function create(descending: boolean, timestamp?: number): string {
     const currentTimestamp = timestamp ?? Date.now()
 
-    if (currentTimestamp !== lastTimestamp) {
-      lastTimestamp = currentTimestamp
+    // The counter occupies the low 12 bits. When it overflows, carry into the
+    // timestamp component instead of letting it spill and break monotonicity
+    // across a millisecond boundary. Track the effective (carried) timestamp so
+    // repeated calls in the same millisecond keep increasing.
+    const advanced = currentTimestamp > lastTimestamp
+    let effective = advanced ? currentTimestamp : lastTimestamp
+    const next = advanced ? 0 : counter + 1
+    if (next >= 0x1000) {
       counter = 0
+      effective = lastTimestamp + 1
+    } else {
+      counter = next
     }
-    counter++
+    lastTimestamp = effective
 
-    let now = BigInt(currentTimestamp) * BigInt(0x1000) + BigInt(counter)
+    let now = BigInt(effective) * BigInt(0x1000) + BigInt(counter)
 
     if (descending) {
       now = ~now & BigInt("0xffffffffffffff")

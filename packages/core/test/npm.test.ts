@@ -42,6 +42,25 @@ describe("Npm.sanitize", () => {
   })
 })
 
+describe("Npm.satisfiesRequestedVersion", () => {
+  test("accepts installed versions that satisfy the requested spec", () => {
+    expect(Npm.satisfiesRequestedVersion("foo@^2.0.0", "2.3.4")).toBe(true)
+    expect(Npm.satisfiesRequestedVersion("foo@1.0.0", "1.0.0")).toBe(true)
+    expect(Npm.satisfiesRequestedVersion("foo", "9.9.9")).toBe(true)
+  })
+
+  test("rejects installed versions that do not satisfy the requested spec", () => {
+    expect(Npm.satisfiesRequestedVersion("foo@^2.0.0", "1.0.0")).toBe(false)
+    expect(Npm.satisfiesRequestedVersion("foo@1.0.0", "1.0.1")).toBe(false)
+  })
+
+  test("keeps the fast path for non-version specs and rejects unreadable versions", () => {
+    expect(Npm.satisfiesRequestedVersion("foo@latest", "1.0.0")).toBe(true)
+    expect(Npm.satisfiesRequestedVersion("foo@file:../bar", "1.0.0")).toBe(true)
+    expect(Npm.satisfiesRequestedVersion("foo@^2.0.0", undefined)).toBe(false)
+  })
+})
+
 describe("Npm.add", () => {
   test("reifies when package cache directory exists without the package installed", async () => {
     await using tmp = await tmpdir()
@@ -61,6 +80,31 @@ describe("Npm.add", () => {
     }).pipe(Effect.scoped, Effect.provide(npmLayer(path.join(tmp.path, "cache"))), Effect.runPromise)
 
     expect(Option.isSome(entry.entrypoint)).toBe(true)
+  })
+
+  test("reinstalls when the installed version does not satisfy the requested spec", async () => {
+    await using tmp = await tmpdir()
+    const name = "fixture-version-mismatch"
+    const spec = `${name}@^2.0.0`
+    const cache = path.join(tmp.path, "cache")
+    const pkgDir = path.join(cache, "packages", Npm.sanitize(spec), "node_modules", name)
+    await fs.mkdir(pkgDir, { recursive: true })
+    await Bun.write(path.join(pkgDir, "package.json"), JSON.stringify({ name, version: "1.0.0", main: "index.js" }))
+    await Bun.write(path.join(pkgDir, "index.js"), "module.exports = {}\n")
+    // Force reify to fail fast without network; the assertion is that it is attempted at all
+    // (the old fast-path returned the stale v1 entrypoint instead).
+    await Bun.write(path.join(cache, "packages", Npm.sanitize(spec), ".npmrc"), "offline=true\n")
+
+    const error = await Effect.gen(function* () {
+      const npm = yield* Npm.Service
+      return yield* npm.add(spec)
+    }).pipe(
+      Effect.scoped,
+      Effect.provide(npmLayer(cache)),
+      Effect.flip,
+      Effect.runPromise,
+    )
+    expect(error._tag).toBe("NpmInstallFailedError")
   })
 
   test("handles malformed packages by falling back to raw spec name and failing with InstallFailedError gracefully", async () => {
