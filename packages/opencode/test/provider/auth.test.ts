@@ -29,6 +29,22 @@ const hook = {
           }
         },
       },
+      {
+        type: "oauth",
+        label: "OAuth Code",
+        authorize: async (inputs?: Record<string, string>) => {
+          let attempts = 0
+          return {
+            url: "https://example.com/auth",
+            method: "code" as const,
+            instructions: "sign in with code",
+            callback: async (_code: string) => {
+              if (inputs?.mode === "flaky" && attempts++ === 0) throw new Error("temporary exchange failure")
+              return { type: "success" as const }
+            },
+          }
+        },
+      },
     ],
   },
 } as unknown as Hooks
@@ -87,4 +103,32 @@ test("callback maps plugin exceptions to OauthCallbackFailed", async () => {
   if (error instanceof ProviderAuth.OauthCallbackFailed) {
     expect(error.cause).toBeInstanceOf(Error)
   }
+})
+
+test("missing-code callback does not consume pending; a valid callback completes and cannot be replayed", async () => {
+  const result = await withAuth((svc) =>
+    Effect.gen(function* () {
+      yield* svc.authorize({ providerID, method: 1 })
+      const missing = yield* Effect.flip(svc.callback({ providerID, method: 1 }))
+      yield* svc.callback({ providerID, method: 1, code: "valid" })
+      const replay = yield* Effect.flip(svc.callback({ providerID, method: 1, code: "valid" }))
+      return { missing, replay }
+    }),
+  )
+  expect(result.missing).toBeInstanceOf(ProviderAuth.OauthCodeMissing)
+  expect(result.replay).toBeInstanceOf(ProviderAuth.OauthMissing)
+})
+
+test("transient exchange failure does not consume pending; a retry completes", async () => {
+  const result = await withAuth((svc) =>
+    Effect.gen(function* () {
+      yield* svc.authorize({ providerID, method: 1, inputs: { mode: "flaky" } })
+      const failed = yield* Effect.flip(svc.callback({ providerID, method: 1, code: "valid" }))
+      yield* svc.callback({ providerID, method: 1, code: "valid" })
+      const replay = yield* Effect.flip(svc.callback({ providerID, method: 1, code: "valid" }))
+      return { failed, replay }
+    }),
+  )
+  expect(result.failed).toBeInstanceOf(ProviderAuth.OauthCallbackFailed)
+  expect(result.replay).toBeInstanceOf(ProviderAuth.OauthMissing)
 })

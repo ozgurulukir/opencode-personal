@@ -204,9 +204,6 @@ export const layer: Layer.Layer<Service, never, Auth.Service | Plugin.Service> =
       const pending = (yield* InstanceState.get(state)).pending
       const match = pending.get(input.providerID)
       if (!match) return yield* Effect.fail(new OauthMissing({ providerID: input.providerID }))
-      // Consume the pending authorization on first use so a stale entry cannot
-      // be replayed by a later callback, including after a failed exchange.
-      pending.delete(input.providerID)
       if (match.method === "code" && !input.code) {
         return yield* Effect.fail(new OauthCodeMissing({ providerID: input.providerID }))
       }
@@ -216,6 +213,11 @@ export const layer: Layer.Layer<Service, never, Auth.Service | Plugin.Service> =
         catch: (cause) => new OauthCallbackFailed({}, { cause }),
       })
       if (!result || result.type !== "success") return yield* Effect.fail(new OauthCallbackFailed({}))
+
+      // Consume the pending authorization only after a valid, successful exchange.
+      // A malformed/early callback or a transient exchange failure must not destroy
+      // the in-flight login; a completed callback cannot be replayed.
+      pending.delete(input.providerID)
 
       if ("key" in result) {
         yield* auth.set(input.providerID, {
