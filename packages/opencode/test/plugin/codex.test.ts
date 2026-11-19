@@ -1,8 +1,9 @@
-import { describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, jest, test } from "bun:test"
 import {
   parseJwtClaims,
   extractAccountIdFromClaims,
   extractAccountId,
+  waitForOAuthCallback,
   type IdTokenClaims,
 } from "../../src/plugin/codex"
 
@@ -119,5 +120,53 @@ describe("plugin.codex", () => {
         }),
       ).toBe("acc-123")
     })
+  })
+})
+
+describe("waitForOAuthCallback", () => {
+  afterEach(() => {
+    jest.useRealTimers()
+  })
+
+  test("times out the current flow when no callback arrives", async () => {
+    jest.useFakeTimers()
+    const pending = waitForOAuthCallback({ verifier: "v", challenge: "c" }, "state-solo")
+    const outcome = pending.then(
+      () => "resolved",
+      (error: Error) => error.message,
+    )
+
+    jest.advanceTimersByTime(5 * 60 * 1000)
+
+    expect(await outcome).toBe("OAuth callback timeout - authorization took too long")
+  })
+
+  test("a stale timeout from a superseded flow does not kill the current flow", async () => {
+    jest.useFakeTimers()
+
+    const first = waitForOAuthCallback({ verifier: "v1", challenge: "c1" }, "state-1")
+    // The superseded flow is abandoned by its caller; ignore its outcome.
+    first.catch(() => {})
+
+    // A second authorize() two minutes later overwrites the shared pending
+    // flow, but the first flow's five-minute timer is still armed.
+    jest.advanceTimersByTime(2 * 60 * 1000)
+    const second = waitForOAuthCallback({ verifier: "v2", challenge: "c2" }, "state-2")
+    const secondOutcome = second.then(
+      () => "resolved",
+      (error: Error) => error.message,
+    )
+
+    // t=5min: the stale first timer fires. It must be a no-op; the buggy
+    // version cleared the second flow's pending state and stopped the server.
+    jest.advanceTimersByTime(3 * 60 * 1000)
+
+    // t=7min: the second flow's own timer fires. Because the second flow is
+    // still intact it rejects with its genuine timeout instead of hanging.
+    jest.advanceTimersByTime(2 * 60 * 1000)
+    jest.useRealTimers()
+
+    const hung = new Promise<never>((_, reject) => setTimeout(() => reject(new Error("second OAuth flow hung")), 50))
+    expect(await Promise.race([secondOutcome, hung])).toBe("OAuth callback timeout - authorization took too long")
   })
 })
