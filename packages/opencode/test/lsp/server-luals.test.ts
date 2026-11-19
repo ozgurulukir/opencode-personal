@@ -26,6 +26,18 @@ function mockInstanceContext(dir: string): InstanceContext {
   } as unknown as InstanceContext
 }
 
+function isGitHubApiReleaseURL(value: string): boolean {
+  try {
+    const url = new URL(value)
+    return (
+      url.hostname === "api.github.com" &&
+      url.pathname === "/repos/LuaLS/lua-language-server/releases/latest"
+    )
+  } catch {
+    return false
+  }
+}
+
 describe("LuaLS LSP Info", () => {
   test("reconstructs the download URL from the canonical host instead of trusting browser_download_url", async () => {
     const prevFlag = Flag.OPENCODE_DISABLE_LSP_DOWNLOAD
@@ -46,7 +58,7 @@ describe("LuaLS LSP Info", () => {
     globalThis.fetch = (async (input: RequestInfo | URL) => {
       const urlStr = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url
       urls.push(urlStr)
-      if (urlStr.includes("api.github.com/repos/LuaLS/lua-language-server/releases/latest")) {
+      if (isGitHubApiReleaseURL(urlStr)) {
         return {
           ok: true,
           json: async () => ({
@@ -64,7 +76,7 @@ describe("LuaLS LSP Info", () => {
       const handle = await LuaLS.spawn(root, mockInstanceContext(root))
       expect(handle).toBeUndefined()
 
-      const downloadUrl = urls.find((url) => !url.includes("api.github.com"))
+      const downloadUrl = urls.find((url) => !isGitHubApiReleaseURL(url))
       expect(downloadUrl).toBeDefined()
       expect(downloadUrl).toBe(
         `https://github.com/LuaLS/lua-language-server/releases/download/${tag}/${assetName}`,
