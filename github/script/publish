@@ -8,8 +8,7 @@ if [ -z "$latest_tag" ]; then
 fi
 echo "Latest tag: $latest_tag"
 
-# Update latest tag
-git tag -d latest
-git push origin :refs/tags/latest
-git tag -a latest $latest_tag -m "Update latest to $latest_tag"
-git push origin latest
+# Update latest tag atomically: force-move the local tag and force-push the ref in one
+# operation, so consumers pinned to @latest never see a window where the tag is missing.
+git tag -f -a latest $latest_tag -m "Update latest to $latest_tag"
+git push --force origin refs/tags/latest

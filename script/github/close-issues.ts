@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-const repo = "anomalyco/opencode"
+const repo = process.env.GH_REPO ?? process.env.GITHUB_REPOSITORY ?? "ozgurulukir/opencode-personal"
 const days = 60
 const msg = `To stay organized issues are automatically closed after ${days} days of no activity. If the issue is still relevant please open a new one.`
 
@@ -15,6 +15,7 @@ const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000)
 type Issue = {
   number: number
   updated_at: string
+  pull_request?: unknown
 }
 
 const headers = {
@@ -50,14 +51,16 @@ async function main() {
 
   while (true) {
     const res = await fetch(
-      `https://api.github.com/repos/${repo}/issues?state=open&sort=updated&direction=asc&per_page=100&page=${page}`,
+      `https://api.github.com/repos/${repo}/issues?state=open&sort=updated&direction=asc&per_page=100&pull_request=null&page=${page}`,
       { headers },
     )
     if (!res.ok) throw new Error(res.statusText)
 
-    const all = (await res.json()) as Issue[]
-    if (all.length === 0) break
-    console.log(`Fetched page ${page} ${all.length} issues`)
+    const raw = (await res.json()) as Issue[]
+    if (raw.length === 0) break
+    console.log(`Fetched page ${page} ${raw.length} issues`)
+    // The GitHub issues endpoint also returns PRs; drop them via the documented `pull_request` key.
+    const all = raw.filter((i) => !i.pull_request)
 
     const stale: number[] = []
     for (const i of all) {

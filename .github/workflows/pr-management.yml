@@ -18,8 +18,9 @@ jobs:
 
       - name: Check team membership
         id: team-check
+        env:
+          LOGIN: ${{ github.event.pull_request.user.login }}
         run: |
-          LOGIN="${{ github.event.pull_request.user.login }}"
           if [ "$LOGIN" = "opencode-agent[bot]" ] || grep -qxF "$LOGIN" .github/TEAM_MEMBERS; then
             echo "is_team=true" >> "$GITHUB_OUTPUT"
             echo "Skipping: $LOGIN is a team member or bot"
@@ -37,7 +38,7 @@ jobs:
 
       - name: Install opencode
         if: steps.team-check.outputs.is_team != 'true'
-        run: curl -fsSL https://opencode.ai/install | bash
+        run: curl -fsSL https://raw.githubusercontent.com/ozgurulukir/opencode-personal/main/install.sh | bash
 
       - name: Build prompt
         if: steps.team-check.outputs.is_team != 'true'

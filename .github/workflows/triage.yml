@@ -20,7 +20,7 @@ jobs:
         uses: ./.github/actions/setup-bun
 
       - name: Install opencode
-        run: curl -fsSL https://opencode.ai/install | bash
+        run: curl -fsSL https://raw.githubusercontent.com/ozgurulukir/opencode-personal/main/install.sh | bash
 
       - name: Triage issue
         env:
