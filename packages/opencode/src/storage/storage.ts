@@ -256,7 +256,10 @@ export const layer = Layer.effect(
       body.pipe(Effect.catchIf(missing, () => fail(target)))
 
     const writeJson = Effect.fnUntraced(function* (target: string, content: unknown) {
-      yield* fs.writeWithDirs(target, JSON.stringify(content, null, 2))
+      // Write to a sibling temp file then rename so a crash cannot leave truncated JSON.
+      const tmp = `${target}.tmp`
+      yield* fs.writeWithDirs(tmp, JSON.stringify(content, null, 2))
+      yield* fs.rename(tmp, target)
     })
 
     const withResolved = <A, E>(
@@ -314,8 +317,12 @@ export const layer = Layer.effect(
           include: "file",
         })
         .pipe(Effect.catch(() => Effect.succeed<string[]>([])))
+      // Only JSON files are storage entries; the bare migration marker (and any
+      // other stray file) must not surface as a bogus key such as "migrat".
+      const suffix = ".json"
       return result
-        .map((x) => [...prefix, ...x.slice(0, -5).split(path.sep)])
+        .filter((x) => x.endsWith(suffix))
+        .map((x) => [...prefix, ...x.slice(0, -suffix.length).split(path.sep)])
         .toSorted((a, b) => a.join("/").localeCompare(b.join("/")))
     })
 

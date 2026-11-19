@@ -1,6 +1,28 @@
 import { sortBy, pipe } from "remeda"
 
 const MAX_WILDCARDS = 10
+const MAX_COMPILED_PATTERNS = 512
+
+// Patterns come from untrusted config, so bound the cache to avoid unbounded growth.
+const compiled = new Map<string, RegExp>()
+
+function compiledPattern(source: string, flags: string): RegExp {
+  const key = `${flags}\0${source}`
+  const hit = compiled.get(key)
+  if (hit) return hit
+  const regex = new RegExp(source, flags)
+  if (compiled.size >= MAX_COMPILED_PATTERNS) {
+    const oldest = compiled.keys().next().value
+    if (oldest !== undefined) compiled.delete(oldest)
+  }
+  compiled.set(key, regex)
+  return regex
+}
+
+/** Number of memoized patterns — exposed for cache-bounding tests. */
+export function cacheSize() {
+  return compiled.size
+}
 
 /**
  * Matches `str` against `pattern` with glob-style wildcards.
@@ -36,7 +58,7 @@ export function match(str: string, pattern: string) {
   }
 
   const flags = process.platform === "win32" ? "si" : "s"
-  return new RegExp("^" + escaped + "$", flags).test(str)
+  return compiledPattern("^" + escaped + "$", flags).test(str)
 }
 
 export function all(input: string, patterns: Record<string, any>) {

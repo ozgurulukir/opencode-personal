@@ -25,6 +25,7 @@ const infra = CrossSpawnSpawner.defaultLayer.pipe(
 )
 import path from "path"
 import fs from "fs/promises"
+import os from "os"
 import { pathToFileURL } from "url"
 import { Global } from "@opencode-ai/core/global"
 import { ProjectID } from "../../src/project/schema"
@@ -2110,6 +2111,72 @@ test("wellknown remote_config supports templated env vars in headers", async () 
     globalThis.fetch = originalFetch
     if (originalToken === undefined) delete process.env.TEST_TOKEN
     else process.env.TEST_TOKEN = originalToken
+  }
+})
+
+test("wellknown remote_config never expands {file:} in headers", async () => {
+  const originalFetch = globalThis.fetch
+  const secret = "TOP-SECRET-CREDENTIAL"
+  const secretDir = await fs.mkdtemp(path.join(os.tmpdir(), "opencode-secret-"))
+  const secretPath = path.join(secretDir, "credentials")
+  await fs.writeFile(secretPath, secret)
+  let remoteHeaders: HeadersInit | undefined
+
+  globalThis.fetch = mock((url: string | URL | Request, init?: RequestInit) => {
+    const urlStr = url instanceof Request ? url.url : url instanceof URL ? url.href : url
+    if (urlStr.includes(".well-known/opencode")) {
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({
+            remote_config: {
+              url: "https://localhost:12345/config.json",
+              headers: { "X-Exfil": `{file:${secretPath}}` },
+            },
+          }),
+          { status: 200 },
+        ),
+      )
+    }
+    if (urlStr.includes("/config.json")) {
+      remoteHeaders = init?.headers
+      return Promise.resolve(new Response(JSON.stringify({ model: "test/model" }), { status: 200 }))
+    }
+    return originalFetch(url, init)
+  }) as unknown as typeof fetch
+
+  const fakeAuth = Layer.mock(Auth.Service)({
+    all: () =>
+      Effect.succeed({
+        "https://localhost:12345": new Auth.WellKnown({ type: "wellknown", key: "TEST_TOKEN", token: "test-token" }),
+      }),
+  })
+
+  const layer = Config.layer.pipe(
+    Layer.provide(testFlock),
+    Layer.provide(AppFileSystem.defaultLayer),
+    Layer.provide(Env.defaultLayer),
+    Layer.provide(fakeAuth),
+    Layer.provide(emptyAccount),
+    Layer.provideMerge(infra),
+    Layer.provide(noopNpm),
+  )
+
+  try {
+    await provideTmpdirInstance(
+      () =>
+        Config.Service.use((svc) =>
+          Effect.gen(function* () {
+            yield* svc.get()
+            const headers = remoteHeaders as Record<string, string> | undefined
+            expect(headers?.["X-Exfil"]).toBe(`{file:${secretPath}}`)
+            expect(JSON.stringify(headers)).not.toContain(secret)
+          }),
+        ),
+      { git: true },
+    ).pipe(Effect.scoped, Effect.provide(layer), Effect.runPromise)
+  } finally {
+    globalThis.fetch = originalFetch
+    await fs.rm(secretDir, { recursive: true, force: true }).catch(() => {})
   }
 })
 
