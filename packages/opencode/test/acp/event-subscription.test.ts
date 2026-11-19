@@ -239,6 +239,7 @@ function createFakeAgent(options?: { closeFirstEventStream?: boolean }) {
         },
         list: async () => ({ data: { items: [] } }),
         messages: async () => ({ data: { items: [] } }),
+        abort: async () => ({ data: true }),
       },
     },
     session: {
@@ -1036,6 +1037,39 @@ describe("acp.agent event subscription", () => {
           .map((u) => inProgressText(u.update))
 
         expect(snapshots).toEqual(["```\na\n```", "```\na\n```"])
+        stop()
+      },
+    })
+  })
+
+  test("closeSession releases per-session tool state for in-flight calls", async () => {
+    await using tmp = await tmpdir()
+    await WithInstance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        const { agent, controller, stop } = createFakeAgent()
+        const cwd = "/tmp/opencode-acp-test"
+        const sessionId = await agent.newSession({ cwd, mcpServers: [] } as any).then((x) => x.sessionId)
+        const callID = "call_inflight"
+
+        // A tool call that starts but never completes leaves state in the
+        // callID-keyed maps; trackCall records the callID under the session.
+        controller.push(calledEvent(sessionId, cwd, callID, "bash", { command: "sleep 100" }))
+        controller.push(bashProgressEvent(sessionId, cwd, callID, "partial"))
+        await new Promise((r) => setTimeout(r, 20))
+
+        const internals = agent as any
+        expect(internals.sessionCallIDs.get(sessionId)?.has(callID)).toBe(true)
+        expect(internals.toolCalls.has(callID)).toBe(true)
+        expect(internals.toolStarts.has(callID)).toBe(true)
+
+        await agent.closeSession({ sessionId, cwd } as any)
+
+        expect(internals.toolCalls.has(callID)).toBe(false)
+        expect(internals.shellSnapshots.has(callID)).toBe(false)
+        expect(internals.toolStarts.has(callID)).toBe(false)
+        expect(internals.sessionCallIDs.has(sessionId)).toBe(false)
+
         stop()
       },
     })

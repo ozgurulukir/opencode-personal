@@ -669,6 +669,13 @@ export const layer = Layer.effect(
             .get(),
         )
 
+        // Resolve the source workspace up front for the final history sync, but
+        // defer stopping the source prompt and claiming the event sequence until
+        // the patch has applied successfully. Doing either earlier would strand
+        // the session on the source if apply fails: workspace_id would still
+        // point at the source while every future event would be rejected as
+        // foreign by the target-owned sequence.
+        let handoff: { ownerID: string; cancelPrompt: boolean } | undefined
         if (current?.workspaceID) {
           const previous = yield* get(current.workspaceID)
           if (previous) {
@@ -687,13 +694,12 @@ export const layer = Layer.effect(
                   }),
                 ),
               )
-            } else {
-              yield* prompt.cancel(input.sessionID)
             }
 
-            // "claim" this session so any future events coming from
-            // the old workspace are ignored
-            SyncEvent.claim(input.sessionID, input.workspaceID ?? previous.projectID)
+            handoff = {
+              ownerID: input.workspaceID ?? previous.projectID,
+              cancelPrompt: target.type === "local",
+            }
           }
         }
 
@@ -733,6 +739,14 @@ export const layer = Layer.effect(
               reason: "not-clean",
             })
           }
+        }
+
+        // The patch applied (or there was nothing to apply), so the warp will
+        // proceed. Only now stop the source prompt and claim the sequence so
+        // late events from the old workspace are ignored.
+        if (handoff) {
+          if (handoff.cancelPrompt) yield* prompt.cancel(input.sessionID)
+          SyncEvent.claim(input.sessionID, handoff.ownerID)
         }
 
         if (input.workspaceID === null) {

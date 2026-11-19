@@ -550,12 +550,14 @@ export class Agent implements ACPAgent {
   async listSessions(params: ListSessionsRequest): Promise<ListSessionsResponse> {
     try {
       // Cursor is "<updated>:<sessionId>". The id is the tiebreaker so sessions
-      // sharing a millisecond timestamp are not dropped between pages.
+      // sharing a millisecond timestamp are not dropped between pages. A bare
+      // numeric cursor (the pre-tiebreaker format) is accepted as an empty id
+      // so clients that persisted a cursor across an upgrade keep working.
       let cursor: { updated: number; id: string } | undefined
       if (params.cursor) {
-        const [updatedPart, id] = params.cursor.split(":")
+        const [updatedPart, id = ""] = params.cursor.split(":")
         const updated = Number(updatedPart)
-        if (!Number.isFinite(updated) || !id) throw RequestError.invalidParams("Invalid cursor")
+        if (!Number.isFinite(updated)) throw RequestError.invalidParams("Invalid cursor")
         cursor = { updated, id }
       }
       const limit = 100
@@ -571,10 +573,16 @@ export class Agent implements ACPAgent {
         )
         .then((x) => x.data?.items ?? [])
 
-      const sorted = sessions.toSorted((a, b) => b.time.updated - a.time.updated || b.id.localeCompare(a.id))
+      // Use one comparator for both the sort and the cursor filter. localeCompare
+      // and the JS `<` operator disagree on mixed-case base62 ids, so mixing
+      // them duplicates or drops sessions at page boundaries.
+      const compareID = (a: string, b: string) => a.localeCompare(b)
+      const sorted = sessions.toSorted((a, b) => b.time.updated - a.time.updated || compareID(b.id, a.id))
       const filtered = cursor
         ? sorted.filter(
-            (s) => s.time.updated < cursor.updated || (s.time.updated === cursor.updated && s.id < cursor.id),
+            (s) =>
+              s.time.updated < cursor.updated ||
+              (s.time.updated === cursor.updated && compareID(s.id, cursor.id) < 0),
           )
         : sorted
       const page = filtered.slice(0, limit)

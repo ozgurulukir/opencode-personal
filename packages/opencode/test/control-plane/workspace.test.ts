@@ -1015,6 +1015,13 @@ describe("workspace CRUD", () => {
             registerAdapter(Instance.project.id, targetType, remoteAdapter(`${url}/apply-fail-target`).adapter)
             const session = yield* sessionSvc.create({})
             attachSessionToWorkspace(session.id, previous.id)
+            // The session is owned by its source workspace before the warp. A
+            // failed apply must leave this ownership untouched, otherwise every
+            // future source event is rejected as foreign and the session is
+            // silently stranded on the source.
+            SyncEvent.claim(session.id, previous.id)
+            const ownerBefore = sessionSequenceOwner(session.id)
+            expect(ownerBefore).toBe(previous.id)
 
             const exit = yield* Effect.exit(
               workspace.sessionWarp({ workspaceID: target.id, sessionID: session.id, copyChanges: true }),
@@ -1036,6 +1043,7 @@ describe("workspace CRUD", () => {
                   .get(),
               )?.workspaceID,
             ).toBe(previous.id)
+            expect(sessionSequenceOwner(session.id)).toBe(ownerBefore)
           }),
         { git: true },
       )
