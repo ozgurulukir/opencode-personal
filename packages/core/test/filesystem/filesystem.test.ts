@@ -109,6 +109,28 @@ describe("AppFileSystem", () => {
         expect(result).toEqual(data)
       }),
     )
+
+    it(
+      "returns a typed FileSystemError for malformed JSON recoverable by callers",
+      Effect.gen(function* () {
+        const fs = yield* AppFileSystem.Service
+        const filesys = yield* FileSystem.FileSystem
+        const tmp = yield* filesys.makeTempDirectoryScoped()
+        const file = path.join(tmp, "bad.json")
+        yield* filesys.writeFileString(file, "{ not valid json")
+
+        const failureTag = yield* fs.readJson(file).pipe(
+          Effect.match({
+            onFailure: (error) => error._tag,
+            onSuccess: () => "ok",
+          }),
+        )
+        expect(failureTag).toBe("FileSystemError")
+
+        const recovered = yield* fs.readJson(file).pipe(Effect.orElseSucceed(() => "fallback"))
+        expect(recovered).toBe("fallback")
+      }),
+    )
   })
 
   describe("ensureDir", () => {

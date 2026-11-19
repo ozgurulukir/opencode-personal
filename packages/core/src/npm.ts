@@ -58,6 +58,28 @@ export const resolveEntryPoint = (name: string, dir: string): EntryPoint => {
   }
 }
 
+/**
+ * Returns whether an installed version satisfies the version/range requested by a package spec.
+ * A missing or non-string installed version never satisfies (returns false).
+ * Otherwise non-version specs (tags, file:, git, ...) return true to keep the install fast-path.
+ */
+export function satisfiesRequestedVersion(pkg: string, installedVersion: unknown): boolean {
+  if (typeof installedVersion !== "string") return false
+  let parsed
+  try {
+    parsed = npa(pkg)
+  } catch {
+    return false
+  }
+  if (parsed.type !== "version" && parsed.type !== "range") return true
+  const range = parsed.fetchSpec
+  if (typeof range !== "string") return true
+  if (typeof Bun !== "undefined" && Bun.semver) return Bun.semver.satisfies(installedVersion, range)
+  // Node fallback: exact versions and the wildcard are verifiable without a semver library;
+  // anything else conservatively reinstalls.
+  return range === "*" || installedVersion === range
+}
+
 interface ArboristNode {
   name: string
   path: string
@@ -136,8 +158,16 @@ export const layer = Layer.effect(
         }
       })()
 
-      if (yield* afs.existsSafe(path.join(dir, "node_modules", name))) {
-        return resolveEntryPoint(name, path.join(dir, "node_modules", name))
+      const installedDir = path.join(dir, "node_modules", name)
+      if (yield* afs.existsSafe(installedDir)) {
+        const installed = yield* afs.readJson(path.join(installedDir, "package.json")).pipe(
+          Effect.orElseSucceed(() => undefined),
+        )
+        const version =
+          installed && typeof installed === "object" ? (installed as { version?: unknown }).version : undefined
+        if (satisfiesRequestedVersion(pkg, version)) {
+          return resolveEntryPoint(name, installedDir)
+        }
       }
 
       const tree = yield* reify({ dir, add: [pkg] })
@@ -205,6 +235,18 @@ export const layer = Layer.effect(
 
         for (const name of declared) {
           if (!locked.has(name)) {
+            yield* reify({ dir, add })
+            return
+          }
+        }
+
+        // Names can match while the locked version no longer satisfies an explicitly
+        // requested spec (e.g. locked foo@1.x but add requests foo@^2).
+        const lockPackages = lockJson.packages ?? {}
+        for (const dep of input?.add ?? []) {
+          if (!dep.version) continue
+          const installed = lockPackages[`node_modules/${dep.name}`] as { version?: unknown } | undefined
+          if (!satisfiesRequestedVersion(`${dep.name}@${dep.version}`, installed?.version)) {
             yield* reify({ dir, add })
             return
           }

@@ -138,10 +138,22 @@ describe("Log", () => {
     })
   })
 
+  describe("robustness", () => {
+    test("does not throw when an extra value is circular", () => {
+      const circular: Record<string, unknown> = {}
+      circular["self"] = circular
+      const logger = Log.create()
+
+      expect(() => logger.info("msg", { circular })).not.toThrow()
+      expect(stderrWriteSpy.mock.calls[0][0]).toContain("[circular]")
+    })
+  })
+
   describe("init and file writing", () => {
     test("initializes file logger and writes to stream", async () => {
       // Mock createWriteStream to intercept writes
       const mockStream = {
+        on: mock(() => mockStream),
         write: mock((msg, cb) => {
           cb(null)
           return true
@@ -164,6 +176,33 @@ describe("Log", () => {
       expect(mockStream.write).toHaveBeenCalledTimes(1)
       expect(mockStream.write.mock.calls[0][0]).toContain("DEBUG")
       expect(mockStream.write.mock.calls[0][0]).toContain("file test")
+
+      createStreamSpy.mockRestore()
+    })
+
+    test("registers a stream error handler so write errors never crash the process", async () => {
+      const handlers: Record<string, (error: Error) => void> = {}
+      const mockStream = {
+        on: mock((event: string, handler: (error: Error) => void) => {
+          handlers[event] = handler
+          return mockStream
+        }),
+        write: mock((msg, cb) => {
+          cb(new Error("disk full"))
+          return true
+        }),
+      }
+      const createStreamSpy = spyOn(fsSync, "createWriteStream").mockReturnValue(mockStream as any)
+
+      await Log.init({ print: false, dev: true, level: "INFO" })
+      expect(typeof handlers["error"]).toBe("function")
+
+      const logger = Log.create()
+      expect(() => logger.info("file test")).not.toThrow()
+      await new Promise((r) => setTimeout(r, 0))
+
+      expect(() => handlers["error"](new Error("disk full"))).not.toThrow()
+      expect(stderrWriteSpy.mock.calls.some((c: unknown[]) => String(c[0]).includes("log stream error"))).toBe(true)
 
       createStreamSpy.mockRestore()
     })
