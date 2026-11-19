@@ -164,6 +164,46 @@ describe("webfetch limits", () => {
     })
   })
 
+  test("cancels the first response body when retrying a Cloudflare challenge", async () => {
+    await WithInstance.provide({
+      directory: projectRoot,
+      fn: async () => {
+        let calls = 0
+        let firstBodyCancelled = false
+        const originalFetch = globalThis.fetch
+        ;(globalThis as any).fetch = async () => {
+          calls++
+          if (calls === 1) {
+            // Cloudflare challenge response: 403 with the cf-mitigated header.
+            // Its body is never consumed on the retry path, so the tool must
+            // cancel it to release the connection.
+            const body = new ReadableStream<Uint8Array>({
+              start(controller) {
+                controller.enqueue(new TextEncoder().encode("challenge"))
+              },
+              cancel() {
+                firstBodyCancelled = true
+              },
+            })
+            return new Response(body, {
+              status: 403,
+              headers: { "content-type": "text/plain", "cf-mitigated": "challenge" },
+            })
+          }
+          return new Response("retried ok", { status: 200, headers: { "content-type": "text/plain" } })
+        }
+        try {
+          const result = await exec({ url: "http://localhost/cf-challenge", format: "text" })
+          expect(result.output).toContain("retried ok")
+          expect(calls).toBe(2)
+          expect(firstBodyCancelled).toBe(true)
+        } finally {
+          ;(globalThis as any).fetch = originalFetch
+        }
+      },
+    })
+  })
+
   test("applies the configured response size limit to fetches", async () => {
     await WithInstance.provide({
       directory: projectRoot,

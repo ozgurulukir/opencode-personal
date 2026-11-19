@@ -51,6 +51,11 @@ export const ApplyPatchTool = Tool.define<
     const todo = yield* Todo.Service
     const editLocks = new LockRegistry() // Per-instance: cross-instance edits are not serialized.
 
+    // Acquire every per-path lock in a stable (sorted) order so multi-file patches
+    // and moves never deadlock against each other. A move locks both endpoints.
+    const withLocks = <A, E, R>(keys: string[], effect: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> =>
+      [...new Set(keys)].sort().reduceRight((acc, key) => editLocks.withLock(key, acc), effect)
+
     const run = Effect.fn("ApplyPatchTool.execute")(function* (
       params: Schema.Schema.Type<typeof Parameters>,
       ctx: Tool.Context<Metadata>,
@@ -91,6 +96,7 @@ export const ApplyPatchTool = Tool.define<
         additions: number
         deletions: number
         bom: boolean
+        chunks?: Patch.UpdateFileChunk[]
       }> = []
 
       let totalDiff = ""
@@ -258,6 +264,7 @@ export const ApplyPatchTool = Tool.define<
                 additions,
                 deletions,
                 bom,
+                chunks: hunk.chunks,
               })
 
               totalDiff += diff + "\n"
@@ -362,26 +369,58 @@ export const ApplyPatchTool = Tool.define<
         },
       })
 
-      // Apply the changes
+      // Apply the changes. Read + derive + write all happen inside the lock so
+      // two concurrent calls cannot both read stale content and clobber each
+      // other. Moves serialize both endpoints (ordered by withLocks).
       const updates: Array<{ file: string; event: "add" | "change" | "unlink" }> = []
 
       for (const change of fileChanges) {
         const edited = change.type === "delete" ? undefined : (change.movePath ?? change.filePath)
-        // Serialize read-modify-write per destination path, matching EditTool's
-        // LockRegistry usage so concurrent tool calls cannot interleave writes.
-        yield* editLocks.withLock(
-          change.movePath ?? change.filePath,
+        const lockKeys = change.movePath ? [change.filePath, change.movePath] : [change.filePath]
+        yield* withLocks(
+          lockKeys,
           Effect.gen(function* () {
+            // Re-read under the lock: content read while building the patch may
+            // be stale by write time. Re-derive from the original chunks against
+            // the freshest content so a concurrent edit is not silently lost.
+            let content = change.newContent
+            let bom = change.bom
+            if (change.type === "update" || change.type === "move") {
+              const fresh = yield* Bom.readFile(afs, change.filePath).pipe(
+                Effect.catch(() => Effect.succeed(undefined)),
+              )
+              if (!fresh) {
+                failedHunks.push({
+                  path: change.filePath,
+                  error: `Failed to re-read file before writing: ${change.filePath}`,
+                })
+                return
+              }
+              if (change.chunks) {
+                try {
+                  const derived = Patch.deriveNewContentsFromChunks(change.filePath, change.chunks, fresh)
+                  content = derived.content
+                  bom = derived.bom
+                } catch (error) {
+                  failedHunks.push({
+                    path: change.filePath,
+                    error: `Failed to re-apply patch under lock: ${error instanceof Error ? error.message : String(error)}`,
+                  })
+                  return
+                }
+              }
+            }
+
             switch (change.type) {
               case "add":
                 // Create parent directories (recursive: true is safe on existing/root dirs)
 
-                yield* afs.writeWithDirs(change.filePath, Bom.join(change.newContent, change.bom))
+                yield* afs.writeWithDirs(change.filePath, Bom.join(content, bom))
                 updates.push({ file: change.filePath, event: "add" })
                 break
 
               case "update":
-                yield* afs.writeWithDirs(change.filePath, Bom.join(change.newContent, change.bom))
+                yield* afs.writeWithDirs(change.filePath, Bom.join(content, bom))
                 updates.push({ file: change.filePath, event: "change" })
                 break
 
@@ -389,7 +428,7 @@ export const ApplyPatchTool = Tool.define<
                 if (change.movePath) {
                   // Create parent directories (recursive: true is safe on existing/root dirs)
 
-                  yield* afs.writeWithDirs(change.movePath!, Bom.join(change.newContent, change.bom))
+                  yield* afs.writeWithDirs(change.movePath, Bom.join(content, bom))
                   yield* afs.remove(change.filePath)
                   updates.push({ file: change.filePath, event: "unlink" })
                   updates.push({ file: change.movePath, event: "add" })
@@ -404,7 +443,7 @@ export const ApplyPatchTool = Tool.define<
 
             if (edited) {
               if (yield* format.file(edited)) {
-                yield* Bom.syncFile(afs, edited, change.bom)
+                yield* Bom.syncFile(afs, edited, bom)
               }
               yield* bus.publish(File.Event.Edited, { file: edited })
             }

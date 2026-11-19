@@ -411,10 +411,14 @@ export function createShellTool(
           }
 
           // Node can emit "exit" before stdio "close", so output buffered after
-          // exitCode resolves would be dropped when the scope closes. Join the
-          // consumer so trailing output is captured; the timeout is a backstop
-          // for a stream that never closes (e.g. a child holding the pipe open).
-          yield* Fiber.join(outputFiber).pipe(Effect.timeout("5 seconds"))
+          // exitCode resolves would be dropped when the scope closes. Give the
+          // consumer a bounded, non-failing grace period to drain trailing output.
+          // A stream that never closes (e.g. a detached child holding the pipe
+          // open) must not stall the tool call, and a timeout must never become a
+          // defect through the enclosing orDie — timeoutOption keeps the error
+          // channel empty on expiry. Normal runs drain immediately and pay none
+          // of this grace period.
+          yield* Fiber.join(outputFiber).pipe(Effect.timeoutOption("2 seconds"))
 
           return exit.kind === "exit" ? exit.code : null
         }),

@@ -933,6 +933,37 @@ EOF`
       },
     })
   })
+
+  test("serializes concurrent patches to the same file without losing updates", async () => {
+    await using fixture = await tmpdir({ git: true })
+    const { ctx } = makeCtx()
+
+    await WithInstance.provide({
+      directory: fixture.path,
+      fn: async () => {
+        const target = path.join(fixture.path, "shared.txt")
+        await fs.writeFile(target, "alpha\nbeta\n", "utf-8")
+
+        // Both patches are parsed against the same original content. The write
+        // phase must re-read + re-derive under the lock so the second patch
+        // builds on the first instead of overwriting it.
+        const info = await runtime.runPromise(ApplyPatchTool)
+        const tool = await runtime.runPromise(info.init())
+        const patchA = "*** Begin Patch\n*** Update File: shared.txt\n@@\n-alpha\n+ALPHA\n*** End Patch"
+        const patchB = "*** Begin Patch\n*** Update File: shared.txt\n@@\n-beta\n+BETA\n*** End Patch"
+
+        await Effect.runPromise(
+          Effect.all([tool.execute({ patchText: patchA }, ctx), tool.execute({ patchText: patchB }, ctx)], {
+            concurrency: "unbounded",
+          }),
+        )
+
+        const content = await fs.readFile(target, "utf-8")
+        expect(content).toContain("ALPHA")
+        expect(content).toContain("BETA")
+      },
+    })
+  })
 })
 
 
