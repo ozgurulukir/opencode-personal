@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test"
+import dns from "node:dns"
 import { assertSafeRemoteUrl, guardedFetch, isLoopbackHostname, isPrivateIP, safeFetchJson } from "@/util/network"
 
 describe("network safety", () => {
@@ -54,6 +55,29 @@ describe("network safety", () => {
       expect(isPrivateIP("0177.0.0.1")).toBe(true)
       expect(isPrivateIP("127.0..1")).toBe(true)
       expect(isPrivateIP("010.0.0.1")).toBe(true)
+    })
+
+    test("resolves non-IP hostnames via DNS instead of treating them as IPs", async () => {
+      const originalLookup = dns.promises.lookup
+      dns.promises.lookup = (async () => [{ address: "93.184.216.34", family: 4 }]) as unknown as typeof dns.promises.lookup
+      try {
+        const url = await assertSafeRemoteUrl("https://example.com/config", "test")
+        expect(url.hostname).toBe("example.com")
+      } finally {
+        dns.promises.lookup = originalLookup
+      }
+    })
+
+    test("rejects hostnames that resolve to private IPs", async () => {
+      const originalLookup = dns.promises.lookup
+      dns.promises.lookup = (async () => [{ address: "10.0.0.5", family: 4 }]) as unknown as typeof dns.promises.lookup
+      try {
+        await expect(assertSafeRemoteUrl("https://example.com/config", "test")).rejects.toThrow(
+          "private/internal network target",
+        )
+      } finally {
+        dns.promises.lookup = originalLookup
+      }
     })
   })
 

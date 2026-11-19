@@ -19,6 +19,8 @@ type ParseSource =
 type SubstituteInput = ParseSource & {
   text: string
   missing?: "error" | "empty"
+  /** When false, `{file:...}` tokens are left untouched (used for untrusted, network-bound values). */
+  allowFile?: boolean
 }
 
 function source(input: ParseSource) {
@@ -58,6 +60,10 @@ export async function substitute(input: SubstituteInput) {
     out += text.slice(cursor)
     text = out
   }
+
+  // Untrusted, network-bound values (e.g. remote well-known config headers) must
+  // never be allowed to read local files via {file:...}.
+  if (input.allowFile === false) return text
 
   const fileMatches = Array.from(text.matchAll(/\{file:[^}]+\}/g))
   if (!fileMatches.length) return text

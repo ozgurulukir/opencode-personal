@@ -147,11 +147,14 @@ function normalizeLoadedConfig(data: unknown, source: string) {
 async function substituteWellKnownRemoteConfig(input: { value: unknown; dir: string; source: string }) {
   if (!isRecord(input.value) || typeof input.value.url !== "string") return
 
+  // These values are sent over the network to the remote config host. Never let
+  // an untrusted well-known provider read local files via {file:...}.
   const url = await ConfigVariable.substitute({
     text: input.value.url,
     type: "virtual",
     dir: input.dir,
     source: input.source,
+    allowFile: false,
   })
   const headers = isRecord(input.value.headers)
     ? Object.fromEntries(
@@ -165,6 +168,7 @@ async function substituteWellKnownRemoteConfig(input: { value: unknown; dir: str
                 type: "virtual",
                 dir: input.dir,
                 source: input.source,
+                allowFile: false,
               }),
             ]),
         ),
@@ -527,17 +531,20 @@ export const layer = Layer.effect(
     const accountSvc = yield* Account.Service
     const env = yield* Env.Service
     const npmSvc = yield* Npm.Service
+    const flock = yield* EffectFlock.Service
 
     const readConfigFile = (filepath: string) => fs.readFileStringSafe(filepath).pipe(Effect.orDie)
 
     const loadConfig = Effect.fnUntraced(function* (
       text: string,
-      options: { path: string } | { dir: string; source: string },
+      options: ({ path: string } | { dir: string; source: string }) & { allowFile?: boolean },
     ) {
       const source = "path" in options ? options.path : options.source
       const expanded = yield* Effect.promise(() =>
         ConfigVariable.substitute(
-          "path" in options ? { text, type: "path", path: options.path } : { text, type: "virtual", ...options },
+          "path" in options
+            ? { text, type: "path", path: options.path, allowFile: options.allowFile }
+            : { text, type: "virtual", dir: options.dir, source: options.source, allowFile: options.allowFile },
         ),
       )
       const parsed = ConfigParse.jsonc(expanded, source)
@@ -569,18 +576,31 @@ export const layer = Layer.effect(
 
       const legacy = path.join(Global.Path.config, "config")
       if (existsSync(legacy)) {
-        yield* Effect.promise(() =>
-          import(pathToFileURL(legacy).href, { with: { type: "toml" } })
-            .then(async (mod) => {
-              const { provider, model, ...rest } = mod.default
-              if (provider && model) result.model = `${provider}/${model}`
-              result["$schema"] = "https://ozgurulukir.github.io/opencode-personal/config.json"
-              result = mergeConfig(result, rest)
-              await fsNode.writeFile(path.join(Global.Path.config, "config.json"), JSON.stringify(result, null, 2))
-              await fsNode.unlink(legacy)
-            })
-            .catch((error) => log.warn("legacy config migration failed; keeping legacy file", { error: String(error) })),
+        const migrated = yield* flock.withLock(
+          Effect.tryPromise(async () => {
+            const mod = await import(pathToFileURL(legacy).href, { with: { type: "toml" } })
+            const { provider, model, ...rest } = mod.default
+            const next: Info = { ...result }
+            if (provider && model) next.model = `${provider}/${model}`
+            next["$schema"] = "https://ozgurulukir.github.io/opencode-personal/config.json"
+            const merged = mergeConfig(next, rest)
+            // Write to a temp file then rename so a crash cannot leave a truncated config.json.
+            const target = path.join(Global.Path.config, "config.json")
+            const tmp = `${target}.tmp`
+            await fsNode.writeFile(tmp, JSON.stringify(merged, null, 2))
+            await fsNode.rename(tmp, target)
+            await fsNode.unlink(legacy)
+            return merged
+          }).pipe(
+            Effect.catch((error) => {
+              log.warn("legacy config migration failed; keeping legacy file", { error: String(error) })
+              return Effect.succeed(null)
+            }),
+          ),
+          "config-toml-migration",
+          Global.Path.config,
         )
+        if (migrated) result = migrated
       }
 
       return result
@@ -718,6 +738,8 @@ export const layer = Layer.effect(
             const next = yield* loadConfig(JSON.stringify(remoteConfig), {
               dir: path.dirname(source),
               source,
+              // Remote-sourced config is untrusted: never let its body read local files.
+              allowFile: false,
             })
             yield* merge(source, next, "global")
             log.debug("loaded remote config from well-known", { url })
@@ -746,6 +768,8 @@ export const layer = Layer.effect(
               const next = yield* loadConfig(JSON.stringify(configOpt.value), {
                 dir: path.dirname(source),
                 source,
+                // Remote-sourced config is untrusted: never let its body read local files.
+                allowFile: false,
               })
               for (const providerID of Object.keys(next.provider ?? {})) {
                 consoleManagedProviders.add(providerID)

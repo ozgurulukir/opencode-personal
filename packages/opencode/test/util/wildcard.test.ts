@@ -98,3 +98,13 @@ test("match returns true for patterns with exactly 10 wildcards", () => {
   const pattern = "*".repeat(10)
   expect(Wildcard.match("short", pattern)).toBe(true)
 })
+
+test("match memoizes compiled patterns in a bounded cache", () => {
+  for (let i = 0; i < 2000; i++) {
+    expect(Wildcard.match(`value-${i}`, `value-${i}`)).toBe(true)
+  }
+  expect(Wildcard.cacheSize()).toBeLessThanOrEqual(512)
+  // A cached pattern still behaves correctly after eviction churn.
+  expect(Wildcard.match("git status", "git *")).toBe(true)
+  expect(Wildcard.match("lstmeval", "ls *")).toBe(false)
+})

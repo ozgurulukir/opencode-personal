@@ -44,6 +44,7 @@ function remappedFs(root: string) {
         isDir: (file) => fs.isDir(remap(root, file)),
         readJson: (file) => fs.readJson(remap(root, file)),
         writeWithDirs: (file, content, mode) => fs.writeWithDirs(remap(root, file), content, mode),
+        rename: (oldPath, newPath) => fs.rename(remap(root, oldPath), remap(root, newPath)),
         readFileString: (file) => fs.readFileString(remap(root, file)),
         remove: (file) => fs.remove(remap(root, file)),
         glob: (pattern, options) =>
@@ -100,6 +101,19 @@ describe("Storage", () => {
       yield* svc.write<{ v: number }>(key, { v: 2 })
 
       expect(yield* svc.read<{ v: number }>(key)).toEqual({ v: 2 })
+    }),
+  )
+
+  it.live("write is atomic and leaves no temp file behind", () =>
+    Effect.gen(function* () {
+      const { root, svc } = yield* scope()
+      const fs = yield* AppFileSystem.Service
+      const key = [...root, "atomic", "write"]
+      yield* svc.write(key, { ok: true })
+
+      const target = path.join(dir, ...key) + ".json"
+      expect(yield* fs.exists(`${target}.tmp`)).toBe(false)
+      expect(yield* svc.read(key)).toEqual({ ok: true })
     }),
   )
 
@@ -183,6 +197,22 @@ describe("Storage", () => {
       expect(yield* svc.list(prefix)).toEqual([b])
       const exit = yield* svc.read(a).pipe(Effect.exit)
       expect(Exit.isFailure(exit)).toBe(true)
+    }),
+  )
+
+  it.live("list ignores non-json files such as the migration marker", () =>
+    Effect.gen(function* () {
+      const fs = yield* AppFileSystem.Service
+      const tmp = yield* tmpdirScoped()
+      const storage = path.join(tmp, "storage")
+      yield* fs.writeWithDirs(path.join(storage, "migration"), "2")
+      yield* fs.writeWithDirs(path.join(storage, "keep.json"), JSON.stringify({ ok: true }))
+      yield* fs.writeWithDirs(path.join(storage, "notes.txt"), "ignore me")
+
+      yield* Effect.gen(function* () {
+        const svc = yield* Storage.Service
+        expect(yield* svc.list([])).toEqual([["keep"]])
+      }).pipe(Effect.provide(remappedStorage(tmp)))
     }),
   )
 

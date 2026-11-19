@@ -20,10 +20,16 @@ export const layer = Layer.effect(
     const get = Effect.fn("Env.get")((key: string) => InstanceState.use(state, (env) => env[key]))
     const all = Effect.fn("Env.all")(() => InstanceState.get(state))
     const set = Effect.fn("Env.set")(function* (key: string, value: string) {
+      // Keep process.env in sync so instances materialized in other directories
+      // see the change, and invalidate cached snapshots that predate it.
+      process.env[key] = value
+      yield* InstanceState.invalidateAll(state)
       const env = yield* InstanceState.get(state)
       env[key] = value
     })
     const remove = Effect.fn("Env.remove")(function* (key: string) {
+      delete process.env[key]
+      yield* InstanceState.invalidateAll(state)
       const env = yield* InstanceState.get(state)
       delete env[key]
     })

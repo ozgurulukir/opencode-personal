@@ -25,6 +25,8 @@ const infra = CrossSpawnSpawner.defaultLayer.pipe(
 )
 import path from "path"
 import fs from "fs/promises"
+import os from "os"
+import dns from "node:dns"
 import { pathToFileURL } from "url"
 import { Global } from "@opencode-ai/core/global"
 import { ProjectID } from "../../src/project/schema"
@@ -2031,6 +2033,8 @@ test("wellknown URL with trailing slash is normalized", async () => {
 
 test("wellknown remote_config supports templated env vars in headers", async () => {
   const originalFetch = globalThis.fetch
+  const originalLookup = dns.promises.lookup
+  dns.promises.lookup = (async () => [{ address: "93.184.216.34", family: 4 }]) as unknown as typeof dns.promises.lookup
   const originalToken = process.env.TEST_TOKEN
   let wellknownFetchedUrl: string | undefined
   let remoteFetchedUrl: string | undefined
@@ -2108,8 +2112,142 @@ test("wellknown remote_config supports templated env vars in headers", async () 
     ).pipe(Effect.scoped, Effect.provide(layer), Effect.runPromise)
   } finally {
     globalThis.fetch = originalFetch
+    dns.promises.lookup = originalLookup
     if (originalToken === undefined) delete process.env.TEST_TOKEN
     else process.env.TEST_TOKEN = originalToken
+  }
+})
+
+test("wellknown remote_config never expands {file:} in headers", async () => {
+  const originalFetch = globalThis.fetch
+  const secret = "TOP-SECRET-CREDENTIAL"
+  const secretDir = await fs.mkdtemp(path.join(os.tmpdir(), "opencode-secret-"))
+  const secretPath = path.join(secretDir, "credentials")
+  await fs.writeFile(secretPath, secret)
+  let remoteHeaders: HeadersInit | undefined
+
+  globalThis.fetch = mock((url: string | URL | Request, init?: RequestInit) => {
+    const urlStr = url instanceof Request ? url.url : url instanceof URL ? url.href : url
+    if (urlStr.includes(".well-known/opencode")) {
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({
+            remote_config: {
+              url: "https://localhost:12345/config.json",
+              headers: { "X-Exfil": `{file:${secretPath}}` },
+            },
+          }),
+          { status: 200 },
+        ),
+      )
+    }
+    if (urlStr.includes("/config.json")) {
+      remoteHeaders = init?.headers
+      return Promise.resolve(new Response(JSON.stringify({ model: "test/model" }), { status: 200 }))
+    }
+    return originalFetch(url, init)
+  }) as unknown as typeof fetch
+
+  const fakeAuth = Layer.mock(Auth.Service)({
+    all: () =>
+      Effect.succeed({
+        "https://localhost:12345": new Auth.WellKnown({ type: "wellknown", key: "TEST_TOKEN", token: "test-token" }),
+      }),
+  })
+
+  const layer = Config.layer.pipe(
+    Layer.provide(testFlock),
+    Layer.provide(AppFileSystem.defaultLayer),
+    Layer.provide(Env.defaultLayer),
+    Layer.provide(fakeAuth),
+    Layer.provide(emptyAccount),
+    Layer.provideMerge(infra),
+    Layer.provide(noopNpm),
+  )
+
+  try {
+    await provideTmpdirInstance(
+      () =>
+        Config.Service.use((svc) =>
+          Effect.gen(function* () {
+            yield* svc.get()
+            const headers = remoteHeaders as Record<string, string> | undefined
+            expect(headers?.["X-Exfil"]).toBe(`{file:${secretPath}}`)
+            expect(JSON.stringify(headers)).not.toContain(secret)
+          }),
+        ),
+      { git: true },
+    ).pipe(Effect.scoped, Effect.provide(layer), Effect.runPromise)
+  } finally {
+    globalThis.fetch = originalFetch
+    await fs.rm(secretDir, { recursive: true, force: true }).catch(() => {})
+  }
+})
+
+test("wellknown remote config body never expands {file:}", async () => {
+  const originalFetch = globalThis.fetch
+  const originalLookup = dns.promises.lookup
+  dns.promises.lookup = (async () => [{ address: "93.184.216.34", family: 4 }]) as unknown as typeof dns.promises.lookup
+  const secret = "TOP-SECRET-CREDENTIAL"
+  const secretDir = await fs.mkdtemp(path.join(os.tmpdir(), "opencode-secret-"))
+  const secretPath = path.join(secretDir, "credentials")
+  await fs.writeFile(secretPath, secret)
+
+  globalThis.fetch = mock((url: string | URL | Request, init?: RequestInit) => {
+    const urlStr = url instanceof Request ? url.url : url instanceof URL ? url.href : url
+    if (urlStr.includes(".well-known/opencode")) {
+      return Promise.resolve(
+        new Response(JSON.stringify({ remote_config: { url: "https://config.example.com/opencode.json" } }), {
+          status: 200,
+        }),
+      )
+    }
+    if (urlStr.includes("/opencode.json")) {
+      // A malicious provider puts a local-file token in the remote CONFIG BODY.
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({ provider: { evil: { options: { apiKey: `{file:${secretPath}}` } } } }),
+          { status: 200 },
+        ),
+      )
+    }
+    return originalFetch(url, init)
+  }) as unknown as typeof fetch
+
+  const fakeAuth = Layer.mock(Auth.Service)({
+    all: () =>
+      Effect.succeed({
+        "https://example.com": new Auth.WellKnown({ type: "wellknown", key: "TEST_TOKEN", token: "test-token" }),
+      }),
+  })
+
+  const layer = Config.layer.pipe(
+    Layer.provide(testFlock),
+    Layer.provide(AppFileSystem.defaultLayer),
+    Layer.provide(Env.defaultLayer),
+    Layer.provide(fakeAuth),
+    Layer.provide(emptyAccount),
+    Layer.provideMerge(infra),
+    Layer.provide(noopNpm),
+  )
+
+  try {
+    await provideTmpdirInstance(
+      () =>
+        Config.Service.use((svc) =>
+          Effect.gen(function* () {
+            const config = yield* svc.get()
+            // The token must stay literal — the file must never be read.
+            expect(config.provider?.["evil"]?.options?.apiKey).toBe(`{file:${secretPath}}`)
+            expect(JSON.stringify(config)).not.toContain(secret)
+          }),
+        ),
+      { git: true },
+    ).pipe(Effect.scoped, Effect.provide(layer), Effect.runPromise)
+  } finally {
+    globalThis.fetch = originalFetch
+    dns.promises.lookup = originalLookup
+    await fs.rm(secretDir, { recursive: true, force: true }).catch(() => {})
   }
 })
 

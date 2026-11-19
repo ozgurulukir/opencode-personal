@@ -95,6 +95,16 @@ export function normalizeHostname(hostname: string): string {
   return hostname.replace(/^\[(.*?)\]$/, "$1")
 }
 
+/**
+ * True when the host is a literal IP address (IPv4 or IPv6) rather than a DNS
+ * name. Only literal IPs may be classified directly by `isPrivateIP`; DNS names
+ * must be judged by the addresses they resolve to.
+ */
+function isLiteralIPHost(host: string): boolean {
+  const isIPv4Literal = ipv4ToInt(host) !== -1 && /^\d{1,3}(\.\d{1,3}){3}$/.test(host)
+  return host.includes(":") || isIPv4Literal
+}
+
 export function isLoopbackHostname(hostname: string): boolean {
   const bare = normalizeHostname(hostname).toLowerCase()
   if (bare === "localhost" || bare.endsWith(".localhost") || bare === "::1") return true
@@ -130,8 +140,9 @@ export async function assertSafeRemoteUrl(url: string, what: string, options?: S
 
   const bareHost = normalizeHostname(parsed.hostname)
 
-  // Check if literal hostname is already an IP address
-  if (isPrivateIP(bareHost)) {
+  // Only classify the hostname itself when it is a literal IP — non-IP
+  // hostnames (including "localhost") are judged by what DNS resolves them to.
+  if (isLiteralIPHost(bareHost) && isPrivateIP(bareHost)) {
     throw new Error(`Refusing to fetch ${what} from private/internal network target (${bareHost}): ${url}`)
   }
 
@@ -252,8 +263,7 @@ export async function validateFetchTarget(
 
   // Only classify the hostname itself when it is a literal IP — non-IP
   // hostnames (including "localhost") are judged by what DNS resolves them to.
-  const isIPv4Literal = ipv4ToInt(bareHost) !== -1 && /^\d{1,3}(\.\d{1,3}){3}$/.test(bareHost)
-  const isLiteralIP = bareHost.includes(":") || isIPv4Literal
+  const isLiteralIP = isLiteralIPHost(bareHost)
   if (isLiteralIP && !allowPrivate && isPrivateIP(bareHost)) {
     throw new Error(`Refusing to fetch ${what} from private/internal network target (${bareHost}): ${rawUrl}`)
   }
