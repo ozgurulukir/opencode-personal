@@ -214,6 +214,9 @@ function handleSessionUpdated(input: {
   // leaves sessions stale (e.g. undo can't reflect a `session.revert`).
   const result = Binary.search(input.store.session, input.sessionID, (s) => s.id)
   if (input.info.time?.archived) {
+    // `info` is a partial patch and may omit `parentID`; use the stored session's
+    // value so archiving a subagent does not wrongly decrement the root total.
+    const parentID = result.found ? input.store.session[result.index].parentID : input.info.parentID
     if (input.directory) clearPendingSessionPatch(input.directory, input.sessionID)
     if (result.found) {
       input.setStore(
@@ -224,7 +227,7 @@ function handleSessionUpdated(input: {
       )
     }
     cleanupSessionCaches(input.setStore, input.sessionID, input.setSessionTodo)
-    if (input.info.parentID) return
+    if (parentID) return
     input.setStore("sessionTotal", (value) => Math.max(0, value - 1))
     return
   }

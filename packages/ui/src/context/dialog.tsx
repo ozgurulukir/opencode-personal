@@ -32,9 +32,13 @@ function init() {
   let nextId = 0
 
   onCleanup(() => {
-    if (timer.current === undefined) return
-    clearTimeout(timer.current)
-    timer.current = undefined
+    if (timer.current !== undefined) {
+      clearTimeout(timer.current)
+      timer.current = undefined
+    }
+    // Dialog content lives in its own root (created in `show`), so it is not
+    // disposed with the provider's owner tree — release it explicitly here.
+    active()?.dispose()
   })
 
   const close = () => {

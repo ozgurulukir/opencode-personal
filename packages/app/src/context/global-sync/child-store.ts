@@ -28,7 +28,7 @@ export function createChildStoreManager(input: {
   translate: (key: string, vars?: Record<string, string | number>) => string
   getSdk: (directory: string) => OpencodeClient
   global: {
-    provider: ProviderListResponse
+    provider: () => ProviderListResponse
   }
 }) {
   const children: Record<string, [Store<State>, SetStoreFunction<State>]> = {}
@@ -226,8 +226,8 @@ export function createChildStoreManager(input: {
             get provider() {
               const EMPTY = { all: [], connected: [], default: {} }
               if (providerQuery.isLoading) return EMPTY
-              if (providerQuery.data?.all.length === 0 && input.global.provider.all.length > 0)
-                return input.global.provider
+              const global = input.global.provider()
+              if (providerQuery.data?.all.length === 0 && global.all.length > 0) return global
               return providerQuery.data ?? EMPTY
             },
             config: {},

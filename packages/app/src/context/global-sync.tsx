@@ -108,8 +108,9 @@ function createGlobalSync() {
   })
   const queryClient = useQueryClient()
 
+  // Global bootstrap emits a burst of events around query completion; this short
+  // window after `bootedAt` is enough to suppress them.
   let bootedAt = 0
-  let bootingRoot = false
   let eventFrame: number | undefined
   let eventTimer: ReturnType<typeof setTimeout> | undefined
 
@@ -211,7 +212,7 @@ function createGlobalSync() {
     translate: language.t,
     getSdk: sdkFor,
     global: {
-      provider: globalStore.provider,
+      provider: () => globalStore.provider,
     },
   })
 
@@ -369,7 +370,7 @@ function createGlobalSync() {
     const directory = e.name
     const key = directoryKey(directory)
     const event = e.details
-    const recent = bootingRoot || Date.now() - bootedAt < 1500
+    const recent = Date.now() - bootedAt < 1500
 
     if (directory === "global") {
       applyGlobalEvent({

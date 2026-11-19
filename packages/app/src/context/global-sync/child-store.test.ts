@@ -23,7 +23,7 @@ describe("createChildStoreManager", () => {
       onDispose() {},
       translate: (key) => key,
       getSdk: () => null!,
-      global: { provider: null! },
+      global: { provider: () => null! },
     })
 
     Array.from({ length: 30 }, (_, index) => `/pinned-${index}`).forEach((directory) => {
@@ -54,7 +54,7 @@ describe("createChildStoreManager", () => {
       onDispose() {},
       translate: (key) => key,
       getSdk: () => null!,
-      global: { provider: null! },
+      global: { provider: () => null! },
     })
 
     const origError = console.error
@@ -66,5 +66,35 @@ describe("createChildStoreManager", () => {
     } finally {
       console.error = origError
     }
+  })
+
+  test("reads the global provider through an accessor, not at construction", () => {
+    const owner = createRoot((dispose) => {
+      const current = getOwner()
+      dispose()
+      return current
+    })
+    if (!owner) throw new Error("owner required")
+
+    let reads = 0
+    createChildStoreManager({
+      owner,
+      isBooting: () => false,
+      isLoadingSessions: () => false,
+      onBootstrap() {},
+      onDispose() {},
+      translate: (key) => key,
+      getSdk: () => null!,
+      global: {
+        provider: () => {
+          reads++
+          return null!
+        },
+      },
+    })
+
+    // Construction must not snapshot the provider (it was empty while loading);
+    // the child store getter calls the accessor on each read instead.
+    expect(reads).toBe(0)
   })
 })

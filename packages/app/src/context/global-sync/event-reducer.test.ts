@@ -261,6 +261,32 @@ describe("applyDirectoryEvent", () => {
     expect(store.session_status.ses_1).toBeUndefined()
   })
 
+  test("archiving a subagent with a partial patch keeps sessionTotal", () => {
+    const [store, setStore] = createStore(
+      baseState({
+        session: [rootSession({ id: "child", parentID: "root" }), rootSession({ id: "root" })],
+        sessionTotal: 1,
+      }),
+    )
+
+    // The archive patch omits `parentID` — the stored session still has it, so
+    // the root total must not be decremented for this subagent.
+    applyDirectoryEvent({
+      event: {
+        type: "session.next.updated",
+        properties: { sessionID: "child", info: { time: { archived: 10 } } },
+      },
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+
+    expect(store.session.map((x) => x.id)).toEqual(["root"])
+    expect(store.sessionTotal).toBe(1)
+  })
+
   test("cleans session caches when deleted and decrements only root totals", () => {
     const cases = [
       { info: rootSession({ id: "ses_1" }), expectedTotal: 1 },
