@@ -17,6 +17,7 @@ import {
   AccountID,
   DeviceCode,
   Info,
+  InvalidServerUrlError,
   RefreshToken,
   AccountServiceError,
   AccountTransportError,
@@ -40,6 +41,7 @@ export {
   AccountServiceError,
   AccountTransportError,
   AccessToken,
+  InvalidServerUrlError,
   RefreshToken,
   DeviceCode,
   UserCode,
@@ -380,7 +382,13 @@ export const layer: Layer.Layer<Service, never, AccountRepo.Service | HttpClient
     })
 
     const login = Effect.fn("Account.login")(function* (server: string) {
-      const normalizedServer = normalizeServerUrl(server)
+      const normalizedServer = yield* Effect.try({
+        try: () => normalizeServerUrl(server),
+        catch: (cause) =>
+          cause instanceof InvalidServerUrlError
+            ? cause
+            : new AccountServiceError({ message: "Invalid server URL", cause }),
+      })
       const response = yield* executeEffectOk(
         HttpClientRequest.post(`${normalizedServer}/auth/device/code`).pipe(
           HttpClientRequest.acceptJson,
@@ -391,10 +399,14 @@ export const layer: Layer.Layer<Service, never, AccountRepo.Service | HttpClient
       const parsed = yield* HttpClientResponse.schemaBodyJson(DeviceAuth)(response).pipe(
         mapAccountServiceError("Failed to decode response"),
       )
+      const verificationUrl = yield* Effect.try({
+        try: () => new URL(parsed.verification_uri_complete, normalizedServer).toString(),
+        catch: (cause) => new AccountServiceError({ message: "Invalid verification URI", cause }),
+      })
       return new Login({
         code: parsed.device_code,
         user: parsed.user_code,
-        url: `${normalizedServer}${parsed.verification_uri_complete}`,
+        url: verificationUrl,
         server: normalizedServer,
         expiry: parsed.expires_in,
         interval: parsed.interval,

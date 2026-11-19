@@ -188,7 +188,10 @@ export const layer: Layer.Layer<Service, never, Auth.Service | Plugin.Service> =
         }
       }
 
-      const result = yield* Effect.promise(() => method.authorize(input.inputs))
+      const result = yield* Effect.tryPromise({
+        try: () => method.authorize(input.inputs),
+        catch: (cause) => new ValidationFailed({ field: "authorize", message: "Authorization failed" }, { cause }),
+      })
       pending.set(input.providerID, result)
       return {
         url: result.url,
@@ -201,13 +204,17 @@ export const layer: Layer.Layer<Service, never, Auth.Service | Plugin.Service> =
       const pending = (yield* InstanceState.get(state)).pending
       const match = pending.get(input.providerID)
       if (!match) return yield* Effect.fail(new OauthMissing({ providerID: input.providerID }))
+      // Consume the pending authorization on first use so a stale entry cannot
+      // be replayed by a later callback, including after a failed exchange.
+      pending.delete(input.providerID)
       if (match.method === "code" && !input.code) {
         return yield* Effect.fail(new OauthCodeMissing({ providerID: input.providerID }))
       }
 
-      const result = yield* Effect.promise(() =>
-        match.method === "code" ? match.callback(input.code!) : match.callback(),
-      )
+      const result = yield* Effect.tryPromise({
+        try: () => (match.method === "code" ? match.callback(input.code!) : match.callback()),
+        catch: (cause) => new OauthCallbackFailed({}, { cause }),
+      })
       if (!result || result.type !== "success") return yield* Effect.fail(new OauthCallbackFailed({}))
 
       if ("key" in result) {
