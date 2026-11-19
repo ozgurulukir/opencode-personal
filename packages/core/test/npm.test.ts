@@ -176,6 +176,37 @@ describe("Npm.install", () => {
     await expect(fs.stat(path.join(tmp.path, "node_modules", "prod-pkg"))).resolves.toBeDefined()
     await expect(fs.stat(path.join(tmp.path, "node_modules", "dev-pkg"))).rejects.toThrow()
   })
+
+  test("reinstalls when the locked version does not satisfy an explicitly requested spec", async () => {
+    await using tmp = await tmpdir()
+    const name = "fixture-install-version-mismatch"
+    await writePackage(tmp.path, { name: "fixture" })
+    await fs.mkdir(path.join(tmp.path, "node_modules"))
+    await Bun.write(
+      path.join(tmp.path, "package-lock.json"),
+      JSON.stringify({
+        lockfileVersion: 3,
+        packages: {
+          "": { dependencies: { [name]: "^2.0.0" } },
+          [`node_modules/${name}`]: { version: "1.0.0" },
+        },
+      }),
+    )
+    // Force reify to fail fast without network; the assertion is that it is attempted at all
+    // (the old name-only check skipped reinstall and returned without error).
+    await Bun.write(path.join(tmp.path, ".npmrc"), "offline=true\n")
+
+    const error = await Effect.gen(function* () {
+      const npm = yield* Npm.Service
+      return yield* npm.install(tmp.path, { add: [{ name, version: "^2.0.0" }] })
+    }).pipe(
+      Effect.scoped,
+      Effect.provide(npmLayer(path.join(tmp.path, "cache"))),
+      Effect.flip,
+      Effect.runPromise,
+    )
+    expect(error._tag).toBe("NpmInstallFailedError")
+  })
 })
 
 describe("Npm.resolveEntryPoint", () => {

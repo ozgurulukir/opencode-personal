@@ -60,7 +60,8 @@ export const resolveEntryPoint = (name: string, dir: string): EntryPoint => {
 
 /**
  * Returns whether an installed version satisfies the version/range requested by a package spec.
- * Non-version specs (tags, file:, git, ...) return true so the existing install fast-path is kept.
+ * A missing or non-string installed version never satisfies (returns false).
+ * Otherwise non-version specs (tags, file:, git, ...) return true to keep the install fast-path.
  */
 export function satisfiesRequestedVersion(pkg: string, installedVersion: unknown): boolean {
   if (typeof installedVersion !== "string") return false
@@ -234,6 +235,18 @@ export const layer = Layer.effect(
 
         for (const name of declared) {
           if (!locked.has(name)) {
+            yield* reify({ dir, add })
+            return
+          }
+        }
+
+        // Names can match while the locked version no longer satisfies an explicitly
+        // requested spec (e.g. locked foo@1.x but add requests foo@^2).
+        const lockPackages = lockJson.packages ?? {}
+        for (const dep of input?.add ?? []) {
+          if (!dep.version) continue
+          const installed = lockPackages[`node_modules/${dep.name}`] as { version?: unknown } | undefined
+          if (!satisfiesRequestedVersion(`${dep.name}@${dep.version}`, installed?.version)) {
             yield* reify({ dir, add })
             return
           }
