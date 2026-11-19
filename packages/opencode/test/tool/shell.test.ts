@@ -162,6 +162,29 @@ describe("tool.shell", () => {
     })
   })
 
+  test("captures output flushed after the process exit event", async () => {
+    await using tmp = await tmpdir()
+    await WithInstance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        const bash = await initBash()
+        // A large burst right before exit is the case where Node can emit
+        // "exit" before stdio "close". The final line must not be dropped.
+        const result = await Effect.runPromise(
+          bash.execute(
+            {
+              command: fill("lines", 5000),
+              description: "Emit trailing output",
+            },
+            ctx,
+          ),
+        )
+        expect(result.metadata.exit).toBe(0)
+        expect(result.output).toContain("5000")
+      },
+    })
+  })
+
   test("falls back from terminal-only configured shell", async () => {
     await using tmp = await tmpdir({
       config: { shell: "fish" },

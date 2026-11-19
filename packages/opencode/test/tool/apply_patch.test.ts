@@ -886,6 +886,53 @@ EOF`
       },
     })
   })
+
+  test("rejects Force Move to the same path without destroying the file", async () => {
+    await using fixture = await tmpdir()
+    const { ctx } = makeCtx()
+
+    await WithInstance.provide({
+      directory: fixture.path,
+      fn: async () => {
+        const target = path.join(fixture.path, "same.txt")
+        await fs.writeFile(target, "original\n", "utf-8")
+
+        // Source and destination resolve to the same real path. Without a guard
+        // the tool writes the new content here and then removes this very file.
+        const patchText =
+          "*** Begin Patch\n*** Update File: same.txt\n*** Force Move to: ./same.txt\n@@\n-original\n+replacement\n*** End Patch"
+
+        const result = await execute({ patchText }, ctx)
+
+        expect(result.metadata.failedHunks.length).toBe(1)
+        expect(result.metadata.failedHunks[0].error).toContain("same as the source")
+        // The file must survive with its original content intact.
+        expect(await fs.readFile(target, "utf-8")).toBe("original\n")
+      },
+    })
+  })
+
+  test("inserts pure-addition hunk at the @@ context position, not EOF", async () => {
+    await using fixture = await tmpdir()
+    const { ctx } = makeCtx()
+
+    await WithInstance.provide({
+      directory: fixture.path,
+      fn: async () => {
+        const target = path.join(fixture.path, "addition_ctx.txt")
+        await fs.writeFile(target, "alpha\nbeta\ngamma\n", "utf-8")
+
+        // A pure-addition chunk anchored to the "beta" context line must be
+        // inserted right after beta, not appended at the end of the file.
+        const patchText =
+          "*** Begin Patch\n*** Update File: addition_ctx.txt\n@@ beta\n+inserted\n*** End Patch"
+
+        await execute({ patchText }, ctx)
+
+        expect(await fs.readFile(target, "utf-8")).toBe("alpha\nbeta\ninserted\ngamma\n")
+      },
+    })
+  })
 })
 
 

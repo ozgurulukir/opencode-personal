@@ -16,6 +16,7 @@ import { Format } from "../format"
 import * as Bom from "@/util/bom"
 import { Todo } from "../session/todo"
 import { projectContainmentError, resolvePath } from "./file-path"
+import { LockRegistry } from "./lock"
 
 export const Parameters = Schema.Struct({
   patchText: Schema.String.annotate({ description: "The full patch text that describes all changes to be made" }),
@@ -48,6 +49,7 @@ export const ApplyPatchTool = Tool.define<
     const format = yield* Format.Service
     const bus = yield* Bus.Service
     const todo = yield* Todo.Service
+    const editLocks = new LockRegistry() // Per-instance: cross-instance edits are not serialized.
 
     const run = Effect.fn("ApplyPatchTool.execute")(function* (
       params: Schema.Schema.Type<typeof Parameters>,
@@ -215,6 +217,15 @@ export const ApplyPatchTool = Tool.define<
 
               const movePath = hunk.move_path ? resolvePath(path.resolve(instance.directory, hunk.move_path)) : undefined
               if (movePath) {
+                // A move whose destination resolves to the source path would write the
+                // new content and then delete that same file, destroying it entirely.
+                if (movePath === filePath) {
+                  failedHunks.push({
+                    path: hunk.path,
+                    error: `Move destination is the same as the source file: ${filePath}`,
+                  })
+                  break
+                }
                 const moveError = projectContainmentError(movePath, instance.directory)
                 if (moveError) {
                   failedHunks.push({
@@ -356,42 +367,49 @@ export const ApplyPatchTool = Tool.define<
 
       for (const change of fileChanges) {
         const edited = change.type === "delete" ? undefined : (change.movePath ?? change.filePath)
-        switch (change.type) {
-          case "add":
-            // Create parent directories (recursive: true is safe on existing/root dirs)
+        // Serialize read-modify-write per destination path, matching EditTool's
+        // LockRegistry usage so concurrent tool calls cannot interleave writes.
+        yield* editLocks.withLock(
+          change.movePath ?? change.filePath,
+          Effect.gen(function* () {
+            switch (change.type) {
+              case "add":
+                // Create parent directories (recursive: true is safe on existing/root dirs)
 
-            yield* afs.writeWithDirs(change.filePath, Bom.join(change.newContent, change.bom))
-            updates.push({ file: change.filePath, event: "add" })
-            break
+                yield* afs.writeWithDirs(change.filePath, Bom.join(change.newContent, change.bom))
+                updates.push({ file: change.filePath, event: "add" })
+                break
 
-          case "update":
-            yield* afs.writeWithDirs(change.filePath, Bom.join(change.newContent, change.bom))
-            updates.push({ file: change.filePath, event: "change" })
-            break
+              case "update":
+                yield* afs.writeWithDirs(change.filePath, Bom.join(change.newContent, change.bom))
+                updates.push({ file: change.filePath, event: "change" })
+                break
 
-          case "move":
-            if (change.movePath) {
-              // Create parent directories (recursive: true is safe on existing/root dirs)
+              case "move":
+                if (change.movePath) {
+                  // Create parent directories (recursive: true is safe on existing/root dirs)
 
-              yield* afs.writeWithDirs(change.movePath!, Bom.join(change.newContent, change.bom))
-              yield* afs.remove(change.filePath)
-              updates.push({ file: change.filePath, event: "unlink" })
-              updates.push({ file: change.movePath, event: "add" })
+                  yield* afs.writeWithDirs(change.movePath!, Bom.join(change.newContent, change.bom))
+                  yield* afs.remove(change.filePath)
+                  updates.push({ file: change.filePath, event: "unlink" })
+                  updates.push({ file: change.movePath, event: "add" })
+                }
+                break
+
+              case "delete":
+                yield* afs.remove(change.filePath)
+                updates.push({ file: change.filePath, event: "unlink" })
+                break
             }
-            break
 
-          case "delete":
-            yield* afs.remove(change.filePath)
-            updates.push({ file: change.filePath, event: "unlink" })
-            break
-        }
-
-        if (edited) {
-          if (yield* format.file(edited)) {
-            yield* Bom.syncFile(afs, edited, change.bom)
-          }
-          yield* bus.publish(File.Event.Edited, { file: edited })
-        }
+            if (edited) {
+              if (yield* format.file(edited)) {
+                yield* Bom.syncFile(afs, edited, change.bom)
+              }
+              yield* bus.publish(File.Event.Edited, { file: edited })
+            }
+          }),
+        )
       }
 
       // Publish file change events
