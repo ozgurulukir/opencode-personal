@@ -2,6 +2,7 @@
 
 import { Script } from "@opencode-ai/script"
 import { $ } from "bun"
+import { appendFile } from "node:fs/promises"
 
 const output = [`version=${Script.version}`]
 const sha = process.env.GITHUB_SHA ?? (await $`git rev-parse HEAD`.text()).trim()
@@ -30,7 +31,7 @@ if (!Script.preview) {
 output.push(`repo=${process.env.GH_REPO}`)
 
 if (process.env.GITHUB_OUTPUT) {
-  await Bun.write(process.env.GITHUB_OUTPUT, output.join("\n"))
+  await appendFile(process.env.GITHUB_OUTPUT, output.join("\n") + "\n")
 }
 
 process.exit(0)
