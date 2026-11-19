@@ -139,7 +139,7 @@
         "@ai-sdk/gateway": "3.0.202",
         "@ai-sdk/google": "3.0.127",
         "@ai-sdk/google-vertex": "4.0.221",
-        "@ai-sdk/groq": "3.0.69",
+        "@ai-sdk/groq": "3.0.83",
         "@ai-sdk/mistral": "3.0.80",
         "@ai-sdk/openai": "3.0.118",
         "@ai-sdk/openai-compatible": "2.0.78",
@@ -509,7 +509,7 @@
 
     "@ai-sdk/google-vertex": ["@ai-sdk/google-vertex@4.0.221", "", { "dependencies": { "@ai-sdk/anthropic": "3.0.135", "@ai-sdk/google": "3.0.138", "@ai-sdk/openai-compatible": "2.0.87", "@ai-sdk/provider": "3.0.19", "@ai-sdk/provider-utils": "4.0.62", "google-auth-library": "^10.5.0" }, "peerDependencies": { "zod": "^3.25.76 || ^4.1.8" } }, "sha512-E6GlSI4brQrt5xBnFaE94SIC2DkzHs3DweUrN0Cb8LeVQj25Kqkx36yqZCK/JVhzsYlvbc49QhfATnY+NSSAlg=="],
 
-    "@ai-sdk/groq": ["@ai-sdk/groq@3.0.69", "", { "dependencies": { "@ai-sdk/provider": "3.0.17", "@ai-sdk/provider-utils": "4.0.54" }, "peerDependencies": { "zod": "^3.25.76 || ^4.1.8" } }, "sha512-MGz/1weC3lzubXJKDhGHoEEyRmfad/cX32/y/odsN60xXMGTHzfedHUlIAX1huOT8UM3EB56I2Fp4FYUXQCV6A=="],
+    "@ai-sdk/groq": ["@ai-sdk/groq@3.0.83", "", { "dependencies": { "@ai-sdk/provider": "3.0.19", "@ai-sdk/provider-utils": "4.0.66" }, "peerDependencies": { "zod": "^3.25.76 || ^4.1.8" } }, "sha512-D9AmSumunXRR2ifYO51XHeiCNmbcyz2VJFFvP3azo8YXfWuKiqKHXiZi15vHvEBwDQvVU13+x3dcLKXjFyMhHg=="],
 
     "@ai-sdk/mistral": ["@ai-sdk/mistral@3.0.80", "", { "dependencies": { "@ai-sdk/provider": "3.0.19", "@ai-sdk/provider-utils": "4.0.65" }, "peerDependencies": { "zod": "^3.25.76 || ^4.1.8" } }, "sha512-K070yjSWXTc2BBnL0tU6xELbuPPVtKQx6UBi5JjZw9TPXTmDTnJJrEJz1CkLmiOKRoXs9EdNpDZtRrH7WFb6vg=="],
 
@@ -3603,6 +3603,10 @@
 
     "@ai-sdk/google-vertex/@ai-sdk/provider-utils": ["@ai-sdk/provider-utils@4.0.62", "", { "dependencies": { "@ai-sdk/provider": "3.0.19", "@standard-schema/spec": "^1.1.0", "eventsource-parser": "^3.0.8", "undici": "^6.28.0" }, "peerDependencies": { "zod": "^3.25.76 || ^4.1.8" } }, "sha512-+FXkZ2e169zASBHP5HAakP0Iai3Eoa8zgh7bnuZExsek3N9HgGt/c7l1Oibdxb79vvsn5Mrg2Sjam80mR6bL8A=="],
 
+    "@ai-sdk/groq/@ai-sdk/provider": ["@ai-sdk/provider@3.0.19", "", { "dependencies": { "json-schema": "^0.4.0" } }, "sha512-5lWq7zSfRaU5ylDESn3sDQjgGl2AI1vjZKO/6JY3aFW70ct4zcP1kN+ZUYOuTXr28fVsYbyu2YFhddLdIgQFZQ=="],
+
+    "@ai-sdk/groq/@ai-sdk/provider-utils": ["@ai-sdk/provider-utils@4.0.66", "", { "dependencies": { "@ai-sdk/provider": "3.0.19", "@standard-schema/spec": "^1.1.0", "eventsource-parser": "^3.0.8", "undici": "^6.28.0" }, "peerDependencies": { "zod": "^3.25.76 || ^4.1.8" } }, "sha512-tITCIYBJlxD4PmDIAI2VXb67yEbWRepvJBJrv2pIY5vMRUta51AFRxLlxm0IexRGdIBGuQ10+ClClZMXtawkbA=="],
+
     "@ai-sdk/mistral/@ai-sdk/provider": ["@ai-sdk/provider@3.0.19", "", { "dependencies": { "json-schema": "^0.4.0" } }, "sha512-5lWq7zSfRaU5ylDESn3sDQjgGl2AI1vjZKO/6JY3aFW70ct4zcP1kN+ZUYOuTXr28fVsYbyu2YFhddLdIgQFZQ=="],
 
     "@ai-sdk/mistral/@ai-sdk/provider-utils": ["@ai-sdk/provider-utils@4.0.65", "", { "dependencies": { "@ai-sdk/provider": "3.0.19", "@standard-schema/spec": "^1.1.0", "eventsource-parser": "^3.0.8", "undici": "^6.28.0" }, "peerDependencies": { "zod": "^3.25.76 || ^4.1.8" } }, "sha512-9K/75/v+nVAKIBKEm7wTwrv49FpQOtGgE0w1+xPo/FQ2JivcWK2VjO7r5uqnzofURlXSuzHBjdoPtQJjO9tyjw=="],
@@ -4140,6 +4144,8 @@
     "@ai-sdk/fireworks/@ai-sdk/provider-utils/undici": ["undici@5.29.0", "", { "dependencies": { "@fastify/busboy": "^2.0.0" } }, "sha512-raqeBD6NQK4SkWhQzeYKd1KmIG6dllBOTt55Rmkt4HtI9mwdWtJljnrXjAFUBLTSN67HWrOIZ3EPF4kjUw80Bg=="],
 
     "@ai-sdk/google-vertex/@ai-sdk/provider-utils/undici": ["undici@6.28.0", "", {}, "sha512-LIY910g9TI13YS95lrMFrs8Rm/u/irgHeTWoKCoteeJ04CUJ92eEfj0rVn+7VKMPBpUPiUoBKfhNyLI23EE/KA=="],
+
+    "@ai-sdk/groq/@ai-sdk/provider-utils/undici": ["undici@6.28.0", "", {}, "sha512-LIY910g9TI13YS95lrMFrs8Rm/u/irgHeTWoKCoteeJ04CUJ92eEfj0rVn+7VKMPBpUPiUoBKfhNyLI23EE/KA=="],
 
     "@ai-sdk/mistral/@ai-sdk/provider-utils/undici": ["undici@6.28.0", "", {}, "sha512-LIY910g9TI13YS95lrMFrs8Rm/u/irgHeTWoKCoteeJ04CUJ92eEfj0rVn+7VKMPBpUPiUoBKfhNyLI23EE/KA=="],
 
