@@ -10,6 +10,14 @@ const fileConcurrency = 8
 /** Cap both the index and each downloaded skill file; skill URLs come from (possibly remote) config. */
 export const MAX_SKILL_BYTES = 2 * 1024 * 1024
 
+/** A fetch failure that will never succeed on retry (SSRF rejection, 4xx, size cap, bad body). */
+class PermanentFetchError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = "PermanentFetchError"
+  }
+}
+
 class IndexSkill extends Schema.Class<IndexSkill>("IndexSkill")({
   name: Schema.String,
   files: Schema.Array(Schema.String),
@@ -37,16 +45,31 @@ export const layer: Layer.Layer<Service, never, AppFileSystem.Service | Path.Pat
       // All fetches go through the SSRF guard and are byte-capped: skill URLs can
       // originate from untrusted (including remote well-known) config.
       const fetchBytes = async (url: string, what: string, maxBytes: number): Promise<Uint8Array> => {
-        const res = await guardedFetch(url, what)
-        if (!res.ok) throw new Error(`failed to fetch ${what} from ${url}: ${res.status}`)
+        let res: Response
+        try {
+          res = await guardedFetch(url, what)
+        } catch (error) {
+          // SSRF/scheme/DNS rejections from the guard are permanent — never retry them.
+          throw new PermanentFetchError(
+            `fetch guard rejected ${what} from ${url}: ${error instanceof Error ? error.message : String(error)}`,
+          )
+        }
+        if (!res.ok) {
+          const err = `failed to fetch ${what} from ${url}: ${res.status}`
+          // 408/429/5xx are transient; other 4xx (e.g. 404) are permanent.
+          if (res.status === 408 || res.status === 429 || res.status >= 500) throw new Error(err)
+          throw new PermanentFetchError(err)
+        }
         const length = res.headers.get("content-length")
         if (length) {
           const size = Number(length)
           if (Number.isFinite(size) && size > maxBytes) {
-            throw new Error(`Response size for ${what} from ${url} (${size} bytes) exceeds maximum allowed size of ${maxBytes} bytes`)
+            throw new PermanentFetchError(
+              `Response size for ${what} from ${url} (${size} bytes) exceeds maximum allowed size of ${maxBytes} bytes`,
+            )
           }
         }
-        if (!res.body) throw new Error(`missing response body for ${what} from ${url}`)
+        if (!res.body) throw new PermanentFetchError(`missing response body for ${what} from ${url}`)
         const reader = res.body.getReader()
         const chunks: Uint8Array[] = []
         let bytes = 0
@@ -57,7 +80,9 @@ export const layer: Layer.Layer<Service, never, AppFileSystem.Service | Path.Pat
             bytes += value.byteLength
             if (bytes > maxBytes) {
               await reader.cancel()
-              throw new Error(`Response size for ${what} from ${url} exceeds maximum allowed size of ${maxBytes} bytes`)
+              throw new PermanentFetchError(
+                `Response size for ${what} from ${url} exceeds maximum allowed size of ${maxBytes} bytes`,
+              )
             }
             chunks.push(value)
           }
@@ -74,7 +99,13 @@ export const layer: Layer.Layer<Service, never, AppFileSystem.Service | Path.Pat
       }
 
       const retry = <A, E>(effect: Effect.Effect<A, E>) =>
-        effect.pipe(Effect.retry({ times: 2, schedule: Schedule.exponential(200).pipe(Schedule.jittered) }))
+        effect.pipe(
+          Effect.retry({
+            while: (error) => !(error instanceof PermanentFetchError),
+            times: 2,
+            schedule: Schedule.exponential(200).pipe(Schedule.jittered),
+          }),
+        )
 
       const safePath = (base: string, target: string): string | null => {
         const dest = path.resolve(base, target)
@@ -108,7 +139,13 @@ export const layer: Layer.Layer<Service, never, AppFileSystem.Service | Path.Pat
         const data = yield* retry(
           Effect.tryPromise(async () => {
             const body = await fetchBytes(index, "skill index", MAX_SKILL_BYTES)
-            return Schema.decodeUnknownSync(Index)(JSON.parse(new TextDecoder().decode(body)))
+            try {
+              return Schema.decodeUnknownSync(Index)(JSON.parse(new TextDecoder().decode(body)))
+            } catch (error) {
+              throw new PermanentFetchError(
+                `invalid skill index at ${index}: ${error instanceof Error ? error.message : String(error)}`,
+              )
+            }
           }),
         ).pipe(
           Effect.catch((err) =>

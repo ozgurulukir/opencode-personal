@@ -537,12 +537,14 @@ export const layer = Layer.effect(
 
     const loadConfig = Effect.fnUntraced(function* (
       text: string,
-      options: { path: string } | { dir: string; source: string },
+      options: ({ path: string } | { dir: string; source: string }) & { allowFile?: boolean },
     ) {
       const source = "path" in options ? options.path : options.source
       const expanded = yield* Effect.promise(() =>
         ConfigVariable.substitute(
-          "path" in options ? { text, type: "path", path: options.path } : { text, type: "virtual", ...options },
+          "path" in options
+            ? { text, type: "path", path: options.path, allowFile: options.allowFile }
+            : { text, type: "virtual", dir: options.dir, source: options.source, allowFile: options.allowFile },
         ),
       )
       const parsed = ConfigParse.jsonc(expanded, source)
@@ -736,6 +738,8 @@ export const layer = Layer.effect(
             const next = yield* loadConfig(JSON.stringify(remoteConfig), {
               dir: path.dirname(source),
               source,
+              // Remote-sourced config is untrusted: never let its body read local files.
+              allowFile: false,
             })
             yield* merge(source, next, "global")
             log.debug("loaded remote config from well-known", { url })
@@ -764,6 +768,8 @@ export const layer = Layer.effect(
               const next = yield* loadConfig(JSON.stringify(configOpt.value), {
                 dir: path.dirname(source),
                 source,
+                // Remote-sourced config is untrusted: never let its body read local files.
+                allowFile: false,
               })
               for (const providerID of Object.keys(next.provider ?? {})) {
                 consoleManagedProviders.add(providerID)
