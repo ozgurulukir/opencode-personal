@@ -2909,4 +2909,28 @@ describe("compaction.shared", () => {
     expect(result.head[2]).toBe(head[2])
     expect(result.toolOutputMaxChars).toBe(1000)
   })
+
+  test("planHead passes a fresh array reference on each drop (memo-safe)", async () => {
+    const head = Array.from({ length: 4 }, () => sharedMsg("assistant"))
+    const seen: MessageV2.WithParts[][] = []
+    const result = await Effect.runPromise(
+      CompactionShared.planHead({
+        head,
+        promptTokens: 0,
+        summarizerCapacity: 100,
+        toolOutputMaxChars: 1000,
+        estimate: (slice) => {
+          seen.push(slice)
+          return Effect.succeed(slice.length * 100)
+        },
+      }),
+    )
+    // 400 > 100 → drop → 300 > 100 → drop → 200 > 100 → drop → 100 ≤ 100 stop.
+    expect(result.dropped).toBe(3)
+    expect(result.head).toHaveLength(1)
+    // Identity-memoizing estimate callbacks (compaction.ts estimateHead) rely
+    // on each drop handing them a distinct array; a mutated shared reference
+    // would make the memo return the pre-drop token count for every iteration.
+    expect(new Set(seen).size).toBe(seen.length)
+  })
 })

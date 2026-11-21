@@ -171,13 +171,16 @@ export const planHead = Effect.fnUntraced(function* (input: {
   toolOutputMaxChars: number
   estimate: (messages: MessageV2.WithParts[], toolOutputMaxChars: number) => Effect.Effect<number>
 }) {
-  const head = [...input.head]
+  let head = input.head.slice()
   let dropped = 0
   let toolOutputMaxChars = input.toolOutputMaxChars
   let headTokens = yield* input.estimate(head, toolOutputMaxChars)
 
   while (head.length > 1 && headTokens + input.promptTokens > input.summarizerCapacity) {
-    head.shift()
+    // Each drop must produce a NEW array reference: identity-memoizing
+    // estimate callbacks (compaction.ts estimateHead) would otherwise return
+    // the pre-drop token count for the same mutated array.
+    head = head.slice(1)
     dropped++
     headTokens = yield* input.estimate(head, toolOutputMaxChars)
   }
@@ -189,7 +192,3 @@ export const planHead = Effect.fnUntraced(function* (input: {
 
   return { head, dropped, toolOutputMaxChars, headTokens }
 })
-
-
-
-
