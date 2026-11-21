@@ -35,3 +35,24 @@ describe("MCP tool key collisions", () => {
     expect(Object.keys(map).sort()).toEqual(["mcp_server_get-weather", "mcp_server_get_weather"])
   })
 })
+
+describe("MCP cross-client prompt/resource key collisions", () => {
+  test("first client wins when two servers sanitize to the same key", () => {
+    const merged = MCP.mergeClientEntries("prompts", [
+      ["my_server:run", { name: "run", client: "my.server" }],
+      ["my_server:run", { name: "run", client: "my_server" }],
+    ])
+
+    expect(Object.keys(merged)).toEqual(["my_server:run"])
+    expect(merged["my_server:run"].client).toBe("my.server")
+  })
+
+  test("distinct keys are all kept", () => {
+    const merged = MCP.mergeClientEntries("resources", [
+      ["a_server:run", { name: "run", client: "a" }],
+      ["b_server:run", { name: "run", client: "b" }],
+    ])
+
+    expect(Object.keys(merged).sort()).toEqual(["a_server:run", "b_server:run"])
+  })
+})

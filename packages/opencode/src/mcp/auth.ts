@@ -3,6 +3,9 @@ import z from "zod"
 import { Global } from "@opencode-ai/core/global"
 import { Effect, Layer, Context } from "effect"
 import { AppFileSystem } from "@opencode-ai/core/filesystem"
+import * as Log from "@opencode-ai/core/util/log"
+
+const log = Log.create({ service: "mcp.auth" })
 
 export const Tokens = z.object({
   accessToken: z.string(),
@@ -55,6 +58,20 @@ export const layer = Layer.effect(
   Effect.gen(function* () {
     const fs = yield* AppFileSystem.Service
 
+    // A failed token write must be loud and observed, never silently
+    // swallowed: each write logs the failure, then defects at this explicit
+    // boundary. The interface deliberately stays data-level — widening the
+    // error channel would ripple through every update* flow; the defect is the
+    // raw fs error, so the HTTP errorLayer renders it as an internal-error
+    // response rather than a structured NamedError one.
+    const writeOrDie = (mcpName: string, data: Record<string, Entry>) =>
+      fs.writeJson(filepath, data, 0o600).pipe(
+        Effect.tapError((error) =>
+          Effect.sync(() => log.error("failed to write mcp-auth.json", { mcpName, error: String(error) })),
+        ),
+        Effect.orDie,
+      )
+
     const all = Effect.fn("McpAuth.all")(function* () {
       return yield* fs.readJson(filepath).pipe(
         Effect.map((data) => data as Record<string, Entry>),
@@ -78,13 +95,13 @@ export const layer = Layer.effect(
     const set = Effect.fn("McpAuth.set")(function* (mcpName: string, entry: Entry, serverUrl?: string) {
       const data = yield* all()
       if (serverUrl) entry.serverUrl = serverUrl
-      yield* fs.writeJson(filepath, { ...data, [mcpName]: entry }, 0o600).pipe(Effect.orDie)
+      yield* writeOrDie(mcpName, { ...data, [mcpName]: entry })
     })
 
     const remove = Effect.fn("McpAuth.remove")(function* (mcpName: string) {
       const data = yield* all()
       delete data[mcpName]
-      yield* fs.writeJson(filepath, data, 0o600).pipe(Effect.orDie)
+      yield* writeOrDie(mcpName, data)
     })
 
     const updateField = <K extends keyof Entry>(field: K, spanName: string) =>

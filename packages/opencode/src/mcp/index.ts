@@ -166,7 +166,15 @@ function listTools(key: string, client: MCPClient, timeout: number) {
 
       log.warn("failed to validate MCP tool output schemas, retrying without output schema validation", { key, error })
       return Effect.tryPromise({
-        try: () => client.request({ method: "tools/list" }, TolerantListToolsResultSchema as any, { timeout }),
+        // The MCP SDK resolves its own zod version; cast our tolerant schema to
+        // the request-schema type the SDK's client.request expects (see the
+        // boundary note on TolerantListToolsResultSchema above).
+        try: () =>
+          client.request(
+            { method: "tools/list" },
+            TolerantListToolsResultSchema as unknown as Parameters<MCPClient["request"]>[1],
+            { timeout },
+          ),
         catch: (err) => (err instanceof Error ? err : new Error(String(err))),
       }).pipe(
         Effect.map(
@@ -243,6 +251,10 @@ export function buildToolMap(
 ): Record<string, Tool> {
   const result: Record<string, Tool> = {}
   const seen = new Set<string>()
+  // Tracks the first raw "<server>/<tool>" owner of each key so collision
+  // warnings name BOTH original names — one allow/deny rule governs the key,
+  // so users need to know exactly which tools share it.
+  const owners = new Map<string, string>()
   for (const { clientName, client, tools, timeout } of entries) {
     for (const mcpTool of tools) {
       const key = "mcp_" + sanitize(clientName) + "_" + sanitize(mcpTool.name)
@@ -251,10 +263,12 @@ export function buildToolMap(
           key,
           server: clientName,
           tool: mcpTool.name,
+          collidesWith: owners.get(key),
         })
         continue
       }
       seen.add(key)
+      owners.set(key, `${clientName}/${mcpTool.name}`)
       result[key] = convertMcpTool(mcpTool, client, clientName, timeout)
     }
   }
@@ -286,13 +300,54 @@ function fetchFromClient<T extends { name: string }>(
     Effect.map((items) => {
       const out: Record<string, T & { client: string }> = {}
       const sanitizedClient = sanitize(clientName)
+      // First definition wins; later sanitized-name collisions are warned
+      // instead of silently overwriting (mirrors buildToolMap above).
+      const seen = new Map<string, string>()
       for (const item of items) {
-        out[sanitizedClient + ":" + sanitize(item.name)] = { ...item, client: clientName }
+        const key = sanitizedClient + ":" + sanitize(item.name)
+        if (seen.has(key)) {
+          log.warn(`duplicate MCP ${label} key ignored (name collision after sanitization)`, {
+            key,
+            server: clientName,
+            name: item.name,
+            collidesWith: seen.get(key),
+          })
+          continue
+        }
+        seen.set(key, item.name)
+        out[key] = { ...item, client: clientName }
       }
       return out
     }),
     Effect.orElseSucceed(() => undefined),
   )
+}
+
+// Cross-client merge for prompts/resources: keys embed the sanitized server
+// name, so distinct servers ("my.server" vs "my_server") can still collide
+// after sanitization. First-wins + warn, mirroring buildToolMap — the
+// intra-client dedupe inside fetchFromClient cannot see these.
+export function mergeClientEntries<T extends { name: string }>(
+  label: string,
+  entries: Array<[string, T & { client: string }]>,
+): Record<string, T & { client: string }> {
+  const out: Record<string, T & { client: string }> = {}
+  const owners = new Map<string, string>()
+  for (const [key, item] of entries) {
+    const owner = owners.get(key)
+    if (owner) {
+      log.warn(`duplicate MCP ${label} key ignored (name collision after sanitization)`, {
+        key,
+        server: item.client,
+        name: item.name,
+        collidesWith: owner,
+      })
+      continue
+    }
+    owners.set(key, `${item.client}/${item.name}`)
+    out[key] = item
+  }
+  return out
 }
 
 interface CreateResult {
@@ -884,7 +939,7 @@ export const layer = Layer.effect(
         ([clientName, client]) =>
           fetchFromClient(clientName, client, listFn, label).pipe(Effect.map((items) => Object.entries(items ?? {}))),
         { concurrency: "unbounded" },
-      ).pipe(Effect.map((results) => Object.fromEntries<T & { client: string }>(results.flat())))
+      ).pipe(Effect.map((results) => mergeClientEntries(label, results.flat())))
     }
 
     const prompts = Effect.fn("MCP.prompts")(function* () {
