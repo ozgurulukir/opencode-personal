@@ -49,7 +49,9 @@ export async function read(): Promise<Content | undefined> {
   const os = platform()
 
   if (os === "darwin") {
-    const tmpfile = path.join(tmpdir(), "opencode-clipboard.png")
+    // Randomized name: a predictable temp file invites symlink/TOCTOU
+    // tampering with the clipboard image payload.
+    const tmpfile = path.join(tmpdir(), `opencode-clipboard-${crypto.randomUUID()}.png`)
     try {
       await Process.run(
         [
@@ -118,6 +120,11 @@ const getCopyMethod = lazy(async () => {
   if (os === "darwin" && which("osascript")) {
     Log.Default.info("clipboard: using osascript")
     return async (text: string) => {
+      // AppleScript string literals DO support backslash escapes (\" and \\)
+      // — backslashes first, then quotes, produces a valid literal for any
+      // copied text. The script reaches osascript as a direct argv element,
+      // so no shell layer is involved. Failures stay best-effort like every
+      // other fallback in this file; OSC 52 already ran before this.
       const escaped = text.replace(/\\/g, "\\\\").replace(/"/g, '\\"')
       await Process.run(["osascript", "-e", `set the clipboard to "${escaped}"`], { nothrow: true })
     }

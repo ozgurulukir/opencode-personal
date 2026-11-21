@@ -1,5 +1,5 @@
 import type { Argv } from "yargs"
-import { spawn } from "child_process"
+import { Process } from "@/util/process"
 import { Database } from "@/storage/db"
 import { drizzle } from "drizzle-orm/bun-sqlite"
 import { Database as BunDatabase } from "bun:sqlite"
@@ -64,10 +64,14 @@ const QueryCommand = cmd({
       }
       return
     }
-    const child = spawn("sqlite3", [Database.Path], {
-      stdio: "inherit",
+    // Route through Process.spawn so the validated-spawn path (executable
+    // allowlist checks, abort/timeout plumbing) applies here too.
+    const child = Process.spawn(["sqlite3", Database.Path], {
+      stdin: "inherit",
+      stdout: "inherit",
+      stderr: "inherit",
     })
-    await new Promise((resolve) => child.on("close", resolve))
+    await child.exited
   },
 })
 
