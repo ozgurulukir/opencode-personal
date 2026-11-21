@@ -112,6 +112,13 @@ export const Client = lazy(() => {
       mode: typeof OPENCODE_MIGRATIONS !== "undefined" ? "bundled" : "dev",
     })
     if (Flag.OPENCODE_SKIP_MIGRATIONS) {
+      // Fail loud: skipping migrations leaves the schema stale and surfaces as
+      // cryptic "no such table" runtime errors, so every skip is logged — the
+      // flag is a debugging escape hatch, not a deployment mode.
+      log.warn(
+        "OPENCODE_SKIP_MIGRATIONS is set: all migration SQL is replaced with no-ops; the schema will not match the code",
+        { count: entries.length },
+      )
       for (const item of entries) {
         item.sql = "select 1;"
       }

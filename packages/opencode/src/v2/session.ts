@@ -494,16 +494,20 @@ export const layer = Layer.effect(
                 )!,
           )
         }
-        const query = Database.Client()
-          .select()
-          .from(SessionTable)
-          .where(conditions.length > 0 ? and(...conditions) : undefined)
-          .orderBy(
-            order === "asc" ? asc(SessionTable.time_created) : desc(SessionTable.time_created),
-            order === "asc" ? asc(SessionTable.id) : desc(SessionTable.id),
-          )
-
-        const rows = input.limit === undefined ? query.all() : query.limit(input.limit).all()
+        // Join the ambient transaction context like every other read in this
+        // file — a raw Database.Client() query runs outside any enclosing
+        // transaction and could observe a torn snapshot.
+        const rows = Database.use((db) => {
+          const query = db
+            .select()
+            .from(SessionTable)
+            .where(conditions.length > 0 ? and(...conditions) : undefined)
+            .orderBy(
+              order === "asc" ? asc(SessionTable.time_created) : desc(SessionTable.time_created),
+              order === "asc" ? asc(SessionTable.id) : desc(SessionTable.id),
+            )
+          return input.limit === undefined ? query.all() : query.limit(input.limit).all()
+        })
         return fromRows(direction === "previous" ? rows.toReversed() : rows)
       }),
       messages: Effect.fn("V2Session.messages")(function* (input) {
@@ -527,12 +531,22 @@ export const layer = Layer.effect(
           if (row.type !== "shell") return false
           if (!toolCallIDs) {
             toolCallIDs = new Set<string>()
+            // SQL-side prefilter: only fetch assistant rows whose JSON can
+            // contain a tool item (any serialized tool part includes the
+            // `"tool"` substring). Rows that pass are still parsed in JS
+            // below, keeping the fail-open semantics; rows without tool
+            // items are no longer shipped and parsed at all.
             const assistants = Database.use((db) =>
               db
                 .select({ data: sql<string>`${SessionMessageTable.data}` })
                 .from(SessionMessageTable)
                 .where(
-                  and(eq(SessionMessageTable.session_id, input.sessionID), eq(SessionMessageTable.type, "assistant")),
+                  and(
+                    eq(SessionMessageTable.session_id, input.sessionID),
+                    eq(SessionMessageTable.type, "assistant"),
+                    // pattern %"tool"% — matches any serialized tool part
+                    sql`${SessionMessageTable.data} LIKE ${'%"tool"%'}`,
+                  ),
                 )
                 .all(),
             )
