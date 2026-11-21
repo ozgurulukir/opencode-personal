@@ -226,6 +226,13 @@ export const layer: Layer.Layer<
         return true
       })
 
+      // Tool calls are forbidden while generating a compaction summary.
+      const assertNotDuringSummary = (toolName: string) => {
+        if (ctx.assistantMessage.summary) {
+          throw new Error(`Tool call not allowed while generating summary: ${toolName}`)
+        }
+      }
+
       const handleEvent = Effect.fnUntraced(function* (value: StreamEvent) {
         switch (value.type) {
           case "start":
@@ -289,9 +296,7 @@ export const layer: Layer.Layer<
             return
 
           case "tool-input-start":
-            if (ctx.assistantMessage.summary) {
-              throw new Error(`Tool call not allowed while generating summary: ${value.toolName}`)
-            }
+            assertNotDuringSummary(value.toolName)
             // V2 read-model projection: emit the SessionEvent so V2 projectors populate SessionMessageTable.
             yield* sync.run(SessionEvent.Tool.Input.Started.Sync, {
               sessionID: ctx.sessionID,
@@ -332,9 +337,7 @@ export const layer: Layer.Layer<
           }
 
           case "tool-call": {
-            if (ctx.assistantMessage.summary) {
-              throw new Error(`Tool call not allowed while generating summary: ${value.toolName}`)
-            }
+            assertNotDuringSummary(value.toolName)
             const input = SessionMessage.normalizeToolInput(value.input)
             const toolCall = yield* readToolCall(value.toolCallId)
             // V2 read-model projection: emit the SessionEvent so V2 projectors populate SessionMessageTable.

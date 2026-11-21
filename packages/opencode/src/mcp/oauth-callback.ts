@@ -2,6 +2,7 @@ import { createConnection } from "net"
 import { createServer } from "http"
 import * as Log from "@opencode-ai/core/util/log"
 import { OAUTH_CALLBACK_PORT, OAUTH_CALLBACK_PATH, parseRedirectUri } from "./oauth-provider"
+import { escapeHtml } from "../util/escape-html"
 
 const log = Log.create({ service: "mcp.oauth-callback" })
 
@@ -28,22 +29,6 @@ const HTML_SUCCESS = `<!DOCTYPE html>
   <script>setTimeout(() => window.close(), 2000);</script>
 </body>
 </html>`
-
-function escapeHtml(str: string): string {
-  return str.replace(
-    /[&<>"']/g,
-    (c) =>
-      ({
-        "&": "&amp;",
-        "<": "&lt;",
-        ">": "&gt;",
-        '"': "&quot;",
-        "'": "&#39;",
-      })[c] || c,
-  )
-}
-
-export { escapeHtml as _escapeHtml }
 
 const HTML_ERROR = (error: string) => `<!DOCTYPE html>
 <html>

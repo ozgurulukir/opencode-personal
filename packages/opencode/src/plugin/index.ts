@@ -100,8 +100,11 @@ async function applyPlugin(load: PluginLoader.Loaded, input: PluginInput, hooks:
     return
   }
 
-  for (const server of getLegacyPlugins(load.mod)) {
-    hooks.push(await server(input, load.options))
+  if (getLegacyPlugins(load.mod).length > 0) {
+    // Legacy plugins are independent; load them concurrently while keeping
+    // the hooks array in declaration order.
+    hooks.push(...(await Promise.all(getLegacyPlugins(load.mod).map((server) => server(input, load.options)))))
+    return
   }
 }
 

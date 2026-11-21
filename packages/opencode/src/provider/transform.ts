@@ -992,6 +992,11 @@ export function smallOptions(model: Model) {
         return { store: false, reasoningEffort: "medium" }
       }
       if (model.api.id.includes("search-api")) return { store: false }
+      // Codex ids never expose `minimal`; default them to `low`, and
+      // gpt-5-pro exposes only high-tier efforts (see variants()) so it gets
+      // no effort default at all. Sending an unexposed tier would be rejected.
+      if (model.api.id.includes("codex")) return { store: false, reasoningEffort: "low" }
+      if (GPT5_PRO_RE.test(model.api.id) || GPT5_VERSIONED_PRO_RE.test(model.api.id)) return { store: false }
       if (model.api.id.includes("5.") || model.api.id.includes("5-mini")) {
         return { store: false, reasoningEffort: "low" }
       }
