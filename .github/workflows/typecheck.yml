@@ -32,5 +32,14 @@ jobs:
         working-directory: packages/diff-wasm
         run: bun run build:wasm
 
+      - name: Delete stale incremental build info
+        # tsgo -b caches results in *.tsbuildinfo; turbo --force does not clear
+        # them, so a stale cache can mask real errors locally that only surface
+        # on a clean box. CI always typechecks from scratch.
+        run: find packages -name "*.tsbuildinfo" -delete
+
+      - name: Check patches/ matches patchedDependencies
+        run: bun script/check-patches.ts
+
       - name: Run typecheck
         run: bun typecheck

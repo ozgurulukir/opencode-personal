@@ -75,6 +75,11 @@ for (const genDir of ["src/v2/gen"] as const) {
       `        ? (TData extends Record<string, unknown> ? TData[keyof TData] : TData) | (TError extends Record<string, unknown> ? TError[keyof TError] : TError)`,
     )
   if (patchedTypes !== typesText) await Bun.write(typesFile, patchedTypes)
+  // Fail loud on silent patch drift (mirrors the client assertion above): if
+  // the generator's output no longer matches, the TError union fix is lost.
+  if (!patchedTypes.includes("TError extends Record<string, unknown> ? TError[keyof TError] : TError")) {
+    throw new Error("Generated SDK types changed; update the TError union patch")
+  }
 
   const paramsFile = path.join(dir, genDir, "core", "params.gen.ts")
   const paramsText = await Bun.file(paramsFile).text()
@@ -88,6 +93,14 @@ for (const genDir of ["src/v2/gen"] as const) {
       `    Object.defineProperty(record, key, {\n      value,\n      writable: true,\n      enumerable: true,\n      configurable: true,\n    })`,
     )
   if (patchedParams !== paramsText) await Bun.write(paramsFile, patchedParams)
+  // Fail loud on silent patch drift: a no-op replace here would silently drop
+  // the prototype-pollution guard or the defineProperty hardening.
+  if (!patchedParams.includes('if (key === "__proto__" || key === "constructor" || key === "prototype") return')) {
+    throw new Error("Generated SDK params changed; update the prototype-pollution guard patch")
+  }
+  if (!patchedParams.includes("Object.defineProperty(record, key")) {
+    throw new Error("Generated SDK params changed; update the defineProperty patch")
+  }
 }
 
 await $`bun prettier --write src/v2/gen/client/types.gen.ts`

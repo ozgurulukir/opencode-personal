@@ -229,6 +229,32 @@ if (!skipInstall) {
 // Resolve @opentui/core's parser.worker.js (may be in bun cache)
 const opentuiLocalPath = path.resolve(dir, "node_modules/@opentui/core/parser.worker.js")
 const opentuiRootPath = path.resolve(dir, "../../node_modules/@opentui/core/parser.worker.js")
+
+// Fail loud on a stale package-local @opentui/core left behind by a prior
+// dependency era: `bun install` is incremental and does not prune it, and the
+// compiled binary embeds the resolved module graph as-is — a stale duplicate
+// makes the TUI render then quit silently (exit 0, no stack trace).
+const readOpentuiVersion = (pkgJsonPath: string) => {
+  try {
+    return (JSON.parse(fs.readFileSync(pkgJsonPath, "utf8")) as { version?: string }).version
+  } catch {
+    return undefined
+  }
+}
+const opentuiLocalVersion = readOpentuiVersion(path.resolve(dir, "node_modules/@opentui/core/package.json"))
+const opentuiRootVersion = readOpentuiVersion(path.resolve(dir, "../../node_modules/@opentui/core/package.json"))
+if (
+  opentuiLocalVersion &&
+  opentuiRootVersion &&
+  opentuiLocalVersion !== opentuiRootVersion
+) {
+  throw new Error(
+    `Stale duplicate @opentui/core detected: package-local ${opentuiLocalVersion} != root ${opentuiRootVersion}. ` +
+      "The compiled binary embeds the module graph as-is, so a stale copy breaks the TUI silently. " +
+      "Delete node_modules (root and every packages/*), run bun install, then rebuild.",
+  )
+}
+
 const parserWorker = fs.realpathSync(fs.existsSync(opentuiLocalPath) ? opentuiLocalPath : opentuiRootPath)
 
 // Compiled binaries cannot load the tree-sitter worker from Bun's virtual
@@ -415,6 +441,14 @@ for (const item of targets) {
   const platformLib = path.join(coreDir, `../core-${item.os}-${item.arch}/${platformLibName}`)
   if (fs.existsSync(platformLib)) {
     fs.copyFileSync(platformLib, `dist/${name}/bin/${platformLibName}`)
+  } else {
+    // Fail loud instead of silently shipping a binary whose TUI cannot start:
+    // the @opentui/core platform package must be installed for every target.
+    throw new Error(
+      `Missing native library ${platformLibName} (expected at ${platformLib}). ` +
+        "The compiled binary would ship without the OpenTUI renderer. " +
+        "Install dependencies (bun install) and rebuild.",
+    )
   }
 
   await Bun.file(`dist/${name}/package.json`).write(

@@ -36,13 +36,23 @@ async function embeddedWorkerSource(): Promise<string | undefined> {
  * No-op in dev (worker resolves from node_modules) and when the user already
  * overrode OTUI_TREE_SITTER_WORKER_PATH.
  */
+/**
+ * Whether the on-disk worker must be (re)written: missing file OR content
+ * drift. Guards against stale workers after an @opentui/core upgrade without
+ * a version bump — the stale copy would keep being served (raw markdown
+ * output).
+ */
+export function workerNeedsWrite(file: string, source: string): boolean {
+  return !fs.existsSync(file) || fs.readFileSync(file, "utf8") !== source
+}
+
 export async function ensureTreeSitterWorker(): Promise<void> {
   if (process.env.OTUI_TREE_SITTER_WORKER_PATH) return
   if (!isCompiledBinary()) return
   const source = await embeddedWorkerSource()
   if (!source) return
   const file = workerFilePath()
-  if (!fs.existsSync(file)) {
+  if (workerNeedsWrite(file, source)) {
     fs.mkdirSync(path.dirname(file), { recursive: true })
     await Bun.write(file, source)
   }
