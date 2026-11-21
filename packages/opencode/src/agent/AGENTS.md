@@ -57,7 +57,8 @@ Subagent sessions are **not** automatically cleaned up. They persist in the data
 ## MAX_SUBAGENT_NESTING_LEVELS semantics — 3 levels allowed
 
 `MAX_SUBAGENT_NESTING_LEVELS = 3` with `depth > MAX_SUBAGENT_NESTING_LEVELS` in
-`checkNesting()` allows exactly 3 levels of subagent nesting (ancestor chains up
-to 3 links spawn freely; a 4th link is denied with the "Maximum subagent nesting
-levels (3) exceeded" error). The check was `depth >=` and allowed only 2 levels
-until it was aligned with the constant name (issue #564).
+`checkNesting()` allows exactly 3 levels of subagent nesting (chains of up to 3
+sessions — the spawning session plus its ancestors — spawn freely; a 4th
+session in the walk is denied with the "Maximum subagent nesting levels (3)
+exceeded" error). The check was `depth >=` and allowed only 2 levels until it
+was aligned with the constant name (issue #564).

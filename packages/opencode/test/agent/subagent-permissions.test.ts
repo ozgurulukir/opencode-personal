@@ -274,8 +274,8 @@ describe("checkNesting", () => {
   })
 
   test("checkNesting allows a 3-level chain (the constant's namesake)", () => {
-    // start → mid → root: three ancestor links — exactly 3 levels of
-    // subagents, allowed now that the check is `depth > max`.
+    // start → mid → root: three walked sessions (two parentID edges) — exactly
+    // 3 levels of subagents, allowed now that the check is `depth > max`.
     const mid = SessionID.make("ses_mid")
     const get = (id: SessionID) =>
       Effect.succeed(id === start ? { parentID: mid } : id === mid ? { parentID: root } : {})
@@ -283,7 +283,7 @@ describe("checkNesting", () => {
   })
 
   test("checkNesting fails at a 4-level chain with the exact message", () => {
-    // start → mid → root → great: a fourth ancestor link exceeds
+    // start → mid → root → great: a fourth walked session exceeds
     // MAX_SUBAGENT_NESTING_LEVELS — byte-identical to the V1/V2 spawn-path error
     const mid = SessionID.make("ses_mid")
     const great = SessionID.make("ses_great")
