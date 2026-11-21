@@ -149,8 +149,9 @@ concrete model while V2 `create` writes `input.model` only when supplied.
 
 `subagent()` enforces a maximum nesting levels of `MAX_SUBAGENT_NESTING_LEVELS = 3` (defined in
 `agent/subagent-permissions.ts`). The depth check walks the `parentID` chain
-iteratively before creating the child session. If the chain length is already 3 or
-more, the subagent creation is rejected with an error. This prevents deeply nested
+iteratively before creating the child session. If the chain length is already 4 or
+more, the subagent creation is rejected with an error — 3 levels of subagents are
+allowed, matching the constant name. This prevents deeply nested
 recursive subagents from causing resource exhaustion.
 
 ## V2 subagent() error handling — use `Effect.fail`, not `Effect.die`

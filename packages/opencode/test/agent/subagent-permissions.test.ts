@@ -273,12 +273,30 @@ describe("checkNesting", () => {
     expect(Effect.runSync(checkNesting({ startID: start, get }))).toBeUndefined()
   })
 
-  test("checkNesting fails at depth 3 with the exact message", () => {
-    // start → mid → root: the walk reaches depth 3 (>= MAX) and fails before
-    // fetching root — byte-identical to the V1/V2 spawn-path error
+  test("checkNesting allows a 3-level chain (the constant's namesake)", () => {
+    // start → mid → root: three ancestor links — exactly 3 levels of
+    // subagents, allowed now that the check is `depth > max`.
     const mid = SessionID.make("ses_mid")
     const get = (id: SessionID) =>
       Effect.succeed(id === start ? { parentID: mid } : id === mid ? { parentID: root } : {})
+    expect(Effect.runSync(checkNesting({ startID: start, get }))).toBeUndefined()
+  })
+
+  test("checkNesting fails at a 4-level chain with the exact message", () => {
+    // start → mid → root → great: a fourth ancestor link exceeds
+    // MAX_SUBAGENT_NESTING_LEVELS — byte-identical to the V1/V2 spawn-path error
+    const mid = SessionID.make("ses_mid")
+    const great = SessionID.make("ses_great")
+    const get = (id: SessionID) =>
+      Effect.succeed(
+        id === start
+          ? { parentID: mid }
+          : id === mid
+            ? { parentID: root }
+            : id === root
+              ? { parentID: great }
+              : {},
+      )
     expect(() => Effect.runSync(checkNesting({ startID: start, get }))).toThrow(
       new Error("Maximum subagent nesting levels (3) exceeded"),
     )
