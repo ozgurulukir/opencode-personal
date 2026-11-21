@@ -123,6 +123,10 @@ export const SessionMessageTable = sqliteTable(
   (table) => [
     index("session_message_session_idx").on(table.session_id),
     index("session_message_session_type_idx").on(table.session_id, table.type),
+    // Cursor pagination orders by id within one session (messages() in
+    // v2/session.ts); the single-column session_id index alone made SQLite
+    // sort or scan beyond the session subset.
+    index("session_message_session_id_idx").on(table.session_id, table.id),
     index("session_message_time_created_idx").on(table.time_created),
   ],
 )

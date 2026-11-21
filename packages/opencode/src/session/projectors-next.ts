@@ -137,6 +137,12 @@ export function sqlite(db: Database.TxOrDb, sessionID: SessionID): SessionMessag
             data: encodeMessageData(data),
           },
         ])
+        // Defense-in-depth: a duplicate key must not abort the enclosing
+        // session transaction. Duplicates are not reachable through the seq
+        // guard in SyncEvent (replay checks `seq <= latest`; live runs write
+        // the seq row in the same transaction), but a replayed event hitting
+        // an already-projected row should be a no-op, not a crash.
+        .onConflictDoNothing()
         .run()
     },
     finish() {},
