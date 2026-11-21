@@ -1,11 +1,25 @@
 import { describe, expect, test } from "bun:test"
 import { APICallError, InvalidResponseDataError } from "ai"
+import { Effect } from "effect"
 import { MessageV2 } from "../../src/session/message-v2"
 import { ProviderTransform } from "@/provider/transform"
 import type { Provider } from "@/provider/provider"
 import { ModelID, ProviderID } from "../../src/provider/schema"
 import { SessionID, MessageID, PartID } from "../../src/session/schema"
 import { Question } from "../../src/question"
+import * as EffectLogger from "@opencode-ai/core/effect/logger"
+
+// Test-local port of the removed synchronous `MessageV2.toModelMessages`
+// wrapper: tests drive the Effect variant through a plain runPromise so
+// production code keeps a single Effect-context entrypoint.
+const toModelMessages = (
+  input: Parameters<typeof MessageV2.toModelMessagesEffect>[0],
+  model: Parameters<typeof MessageV2.toModelMessagesEffect>[1],
+  options?: Parameters<typeof MessageV2.toModelMessagesEffect>[2],
+) =>
+  Effect.runPromise(
+    MessageV2.toModelMessagesEffect(input, model, options).pipe(Effect.provide(EffectLogger.layer)),
+  )
 
 const sessionID = SessionID.make("session")
 const providerID = ProviderID.make("test")
@@ -127,7 +141,7 @@ describe("session.message-v2.toModelMessage", () => {
       },
     ]
 
-    expect(await MessageV2.toModelMessages(input, model)).toStrictEqual([
+    expect(await toModelMessages(input, model)).toStrictEqual([
       {
         role: "user",
         content: [{ type: "text", text: "hello" }],
@@ -152,7 +166,7 @@ describe("session.message-v2.toModelMessage", () => {
       },
     ]
 
-    expect(await MessageV2.toModelMessages(input, model)).toStrictEqual([])
+    expect(await toModelMessages(input, model)).toStrictEqual([])
   })
 
   test("filters out user messages with only empty text parts", async () => {
@@ -171,7 +185,7 @@ describe("session.message-v2.toModelMessage", () => {
       },
     ]
 
-    expect(await MessageV2.toModelMessages(input, model)).toStrictEqual([])
+    expect(await toModelMessages(input, model)).toStrictEqual([])
   })
 
   test("filters empty user text parts while keeping non-empty parts", async () => {
@@ -195,7 +209,7 @@ describe("session.message-v2.toModelMessage", () => {
       },
     ]
 
-    expect(await MessageV2.toModelMessages(input, model)).toStrictEqual([
+    expect(await toModelMessages(input, model)).toStrictEqual([
       {
         role: "user",
         content: [{ type: "text", text: "hello" }],
@@ -231,7 +245,7 @@ describe("session.message-v2.toModelMessage", () => {
       },
     ]
 
-    expect(await MessageV2.toModelMessages(input, model)).toStrictEqual([
+    expect(await toModelMessages(input, model)).toStrictEqual([
       {
         role: "user",
         content: [{ type: "text", text: "hello" }],
@@ -298,7 +312,7 @@ describe("session.message-v2.toModelMessage", () => {
       },
     ]
 
-    expect(await MessageV2.toModelMessages(input, model)).toStrictEqual([
+    expect(await toModelMessages(input, model)).toStrictEqual([
       {
         role: "user",
         content: [
@@ -368,7 +382,7 @@ describe("session.message-v2.toModelMessage", () => {
       },
     ]
 
-    expect(await MessageV2.toModelMessages(input, model)).toStrictEqual([
+    expect(await toModelMessages(input, model)).toStrictEqual([
       {
         role: "user",
         content: [{ type: "text", text: "run tool" }],
@@ -474,7 +488,7 @@ describe("session.message-v2.toModelMessage", () => {
       },
     ]
 
-    const result = ProviderTransform.message(await MessageV2.toModelMessages(input, anthropicModel), anthropicModel, {})
+    const result = ProviderTransform.message(await toModelMessages(input, anthropicModel), anthropicModel, {})
     expect(result).toHaveLength(3)
     expect(result[2].role).toBe("tool")
     expect(result[2].content[0]).toMatchObject({
@@ -555,7 +569,7 @@ describe("session.message-v2.toModelMessage", () => {
       },
     ]
 
-    expect(await MessageV2.toModelMessages(input, bedrockModel)).toStrictEqual([
+    expect(await toModelMessages(input, bedrockModel)).toStrictEqual([
       {
         role: "user",
         content: [{ type: "text", text: "run tool" }],
@@ -648,7 +662,7 @@ describe("session.message-v2.toModelMessage", () => {
       },
     ]
 
-    expect(await MessageV2.toModelMessages(input, model)).toStrictEqual([
+    expect(await toModelMessages(input, model)).toStrictEqual([
       {
         role: "user",
         content: [{ type: "text", text: "run tool" }],
@@ -717,7 +731,7 @@ describe("session.message-v2.toModelMessage", () => {
       },
     ]
 
-    expect(await MessageV2.toModelMessages(input, model)).toStrictEqual([
+    expect(await toModelMessages(input, model)).toStrictEqual([
       {
         role: "user",
         content: [{ type: "text", text: "run tool" }],
@@ -784,7 +798,7 @@ describe("session.message-v2.toModelMessage", () => {
       },
     ]
 
-    expect(await MessageV2.toModelMessages(input, model, { toolOutputMaxChars: 4 })).toStrictEqual([
+    expect(await toModelMessages(input, model, { toolOutputMaxChars: 4 })).toStrictEqual([
       {
         role: "user",
         content: [{ type: "text", text: "run tool" }],
@@ -854,7 +868,7 @@ describe("session.message-v2.toModelMessage", () => {
       },
     ]
 
-    expect(await MessageV2.toModelMessages(input, model)).toStrictEqual([
+    expect(await toModelMessages(input, model)).toStrictEqual([
       {
         role: "user",
         content: [{ type: "text", text: "run tool" }],
@@ -931,7 +945,7 @@ describe("session.message-v2.toModelMessage", () => {
       },
     ]
 
-    expect(await MessageV2.toModelMessages(input, model)).toStrictEqual([
+    expect(await toModelMessages(input, model)).toStrictEqual([
       {
         role: "user",
         content: [{ type: "text", text: "run tool" }],
@@ -982,7 +996,7 @@ describe("session.message-v2.toModelMessage", () => {
       },
     ]
 
-    expect(await MessageV2.toModelMessages(input, model)).toStrictEqual([])
+    expect(await toModelMessages(input, model)).toStrictEqual([])
   })
 
   test("includes aborted assistant messages only when they have non-step-start/reasoning content", async () => {
@@ -1025,7 +1039,7 @@ describe("session.message-v2.toModelMessage", () => {
       },
     ]
 
-    expect(await MessageV2.toModelMessages(input, model)).toStrictEqual([
+    expect(await toModelMessages(input, model)).toStrictEqual([
       {
         role: "assistant",
         content: [
@@ -1089,7 +1103,7 @@ describe("session.message-v2.toModelMessage", () => {
     ]
 
     expect(
-      ProviderTransform.message(await MessageV2.toModelMessages(input, openrouterModel), openrouterModel, {}),
+      ProviderTransform.message(await toModelMessages(input, openrouterModel), openrouterModel, {}),
     ).toStrictEqual([
       {
         role: "assistant",
@@ -1134,7 +1148,7 @@ describe("session.message-v2.toModelMessage", () => {
       },
     ]
 
-    expect(await MessageV2.toModelMessages(input, model)).toStrictEqual([
+    expect(await toModelMessages(input, model)).toStrictEqual([
       {
         role: "assistant",
         content: [{ type: "text", text: "first" }],
@@ -1161,7 +1175,7 @@ describe("session.message-v2.toModelMessage", () => {
       },
     ]
 
-    expect(await MessageV2.toModelMessages(input, model)).toStrictEqual([])
+    expect(await toModelMessages(input, model)).toStrictEqual([])
   })
 
   test("converts pending/running tool calls to error results to prevent dangling tool_use", async () => {
@@ -1208,7 +1222,7 @@ describe("session.message-v2.toModelMessage", () => {
       },
     ]
 
-    const result = await MessageV2.toModelMessages(input, model)
+    const result = await toModelMessages(input, model)
 
     expect(result).toStrictEqual([
       {
@@ -1291,7 +1305,7 @@ describe("session.message-v2.toModelMessage", () => {
       },
     ]
 
-    const result = await MessageV2.toModelMessages(input, model)
+    const result = await toModelMessages(input, model)
 
     expect(result[1]).toMatchObject({
       role: "assistant",
@@ -1333,7 +1347,7 @@ describe("session.message-v2.toModelMessage", () => {
       },
     ]
 
-    const result = await MessageV2.toModelMessages(input, model)
+    const result = await toModelMessages(input, model)
 
     // step-start splits into two assistant messages; SDK's groupIntoBlocks merges them later
     expect(result).toHaveLength(2)
@@ -1361,7 +1375,7 @@ describe("session.message-v2.toModelMessage", () => {
       },
     ]
 
-    const result = await MessageV2.toModelMessages(input, model)
+    const result = await toModelMessages(input, model)
 
     expect(result).toHaveLength(1)
     const texts = (result[0].content as any[]).filter((p) => p.type === "text")
@@ -1383,7 +1397,7 @@ describe("session.message-v2.toModelMessage", () => {
       },
     ]
 
-    const result = await MessageV2.toModelMessages(input, model)
+    const result = await toModelMessages(input, model)
 
     expect(result).toHaveLength(1)
     const texts = (result[0].content as any[]).filter((p) => p.type === "text")
@@ -1402,7 +1416,7 @@ describe("session.message-v2.toModelMessage", () => {
       },
     ]
 
-    const result = await MessageV2.toModelMessages(input, model)
+    const result = await toModelMessages(input, model)
 
     expect(result).toHaveLength(1)
     const texts = (result[0].content as any[]).filter((p) => p.type === "text")

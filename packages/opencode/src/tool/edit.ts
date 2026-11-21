@@ -61,12 +61,15 @@ export const EditTool = Tool.define<
       parameters: Parameters,
       execute: (params: Schema.Schema.Type<typeof Parameters>, ctx: Tool.Context) =>
         Effect.gen(function* () {
+          // Validation failures are typed (Effect.fail) rather than bare throws
+          // so the error intent is explicit; Tool.wrap's orDie boundary still
+          // funnels them into the tool-error stream part the model sees.
           if (!params.filePath) {
-            throw new Error("filePath is required")
+            return yield* Effect.fail(new Error("filePath is required"))
           }
 
           if (params.oldString === params.newString) {
-            throw new Error("No changes to apply: oldString and newString are identical.")
+            return yield* Effect.fail(new Error("No changes to apply: oldString and newString are identical."))
           }
 
           const instance = yield* InstanceState.context
@@ -76,7 +79,7 @@ export const EditTool = Tool.define<
           const resolvedFilePath = resolvePath(filePath)
           const containmentError = projectContainmentError(resolvedFilePath, instance.directory)
           if (containmentError) {
-            throw new Error(containmentError)
+            return yield* Effect.fail(new Error(containmentError))
           }
           yield* assertExternalDirectoryEffect(ctx, resolvedFilePath)
 
@@ -125,8 +128,9 @@ export const EditTool = Tool.define<
               }
 
               const info = yield* afs.stat(resolvedFilePath).pipe(Effect.catch(() => Effect.succeed(undefined)))
-              if (!info) throw new Error(`File ${resolvedFilePath} not found`)
-              if (info.type === "Directory") throw new Error(`Path is a directory, not a file: ${resolvedFilePath}`)
+              if (!info) return yield* Effect.fail(new Error(`File ${resolvedFilePath} not found`))
+              if (info.type === "Directory")
+                return yield* Effect.fail(new Error(`Path is a directory, not a file: ${resolvedFilePath}`))
               const source = yield* Bom.readFile(afs, resolvedFilePath)
               contentOld = source.text
 
@@ -134,7 +138,15 @@ export const EditTool = Tool.define<
               const old = convertToLineEnding(normalizeLineEndings(params.oldString), ending)
               const replacement = convertToLineEnding(normalizeLineEndings(params.newString), ending)
 
-               const next = Bom.split(replace(contentOld, old, replacement, params.replaceAll))
+              // replace() throws for "oldString not found" / "found multiple
+              // matches" / "identical strings" — wrap so an LLM typo in
+              // oldString surfaces as a clean failure (mirrors apply_patch.ts)
+              // instead of relying on the throw.
+              const replaced = yield* Effect.try({
+                try: () => replace(contentOld, old, replacement, params.replaceAll),
+                catch: (error) => (error instanceof Error ? error : new Error(String(error))),
+              })
+              const next = Bom.split(replaced)
               const desiredBom = source.bom || next.bom
               contentNew = next.text
 

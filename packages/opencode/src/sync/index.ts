@@ -71,6 +71,13 @@ export interface Interface {
     data: Event<Def>["data"],
     options?: { publish?: boolean },
   ) => Effect.Effect<void>
+  // Emits several events atomically: every seq read + projection shares one
+  // "immediate" transaction, so a crash can never leave a prefix applied.
+  // Entry defs may differ per slot; data is typed against its own def.
+  readonly runBatch: <const Defs extends readonly [Definition, ...Definition[]]>(
+    entries: { readonly [K in keyof Defs]: { readonly def: Defs[K]; readonly data: Event<Defs[K]>["data"] } },
+    options?: { publish?: boolean },
+  ) => Effect.Effect<void>
   readonly replay: (event: SerializedEvent, options?: { publish: boolean; ownerID?: string }) => Effect.Effect<void>
   readonly replayAll: (
     events: SerializedEvent[],
@@ -192,6 +199,54 @@ export const layer = Layer.effect(Service)(
       )
     })
 
+    const runBatch: Interface["runBatch"] = Effect.fn("SyncEvent.runBatch")(function* (entries, options) {
+      // Validate every entry up-front (mirroring run()) so a validation defect
+      // can never abort the shared transaction halfway through the batch.
+      for (const entry of entries) {
+        const agg = (entry.data as Record<string, string>)[entry.def.aggregate]
+        if (agg == null) {
+          throw new Error(
+            `SyncEvent.runBatch: "${entry.def.aggregate}" required but not found: ${JSON.stringify(entry.data)}`,
+          )
+        }
+        if (entry.def.version !== versions.get(entry.def.type)) {
+          throw new Error(`SyncEvent.runBatch: running old versions of events is not allowed: ${entry.def.type}`)
+        }
+      }
+
+      const { publish = true } = options || {}
+      const context = publish
+        ? {
+            instance: yield* InstanceState.context,
+            workspace: yield* InstanceState.workspaceID,
+          }
+        : undefined
+
+      // One "immediate" transaction for the whole batch. Each per-event seq
+      // read + projection joins it (Database.transaction reuses the ambient
+      // tx), matching run()'s per-event guarantees while keeping the batch
+      // atomic with respect to concurrent writers.
+      Database.transaction(
+        (tx) => {
+          for (const entry of entries as readonly { def: Definition; data: Event<Definition>["data"] }[]) {
+            const agg = (entry.data as Record<string, string>)[entry.def.aggregate]
+            const id = EventID.ascending()
+            const row = tx
+              .select({ seq: EventSequenceTable.seq })
+              .from(EventSequenceTable)
+              .where(eq(EventSequenceTable.aggregate_id, agg))
+              .get()
+            const seq = row?.seq != null ? row.seq + 1 : 0
+            const event = { id, seq, aggregateID: agg, data: entry.data }
+            process(entry.def, event, { publish, context })
+          }
+        },
+        {
+          behavior: "immediate",
+        },
+      )
+    })
+
     const remove: Interface["remove"] = Effect.fn("SyncEvent.remove")(function* (aggregateID) {
       Database.transaction((tx) => {
         tx.delete(EventSequenceTable).where(eq(EventSequenceTable.aggregate_id, aggregateID)).run()
@@ -201,6 +256,7 @@ export const layer = Layer.effect(Service)(
 
     return Service.of({
       run,
+      runBatch,
       replay,
       replayAll,
       remove,

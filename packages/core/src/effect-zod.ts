@@ -68,7 +68,11 @@ function walk(ast: SchemaAST.AST): z.ZodTypeAny {
 }
 
 function walkUncached(ast: SchemaAST.AST): z.ZodTypeAny {
-  const override = (ast.annotations as any)?.[ZodOverride] as z.ZodTypeAny | undefined
+  // Annotations carry symbol-keyed values the AST type doesn't declare; read
+  // them through a structural record cast (see ZodOverride above).
+  const override = (ast.annotations as Record<symbol, unknown> | undefined)?.[ZodOverride] as
+    | z.ZodTypeAny
+    | undefined
   // `description` annotations layer on top of an override so callers can
   // reuse a shared override schema (e.g. `SessionID`) and still add a
   // per-field description on the outer wrapper.
@@ -113,11 +117,10 @@ function encoded(ast: SchemaAST.AST): z.ZodTypeAny {
 // decodeTo case) resolve synchronously, so running with no services is safe.
 // Effectful / middleware-based transforms will surface as Effect defects.
 function decode(transformation: SchemaAST.Link["transformation"], value: unknown): unknown {
-  const exit = Effect.runSyncExit(
-    (transformation.decode as any).run(Option.some(value), EMPTY_PARSE_OPTIONS) as Effect.Effect<
-      Option.Option<unknown>
-    >,
-  )
+  // Bridge to the structural DecodeLink shape — the AST's declared Getter type
+  // is wider than the decode-run shape decodeTo actually builds here.
+  const link = transformation as unknown as DecodeLink["transformation"]
+  const exit = Effect.runSyncExit(link.decode.run(Option.some(value), EMPTY_PARSE_OPTIONS))
   if (exit._tag === "Failure") throw new Error(`effect-zod: transform failed: ${String(exit.cause)}`)
   return Option.getOrElse(exit.value, () => value)
 }
@@ -150,7 +153,8 @@ function applyChecks(out: z.ZodTypeAny, checks: SchemaAST.Checks, ast: SchemaAST
     for (const filter of unhandled) {
       const issue = filter.run(value, ast, EMPTY_PARSE_OPTIONS)
       if (!issue) continue
-      const message = issueMessage(issue) ?? (filter.annotations as any)?.message ?? "Validation failed"
+      const annotated = (filter.annotations as { message?: unknown } | undefined)?.message as string | undefined
+      const message = issueMessage(issue) ?? annotated ?? "Validation failed"
       ctx.addIssue({ code: "custom", message })
     }
   })

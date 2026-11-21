@@ -423,4 +423,62 @@ describe("SyncEvent", () => {
       ),
     )
   })
+
+  describe("runBatch", () => {
+    it.live(
+      "inserts every event row in one transaction with per-event seq",
+      provideTmpdirInstance(() =>
+        Effect.gen(function* () {
+          const { Created, Sent } = setup()
+          const id = MessageID.ascending()
+          yield* SyncEvent.use.runBatch([
+            { def: Created, data: { id, name: "first" } },
+            { def: Sent, data: { item_id: id, to: "james" } },
+          ])
+          const rows = Database.use((db) => db.select().from(EventTable).all())
+          expect(rows).toHaveLength(2)
+          const byType = new Map(rows.map((row) => [row.type, row]))
+          expect(byType.get("item.created.1")).toMatchObject({ aggregate_id: id, seq: 0 })
+          expect(byType.get("item.sent.1")).toMatchObject({ aggregate_id: id, seq: 1 })
+        }),
+      ),
+    )
+
+    it.live(
+      "increments seq across successive batches for the same aggregate",
+      provideTmpdirInstance(() =>
+        Effect.gen(function* () {
+          const { Created } = setup()
+          const id = MessageID.ascending()
+          yield* SyncEvent.use.runBatch([
+            { def: Created, data: { id, name: "first" } },
+            { def: Created, data: { id, name: "second" } },
+          ])
+          yield* SyncEvent.use.runBatch([{ def: Created, data: { id, name: "third" } }])
+          const rows = Database.use((db) => db.select().from(EventTable).all())
+          expect(rows.map((row) => row.seq)).toEqual([0, 1, 2])
+        }),
+      ),
+    )
+
+    it.live(
+      "rejects an invalid entry before any projection is applied",
+      provideTmpdirInstance(() =>
+        Effect.gen(function* () {
+          const { Created, Sent } = setup()
+          const id = MessageID.ascending()
+          yield* expectDefect(
+            SyncEvent.use.runBatch([
+              { def: Created, data: { id, name: "first" } },
+              // Missing the "item_id" aggregate field — must abort the whole batch.
+              { def: Sent, data: { to: "james" } } as never,
+            ]),
+            /required but not found/,
+          )
+          const rows = Database.use((db) => db.select().from(EventTable).all())
+          expect(rows).toHaveLength(0)
+        }),
+      ),
+    )
+  })
 })
