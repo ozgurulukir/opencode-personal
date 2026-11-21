@@ -392,11 +392,14 @@ function pathContainsLength(parent: string, child: string) {
 function openEditorSocket(connection: EditorConnection, WebSocketImpl: typeof WebSocket) {
   if (!connection.authToken) return new WebSocketImpl(connection.url)
 
+  // Bun's runtime WebSocket accepts per-instance headers, but the DOM lib's
+  // constructor type only declares the string `protocols` param — bridge the
+  // option bag at this runtime boundary.
   return new WebSocketImpl(connection.url, {
     headers: {
       "x-claude-code-ide-authorization": connection.authToken,
     },
-  } as any)
+  } as unknown as string)
 }
 
 function parseMessage(value: unknown) {

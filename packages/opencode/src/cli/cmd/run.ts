@@ -16,7 +16,7 @@ import path from "path"
 import { pathToFileURL } from "url"
 import { Effect } from "effect"
 import { UI } from "../ui"
-import { effectCmd } from "../effect-cmd"
+import { effectCmd, CliError } from "../effect-cmd"
 import { Flag } from "@opencode-ai/core/flag/flag"
 import { ServerAuth } from "@/server/auth"
 import { EOL } from "os"
@@ -235,9 +235,14 @@ export const RunCommand = effectCmd({
     yield* Effect.promise(async () => {
       const rawMessage = [...args.message, ...(args["--"] || [])].join(" ")
       const thinking = args.interactive ? (args.thinking ?? true) : (args.thinking ?? false)
+      // Domain failures throw CliError instead of calling process.exit(1):
+      // the rejection surfaces through Effect.promise as a defect (die), which
+      // runPromise unwraps via causeSquash at the boundary — effectCmd's
+      // finally (instance store disposal) still runs on every exit, and the
+      // top-level FormatError recognizes the unwrapped CliError and formats
+      // the message with the exit code.
       const die = (message: string): never => {
-        UI.error(message)
-        process.exit(1)
+        throw new CliError({ message, exitCode: 1 })
       }
       const dieInteractive = (error: unknown): never => {
         if (error instanceof Error && error.message === INTERACTIVE_INPUT_ERROR) {
@@ -284,8 +289,7 @@ export const RunCommand = effectCmd({
           process.chdir(path.isAbsolute(args.dir) ? args.dir : path.join(root, args.dir))
           return process.cwd()
         } catch {
-          UI.error("Failed to change directory to " + args.dir)
-          process.exit(1)
+          throw new CliError({ message: "Failed to change directory to " + args.dir, exitCode: 1 })
         }
       })()
       const attachHeaders = args.attach
@@ -306,8 +310,7 @@ export const RunCommand = effectCmd({
         for (const filePath of list) {
           const resolvedPath = path.resolve(args.attach ? root : (directory ?? root), filePath)
           if (!(await Filesystem.exists(resolvedPath))) {
-            UI.error(`File not found: ${filePath}`)
-            process.exit(1)
+            throw new CliError({ message: `File not found: ${filePath}`, exitCode: 1 })
           }
 
           const mime = (await Filesystem.isDir(resolvedPath)) ? "application/x-directory" : "text/plain"
@@ -326,13 +329,11 @@ export const RunCommand = effectCmd({
       const initialInput = resolveRunInput(rawMessage, piped)
 
       if (message.trim().length === 0 && !args.command && !args.interactive) {
-        UI.error("You must provide a message or a command")
-        process.exit(1)
+        throw new CliError({ message: "You must provide a message or a command", exitCode: 1 })
       }
 
       if (args.fork && !args.continue && !args.session) {
-        UI.error("--fork requires --continue or --session")
-        process.exit(1)
+        throw new CliError({ message: "--fork requires --continue or --session", exitCode: 1 })
       }
 
       const rules: Permission.Ruleset = args.interactive
@@ -370,8 +371,7 @@ export const RunCommand = effectCmd({
             .catch(() => undefined)
 
           if (!current?.data) {
-            UI.error("Session not found")
-            process.exit(1)
+            throw new CliError({ message: "Session not found", exitCode: 1 })
           }
 
           if (args.fork) {
@@ -499,8 +499,7 @@ export const RunCommand = effectCmd({
           return next
         }
 
-        UI.error("Failed to resolve remote directory")
-        process.exit(1)
+        throw new CliError({ message: "Failed to resolve remote directory", exitCode: 1 })
       }
 
       async function localAgent() {
@@ -579,8 +578,7 @@ export const RunCommand = effectCmd({
       async function execute(sdk: OpencodeClient) {
         const sess = await session(sdk)
         if (!sess?.id) {
-          UI.error("Session not found")
-          process.exit(1)
+          throw new CliError({ message: "Session not found", exitCode: 1 })
         }
         const sessionID = sess.id
 
@@ -624,14 +622,15 @@ export const RunCommand = effectCmd({
           }
           // Await the event drain before returning: the top-level finally runs
           // process.exit(), which would otherwise kill the still-draining SSE
-          // consumer and truncate buffered output/tool events.
+          // consumer and truncate buffered output/tool events. Failures throw
+          // CliError/rethrow so effectCmd's finally (instance disposal) runs
+          // and the top-level handler formats the error.
           const drain = loop(ctx, events, { native: true }).then(
             (err) => {
-              if (err) process.exit(1)
+              if (err) throw new CliError({ message: err, exitCode: 1 })
             },
             (e) => {
-              console.error(e)
-              process.exit(1)
+              throw e
             },
           )
 

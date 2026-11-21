@@ -105,9 +105,19 @@ export const SessionListCommand = effectCmd({
           return
         }
 
-        proc.stdin.write(output)
+        // The pager may exit early (e.g. `less` quit immediately): the write
+        // callback surfaces EPIPE instead of an unhandled stream error, and
+        // `exited` can reject via the child `error` event — swallow both so a
+        // closed pager never crashes the command.
+        try {
+          await new Promise<void>((resolve, reject) => {
+            proc.stdin!.write(output, (error) => (error ? reject(error) : resolve()))
+          })
+        } catch {
+          // pager closed its stdin early — remaining output is dropped
+        }
         proc.stdin.end()
-        await proc.exited
+        await proc.exited.catch(() => {})
       })
     } else {
       console.log(output)

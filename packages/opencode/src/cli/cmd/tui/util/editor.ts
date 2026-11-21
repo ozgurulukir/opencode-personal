@@ -5,19 +5,22 @@ import { join } from "node:path"
 import { CliRenderer } from "@opentui/core"
 import { Filesystem } from "@/util/filesystem"
 import { Process } from "@/util/process"
+import { editorArgs } from "./editor-args"
 
 export async function open(opts: { value: string; renderer: CliRenderer }): Promise<string | undefined> {
   const editor = process.env["VISUAL"] || process.env["EDITOR"]
   if (!editor) return
 
-  const filepath = join(tmpdir(), `${Date.now()}.md`)
+  // Randomized name: a predictable temp file invites symlink/TOCTOU tampering
+  // with the editor payload.
+  const filepath = join(tmpdir(), `opencode-editor-${crypto.randomUUID()}.md`)
   await using _ = defer(async () => rm(filepath, { force: true }))
 
   await Filesystem.write(filepath, opts.value)
   opts.renderer.suspend()
   opts.renderer.currentRenderBuffer.clear()
   try {
-    const parts = editor.split(" ")
+    const parts = editorArgs(editor)
     const proc = Process.spawn([...parts, filepath], {
       stdin: "inherit",
       stdout: "inherit",
