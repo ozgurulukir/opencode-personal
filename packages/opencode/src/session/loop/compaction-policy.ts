@@ -52,7 +52,10 @@ export function createAutoCompaction(
     if (CompactionTrigger.breakerTripped(input.consecutiveAutoCompactions)) {
       const error = new NamedError.Unknown({ message: CompactionTrigger.BREAKER_MESSAGE })
       yield* deps.bus.publish(Session.Event.Error, { sessionID: input.sessionID, error: error.toObject() })
-      throw error
+      // Fail typed instead of throwing: `compaction.create` has an empty error
+      // channel, so this is the effect's only failure source, and call sites
+      // catch it to end the prompt cleanly rather than dying with a defect.
+      return yield* Effect.fail(error)
     }
     yield* deps.compaction.create({
       sessionID: input.sessionID,

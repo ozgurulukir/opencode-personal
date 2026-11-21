@@ -644,22 +644,21 @@ export const layer: Layer.Layer<Service, never, Bus.Service | Storage.Service | 
 
     const patch = (sessionID: SessionID, info: Patch) =>
       Effect.gen(function* () {
-        // Both emissions must land in one SQLite transaction: SyncEvent.run
-        // joins the ambient transaction context, so a crash between them can
-        // no longer leave the V1 event recorded while the V2 event is missing.
-        // The effects run on the current fiber with the captured environment
-        // because a sync transaction callback cannot yield.
-        const env = yield* Effect.context<never>()
-        Database.transaction(() => {
-          Effect.runSync(sync.run(Event.Updated, { sessionID, info }).pipe(Effect.provide(env)))
-          Effect.runSync(
-            sync.run(SessionEvent.Updated.Sync, {
+        // Both emissions must land in one SQLite transaction: runBatch reads
+        // the per-event seq and projects inside a shared "immediate"
+        // transaction, so a crash between them can no longer leave the V1
+        // event recorded while the V2 event is missing.
+        yield* sync.runBatch([
+          { def: Event.Updated, data: { sessionID, info } },
+          {
+            def: SessionEvent.Updated.Sync,
+            data: {
               sessionID,
               timestamp: DateTime.makeUnsafe(Date.now()),
               info,
-            }).pipe(Effect.provide(env)),
-          )
-        })
+            },
+          },
+        ])
       })
 
     const touch = Effect.fn("Session.touch")(function* (sessionID: SessionID) {

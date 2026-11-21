@@ -17,6 +17,19 @@ import type { Agent } from "../../src/agent/agent"
 import { MessageV2 } from "../../src/session/message-v2"
 import { SessionID, MessageID } from "../../src/session/schema"
 import { AppRuntime } from "../../src/effect/app-runtime"
+import * as EffectLogger from "@opencode-ai/core/effect/logger"
+
+// Test-local port of the removed synchronous `MessageV2.toModelMessages`
+// wrapper: tests drive the Effect variant through a plain runPromise so
+// production code keeps a single Effect-context entrypoint.
+const toModelMessages = (
+  input: Parameters<typeof MessageV2.toModelMessagesEffect>[0],
+  model: Parameters<typeof MessageV2.toModelMessagesEffect>[1],
+  options?: Parameters<typeof MessageV2.toModelMessagesEffect>[2],
+) =>
+  Effect.runPromise(
+    MessageV2.toModelMessagesEffect(input, model, options).pipe(Effect.provide(EffectLogger.layer)),
+  )
 
 async function getModel(providerID: ProviderID, modelID: ModelID) {
   return AppRuntime.runPromise(
@@ -1343,7 +1356,7 @@ describe("session.llm.stream", () => {
           model: resolved,
           agent,
           system: { prefix: "", suffix: "" },
-          messages: await MessageV2.toModelMessages(input as any, resolved),
+          messages: await toModelMessages(input as any, resolved),
           tools: {
             read: tool({
               description: "Stub read tool",

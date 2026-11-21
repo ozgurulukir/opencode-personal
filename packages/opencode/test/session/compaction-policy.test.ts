@@ -1,5 +1,5 @@
 import { describe, expect, test, mock } from "bun:test"
-import { Effect } from "effect"
+import { Cause, Effect, Exit } from "effect"
 import {
   handleCompactionTask,
   createAutoCompaction,
@@ -95,7 +95,7 @@ describe("session/loop/compaction-policy", () => {
     })
   })
 
-  test("createAutoCompaction throws and publishes error when breaker is tripped", async () => {
+  test("createAutoCompaction fails typed (not a defect) and publishes error when breaker is tripped", async () => {
     let publishedError: any = null
     const compaction = {
       create: () => Effect.void,
@@ -109,32 +109,24 @@ describe("session/loop/compaction-policy", () => {
 
     const consecutive = CompactionTrigger.BREAKER_LIMIT
 
-    await expect(
-      Effect.runPromise(
-        createAutoCompaction(
-          { compaction, bus },
-          {
-            sessionID: "ses_1" as SessionID,
-            consecutiveAutoCompactions: consecutive,
-            lastUser: dummyUser,
-          },
-        ),
+    const exit = await Effect.runPromiseExit(
+      createAutoCompaction(
+        { compaction, bus },
+        {
+          sessionID: "ses_1" as SessionID,
+          consecutiveAutoCompactions: consecutive,
+          lastUser: dummyUser,
+        },
       ),
-    ).rejects.toThrow()
+    )
 
-    // Wait for promise rejection to verify bus event
-    try {
-      await Effect.runPromise(
-        createAutoCompaction(
-          { compaction, bus },
-          {
-            sessionID: "ses_1" as SessionID,
-            consecutiveAutoCompactions: consecutive,
-            lastUser: dummyUser,
-          },
-        ),
-      )
-    } catch {}
+    // Typed failure: the cause has fails and no dies — call sites catch it to
+    // end the prompt cleanly instead of dying with a defect. The error
+    // message itself is asserted via the published bus event below.
+    expect(Exit.isFailure(exit)).toBe(true)
+    const cause = (exit as any).cause
+    expect(Cause.hasFails(cause)).toBe(true)
+    expect(Cause.hasDies(cause)).toBe(false)
 
     expect(publishedError).toBeDefined()
     expect(publishedError.sessionID).toBe("ses_1")

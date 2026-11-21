@@ -33,7 +33,6 @@ import { SessionMessage } from "@/v2/session-message"
 import { Effect, Schema } from "effect"
 import { zod } from "@opencode-ai/core/effect-zod"
 import { NonNegativeInt, withStatics } from "@opencode-ai/core/schema"
-import * as EffectLogger from "@opencode-ai/core/effect/logger"
 
 /** Error shape thrown by Bun's fetch() when gzip/br decompression fails mid-stream */
 interface FetchDecompressionError extends Error {
@@ -500,14 +499,6 @@ export const toModelMessagesEffect = Effect.fnUntraced(function* (
     ),
   )
 })
-
-export function toModelMessages(
-  input: WithParts[],
-  model: Provider.Model,
-  options?: { stripMedia?: boolean; toolOutputMaxChars?: number },
-): Promise<ModelMessage[]> {
-  return Effect.runPromise(toModelMessagesEffect(input, model, options).pipe(Effect.provide(EffectLogger.layer)))
-}
 
 export function page(input: { sessionID: SessionID; limit: number; before?: string }) {
   const before = input.before ? cursor.decode(input.before) : undefined

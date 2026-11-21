@@ -203,7 +203,13 @@ export const runLoop: (deps: RunLoopDeps, sessionID: SessionID) => Effect.Effect
           lastUser,
           model,
         },
+      ).pipe(
+        // The breaker publishes the error event before failing (its only
+        // failure source), so end the prompt cleanly instead of dying with a
+        // defect.
+        Effect.catch(() => Effect.succeed("breaker" as const)),
       )
+      if (compacted === "breaker") break
       if (compacted) continue
     }
 
@@ -378,8 +384,11 @@ export const runLoop: (deps: RunLoopDeps, sessionID: SessionID) => Effect.Effect
 
       if (result === "stop") return "break" as const
       if (result === "compact") {
-        // create() is Effect<void>; the next iteration re-reads compacted messages
-        yield* createAutoCompaction(
+        // create() is Effect<void>; the next iteration re-reads compacted messages.
+        // A failure here is the compaction breaker (create() has an empty error
+        // channel and the breaker publishes the error event before failing) —
+        // end the prompt cleanly instead of dying with a defect.
+        const compacted = yield* createAutoCompaction(
           { compaction: deps.compaction, bus: deps.bus },
           {
             sessionID,
@@ -387,7 +396,8 @@ export const runLoop: (deps: RunLoopDeps, sessionID: SessionID) => Effect.Effect
             lastUser,
             overflow: handle.compactionReason === "provider-rejected",
           },
-        )
+        ).pipe(Effect.catch(() => Effect.succeed("breaker" as const)))
+        return compacted === "breaker" ? ("break" as const) : ("continue" as const)
       }
       return "continue" as const
     }).pipe(Effect.ensuring(deps.instruction.clear(handle.message.id)))
