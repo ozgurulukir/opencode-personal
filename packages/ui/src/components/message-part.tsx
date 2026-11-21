@@ -27,6 +27,7 @@ import {
 import { useData } from "../context"
 import { useDialog } from "../context/dialog"
 import { useI18n } from "../context/i18n"
+import { copyText } from "../util/copy-text"
 import { GenericTool } from "./basic-tool"
 import { FileIcon } from "./file-icon"
 import { ToolErrorCard } from "./tool-error-card"
@@ -388,7 +389,7 @@ export function UserMessageDisplay(props: { message: UserMessage; parts: PartTyp
   const handleCopy = async () => {
     const content = text()
     if (!content) return
-    await navigator.clipboard.writeText(content)
+    if (!(await copyText(content))) return
     setState("copied", true)
     setTimeout(() => setState("copied", false), 2000)
   }
@@ -600,7 +601,9 @@ PART_MAPPING["tool"] = function ToolPartDisplay(props) {
               tool={part().tool}
               sessionID={part().sessionID}
               metadata={partMetadata()}
-              // @ts-expect-error
+              // @ts-expect-error tool-specific render components declare
+              // their own output/status props; Dynamic's component union
+              // cannot express the intersection type
               output={part().state.output}
               status={part().state.status}
               hideDetails={props.hideDetails}
@@ -698,7 +701,7 @@ PART_MAPPING["text"] = function TextPartDisplay(props) {
   const handleCopy = async () => {
     const content = text()
     if (!content) return
-    await navigator.clipboard.writeText(content)
+    if (!(await copyText(content))) return
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
