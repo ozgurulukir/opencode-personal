@@ -61,8 +61,9 @@ export const layer = Layer.effect(
     // A failed token write must be loud and observed, never silently
     // swallowed: each write logs the failure, then defects at this explicit
     // boundary. The interface deliberately stays data-level — widening the
-    // error channel would ripple through every update* flow; the HTTP
-    // errorLayer renders the NamedError defect as a structured response.
+    // error channel would ripple through every update* flow; the defect is the
+    // raw fs error, so the HTTP errorLayer renders it as an internal-error
+    // response rather than a structured NamedError one.
     const writeOrDie = (mcpName: string, data: Record<string, Entry>) =>
       fs.writeJson(filepath, data, 0o600).pipe(
         Effect.tapError((error) =>

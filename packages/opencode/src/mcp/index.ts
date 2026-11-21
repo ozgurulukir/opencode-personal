@@ -323,6 +323,33 @@ function fetchFromClient<T extends { name: string }>(
   )
 }
 
+// Cross-client merge for prompts/resources: keys embed the sanitized server
+// name, so distinct servers ("my.server" vs "my_server") can still collide
+// after sanitization. First-wins + warn, mirroring buildToolMap — the
+// intra-client dedupe inside fetchFromClient cannot see these.
+export function mergeClientEntries<T extends { name: string }>(
+  label: string,
+  entries: Array<[string, T & { client: string }]>,
+): Record<string, T & { client: string }> {
+  const out: Record<string, T & { client: string }> = {}
+  const owners = new Map<string, string>()
+  for (const [key, item] of entries) {
+    const owner = owners.get(key)
+    if (owner) {
+      log.warn(`duplicate MCP ${label} key ignored (name collision after sanitization)`, {
+        key,
+        server: item.client,
+        name: item.name,
+        collidesWith: owner,
+      })
+      continue
+    }
+    owners.set(key, `${item.client}/${item.name}`)
+    out[key] = item
+  }
+  return out
+}
+
 interface CreateResult {
   mcpClient?: MCPClient
   status: Status
@@ -912,7 +939,7 @@ export const layer = Layer.effect(
         ([clientName, client]) =>
           fetchFromClient(clientName, client, listFn, label).pipe(Effect.map((items) => Object.entries(items ?? {}))),
         { concurrency: "unbounded" },
-      ).pipe(Effect.map((results) => Object.fromEntries<T & { client: string }>(results.flat())))
+      ).pipe(Effect.map((results) => mergeClientEntries(label, results.flat())))
     }
 
     const prompts = Effect.fn("MCP.prompts")(function* () {
