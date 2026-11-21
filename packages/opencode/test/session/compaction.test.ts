@@ -10,6 +10,7 @@ import { LLM } from "../../src/session/llm"
 import { SessionCompaction } from "../../src/session/compaction"
 import * as ContextBudget from "@opencode-ai/sdk/v2/context-budget"
 import * as CompactionTrigger from "../../src/session/compaction-trigger"
+import * as TodoInfo from "../../src/session/todo"
 import { Token } from "@/util/token"
 import * as Log from "@opencode-ai/core/util/log"
 import { Permission } from "../../src/permission"
@@ -2692,5 +2693,61 @@ describe("SessionNs.getUsage", () => {
     expect(result.tokens.input).toBe(500)
     expect(result.tokens.cache.read).toBe(200)
     expect(result.tokens.cache.write).toBe(300)
+  })
+})
+
+// Characterization for the extracted pure builder: pins the exact auto-continue
+// text (overflow wording, media wording, pending-todo badges) against drift.
+describe("autoContinueText", () => {
+  const CONTINUE = "Continue if you have next steps, or stop and ask for clarification if you are unsure how to proceed."
+
+  test("plain continue with no overflow and no todos", () => {
+    expect(SessionCompaction.autoContinueText({ overflow: false, hasMedia: false })).toBe(CONTINUE)
+  })
+
+  test("overflow wording without media", () => {
+    const text = SessionCompaction.autoContinueText({ overflow: true, hasMedia: false })
+    expect(text).toStartWith("The previous request exceeded the provider's size limit. The conversation was compacted to fit within context limits.\n\n")
+    expect(text.endsWith(CONTINUE)).toBe(true)
+  })
+
+  test("overflow wording with media mentions removed attachments", () => {
+    const text = SessionCompaction.autoContinueText({ overflow: true, hasMedia: true })
+    expect(text).toStartWith("The previous request exceeded the provider's size limit due to large media attachments.")
+    expect(text).toContain("attachments were too large to process")
+    expect(text.endsWith(CONTINUE)).toBe(true)
+  })
+
+  test("no overflow wording when overflow is false even with media", () => {
+    const text = SessionCompaction.autoContinueText({ overflow: false, hasMedia: true })
+    expect(text).toBe(CONTINUE)
+  })
+
+  test("pending todos rendered with priority and status badges", () => {
+    const todos = [
+      { content: "fix bug", priority: "high", status: "pending" },
+      { content: "write docs", priority: "low", status: "in_progress" },
+      { content: "refactor", priority: "medium", status: "pending" },
+    ] as Todo.Info[]
+    const text = SessionCompaction.autoContinueText({ overflow: false, hasMedia: false, todos })
+    expect(text).toBe(
+      CONTINUE +
+        "\n\nPending todos:\n" +
+        "- [H] fix bug\n" +
+        "- [L] [IN PROGRESS] write docs\n" +
+        "- [M] refactor",
+    )
+  })
+
+  test("completed and cancelled todos are excluded", () => {
+    const todos = [
+      { content: "done thing", priority: "high", status: "completed" },
+      { content: "dropped thing", priority: "high", status: "cancelled" },
+      { content: "kept thing", priority: "medium", status: "pending" },
+    ] as Todo.Info[]
+    const text = SessionCompaction.autoContinueText({ overflow: false, hasMedia: false, todos })
+    expect(text).toContain("kept thing")
+    expect(text).not.toContain("done thing")
+    expect(text).not.toContain("dropped thing")
   })
 })

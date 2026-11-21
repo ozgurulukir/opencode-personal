@@ -239,11 +239,9 @@ function waitTurn(done: Wait["done"], signal: AbortSignal) {
       return Effect.sync(() => signal.removeEventListener("abort", onAbort))
     }).pipe(Effect.exit),
   ]).pipe(
-    Effect.flatMap((exit: any) => {
-      if (Exit.isSuccess(exit)) return Effect.succeed(exit.value as unknown as "idle" | "abort")
-      const error = Cause.findError(exit.cause)
-      if (error._tag === "Success") return Effect.fail(error.success)
-      return Effect.fail(new Error("turn failed"))
+    Effect.flatMap((exit: Exit.Exit<unknown, unknown>) => {
+      if (Exit.isSuccess(exit)) return Effect.succeed(exit.value as "idle" | "abort")
+      return Effect.fail(Cause.squash(exit.cause))
     }),
   )
 }

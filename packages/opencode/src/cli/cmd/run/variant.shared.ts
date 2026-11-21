@@ -10,6 +10,7 @@ import path from "path"
 import { AppFileSystem } from "@opencode-ai/core/filesystem"
 import { Context, Effect, Layer } from "effect"
 import { makeRuntime } from "@/effect/run-service"
+import * as Log from "@opencode-ai/core/util/log"
 import { Global } from "@opencode-ai/core/global"
 import { isRecord } from "@/util/record"
 import { createSession, sessionVariant, type RunSession, type SessionMessages } from "./session.shared"
@@ -200,7 +201,10 @@ export function createVariantRuntime(fs = AppFileSystem.defaultLayer): VariantRu
   const runtime = makeRuntime(Service, createLayer(fs))
   return {
     resolveSavedVariant: (model) => runtime.runPromise((svc) => svc.resolveSavedVariant(model)).catch(() => undefined),
-    saveVariant: (model, variant) => runtime.runPromise((svc) => svc.saveVariant(model, variant)).catch(() => {}),
+    saveVariant: (model, variant) =>
+      runtime.runPromise((svc) => svc.saveVariant(model, variant)).catch((error) => {
+        Log.Default.warn("failed to save model variant", { model, variant, error })
+      }),
   }
 }
 

@@ -46,20 +46,21 @@ function authCredentials(auth: Record<string, Auth.Info>): { providerId: string;
 /** Fetch usage reports from all providers that support the available credentials. */
 export async function fetchUsageReports(auth: Record<string, Auth.Info>): Promise<UsageReport[]> {
   const credentials = authCredentials(auth)
-  const reports: UsageReport[] = []
 
-  for (const { providerId, credential } of credentials) {
-    for (const provider of providers) {
-      if (provider.id !== providerId) continue
-      if (!provider.supports(credential)) continue
-      try {
-        const report = await provider.fetchUsage(credential)
-        if (report) reports.push(report)
-      } catch (err) {
-        log.warn("failed to fetch provider usage report", { providerId, error: err })
-      }
-    }
-  }
+  const reports = await Promise.all(
+    credentials.flatMap(({ providerId, credential }) =>
+      providers
+        .filter((provider) => provider.id === providerId && provider.supports(credential))
+        .map(async (provider): Promise<UsageReport | null> => {
+          try {
+            return await provider.fetchUsage(credential)
+          } catch (err) {
+            log.warn("failed to fetch provider usage report", { providerId, error: err })
+            return null
+          }
+        }),
+    ),
+  )
 
-  return reports
+  return reports.filter((report): report is UsageReport => report !== null)
 }

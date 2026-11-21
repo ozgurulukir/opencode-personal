@@ -387,7 +387,10 @@ export async function create(input: { serverID: string; server: LSPServer.Handle
         },
       }),
       DIAGNOSTICS_REQUEST_TIMEOUT_MS,
-    ).catch(() => null)
+    ).catch((error) => {
+      Log.Default.warn("diagnostic request failed", { serverID: input.serverID, method: "textDocument/diagnostic", error })
+      return null
+    })
     if (!report) return { handled: false, matched: false, byFile: new Map<string, Diagnostic[]>() }
 
     const byFile = new Map<string, Diagnostic[]>()
@@ -424,7 +427,10 @@ export async function create(input: { serverID: string; server: LSPServer.Handle
         previousResultIds: [],
       }),
       DIAGNOSTICS_REQUEST_TIMEOUT_MS,
-    ).catch(() => null)
+    ).catch((error) => {
+      Log.Default.warn("diagnostic request failed", { serverID: input.serverID, method: "workspace/diagnostic", error })
+      return null
+    })
     if (!report) return { handled: false, matched: false, byFile: new Map<string, Diagnostic[]>() }
 
     const byFile = new Map<string, Diagnostic[]>()
