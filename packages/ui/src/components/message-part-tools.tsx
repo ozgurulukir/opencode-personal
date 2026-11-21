@@ -5,6 +5,7 @@ import type { Todo, QuestionAnswer, QuestionInfo } from "@opencode-ai/sdk/v2"
 import { getDirectory } from "./message-part-context"
 import { useData } from "../context"
 import { useI18n } from "../context/i18n"
+import { copyText } from "../util/copy-text"
 import { useFileComponent } from "../context/file"
 import { BasicTool } from "./basic-tool"
 import { Accordion } from "./accordion"
@@ -314,7 +315,7 @@ ToolRegistry.register({
     const handleCopy = async () => {
       const content = text()
       if (!content) return
-      await navigator.clipboard.writeText(content)
+      if (!(await copyText(content))) return
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     }
