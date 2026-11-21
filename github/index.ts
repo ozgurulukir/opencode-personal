@@ -382,6 +382,7 @@ async function getAccessToken() {
   if (isMock()) {
     response = await fetch("https://api.opencode.ai/exchange_github_app_token_with_pat", {
       method: "POST",
+      signal: AbortSignal.timeout(10_000),
       headers: {
         Authorization: `Bearer ${useEnvMock().mockToken}`,
       },
@@ -391,6 +392,7 @@ async function getAccessToken() {
     const oidcToken = await core.getIDToken("opencode-github-action")
     response = await fetch("https://api.opencode.ai/exchange_github_app_token", {
       method: "POST",
+      signal: AbortSignal.timeout(10_000),
       headers: {
         Authorization: `Bearer ${oidcToken}`,
       },
@@ -485,6 +487,7 @@ async function getUserPrompt() {
 
     // Download image via verified GitHub user-attachment URL
     const res = await fetch(safeUrl, {
+      signal: AbortSignal.timeout(60_000),
       headers: {
         Authorization: `Bearer ${accessToken}`,
         Accept: "application/vnd.github.v3+json",
@@ -1068,6 +1071,7 @@ async function revokeAppToken() {
 
   await fetch("https://api.github.com/installation/token", {
     method: "DELETE",
+    signal: AbortSignal.timeout(10_000),
     headers: {
       Authorization: `Bearer ${accessToken}`,
       Accept: "application/vnd.github+json",

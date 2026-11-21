@@ -25,6 +25,11 @@ This package follows the root [AGENTS.md](../../../AGENTS.md) for general repo r
 - The only way to fix generated client behavior is post-generation string patching in `script/build.ts`. Any fix to
   `client.gen.ts`, `types.gen.ts`, or `params.gen.ts` must include a matching patch in the build script.
 - `params.gen.ts`: `writeSlot` uses `Object.defineProperty` (and rejects `__proto__`, `constructor`, `prototype`) rather than dynamic property assignment (`record[key] = value`) to eliminate prototype-pollution alerts (`js/prototype-polluting-assignment`) while preserving empty-prototype `Object.create(null)` slot containers. Patched via `script/build.ts`.
+- The three generated `Session` classes in `sdk.gen.ts` (`Session` / `Session2` / `Session3`) are NOT duplicates:
+  they are hey-api's dedup naming for three distinct OpenAPI tag groups sharing the "Session" name — `/experimental/session*`
+  (experimental), `/session*` (legacy V1 instance group, exposed as `client.session.*`), and `/api/session*` (V2 group,
+  exposed as `client.v2.session.*`). Renaming them would require custom tag/alias config in the generator; consumers rely
+  on the `client.session` / `client.v2.session` accessor names, so treat the class names as a generator artifact.
 
 ## Regenerating the SDK can break downstream typecheck — run the `opencode` gate
 
