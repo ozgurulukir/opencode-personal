@@ -1,5 +1,6 @@
 import { BusEvent } from "@/bus/bus-event"
 import { Bus } from "@/bus"
+import type { ModelMessage } from "ai"
 import * as Session from "./session"
 import { SessionID, MessageID, PartID } from "./schema"
 import { Provider } from "@/provider/provider"
@@ -21,6 +22,7 @@ import { serviceUse } from "@/effect/service-use"
 import { SyncEvent } from "@/sync"
 import { SessionEvent } from "@/v2/session-event"
 import * as CompactionTrigger from "./compaction-trigger"
+import * as CompactionShared from "./compaction.shared"
 
 const log = Log.create({ service: "session.compaction" })
 
@@ -73,17 +75,6 @@ Rules:
 - Condense older completed work; expand on recent decisions and unresolved items.
 - Keep the summary concise but complete.
 - Do not mention the summary process or that context was compacted.`
-type Turn = {
-  start: number
-  end: number
-  id: MessageID
-}
-
-type Tail = {
-  start: number
-  id: MessageID
-}
-
 type CompletedCompaction = {
   userIndex: number
   assistantIndex: number
@@ -165,60 +156,6 @@ export function isRealUserTurn(msg: MessageV2.WithParts): msg is MessageV2.WithP
   return true
 }
 
-function turns(messages: MessageV2.WithParts[]) {
-  const result: Turn[] = []
-  for (let i = 0; i < messages.length; i++) {
-    const msg = messages[i]
-    if (!isRealUserTurn(msg)) continue
-    result.push({
-      start: i,
-      end: messages.length,
-      id: msg.info.id,
-    })
-  }
-  for (let i = 0; i < result.length - 1; i++) {
-    result[i].end = result[i + 1].start
-  }
-  return result
-}
-
-export function splitTurn(input: {
-  messages: MessageV2.WithParts[]
-  turn: Turn
-  model: Provider.Model
-  budget: number
-  estimate: (input: { messages: MessageV2.WithParts[]; model: Provider.Model }) => Effect.Effect<number>
-}) {
-  return Effect.gen(function* () {
-    if (input.budget <= 0) return undefined
-    if (input.turn.end - input.turn.start <= 1) return undefined
-    const turnMessages = input.messages.slice(input.turn.start, input.turn.end)
-    const sizes = yield* Effect.forEach(
-      turnMessages,
-      (msg) => input.estimate({ messages: [msg], model: input.model }),
-      { concurrency: 1 },
-    )
-    let total = 0
-    let splitIdx = turnMessages.length
-    for (let i = turnMessages.length - 1; i > 0; i--) {
-      if (total + sizes[i] <= input.budget) {
-        total += sizes[i]
-        splitIdx = i
-      } else {
-        break
-      }
-    }
-    if (splitIdx < turnMessages.length && splitIdx > 0) {
-      const start = input.turn.start + splitIdx
-      return {
-        start,
-        id: input.messages[start]!.info.id,
-      } satisfies Tail
-    }
-    return undefined
-  })
-}
-
 export interface Interface {
   readonly prune: (input: { sessionID: SessionID }) => Effect.Effect<number>
   readonly process: (input: {
@@ -286,51 +223,19 @@ export const layer: Layer.Layer<
       cfg: Config.Info
       model: Provider.Model
     }) {
-      const limit = ContextBudget.compactionConfig(input.cfg).tailTurns
-      if (limit <= 0) return { head: input.messages, tail_start_id: undefined }
+      const cc = ContextBudget.compactionConfig(input.cfg)
       const budget = ContextBudget.preserveRecentBudget({ cfg: input.cfg, model: input.model })
-      const all = turns(input.messages)
-      if (!all.length) return { head: input.messages, tail_start_id: undefined }
-      const recent = all.slice(-limit)
-      const sizes = yield* Effect.forEach(
-        recent,
-        (turn) =>
-          estimate({
-            messages: input.messages.slice(turn.start, turn.end),
-            model: input.model,
-          }),
-        // Sequential: token estimation is cheap (character counting) and
-        // concurrency would not improve latency for the typical 1-2 tail turns.
-        { concurrency: 1 },
-      )
-
-      let total = 0
-      let keep: Tail | undefined
-      for (let i = recent.length - 1; i >= 0; i--) {
-        const turn = recent[i]!
-        const size = sizes[i]
-        if (total + size <= budget) {
-          total += size
-          keep = { start: turn.start, id: turn.id }
-          continue
-        }
-        const remaining = budget - total
-        const split = yield* splitTurn({
-          messages: input.messages,
-          turn,
-          model: input.model,
-          budget: remaining,
-          estimate,
-        })
-        if (split) keep = split
-        else if (!keep) log.info("tail fallback", { budget, size, total })
-        break
-      }
-
-      if (!keep || keep.start === 0) return { head: input.messages, tail_start_id: undefined, fallback: !keep }
+      const plan = yield* CompactionShared.planTail({
+        messages: input.messages,
+        tailTurns: cc.tailTurns,
+        budget,
+        estimate: (messages) => estimate({ messages, model: input.model }),
+      })
+      if (plan.fallback) log.info("tail fallback", { budget, size: plan.fallbackSize, total: plan.fallbackTotal })
       return {
-        head: input.messages.slice(0, keep.start),
-        tail_start_id: keep.id,
+        head: plan.head,
+        tail_start_id: plan.tail_start_id,
+        fallback: plan.fallback,
       }
     })
 
@@ -555,39 +460,46 @@ export const layer: Layer.Layer<
             maxTokens: maxSummaryTokens,
           })
         const summarizerCapacity = Math.max(1000, ContextBudget.usable(cfg, model) - maxSummaryTokens)
-        let msgs = structuredClone(selected.head)
+        const msgs = structuredClone(selected.head)
         yield* plugin.trigger("experimental.chat.messages.transform", {}, { messages: msgs })
-        let toolOutputMaxChars = cc.toolOutputMaxChars
-        let modelMessages = yield* MessageV2.toModelMessagesEffect(msgs, model, {
-          stripMedia: true,
-          toolOutputMaxChars,
+        // Memoizes the last conversion so the summarizer input reuses the one
+        // planHead already estimated instead of repeating the (potentially
+        // large) head conversion + stringify.
+        let last: { head: MessageV2.WithParts[]; chars: number; tokens: number; modelMessages: ModelMessage[] } | undefined
+        const estimateHead = (head: MessageV2.WithParts[], toolOutputMaxChars: number) => {
+          if (last && last.head === head && last.chars === toolOutputMaxChars) return Effect.succeed(last.tokens)
+          return Effect.map(
+            MessageV2.toModelMessagesEffect(head, model, { stripMedia: true, toolOutputMaxChars }),
+            (modelMessages) => {
+              last = { head, chars: toolOutputMaxChars, tokens: Token.estimate(JSON.stringify(modelMessages)), modelMessages }
+              return last.tokens
+            },
+          )
+        }
+        const headPlan = yield* CompactionShared.planHead({
+          head: msgs,
+          promptTokens: Token.estimate(nextPrompt),
+          summarizerCapacity,
+          toolOutputMaxChars: cc.toolOutputMaxChars,
+          estimate: estimateHead,
         })
-        const promptTokens = Token.estimate(nextPrompt)
-        let headTokens = Token.estimate(JSON.stringify(modelMessages))
-
-        let dropped = 0
-        while (msgs.length > 1 && headTokens + promptTokens > summarizerCapacity) {
-          msgs.shift()
-          dropped++
-          modelMessages = yield* MessageV2.toModelMessagesEffect(msgs, model, {
-            stripMedia: true,
-            toolOutputMaxChars,
+        if (headPlan.dropped > 0) {
+          log.info("compaction head truncated for summarizer", {
+            dropped: headPlan.dropped,
+            headTokens: headPlan.headTokens,
+            summarizerCapacity,
           })
-          headTokens = Token.estimate(JSON.stringify(modelMessages))
         }
-
-        if (headTokens + promptTokens > summarizerCapacity && toolOutputMaxChars > 200) {
-          toolOutputMaxChars = Math.max(200, Math.floor(toolOutputMaxChars / 2))
-          modelMessages = yield* MessageV2.toModelMessagesEffect(msgs, model, {
-            stripMedia: true,
-            toolOutputMaxChars,
-          })
-          headTokens = Token.estimate(JSON.stringify(modelMessages))
-        }
-
-        if (dropped > 0) {
-          log.info("compaction head truncated for summarizer", { dropped, headTokens, summarizerCapacity })
-        }
+        // The final head is identical to planHead's last estimate input, so the
+        // memo above always hits; the fallback covers the degenerate empty-head case.
+        const modelMessages = yield* (
+          last && last.head === headPlan.head && last.chars === headPlan.toolOutputMaxChars
+            ? Effect.succeed(last.modelMessages)
+            : MessageV2.toModelMessagesEffect(headPlan.head, model, {
+                stripMedia: true,
+                toolOutputMaxChars: headPlan.toolOutputMaxChars,
+              })
+        )
 
         const ctx = yield* InstanceState.context
         const msg: MessageV2.Assistant = {
