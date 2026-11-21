@@ -364,7 +364,7 @@ async function runInteractiveRuntime(input: RunRuntimeInput): Promise<void> {
             .abort({
               sessionID: state.sessionID,
             })
-            .catch(() => {})
+            .catch((error) => log?.write("session.abort.error", { sessionID: state.sessionID, error: String(error) }))
             .finally(() => {
               state.aborting = false
             })

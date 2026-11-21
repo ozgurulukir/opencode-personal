@@ -169,7 +169,7 @@ describe("sync HttpApi", () => {
     }
   })
 
-  test.todo("returns structured validation errors", async () => {
+  test("returns structured validation errors", async () => {
     await using tmp = await tmpdir({ git: true, config: { formatter: false, lsp: false } })
     const response = await ExperimentalHttpApiServer.webHandler().handler(
       new Request(`http://localhost${SyncPaths.history}`, {
@@ -183,8 +183,8 @@ describe("sync HttpApi", () => {
     expect(response.status).toBe(400)
     expect(response.headers.get("content-type") ?? "").toContain("application/json")
     const body = (await response.json()) as Record<string, unknown>
-    expect(body.success).toBe(false)
-    expect(Array.isArray(body.error) || Array.isArray(body.errors)).toBe(true)
+    expect(body.name).toBe("BadRequest")
+    expect((body.data as Record<string, unknown> | undefined)?.message).toBeTruthy()
   })
 })
 

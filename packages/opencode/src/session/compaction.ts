@@ -100,6 +100,32 @@ function summaryText(message: MessageV2.WithParts) {
   return text || undefined
 }
 
+/**
+ * Formats the synthetic auto-continue text appended after an (auto-)compaction:
+ * an optional overflow explanation, the continue instruction, and a pending-todos
+ * block. Pure — the caller resolves the todo list and media presence.
+ */
+export function autoContinueText(input: { overflow: boolean; hasMedia: boolean; todos?: Todo.Info[] }): string {
+  const pending = (input.todos ?? []).filter((t) => t.status !== "completed" && t.status !== "cancelled")
+  const todoBlock =
+    pending.length === 0
+      ? ""
+      : "\n\nPending todos:\n" +
+        pending
+          .map((t) => {
+            const badge = t.priority === "high" ? "[H] " : t.priority === "low" ? "[L] " : "[M] "
+            const statusBadge = t.status === "in_progress" ? "[IN PROGRESS] " : ""
+            return `- ${badge}${statusBadge}${t.content}`
+          })
+          .join("\n")
+  const overflowBlock = input.overflow
+    ? input.hasMedia
+      ? "The previous request exceeded the provider's size limit due to large media attachments. The conversation was compacted and media files were removed from context. If the user was asking about attached images or files, explain that the attachments were too large to process and suggest they try again with smaller or fewer files.\n\n"
+      : "The previous request exceeded the provider's size limit. The conversation was compacted to fit within context limits.\n\n"
+    : ""
+  return overflowBlock + "Continue if you have next steps, or stop and ask for clarification if you are unsure how to proceed." + todoBlock
+}
+
 function completedCompactions(messages: MessageV2.WithParts[]) {
   const users = new Map<MessageID, number>()
   for (let i = 0; i < messages.length; i++) {
@@ -696,37 +722,18 @@ export const layer: Layer.Layer<
                 tools: userMessage.tools,
                 system: userMessage.system,
               })
-              const todoBlock = yield* Option.match(todo, {
-                onNone: () => Effect.succeed(""),
-                onSome: (svc) =>
-                  svc.get(input.sessionID).pipe(
-                    Effect.map((todos) => {
-                      const pending = todos.filter((t) => t.status !== "completed" && t.status !== "cancelled")
-                      if (pending.length === 0) return ""
-                      return (
-                        "\n\nPending todos:\n" +
-                        pending
-                          .map((t) => {
-                            const badge = t.priority === "high" ? "[H] " : t.priority === "low" ? "[L] " : "[M] "
-                            const statusBadge = t.status === "in_progress" ? "[IN PROGRESS] " : ""
-                            return `- ${badge}${statusBadge}${t.content}`
-                          })
-                          .join("\n")
-                      )
-                    }),
-                  ),
+              const todos = yield* Option.match(todo, {
+                onNone: () => Effect.succeed([] as Todo.Info[]),
+                onSome: (svc) => svc.get(input.sessionID),
               })
               const hasMedia = input.messages.some((m) =>
                 m.parts.some((p) => p.type === "file" && MessageV2.isMedia(p.mime)),
               )
-              const text =
-                (input.overflow
-                  ? hasMedia
-                    ? "The previous request exceeded the provider's size limit due to large media attachments. The conversation was compacted and media files were removed from context. If the user was asking about attached images or files, explain that the attachments were too large to process and suggest they try again with smaller or fewer files.\n\n"
-                    : "The previous request exceeded the provider's size limit. The conversation was compacted to fit within context limits.\n\n"
-                  : "") +
-                "Continue if you have next steps, or stop and ask for clarification if you are unsure how to proceed." +
-                todoBlock
+              const text = autoContinueText({
+                overflow: input.overflow === true,
+                hasMedia,
+                todos,
+              })
               yield* session.updatePart({
                 id: PartID.ascending(),
                 messageID: continueMsg.id,

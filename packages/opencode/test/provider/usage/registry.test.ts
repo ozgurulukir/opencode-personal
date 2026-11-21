@@ -29,7 +29,13 @@ test("dispatches injected auth, resolves aliases, and isolates provider failures
   })
   expect(reports.map((x) => x.provider)).toEqual(["zai"])
   expect(reports[0].limits[0].amount.usedFraction).toBe(0.25)
-  expect(calls.map((x) => x.authorization)).toEqual(["Bearer claude-token", "token", "token", "Bearer openai-token"])
+  // Reports are fetched concurrently, so dispatch order is nondeterministic.
+  expect(calls.map((x) => x.authorization).sort()).toEqual([
+    "Bearer claude-token",
+    "Bearer openai-token",
+    "Bearer token",
+    "Bearer token",
+  ])
 })
 
 test("ignores unknown, unsupported, and empty credentials without requesting usage", async () => {

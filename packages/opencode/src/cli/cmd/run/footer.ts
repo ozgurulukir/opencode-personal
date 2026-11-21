@@ -28,6 +28,7 @@ import { CliRenderEvents, type CliRenderer, type TreeSitterClient } from "@opent
 import { render } from "@opentui/solid"
 import { createComponent, createSignal, type Accessor, type Setter } from "solid-js"
 import { createStore, reconcile } from "solid-js/store"
+import { safeCatch } from "@/util/error"
 import { withRunSpan } from "./otel"
 import { RUN_COMMAND_PANEL_ROWS } from "./footer.command"
 import { SUBAGENT_INSPECTOR_ROWS, SUBAGENT_TAB_ROWS } from "./footer.subagent"
@@ -431,7 +432,7 @@ export class RunFooter implements FooterApi {
           },
         ),
       )
-      .catch(() => {})
+      .catch((error) => safeCatch("footer.scrollback-complete", error))
   }
 
   private present(view: FooterView): void {
@@ -690,7 +691,7 @@ export class RunFooter implements FooterApi {
           }
         }
       })
-      .catch(() => {})
+      .catch((error) => safeCatch("footer.action-patch", error))
   }
 
   private handleModelSelect = (model: NonNullable<RunInput["model"]>): void => {
@@ -863,6 +864,6 @@ export class RunFooter implements FooterApi {
           }, 0)
         }
       })
-      .catch(() => {})
+      .catch((error) => safeCatch("footer.flush", error))
   }
 }
