@@ -25,6 +25,10 @@ export type TailPlan = {
   head: MessageV2.WithParts[]
   tail_start_id: MessageID | undefined
   fallback: boolean
+  /** Size of the over-budget turn that caused the fallback (diagnostics). */
+  fallbackSize?: number
+  /** Accumulated tail size at the fallback point (diagnostics). */
+  fallbackTotal?: number
 }
 
 export type HeadPlan = {
@@ -107,6 +111,8 @@ export const planTail = Effect.fnUntraced(function* (input: {
   const all = turns(input.messages)
   if (!all.length) return { head: input.messages, tail_start_id: undefined, fallback: false }
   const recent = all.slice(-input.tailTurns)
+  // Sequential: token estimation is cheap (character counting) and
+  // concurrency would not improve latency for the typical 1-2 tail turns.
   const sizes = yield* Effect.forEach(
     recent,
     (turn) => input.estimate(input.messages.slice(turn.start, turn.end)),
@@ -114,6 +120,8 @@ export const planTail = Effect.fnUntraced(function* (input: {
   )
   let total = 0
   let keep: Tail | undefined
+  let fallbackSize: number | undefined
+  let fallbackTotal: number | undefined
   for (let i = recent.length - 1; i >= 0; i--) {
     const turn = recent[i]!
     const size = sizes[i]!
@@ -130,9 +138,20 @@ export const planTail = Effect.fnUntraced(function* (input: {
       estimate: input.estimate,
     })
     if (split) keep = split
+    else if (!keep) {
+      fallbackSize = size
+      fallbackTotal = total
+    }
     break
   }
-  if (!keep || keep.start === 0) return { head: input.messages, tail_start_id: undefined, fallback: !keep }
+  if (!keep || keep.start === 0)
+    return {
+      head: input.messages,
+      tail_start_id: undefined,
+      fallback: !keep,
+      fallbackSize,
+      fallbackTotal,
+    }
   return {
     head: input.messages.slice(0, keep.start),
     tail_start_id: keep.id,

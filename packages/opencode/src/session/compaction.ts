@@ -1,5 +1,6 @@
 import { BusEvent } from "@/bus/bus-event"
 import { Bus } from "@/bus"
+import type { ModelMessage } from "ai"
 import * as Session from "./session"
 import { SessionID, MessageID, PartID } from "./schema"
 import { Provider } from "@/provider/provider"
@@ -230,7 +231,7 @@ export const layer: Layer.Layer<
         budget,
         estimate: (messages) => estimate({ messages, model: input.model }),
       })
-      if (plan.fallback) log.info("tail fallback", { budget })
+      if (plan.fallback) log.info("tail fallback", { budget, size: plan.fallbackSize, total: plan.fallbackTotal })
       return {
         head: plan.head,
         tail_start_id: plan.tail_start_id,
@@ -461,11 +462,20 @@ export const layer: Layer.Layer<
         const summarizerCapacity = Math.max(1000, ContextBudget.usable(cfg, model) - maxSummaryTokens)
         const msgs = structuredClone(selected.head)
         yield* plugin.trigger("experimental.chat.messages.transform", {}, { messages: msgs })
-        const estimateHead = (head: MessageV2.WithParts[], toolOutputMaxChars: number) =>
-          Effect.map(
+        // Memoizes the last conversion so the summarizer input reuses the one
+        // planHead already estimated instead of repeating the (potentially
+        // large) head conversion + stringify.
+        let last: { head: MessageV2.WithParts[]; chars: number; tokens: number; modelMessages: ModelMessage[] } | undefined
+        const estimateHead = (head: MessageV2.WithParts[], toolOutputMaxChars: number) => {
+          if (last && last.head === head && last.chars === toolOutputMaxChars) return Effect.succeed(last.tokens)
+          return Effect.map(
             MessageV2.toModelMessagesEffect(head, model, { stripMedia: true, toolOutputMaxChars }),
-            (modelMessages) => Token.estimate(JSON.stringify(modelMessages)),
+            (modelMessages) => {
+              last = { head, chars: toolOutputMaxChars, tokens: Token.estimate(JSON.stringify(modelMessages)), modelMessages }
+              return last.tokens
+            },
           )
+        }
         const headPlan = yield* CompactionShared.planHead({
           head: msgs,
           promptTokens: Token.estimate(nextPrompt),
@@ -480,10 +490,16 @@ export const layer: Layer.Layer<
             summarizerCapacity,
           })
         }
-        const modelMessages = yield* MessageV2.toModelMessagesEffect(headPlan.head, model, {
-          stripMedia: true,
-          toolOutputMaxChars: headPlan.toolOutputMaxChars,
-        })
+        // The final head is identical to planHead's last estimate input, so the
+        // memo above always hits; the fallback covers the degenerate empty-head case.
+        const modelMessages = yield* (
+          last && last.head === headPlan.head && last.chars === headPlan.toolOutputMaxChars
+            ? Effect.succeed(last.modelMessages)
+            : MessageV2.toModelMessagesEffect(headPlan.head, model, {
+                stripMedia: true,
+                toolOutputMaxChars: headPlan.toolOutputMaxChars,
+              })
+        )
 
         const ctx = yield* InstanceState.context
         const msg: MessageV2.Assistant = {
