@@ -21,10 +21,23 @@ export class SchemaErrorMiddleware extends HttpApiMiddleware.Service<SchemaError
   "@opencode/HttpApiSchemaError",
 ) {}
 
+// jsonUnsafe serializes with JSON.stringify, which throws on non-serializable
+// values; inside this error path that would replace the structured 400 with a
+// dropped connection. `reason` is a truncated string and `kind` an enum, so
+// the fallback only guards against an unexpected non-serializable slip.
 export const schemaErrorLayer = HttpApiMiddleware.layerSchemaErrorTransform(SchemaErrorMiddleware, (error) => {
   const reason = truncateReason(error.cause.message)
   log.warn("schema rejection", { kind: error.kind, reason })
-  return Effect.succeed(
-    HttpServerResponse.jsonUnsafe({ name: "BadRequest", data: { message: reason, kind: error.kind } }, { status: 400 }),
-  )
+  try {
+    return Effect.succeed(
+      HttpServerResponse.jsonUnsafe({ name: "BadRequest", data: { message: reason, kind: error.kind } }, { status: 400 }),
+    )
+  } catch {
+    return Effect.succeed(
+      HttpServerResponse.jsonUnsafe(
+        { name: "BadRequest", data: { message: "Invalid request", kind: error.kind } },
+        { status: 400 },
+      ),
+    )
+  }
 })

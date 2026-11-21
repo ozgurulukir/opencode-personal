@@ -77,7 +77,9 @@ export const experimentalHandlers = HttpApiBuilder.group(InstanceHttpApi, "exper
 
     const tool = Effect.fn("ExperimentalHttpApi.tool")(function* (ctx: { query: typeof ToolListQuery.Type }) {
       const agent = yield* agents.get(yield* agents.defaultAgent())
-      if (!agent) return yield* Effect.die(new Error("default agent not found"))
+      // The endpoint declares BadRequest: a missing default agent is a bad
+      // request context (no usable agent for this environment), not a defect.
+      if (!agent) return yield* new HttpApiError.BadRequest({})
       const list = yield* registry.tools({
         providerID: ctx.query.provider,
         modelID: ctx.query.model,

@@ -2,7 +2,7 @@ import { Auth } from "@/auth"
 import { ProviderID } from "@/provider/schema"
 import * as Log from "@opencode-ai/core/util/log"
 import { Effect } from "effect"
-import { HttpApiBuilder } from "effect/unstable/httpapi"
+import { HttpApiBuilder, HttpApiError } from "effect/unstable/httpapi"
 import { RootHttpApi } from "../api"
 import { LogInput } from "../groups/control"
 
@@ -16,12 +16,30 @@ export const controlHandlers = HttpApiBuilder.group(RootHttpApi, "control", (han
       params: { providerID: ProviderID }
       payload: Auth.Info
     }) {
-      yield* auth.set(ctx.params.providerID, ctx.payload).pipe(Effect.orDie)
+      // The endpoint declares BadRequest: fail typed so a credentials-write
+      // failure returns a structured 400 through the declared channel instead
+      // of dying and relying on the errorLayer's defect heuristics. The write
+      // error is logged first — mapError discards it, and the Auth service
+      // does not log, so without this a disk-full/permission failure is
+      // undiagnosable from the server side.
+      yield* auth
+        .set(ctx.params.providerID, ctx.payload)
+        .pipe(
+          Effect.tapError((error) => Effect.sync(() => Log.Default.error("auth set failed", { error: String(error) }))),
+          Effect.mapError(() => new HttpApiError.BadRequest({})),
+        )
       return true
     })
 
     const authRemove = Effect.fn("ControlHttpApi.authRemove")(function* (ctx: { params: { providerID: ProviderID } }) {
-      yield* auth.remove(ctx.params.providerID).pipe(Effect.orDie)
+      yield* auth
+        .remove(ctx.params.providerID)
+        .pipe(
+          Effect.tapError((error) =>
+            Effect.sync(() => Log.Default.error("auth remove failed", { providerID: ctx.params.providerID, error: String(error) })),
+          ),
+          Effect.mapError(() => new HttpApiError.BadRequest({})),
+        )
       return true
     })
 
