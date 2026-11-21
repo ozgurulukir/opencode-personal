@@ -8,6 +8,7 @@ import { Image } from "@/image/image"
 import { Agent } from "../../src/agent/agent"
 import { LLM } from "../../src/session/llm"
 import { SessionCompaction } from "../../src/session/compaction"
+import * as CompactionShared from "../../src/session/compaction.shared"
 import * as ContextBudget from "@opencode-ai/sdk/v2/context-budget"
 import * as CompactionTrigger from "../../src/session/compaction-trigger"
 import * as TodoInfo from "../../src/session/todo"
@@ -2342,12 +2343,11 @@ describe("session.compaction.process", () => {
     }))
     let estimateCalls = 0
     const result = await Effect.runPromise(
-      SessionCompaction.splitTurn({
+      CompactionShared.planTailSplit({
         messages,
         turn: { start: 0, end: count, id: messages[0]!.info.id },
-        model: createModel({ context: 100_000, output: 8_000 }),
         budget: 100,
-        estimate: ({ messages: slice }) =>
+        estimate: (slice) =>
           Effect.sync(() => {
             estimateCalls++
             expect(slice).toHaveLength(1)
@@ -2749,5 +2749,164 @@ describe("autoContinueText", () => {
     expect(text).toContain("kept thing")
     expect(text).not.toContain("done thing")
     expect(text).not.toContain("dropped thing")
+  })
+})
+
+describe("compaction.shared", () => {
+  function sharedMsg(role: "user" | "assistant"): MessageV2.WithParts {
+    const info =
+      role === "user"
+        ? ({
+            id: MessageID.ascending(),
+            role: "user",
+            sessionID: SessionID.make("ses_test"),
+            time: { created: Date.now() },
+          } as MessageV2.User)
+        : ({
+            id: MessageID.ascending(),
+            role: "assistant",
+            sessionID: SessionID.make("ses_test"),
+            time: { created: Date.now() },
+          } as MessageV2.Assistant)
+    return { info, parts: [{ type: "text", text: "body" } as MessageV2.Part] }
+  }
+
+  function userTurnsToMessages(n: number): MessageV2.WithParts[] {
+    const out: MessageV2.WithParts[] = []
+    for (let i = 0; i < n; i++) {
+      out.push(sharedMsg("user"))
+      out.push(sharedMsg("assistant"))
+    }
+    return out
+  }
+
+  test("planTail keeps newest turns within budget and splits the oldest kept turn", async () => {
+    const messages = userTurnsToMessages(3)
+    // Each turn (user+assistant) costs 20; budget retains one assistant tail message.
+    const result = await Effect.runPromise(
+      CompactionShared.planTail({
+        messages,
+        tailTurns: 2,
+        budget: 15,
+        estimate: (slice) => Effect.succeed(slice.length * 10),
+      }),
+    )
+    expect(result.tail_start_id).toBe(messages[5]!.info.id)
+    expect(result.head).toHaveLength(5)
+    expect(result.fallback).toBe(false)
+  })
+
+  test("planTail returns full history when tailTurns is disabled", async () => {
+    const messages = userTurnsToMessages(2)
+    const result = await Effect.runPromise(
+      CompactionShared.planTail({
+        messages,
+        tailTurns: 0,
+        budget: 0,
+        estimate: () => Effect.succeed(10),
+      }),
+    )
+    expect(result.head).toBe(messages)
+    expect(result.tail_start_id).toBeUndefined()
+    expect(result.fallback).toBe(false)
+  })
+
+  test("planTail ignores compaction markers and continue prompts when finding turns", async () => {
+    const messages = userTurnsToMessages(1)
+    messages.push({
+      info: {
+        id: MessageID.ascending(),
+        role: "user",
+        sessionID: SessionID.make("ses_test"),
+        time: { created: Date.now() },
+      } as MessageV2.User,
+      parts: [
+        {
+          type: "text",
+          synthetic: true,
+          metadata: CompactionTrigger.COMPACTION_CONTINUE_METADATA,
+          text: "Continue if you have next steps",
+        } as unknown as MessageV2.Part,
+      ],
+    })
+    const result = await Effect.runPromise(
+      CompactionShared.planTail({
+        messages,
+        tailTurns: 2,
+        budget: 1000,
+        estimate: (slice) => Effect.succeed(slice.length * 10),
+      }),
+    )
+    // Only the single real user turn exists, so the whole history is retained as tail.
+    expect(result.head).toBe(messages)
+    expect(result.tail_start_id).toBeUndefined()
+  })
+
+  test("planTail falls back to summarizing everything when the budget retains nothing", async () => {
+    const messages = userTurnsToMessages(3)
+    const result = await Effect.runPromise(
+      CompactionShared.planTail({
+        messages,
+        tailTurns: 2,
+        budget: 5,
+        estimate: (slice) => Effect.succeed(slice.length * 10),
+      }),
+    )
+    expect(result.head).toBe(messages)
+    expect(result.tail_start_id).toBeUndefined()
+    expect(result.fallback).toBe(true)
+  })
+
+  test("planHead drops oldest messages until the head fits the summarizer capacity", async () => {
+    const head = Array.from({ length: 5 }, () => sharedMsg("assistant"))
+    const result = await Effect.runPromise(
+      CompactionShared.planHead({
+        head,
+        promptTokens: 50,
+        summarizerCapacity: 400,
+        toolOutputMaxChars: 1000,
+        estimate: (slice) => Effect.succeed(slice.length * 100),
+      }),
+    )
+    expect(result.dropped).toBe(2)
+    expect(result.head).toHaveLength(3)
+    expect(result.headTokens).toBe(300)
+    expect(result.toolOutputMaxChars).toBe(1000)
+  })
+
+  test("planHead halves toolOutputMaxChars when messages alone still overflow", async () => {
+    const head = Array.from({ length: 2 }, () => sharedMsg("assistant"))
+    const result = await Effect.runPromise(
+      CompactionShared.planHead({
+        head,
+        promptTokens: 50,
+        summarizerCapacity: 200,
+        toolOutputMaxChars: 500,
+        // Overflowing unless tool output is capped to <= 250 chars.
+        estimate: (_slice, toolOutputMaxChars) => Effect.succeed(toolOutputMaxChars <= 250 ? 100 : 10_000),
+      }),
+    )
+    expect(result.dropped).toBe(1)
+    expect(result.head).toHaveLength(1)
+    expect(result.toolOutputMaxChars).toBe(250)
+    expect(result.headTokens).toBe(100)
+  })
+
+  test("planHead is a no-op when the head fits", async () => {
+    const head = Array.from({ length: 3 }, () => sharedMsg("assistant"))
+    const result = await Effect.runPromise(
+      CompactionShared.planHead({
+        head,
+        promptTokens: 10,
+        summarizerCapacity: 100_000,
+        toolOutputMaxChars: 1000,
+        estimate: (slice) => Effect.succeed(slice.length * 10),
+      }),
+    )
+    expect(result.dropped).toBe(0)
+    expect(result.head).toHaveLength(3)
+    expect(result.head[0]).toBe(head[0])
+    expect(result.head[2]).toBe(head[2])
+    expect(result.toolOutputMaxChars).toBe(1000)
   })
 })
