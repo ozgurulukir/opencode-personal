@@ -6,7 +6,7 @@
 
 ## primary_tools — allow in permission, false in tools
 
-`primary_tools` are simultaneously `allow`ed in the session permission (`subagentSessionPermission`) and `false`d in the tools list (`subagentToolRestrictions`). This is intentional: session permission `allow` means slash-command invocations don't block, but tools list `false` means the LLM can't call them directly. Primary tools are for the primary agent only; indirect access via slash commands is permitted. This intent now holds at runtime: `prompt()` excludes `primary_tools` keys from the tools→permission merge (`session/prompt.ts:216-218`, dedupe at `:222`) so these allows are not killed after the first prompt.
+`primary_tools` are simultaneously `allow`ed in the session permission (`subagentSessionPermission`) and `false`d in the tools list (`subagentToolRestrictions`). This is intentional: session permission `allow` means slash-command invocations don't block, but tools list `false` means the LLM can't call them directly. Primary tools are for the primary agent only; indirect access via slash commands is permitted. This intent now holds at runtime: `prompt()` excludes `primary_tools` keys from the tools→permission merge (`session/prompt.ts:210-218`, dedupe at `:216`) so these allows are not killed after the first prompt.
 
 ## `deriveSubagentSessionPermission` — full parent-session spread, parent-agent deny-filtered, dedupe last-wins
 
@@ -14,7 +14,7 @@
 
 ## `prompt()` must merge, not overwrite, session permission
 
-`prompt()` converts `input.tools` to permission rules via `toolsToPermissions` at `session/prompt.ts:215-223` (primary_tools keys stripped at `:216-218`, `Permission.dedupe(Permission.merge(...))` at `:222`) and **must use `Permission.merge(session.permission ?? [], permissions)`**, not overwrite (`session.permission = permissions`). Overwriting destroys parent denies set by `subagentSessionPermission`, making Plan Mode's `edit: { "*": "deny" }` ineffective at runtime (the #26514 fix). Tests that stub `prompt()` (e.g., `v2/session.test.ts`) don't catch this — only a real `prompt()` call triggers the overwrite path.
+`prompt()` converts `input.tools` to permission rules via `toolsToPermissions` at `session/prompt.ts:210-218` (primary_tools keys stripped at `:212-214`, `Permission.dedupe(Permission.merge(...))` at `:216`) and **must use `Permission.merge(session.permission ?? [], permissions)`**, not overwrite (`session.permission = permissions`). Overwriting destroys parent denies set by `subagentSessionPermission`, making Plan Mode's `edit: { "*": "deny" }` ineffective at runtime (the #26514 fix). Tests that stub `prompt()` (e.g., `v2/session.test.ts`) don't catch this — only a real `prompt()` call triggers the overwrite path.
 
 ## `prompt.ts` has two `ctx.ask` wiring points with different ruleset composition
 

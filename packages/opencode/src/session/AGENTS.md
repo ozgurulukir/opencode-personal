@@ -18,7 +18,7 @@ Delta selection uses anchored regex in a fixed order: `gpt-4`/`o1`/`o3` → beas
 
 ## `system.ts:skills()` — auto-match via semantic search
 
-`SystemPrompt.skills()` now accepts optional `userMessage` and `autoMatchOpts` parameters. When `skills.autoMatch` is enabled in config, `run-loop.ts:runLoop` reads the config, extracts the last user message text, and passes both to `skills()`. The method then calls `skill.matchBySemantics()` instead of `skill.available()`, returning only the top-N matching skills. The config is read at the call site (`run-loop.ts:331-339`), not inside `skills()`, to keep the `Interface` methods' Effect `R = never` (avoiding `Config.Service` requirement on the interface).
+`SystemPrompt.skills()` now accepts optional `userMessage` and `autoMatchOpts` parameters. When `skills.autoMatch` is enabled in config, `run-loop.ts:runLoop` reads the config, extracts the last user message text, and passes both to `skills()`. The method then calls `skill.matchBySemantics()` instead of `skill.available()`, returning only the top-N matching skills. The config is read at the call site (`run-loop.ts:291-300`), not inside `skills()`, to keep the `Interface` methods' Effect `R = never` (avoiding `Config.Service` requirement on the interface).
 
 ## `merge-options.ts` — hot LLM path, cast is intentional
 
@@ -26,7 +26,7 @@ The `as Record<string, any>` cast in `mergeOptions` is deliberate — remeda's `
 
 ## `prompt()` tools-derived permissions must merge with existing session permission
 
-`session/prompt.ts:215-223` (`toolsToPermissions`) merges tool restrictions with existing `session.permission`, not overwrite: primary tools are stripped (`:216-218`) and the derived rules land in `Permission.dedupe(Permission.merge(session.permission ?? [], permissions))` (`:222`). Overwriting destroys parent denies (e.g., Plan Mode `edit: { "*": "deny" }`) set by `subagentSessionPermission` — the #26514 fix was ineffective at runtime because of this overwrite. The merge is safe: `Permission.merge` = `rulesets.flat()`, and `findLast` in `evaluate` means tools-derived rules (appended last) override earlier rules for the same `(permission, pattern)` key.
+`session/prompt.ts:210-218` (`toolsToPermissions`) merges tool restrictions with existing `session.permission`, not overwrite: primary tools are stripped (`:212-214`) and the derived rules land in `Permission.dedupe(Permission.merge(session.permission ?? [], permissions))` (`:216`). Overwriting destroys parent denies (e.g., Plan Mode `edit: { "*": "deny" }`) set by `subagentSessionPermission` — the #26514 fix was ineffective at runtime because of this overwrite. The merge is safe: `Permission.merge` = `rulesets.flat()`, and `findLast` in `evaluate` means tools-derived rules (appended last) override earlier rules for the same `(permission, pattern)` key.
 
 ## TodoWrite tool — autoclose architecture
 
