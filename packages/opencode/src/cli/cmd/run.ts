@@ -236,9 +236,11 @@ export const RunCommand = effectCmd({
       const rawMessage = [...args.message, ...(args["--"] || [])].join(" ")
       const thinking = args.interactive ? (args.thinking ?? true) : (args.thinking ?? false)
       // Domain failures throw CliError instead of calling process.exit(1):
-      // the rejection propagates through Effect.promise as a typed failure so
-      // effectCmd's finally (instance store disposal) still runs, and the
-      // top-level handler formats the message with the exit code.
+      // the rejection surfaces through Effect.promise as a defect (die), which
+      // runPromise unwraps via causeSquash at the boundary — effectCmd's
+      // finally (instance store disposal) still runs on every exit, and the
+      // top-level FormatError recognizes the unwrapped CliError and formats
+      // the message with the exit code.
       const die = (message: string): never => {
         throw new CliError({ message, exitCode: 1 })
       }

@@ -33,6 +33,9 @@ describe("editorArgs", () => {
     // The classic injection shape: an interpreter + a script payload argument.
     expect(() => editorArgs("sh -c 'rm -rf /'")).toThrow(/Invalid \$EDITOR/)
     expect(() => editorArgs('bash -c "echo pwned"')).toThrow(/Invalid \$EDITOR/)
+    // Windows shells are interpreters too.
+    expect(() => editorArgs("powershell -Command 'nvim'")).toThrow(/Invalid \$EDITOR/)
+    expect(() => editorArgs("cmd /c notepad")).toThrow(/Invalid \$EDITOR/)
     // Metacharacters hiding inside a quoted payload are still rejected.
     expect(() => editorArgs('nvim "foo|bar"')).toThrow(/Invalid \$EDITOR/)
   })
