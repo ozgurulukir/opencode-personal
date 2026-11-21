@@ -6,8 +6,6 @@ import { Global } from "@opencode-ai/core/global"
 import { AppFileSystem } from "@opencode-ai/core/filesystem"
 import * as Log from "@opencode-ai/core/util/log"
 
-export const OAUTH_DUMMY_KEY = "opencode-oauth-dummy-key"
-
 const AccountID = Schema.String.pipe(
   Schema.brand("AccountID"),
   withStatics((schema) => ({ create: () => schema.make("acc_" + Identifier.ascending()) })),

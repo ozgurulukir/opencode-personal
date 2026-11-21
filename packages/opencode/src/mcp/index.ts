@@ -166,7 +166,15 @@ function listTools(key: string, client: MCPClient, timeout: number) {
 
       log.warn("failed to validate MCP tool output schemas, retrying without output schema validation", { key, error })
       return Effect.tryPromise({
-        try: () => client.request({ method: "tools/list" }, TolerantListToolsResultSchema as any, { timeout }),
+        // The MCP SDK resolves its own zod version; cast our tolerant schema to
+        // the request-schema type the SDK's client.request expects (see the
+        // boundary note on TolerantListToolsResultSchema above).
+        try: () =>
+          client.request(
+            { method: "tools/list" },
+            TolerantListToolsResultSchema as unknown as Parameters<MCPClient["request"]>[1],
+            { timeout },
+          ),
         catch: (err) => (err instanceof Error ? err : new Error(String(err))),
       }).pipe(
         Effect.map(
@@ -243,6 +251,10 @@ export function buildToolMap(
 ): Record<string, Tool> {
   const result: Record<string, Tool> = {}
   const seen = new Set<string>()
+  // Tracks the first raw "<server>/<tool>" owner of each key so collision
+  // warnings name BOTH original names — one allow/deny rule governs the key,
+  // so users need to know exactly which tools share it.
+  const owners = new Map<string, string>()
   for (const { clientName, client, tools, timeout } of entries) {
     for (const mcpTool of tools) {
       const key = "mcp_" + sanitize(clientName) + "_" + sanitize(mcpTool.name)
@@ -251,10 +263,12 @@ export function buildToolMap(
           key,
           server: clientName,
           tool: mcpTool.name,
+          collidesWith: owners.get(key),
         })
         continue
       }
       seen.add(key)
+      owners.set(key, `${clientName}/${mcpTool.name}`)
       result[key] = convertMcpTool(mcpTool, client, clientName, timeout)
     }
   }
@@ -286,8 +300,22 @@ function fetchFromClient<T extends { name: string }>(
     Effect.map((items) => {
       const out: Record<string, T & { client: string }> = {}
       const sanitizedClient = sanitize(clientName)
+      // First definition wins; later sanitized-name collisions are warned
+      // instead of silently overwriting (mirrors buildToolMap above).
+      const seen = new Map<string, string>()
       for (const item of items) {
-        out[sanitizedClient + ":" + sanitize(item.name)] = { ...item, client: clientName }
+        const key = sanitizedClient + ":" + sanitize(item.name)
+        if (seen.has(key)) {
+          log.warn(`duplicate MCP ${label} key ignored (name collision after sanitization)`, {
+            key,
+            server: clientName,
+            name: item.name,
+            collidesWith: seen.get(key),
+          })
+          continue
+        }
+        seen.set(key, item.name)
+        out[key] = { ...item, client: clientName }
       }
       return out
     }),

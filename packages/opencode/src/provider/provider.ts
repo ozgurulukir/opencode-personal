@@ -10,7 +10,7 @@ import { Plugin } from "../plugin"
 import { type LanguageModelV3 } from "@ai-sdk/provider"
 import * as ModelsDev from "./models"
 import type { Auth as PluginAuth } from "@opencode-ai/sdk/v2"
-import { Auth } from "../auth"
+import { Auth, OAUTH_DUMMY_KEY } from "../auth"
 import { Env } from "../env"
 import { InstallationVersion } from "@opencode-ai/core/installation/version"
 import { Flag } from "@opencode-ai/core/flag/flag"
@@ -1544,6 +1544,22 @@ const layer: Layer.Layer<
           if (provider.name) partial.name = provider.name
           if (provider.options) partial.options = provider.options
           mergeProvider(providerID, partial)
+        }
+
+        // Fail loud if any provider ended up with the OAuth dummy key but no
+        // fetch wrapper to swap it for the real token: the sentinel would be
+        // sent upstream as a bearer token and 401 every request. All merges
+        // (plugin auth loaders, custom providers, config re-apply) have run at
+        // this point, so this is the last line of defense for the invariant.
+        for (const [id, provider] of Object.entries(providers)) {
+          const options = provider.options as { apiKey?: unknown; fetch?: unknown } | undefined
+          if (options?.apiKey !== OAUTH_DUMMY_KEY) continue
+          if (typeof options.fetch !== "function") {
+            log.error(
+              `provider "${id}" kept the OAuth dummy key without a fetch wrapper; the sentinel must always be swapped before any outbound request`,
+              { provider: id },
+            )
+          }
         }
 
         const gitlab = ProviderID.make("gitlab")

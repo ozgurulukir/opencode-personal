@@ -488,3 +488,28 @@ it.live("login rejects a scheme-less server with a typed account error", () =>
     expect(error).toBeInstanceOf(Account.InvalidServerUrlError)
   }),
 )
+
+it.live("poll re-validates the server URL before any outbound request", () =>
+  Effect.gen(function* () {
+    let requests = 0
+    const client = HttpClient.make((req) => {
+      requests++
+      return Effect.succeed(json(req, {}, 404))
+    })
+    // poll() accepts any caller-supplied Login — the schema does not constrain
+    // `server` to http(s), so poll() must re-normalize like login() does.
+    const bad = new Login({
+      code: DeviceCode.make("device-code"),
+      user: UserCode.make("user-code"),
+      url: "https://one.example.com/verify",
+      server: "file:///etc/passwd",
+      expiry: Duration.seconds(600),
+      interval: Duration.seconds(5),
+    })
+    const error = yield* Effect.flip(
+      Account.Service.use((s) => s.poll(bad)).pipe(Effect.provide(live(client))),
+    )
+    expect(error).toBeInstanceOf(Account.InvalidServerUrlError)
+    expect(requests).toBe(0)
+  }),
+)

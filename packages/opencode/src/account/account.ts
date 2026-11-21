@@ -414,8 +414,19 @@ export const layer: Layer.Layer<Service, never, AccountRepo.Service | HttpClient
     })
 
     const poll = Effect.fn("Account.poll")(function* (input: Login) {
+      // Re-validate the server even though login() normalized it: poll accepts
+      // any caller-supplied `Login` value, so defense-in-depth keeps the
+      // outbound requests pinned to http(s) exactly like login().
+      const server = yield* Effect.try({
+        try: () => normalizeServerUrl(input.server),
+        catch: (cause) =>
+          cause instanceof InvalidServerUrlError
+            ? cause
+            : new AccountServiceError({ message: "Invalid server URL", cause }),
+      })
+
       const response = yield* executeEffect(
-        HttpClientRequest.post(`${input.server}/auth/device/token`).pipe(
+        HttpClientRequest.post(`${server}/auth/device/token`).pipe(
           HttpClientRequest.acceptJson,
           HttpClientRequest.schemaBodyJson(DeviceTokenRequest)(
             new DeviceTokenRequest({
@@ -434,8 +445,8 @@ export const layer: Layer.Layer<Service, never, AccountRepo.Service | HttpClient
       if (parsed instanceof DeviceTokenError) return parsed.toPollResult()
       const accessToken = parsed.access_token
 
-      const user = fetchUser(input.server, accessToken)
-      const orgs = fetchOrgs(input.server, accessToken)
+      const user = fetchUser(server, accessToken)
+      const orgs = fetchOrgs(server, accessToken)
 
       const [account, remoteOrgs] = yield* Effect.all([user, orgs], { concurrency: 2 })
 
@@ -449,7 +460,7 @@ export const layer: Layer.Layer<Service, never, AccountRepo.Service | HttpClient
       yield* repo.persistAccount({
         id: account.id,
         email: account.email,
-        url: input.server,
+        url: server,
         accessToken,
         refreshToken,
         expiry,
