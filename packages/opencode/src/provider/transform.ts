@@ -932,7 +932,9 @@ export function options(input: {
   }
 
   if (input.model.api.id.includes("gpt-5") && !input.model.api.id.includes("gpt-5-chat")) {
-    if (!input.model.api.id.includes("gpt-5-pro")) {
+    // Pro ids (including versioned ones like gpt-5.1-pro) expose only high-tier
+    // efforts (see variants()), so they get no default effort at all.
+    if (!GPT5_PRO_RE.test(input.model.api.id) && !GPT5_VERSIONED_PRO_RE.test(input.model.api.id)) {
       result["reasoningEffort"] = "medium"
       // Only inject reasoningSummary for providers that support it natively.
       // @ai-sdk/openai-compatible proxies (e.g. LiteLLM) do not understand this
@@ -992,6 +994,11 @@ export function smallOptions(model: Model) {
         return { store: false, reasoningEffort: "medium" }
       }
       if (model.api.id.includes("search-api")) return { store: false }
+      // Codex ids never expose `minimal`; default them to `low`, and
+      // gpt-5-pro exposes only high-tier efforts (see variants()) so it gets
+      // no effort default at all. Sending an unexposed tier would be rejected.
+      if (model.api.id.includes("codex")) return { store: false, reasoningEffort: "low" }
+      if (GPT5_PRO_RE.test(model.api.id) || GPT5_VERSIONED_PRO_RE.test(model.api.id)) return { store: false }
       if (model.api.id.includes("5.") || model.api.id.includes("5-mini")) {
         return { store: false, reasoningEffort: "low" }
       }

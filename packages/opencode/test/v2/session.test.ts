@@ -1,5 +1,5 @@
 import { afterEach, describe, expect } from "bun:test"
-import { Effect, Exit, Fiber, Layer } from "effect"
+import { Cause, Deferred, Effect, Exit, Fiber, Layer } from "effect"
 import { Config } from "@/config/config"
 import { Agent } from "../../src/agent/agent"
 import { CrossSpawnSpawner } from "@opencode-ai/core/cross-spawn-spawner"
@@ -51,6 +51,10 @@ function stubPromptLayer(opts?: { loopResult?: MessageV2.WithParts; failPrompt?:
     legacyMessageIDs: [],
     legacyAssistantMessageIDs: [],
   }
+  // When armed, `prompt` blocks on a per-session gate until engine.cancel
+  // completes it — lets the abort test prove the abort actually stops the
+  // subagent instead of racing its fast-completing stub.
+  const hang = { armed: false, gates: new Map<SessionID, Deferred.Deferred<void>>() }
   const loopResult = opts?.loopResult ?? {
     info: {
       id: MessageID.ascending(),
@@ -86,7 +90,18 @@ function stubPromptLayer(opts?: { loopResult?: MessageV2.WithParts; failPrompt?:
       return SessionPrompt.Engine.of({
         prompt: (input: any) =>
           Effect.gen(function* () {
+            // Register the gate synchronously BEFORE the observable prompt
+            // signal — a yield here would let the abort race ahead of the
+            // gate and leave the stub awaiting a gate nobody completes.
+            if (hang.armed) {
+              const gate = Deferred.makeUnsafe<void>()
+              hang.gates.set(input.sessionID, gate)
+            }
             calls.prompt.push(input)
+            if (hang.armed) {
+              yield* Deferred.await(hang.gates.get(input.sessionID)!)
+              hang.gates.delete(input.sessionID)
+            }
             if (opts?.failPrompt) {
               yield* Effect.die(new Error("simulated prompt failure"))
             }
@@ -196,13 +211,19 @@ function stubPromptLayer(opts?: { loopResult?: MessageV2.WithParts; failPrompt?:
             return loopResult
           }),
         command: () => Effect.die("not used"),
-        cancel: () => Effect.void,
+        cancel: (sessionID: SessionID) =>
+          Effect.sync(() => {
+            const gate = hang.gates.get(sessionID)
+            // Die (not fail) keeps the stub's prompt error channel never —
+            // cancellation surfaces as a defect, mirroring the real engine.
+            if (gate) Deferred.doneUnsafe(gate, Exit.die(new Error("stub prompt cancelled")))
+          }),
         resolvePromptParts: (template: string) => Effect.succeed([{ type: "text" as const, text: template }]),
         predict: () => Effect.succeed(""),
       })
     }),
   )
-  return { layer, calls }
+  return { layer, calls, armHang: () => (hang.armed = true), disarmHang: () => (hang.armed = false) }
 }
 
 /** A stub V1 SessionCompaction that records create calls. */
@@ -1448,7 +1469,14 @@ describe("v2.session", () => {
 
       const abort = new AbortController()
 
-      // Start subagent with abort signal, abort it immediately after start
+      // Make the child prompt block on a gate so the abort races an in-flight
+      // subagent instead of a stub that completes instantly.
+      promptStub.armHang()
+
+      // Start subagent with abort signal, abort it once THIS subagent's child
+      // prompt is provably in flight. calls.prompt accumulates across tests,
+      // so compare against the pre-fork snapshot.
+      const promptCallsBefore = promptStub.calls.prompt.length
       const fiber = yield* Effect.forkChild(
         session.subagent({
           parentID: parent.id,
@@ -1458,12 +1486,37 @@ describe("v2.session", () => {
         }),
       )
 
-      yield* Effect.sleep("50 millis")
+      let started = false
+      for (let i = 0; i < 100; i++) {
+        if (promptStub.calls.prompt.length > promptCallsBefore) {
+          started = true
+          break
+        }
+        yield* Effect.sleep("10 millis")
+      }
+
+      expect(started).toBe(true)
       abort.abort()
-      const exit = yield* Fiber.await(fiber)
-      // The fiber should complete without unhandled rejection
-      expect(["Success", "Interrupted", "Failure"]).toContain(exit._tag)
-    }),
+      // 5s ceiling so a regression (abort no longer settling the subagent)
+      // fails the test instead of hanging it.
+      const exit = yield* Fiber.await(fiber).pipe(Effect.timeout("5 seconds"))
+      // V2 subagent contract: a cancelled child prompt does not fail the
+      // caller — the subagent completes and posts a fallback synthetic
+      // message to the parent. Assert the child was actually cancelled
+      // (no stub output) by checking the fallback text arrived.
+      expect(exit._tag).toBe("Success")
+      // The cancelled child prompt dies → V2 posts a "Subagent error:" fallback
+      // synthetic message to the parent instead of the stub result.
+      const parentMessages = yield* session.messages({ sessionID: parent.id })
+      const fallback = parentMessages.findLast(
+        (m) => m.type === "synthetic" && (m as { text?: string }).text?.includes("Subagent error:"),
+      )
+      expect(fallback).toBeDefined()
+    }).pipe(
+      // Disarm the prompt hang on every exit path so later subagent tests
+      // cannot hang on the armed stub.
+      Effect.ensuring(Effect.sync(() => promptStub.disarmHang())),
+    ),
   )
 
   it.instance("subagent is cancelled when parent scope is closed", () =>

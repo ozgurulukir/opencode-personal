@@ -6,6 +6,7 @@ import { OAUTH_DUMMY_KEY } from "../auth"
 import os from "os"
 import { setTimeout as sleep } from "node:timers/promises"
 import { createServer } from "http"
+import { escapeHtml } from "../util/escape-html"
 
 const log = Log.create({ service: "plugin.codex" })
 
@@ -201,20 +202,6 @@ const HTML_SUCCESS = `<!doctype html>
     </script>
   </body>
 </html>`
-
-function escapeHtml(str: string): string {
-  return str.replace(
-    /[&<>"']/g,
-    (c) =>
-      ({
-        "&": "&amp;",
-        "<": "&lt;",
-        ">": "&gt;",
-        '"': "&quot;",
-        "'": "&#39;",
-      })[c] || c,
-  )
-}
 
 const HTML_ERROR = (error: string) => `<!doctype html>
 <html>

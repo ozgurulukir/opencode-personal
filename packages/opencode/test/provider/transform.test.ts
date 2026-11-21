@@ -2395,6 +2395,73 @@ describe("ProviderTransform thinking budget minimum", () => {
   })
 })
 
+describe("ProviderTransform gpt-5 default effort invariant", () => {
+  // `options()`/`smallOptions()` hardcode gpt-5 default reasoning efforts that
+  // must always be members of `variants()` for the same model — otherwise a
+  // provider could 400 on an effort tier the model does not expose. Locks the
+  // two sources of truth together.
+  const base = {
+    id: "openai/gpt-5",
+    providerID: "openai",
+    api: { id: "gpt-5", url: "https://api.openai.com", npm: "@ai-sdk/openai" },
+    name: "GPT-5",
+    capabilities: {
+      temperature: true,
+      reasoning: true,
+      attachment: true,
+      toolcall: true,
+      input: { text: true, audio: false, image: true, video: false, pdf: true },
+      output: { text: true, audio: false, image: false, video: false, pdf: false },
+      interleaved: false,
+    },
+    cost: { input: 0, output: 0, cache: { read: 0, write: 0 } },
+    limit: { context: 400_000, output: 128_000 },
+    status: "active",
+    options: {},
+    headers: {},
+  } as any
+
+  const fixture = (apiId: string, providerID = "openai") => ({
+    ...base,
+    id: `${providerID}/${apiId}`,
+    providerID,
+    api: { ...base.api, id: apiId },
+  })
+
+  const gpt5Fixtures = [
+    "gpt-5",
+    "gpt-5-mini",
+    "gpt-5-nano",
+    "gpt-5.1",
+    "gpt-5.2",
+    "gpt-5.2-chat-latest",
+    "gpt-5-codex",
+    "gpt-5.2-codex-max",
+    "gpt-5-pro",
+    "gpt-5-pro-2",
+    "gpt-5.1-pro",
+    "gpt-5.2-pro",
+  ]
+
+  test("options() default reasoningEffort is always an exposed variant", () => {
+    for (const apiId of gpt5Fixtures) {
+      const model = fixture(apiId)
+      const effort = ProviderTransform.options({ model, sessionID: "test" }).reasoningEffort
+      if (effort === undefined) continue
+      expect(Object.keys(ProviderTransform.variants(model))).toContain(effort)
+    }
+  })
+
+  test("smallOptions() default reasoningEffort is always an exposed variant", () => {
+    for (const apiId of gpt5Fixtures) {
+      const model = fixture(apiId)
+      const effort = ProviderTransform.smallOptions(model).reasoningEffort
+      if (effort === undefined) continue
+      expect(Object.keys(ProviderTransform.variants(model))).toContain(effort)
+    }
+  })
+})
+
 describe("ProviderTransform.variants", () => {
   const createMockModel = (overrides: Partial<any> = {}): any => ({
     id: "test/test-model",
