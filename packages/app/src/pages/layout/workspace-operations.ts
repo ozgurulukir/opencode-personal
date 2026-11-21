@@ -16,7 +16,10 @@ export function shouldLeaveDeletedWorkspace(input: {
   currentDirectory: string
   deletedDirectory: string
 }): boolean {
-  return input.leaveDeletedWorkspace || (input.hasRouteSlug && pathKey(input.currentDirectory) === pathKey(input.deletedDirectory))
+  return (
+    input.leaveDeletedWorkspace ||
+    (input.hasRouteSlug && pathKey(input.currentDirectory) === pathKey(input.deletedDirectory))
+  )
 }
 
 export function needsPostDeleteRedirect(input: {
@@ -134,7 +137,10 @@ export function createWorkspaceOperations(input: {
       .then((x) => x.data?.items ?? [])
       .catch(() => [])
 
-    input.clearTerminals(directory, sessions.map((s) => s.id))
+    input.clearTerminals(
+      directory,
+      sessions.map((s) => s.id),
+    )
     await input.globalSDK.client.instance.dispose({ directory }).catch(() => undefined)
 
     const result = await input.globalSDK.client.worktree
@@ -159,11 +165,12 @@ export function createWorkspaceOperations(input: {
       sessions
         .filter((session) => session.time.archived === undefined)
         .map((session) =>
-          input.globalSDK.client.v2.session.update({
-            sessionID: session.id,
-            directory: session.directory,
-            time: { archived: archivedAt },
-          })
+          input.globalSDK.client.v2.session
+            .update({
+              sessionID: session.id,
+              directory: session.directory,
+              time: { archived: archivedAt },
+            })
             .catch(() => undefined),
         ),
     )

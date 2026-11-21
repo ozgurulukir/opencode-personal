@@ -1,15 +1,4 @@
-import {
-  type Info,
-  NearestRoot,
-  spawn,
-  path,
-  fs,
-  log,
-  Filesystem,
-  Flag,
-  Global,
-  Archive,
-} from "./shared"
+import { type Info, NearestRoot, spawn, path, fs, log, Filesystem, Flag, Global, Archive } from "./shared"
 
 export const KotlinLS: Info = {
   id: "kotlin-ls",

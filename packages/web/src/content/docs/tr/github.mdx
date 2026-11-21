@@ -57,20 +57,20 @@ Veya manuel olarak ayarlayabilirsiniz.
        permissions:
          id-token: write
        steps:
-       - name: Checkout repository
-         uses: actions/checkout@v6
-         with:
-           fetch-depth: 1
-           persist-credentials: false
+         - name: Checkout repository
+           uses: actions/checkout@v6
+           with:
+             fetch-depth: 1
+             persist-credentials: false
 
-       - name: Run OpenCode
-         uses: anomalyco/opencode/github@latest
-         env:
-           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-         with:
-           model: anthropic/claude-sonnet-4-5-20250929
-           # share: true
-           # use_github_token: true
+         - name: Run OpenCode
+           uses: anomalyco/opencode/github@latest
+           env:
+             ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+           with:
+             model: anthropic/claude-sonnet-4-5-20250929
+             # share: true
+             # use_github_token: true
    ```
 
 3. **API anahtarlarını gizli olarak saklayın**
@@ -84,25 +84,25 @@ Veya manuel olarak ayarlayabilirsiniz.
 - `model`: opencode ile kullanılacak model. `provider/model` biçimini alır. Bu **gerekli**.
 - `agent`: Kullanılacak aracı. Birincil ajan olmalı. Yapılandırmadan `default_agent`'ye veya bulunamazsa `"build"`'ye geri döner.
 - `share`: opencode hesabının paylaşılıp paylaşılmayacağı. Genel depolar için varsayılan olarak **true** olur.
- - `prompt`: Varsayılan çalışma geçersiz olduğundan dolayı özel istem. opencode'un işleme biçimini kişiselleştirmek için bunu kullanın.
- - `use_github_token`: OpenCode App belirteci yerine iş akışının `GITHUB_TOKEN` değerini kullanmak için `true` olarak ayarlayın. İş akışınıza gereken izinleri verin.
- - `mentions`: Virgülle ayrılmış tetikleyici ifadeler. Varsayılanı `/opencode,/oc` değeridir.
- - `variant`: `high`, `max` veya `minimal` gibi sağlayıcıya özel model varyantı.
- - `oidc_base_url`: Özel bir GitHub App kurulumu kullanırken OIDC token değişim uç noktasını geçersiz kılın.
+- `prompt`: Varsayılan çalışma geçersiz olduğundan dolayı özel istem. opencode'un işleme biçimini kişiselleştirmek için bunu kullanın.
+- `use_github_token`: OpenCode App belirteci yerine iş akışının `GITHUB_TOKEN` değerini kullanmak için `true` olarak ayarlayın. İş akışınıza gereken izinleri verin.
+- `mentions`: Virgülle ayrılmış tetikleyici ifadeler. Varsayılanı `/opencode,/oc` değeridir.
+- `variant`: `high`, `max` veya `minimal` gibi sağlayıcıya özel model varyantı.
+- `oidc_base_url`: Özel bir GitHub App kurulumu kullanırken OIDC token değişim uç noktasını geçersiz kılın.
 
-  Varsayılan olarak opencode, opencode GitHub App'indeki kurulum erişim belirtecini kullanır; bu nedenle taahhütler, yorumlar ve çekme istekleri uygulamadan geliyormuş gibi görünür.
+Varsayılan olarak opencode, opencode GitHub App'indeki kurulum erişim belirtecini kullanır; bu nedenle taahhütler, yorumlar ve çekme istekleri uygulamadan geliyormuş gibi görünür.
 
-  Alternatif olarak, opencode GitHub'u yüklemeden GitHub Eylem çalıştırıcısının [built-in `GITHUB_TOKEN`](https://docs.github.com/en/actions/tutorials/authenticate-with-github_token) akışını kullanabilirsiniz. İşinizde gerekli izinlere sahip olduğunuzdan emin olun:
+Alternatif olarak, opencode GitHub'u yüklemeden GitHub Eylem çalıştırıcısının [built-in `GITHUB_TOKEN`](https://docs.github.com/en/actions/tutorials/authenticate-with-github_token) akışını kullanabilirsiniz. İşinizde gerekli izinlere sahip olduğunuzdan emin olun:
 
-  ```yaml
-  permissions:
-    id-token: write
-    contents: write
-    pull-requests: write
-    issues: write
-  ```
+```yaml
+permissions:
+  id-token: write
+  contents: write
+  pull-requests: write
+  issues: write
+```
 
-  Tercih edilirse [personal access tokens](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens)(PAT) de kullanabilirsiniz.
+Tercih edilirse [personal access tokens](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens)(PAT) de kullanabilirsiniz.
 
 ---
 

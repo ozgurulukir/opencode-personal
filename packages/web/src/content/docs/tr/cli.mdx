@@ -357,7 +357,7 @@ opencode-personal run --attach http://localhost:4096 "Explain async/await in Jav
 | <nobr><code>{"--dir"}</code></nobr>      |      | Çalıştırılacak dizin veya bağlanırken uzak sunucudaki yol                                     |
 | <nobr><code>{"--variant"}</code></nobr>  |      | Model varyantı (sağlayıcıya özgü muhakeme düzeyi)                                             |
 | <nobr><code>{"--thinking"}</code></nobr> |      | Düşünme bloklarını göster                                                                     |
-| <nobr><code>{"--port"}</code></nobr>     |      | Yerel sunucunun bağlantı noktası (4096 denenir, sonra boş bir port kullanılır)               |
+| <nobr><code>{"--port"}</code></nobr>     |      | Yerel sunucunun bağlantı noktası (4096 denenir, sonra boş bir port kullanılır)                |
 
 ---
 
@@ -537,7 +537,7 @@ opencode ortam değişkenleri kullanılarak yapılandırılabilir.
 | Değişken                              | Tip     | Açıklama                                                                    |
 | ------------------------------------- | ------- | --------------------------------------------------------------------------- |
 | `OPENCODE_AUTO_SHARE`                 | boolean | Oturumları otomatik olarak paylaş                                           |
-| `OPENCODE_AUTO_HEAP_SNAPSHOT`         | boolean | Heap anlık görüntüsünü otomatik olarak al                                          |
+| `OPENCODE_AUTO_HEAP_SNAPSHOT`         | boolean | Heap anlık görüntüsünü otomatik olarak al                                   |
 | `OPENCODE_GIT_BASH_PATH`              | string  | Windows'ta yürütülebilir Git Bash'in Yolu                                   |
 | `OPENCODE_CONFIG`                     | string  | Yapılandırma dosyasının yolu                                                |
 | `OPENCODE_TUI_CONFIG`                 | string  | TUI yapılandırma dosyasının yolu                                            |
@@ -554,25 +554,25 @@ opencode ortam değişkenleri kullanılarak yapılandırılabilir.
 | `OPENCODE_DISABLE_CLAUDE_CODE`        | boolean | `.claude`'den okumayı devre dışı bırak (istem + beceriler)                  |
 | `OPENCODE_DISABLE_CLAUDE_CODE_PROMPT` | boolean | `~/.claude/CLAUDE.md` dosyasını okumayı devre dışı bırak                    |
 | `OPENCODE_DISABLE_CLAUDE_CODE_SKILLS` | boolean | `.claude/skills` yüklemesini devre dışı bırak                               |
-| `OPENCODE_DISABLE_EXTERNAL_SKILLS`    | boolean | Harici konumlardaki skill'leri yüklemeyi devre dışı bırak                    |
+| `OPENCODE_DISABLE_EXTERNAL_SKILLS`    | boolean | Harici konumlardaki skill'leri yüklemeyi devre dışı bırak                   |
 | `OPENCODE_DISABLE_MODELS_FETCH`       | boolean | Uzak kaynaklardan model getirmeyi devre dışı bırakın                        |
 | `OPENCODE_FAKE_VCS`                   | string  | Test amaçlı sahte VCS sağlayıcısı                                           |
 | `OPENCODE_CLIENT`                     | string  | Client kimliği (varsayılan: `cli`)                                          |
 | `OPENCODE_ENABLE_EXA`                 | boolean | Exa web arama araçlarını etkinleştir                                        |
-| `OPENCODE_ENABLE_QUESTION_TOOL`       | boolean | Soru aracını etkinleştir                                                     |
+| `OPENCODE_ENABLE_QUESTION_TOOL`       | boolean | Soru aracını etkinleştir                                                    |
 | `OPENCODE_SERVER_PASSWORD`            | string  | `serve`/`web` için temel kimlik doğrulamayı etkinleştirin                   |
 | `OPENCODE_SERVER_USERNAME`            | string  | Temel kimlik doğrulama kullanıcı adını geçersiz kıl (varsayılan `opencode`) |
 | `OPENCODE_MODELS_URL`                 | string  | Model yapılandırmasını almak için özel URL                                  |
-| `OPENCODE_MODELS_PATH`                | string  | Model yapılandırmasını yerel bir dosyadan oku                                |
-| `OPENCODE_DB`                         | string  | SQLite veritabanı yolunu geçersiz kıl                                        |
-| `OPENCODE_DISABLE_CHANNEL_DB`         | boolean | Tüm derleme kanalları için paylaşılan veritabanını kullan                    |
-| `OPENCODE_SKIP_MIGRATIONS`            | boolean | Veritabanı geçişlerini atla                                                  |
-| `OPENCODE_STRICT_CONFIG_DEPS`         | boolean | Çözülemeyen yapılandırma bağımlılıklarında hata ver                          |
-| `OPENCODE_DISABLE_PROJECT_CONFIG`     | boolean | Proje yerelindeki yapılandırma dosyalarını yok say                           |
-| `OPENCODE_DISABLE_EMBEDDED_WEB_UI`    | boolean | Gömülü web arayüzünü devre dışı bırak                                        |
-| `OPENCODE_PURE`                       | boolean | Harici eklentiler olmadan çalıştır                                           |
-| `OPENCODE_PLUGIN_META_FILE`           | string  | Eklenti meta verisi yolu                                                     |
-| `OPENCODE_WORKSPACE_ID`               | string  | Bir çalışma alanı seç                                                        |
+| `OPENCODE_MODELS_PATH`                | string  | Model yapılandırmasını yerel bir dosyadan oku                               |
+| `OPENCODE_DB`                         | string  | SQLite veritabanı yolunu geçersiz kıl                                       |
+| `OPENCODE_DISABLE_CHANNEL_DB`         | boolean | Tüm derleme kanalları için paylaşılan veritabanını kullan                   |
+| `OPENCODE_SKIP_MIGRATIONS`            | boolean | Veritabanı geçişlerini atla                                                 |
+| `OPENCODE_STRICT_CONFIG_DEPS`         | boolean | Çözülemeyen yapılandırma bağımlılıklarında hata ver                         |
+| `OPENCODE_DISABLE_PROJECT_CONFIG`     | boolean | Proje yerelindeki yapılandırma dosyalarını yok say                          |
+| `OPENCODE_DISABLE_EMBEDDED_WEB_UI`    | boolean | Gömülü web arayüzünü devre dışı bırak                                       |
+| `OPENCODE_PURE`                       | boolean | Harici eklentiler olmadan çalıştır                                          |
+| `OPENCODE_PLUGIN_META_FILE`           | string  | Eklenti meta verisi yolu                                                    |
+| `OPENCODE_WORKSPACE_ID`               | string  | Bir çalışma alanı seç                                                       |
 
 ---
 
@@ -580,23 +580,23 @@ opencode ortam değişkenleri kullanılarak yapılandırılabilir.
 
 Bu ortam değişkenleri değişebilecek veya kaldırılabilecek deneysel özellikleri etkinleştirir.
 
-| Değişken                                        | Tip     | Tanım                                                   |
-| ----------------------------------------------- | ------- | ------------------------------------------------------- |
-| `OPENCODE_EXPERIMENTAL`                         | boolean | Deneysel özellik paketini etkinleştir                   |
-| `OPENCODE_EXPERIMENTAL_ICON_DISCOVERY`          | boolean | Simge bulmayı etkinleştir                               |
-| `OPENCODE_EXPERIMENTAL_DISABLE_COPY_ON_SELECT`  | boolean | TUI'da seçim yapıldığında kopyalamayı devre dışı bırak  |
-| `OPENCODE_EXPERIMENTAL_BASH_DEFAULT_TIMEOUT_MS` | number  | MS cinsinden bash komutları için varsayılan zaman aşımı |
-| `OPENCODE_EXPERIMENTAL_OUTPUT_TOKEN_MAX`        | number  | LLM yanıtları için maksimum çıktı belirteçleri          |
-| `OPENCODE_EXPERIMENTAL_FILEWATCHER`             | boolean | Tüm dizin için dosya izleyiciyi etkinleştir             |
-| `OPENCODE_EXPERIMENTAL_OXFMT`                   | boolean | Oxfmt biçimlendiriciyi etkinleştir                      |
-| `OPENCODE_EXPERIMENTAL_LSP_TOOL`                | boolean | Deneysel LSP aracını etkinleştir                        |
-| `OPENCODE_EXPERIMENTAL_DISABLE_FILEWATCHER`     | boolean | Dosya izleyiciyi devre dışı bırak                       |
-| `OPENCODE_EXPERIMENTAL_EXA`                     | boolean | Deneysel Exa özelliklerini etkinleştirin                |
-| `OPENCODE_EXPERIMENTAL_LSP_TY`                  | boolean | python dosyaları için TY LSP'yi etkinleştir             |
-| `OPENCODE_EXPERIMENTAL_MARKDOWN`                | boolean | Deneysel işaretleme özelliklerini etkinleştir           |
-| `OPENCODE_EXPERIMENTAL_PLAN_MODE`               | boolean | Plan modunu etkinleştir                                 |
-| `OPENCODE_EXPERIMENTAL_SCOUT`                   | boolean | Scout araştırma agent'ını etkinleştir                   |
-| `OPENCODE_ENABLE_PARALLEL`                      | boolean | Paralel web aramasını etkinleştir                       |
-| `OPENCODE_EXPERIMENTAL_PARALLEL`                | boolean | Paralel web araması için alternatif ad                  |
-| `OPENCODE_EXPERIMENTAL_WORKSPACES`              | boolean | Deneysel çalışma alanlarını etkinleştir                 |
+| Değişken                                        | Tip     | Tanım                                                                            |
+| ----------------------------------------------- | ------- | -------------------------------------------------------------------------------- |
+| `OPENCODE_EXPERIMENTAL`                         | boolean | Deneysel özellik paketini etkinleştir                                            |
+| `OPENCODE_EXPERIMENTAL_ICON_DISCOVERY`          | boolean | Simge bulmayı etkinleştir                                                        |
+| `OPENCODE_EXPERIMENTAL_DISABLE_COPY_ON_SELECT`  | boolean | TUI'da seçim yapıldığında kopyalamayı devre dışı bırak                           |
+| `OPENCODE_EXPERIMENTAL_BASH_DEFAULT_TIMEOUT_MS` | number  | MS cinsinden bash komutları için varsayılan zaman aşımı                          |
+| `OPENCODE_EXPERIMENTAL_OUTPUT_TOKEN_MAX`        | number  | LLM yanıtları için maksimum çıktı belirteçleri                                   |
+| `OPENCODE_EXPERIMENTAL_FILEWATCHER`             | boolean | Tüm dizin için dosya izleyiciyi etkinleştir                                      |
+| `OPENCODE_EXPERIMENTAL_OXFMT`                   | boolean | Oxfmt biçimlendiriciyi etkinleştir                                               |
+| `OPENCODE_EXPERIMENTAL_LSP_TOOL`                | boolean | Deneysel LSP aracını etkinleştir                                                 |
+| `OPENCODE_EXPERIMENTAL_DISABLE_FILEWATCHER`     | boolean | Dosya izleyiciyi devre dışı bırak                                                |
+| `OPENCODE_EXPERIMENTAL_EXA`                     | boolean | Deneysel Exa özelliklerini etkinleştirin                                         |
+| `OPENCODE_EXPERIMENTAL_LSP_TY`                  | boolean | python dosyaları için TY LSP'yi etkinleştir                                      |
+| `OPENCODE_EXPERIMENTAL_MARKDOWN`                | boolean | Deneysel işaretleme özelliklerini etkinleştir                                    |
+| `OPENCODE_EXPERIMENTAL_PLAN_MODE`               | boolean | Plan modunu etkinleştir                                                          |
+| `OPENCODE_EXPERIMENTAL_SCOUT`                   | boolean | Scout araştırma agent'ını etkinleştir                                            |
+| `OPENCODE_ENABLE_PARALLEL`                      | boolean | Paralel web aramasını etkinleştir                                                |
+| `OPENCODE_EXPERIMENTAL_PARALLEL`                | boolean | Paralel web araması için alternatif ad                                           |
+| `OPENCODE_EXPERIMENTAL_WORKSPACES`              | boolean | Deneysel çalışma alanlarını etkinleştir                                          |
 | `OPENCODE_EXPERIMENTAL_CUSTOMIZE_SKILL`         | boolean | Skill özelleştirmesini etkinleştir (dev/beta/local kanallarında varsayılan açık) |

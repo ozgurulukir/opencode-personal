@@ -115,16 +115,17 @@ describe("__exportTestFetchFn abort lifetime", () => {
   })
 
   test("body chunks pass through intact", async () => {
-    const customFetch = mock(async () =>
-      new Response(
-        new ReadableStream<Uint8Array>({
-          start(ctrl) {
-            ctrl.enqueue(new TextEncoder().encode("hello"))
-            ctrl.close()
-          },
-        }),
-        { headers: { "content-type": "application/json" } },
-      ),
+    const customFetch = mock(
+      async () =>
+        new Response(
+          new ReadableStream<Uint8Array>({
+            start(ctrl) {
+              ctrl.enqueue(new TextEncoder().encode("hello"))
+              ctrl.close()
+            },
+          }),
+          { headers: { "content-type": "application/json" } },
+        ),
     ) as any
     const fetchFn = __exportTestFetchFn({ timeout: 1000 }, { api: { npm: "@ai-sdk/anthropic" } }, customFetch, false)
     const res = await fetchFn("https://example.com", { method: "POST" })

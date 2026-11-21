@@ -63,8 +63,22 @@ describe("prompt-input slash-commands", () => {
     ]
 
     expect(buildSlashCommands([], custom)).toEqual([
-      { id: "custom.review", trigger: "review", title: "review", description: "Review the diff", type: "custom", source: "command" },
-      { id: "custom.deploy", trigger: "deploy", title: "deploy", description: undefined, type: "custom", source: "mcp" },
+      {
+        id: "custom.review",
+        trigger: "review",
+        title: "review",
+        description: "Review the diff",
+        type: "custom",
+        source: "command",
+      },
+      {
+        id: "custom.deploy",
+        trigger: "deploy",
+        title: "deploy",
+        description: undefined,
+        type: "custom",
+        source: "mcp",
+      },
     ])
   })
 

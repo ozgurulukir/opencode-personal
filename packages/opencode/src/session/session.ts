@@ -414,319 +414,318 @@ export type Patch = Types.DeepMutable<SyncEvent.Event<typeof Event.Updated>["dat
 const db = <T>(fn: (d: Parameters<typeof Database.use>[0] extends (trx: infer D) => any ? D : never) => T) =>
   Effect.sync(() => Database.use(fn as (trx: Database.TxOrDb) => Database.NotPromise<T>))
 
-export const layer: Layer.Layer<Service, never, Bus.Service | Storage.Service | SyncEvent.Service | Snapshot.Service> = Layer.effect(
-  Service,
-  Effect.gen(function* () {
-    const bus = yield* Bus.Service
-    const storage = yield* Storage.Service
-    const sync = yield* SyncEvent.Service
-    const snapshot = yield* Snapshot.Service
+export const layer: Layer.Layer<Service, never, Bus.Service | Storage.Service | SyncEvent.Service | Snapshot.Service> =
+  Layer.effect(
+    Service,
+    Effect.gen(function* () {
+      const bus = yield* Bus.Service
+      const storage = yield* Storage.Service
+      const sync = yield* SyncEvent.Service
+      const snapshot = yield* Snapshot.Service
 
-    const createNext = Effect.fn("Session.createNext")(function* (input: {
-      id?: SessionID
-      title?: string
-      agent?: string
-      model?: Schema.Schema.Type<typeof Model>
-      parentID?: SessionID
-      workspaceID?: WorkspaceID
-      directory: string
-      path?: string
-      permission?: Permission.Ruleset
-    }) {
-      const ctx = yield* InstanceState.context
-      const result: Info = {
-        id: SessionID.descending(input.id),
-        slug: Slug.create(),
-        version: InstallationVersion,
-        projectID: ctx.project.id,
-        directory: input.directory,
-        path: input.path,
-        workspaceID: input.workspaceID,
-        parentID: input.parentID,
-        title: input.title ?? createDefaultTitle(!!input.parentID),
-        agent: input.agent,
-        model: input.model,
-        permission: input.permission,
-        time: {
-          created: Date.now(),
-          updated: Date.now(),
-        },
-      }
-      log.info("created", result)
+      const createNext = Effect.fn("Session.createNext")(function* (input: {
+        id?: SessionID
+        title?: string
+        agent?: string
+        model?: Schema.Schema.Type<typeof Model>
+        parentID?: SessionID
+        workspaceID?: WorkspaceID
+        directory: string
+        path?: string
+        permission?: Permission.Ruleset
+      }) {
+        const ctx = yield* InstanceState.context
+        const result: Info = {
+          id: SessionID.descending(input.id),
+          slug: Slug.create(),
+          version: InstallationVersion,
+          projectID: ctx.project.id,
+          directory: input.directory,
+          path: input.path,
+          workspaceID: input.workspaceID,
+          parentID: input.parentID,
+          title: input.title ?? createDefaultTitle(!!input.parentID),
+          agent: input.agent,
+          model: input.model,
+          permission: input.permission,
+          time: {
+            created: Date.now(),
+            updated: Date.now(),
+          },
+        }
+        log.info("created", result)
 
-      yield* sync.run(Event.Created, { sessionID: result.id, info: result })
+        yield* sync.run(Event.Created, { sessionID: result.id, info: result })
 
-      if (!Flag.OPENCODE_EXPERIMENTAL_WORKSPACES) {
-        // This only exist for backwards compatibility. We should not be
-        // manually publishing this event; it is a sync event now
-        yield* bus.publish(Event.Updated, {
-          sessionID: result.id,
-          info: result,
-        })
-      }
+        if (!Flag.OPENCODE_EXPERIMENTAL_WORKSPACES) {
+          // This only exist for backwards compatibility. We should not be
+          // manually publishing this event; it is a sync event now
+          yield* bus.publish(Event.Updated, {
+            sessionID: result.id,
+            info: result,
+          })
+        }
 
-      return result
-    })
+        return result
+      })
 
-    const get = Effect.fn("Session.get")(function* (id: SessionID) {
-      const row = yield* db((d) => d.select().from(SessionTable).where(eq(SessionTable.id, id)).get())
-      if (!row) return yield* Effect.fail(new NotFoundError({ message: `Session not found: ${id}` }))
-      return fromRow(row)
-    })
+      const get = Effect.fn("Session.get")(function* (id: SessionID) {
+        const row = yield* db((d) => d.select().from(SessionTable).where(eq(SessionTable.id, id)).get())
+        if (!row) return yield* Effect.fail(new NotFoundError({ message: `Session not found: ${id}` }))
+        return fromRow(row)
+      })
 
-    const list = Effect.fn("Session.list")(function* (input?: ListInput) {
-      const ctx = yield* InstanceState.context
-      return Array.from(listByProject({ projectID: ctx.project.id, ...input }))
-    })
+      const list = Effect.fn("Session.list")(function* (input?: ListInput) {
+        const ctx = yield* InstanceState.context
+        return Array.from(listByProject({ projectID: ctx.project.id, ...input }))
+      })
 
-    const children = Effect.fn("Session.children")(function* (parentID: SessionID) {
-      const rows = yield* db((d) =>
-        d
-          .select()
-          .from(SessionTable)
-          .where(and(eq(SessionTable.parent_id, parentID)))
-          .all(),
-      )
-      return rows.map(fromRow)
-    })
+      const children = Effect.fn("Session.children")(function* (parentID: SessionID) {
+        const rows = yield* db((d) =>
+          d
+            .select()
+            .from(SessionTable)
+            .where(and(eq(SessionTable.parent_id, parentID)))
+            .all(),
+        )
+        return rows.map(fromRow)
+      })
 
-    const remove: Interface["remove"] = Effect.fnUntraced(function* (sessionID: SessionID) {
-      const session = yield* get(sessionID)
-      const kids = yield* children(sessionID)
-      for (const child of kids) {
-        yield* remove(child.id).pipe(Effect.catchIf(NotFoundError.isInstance, () => Effect.void))
-      }
+      const remove: Interface["remove"] = Effect.fnUntraced(function* (sessionID: SessionID) {
+        const session = yield* get(sessionID)
+        const kids = yield* children(sessionID)
+        for (const child of kids) {
+          yield* remove(child.id).pipe(Effect.catchIf(NotFoundError.isInstance, () => Effect.void))
+        }
 
-      // `remove` needs to work in all cases, such as a broken
-      // sessions that run cleanup. In certain cases these will
-      // run without any instance state, so we need to turn off
-      // publishing of events in that case
-      const hasInstance = yield* InstanceState.directory.pipe(
-        Effect.as(true),
-        Effect.catchCause(() => Effect.succeed(false)),
-      )
+        // `remove` needs to work in all cases, such as a broken
+        // sessions that run cleanup. In certain cases these will
+        // run without any instance state, so we need to turn off
+        // publishing of events in that case
+        const hasInstance = yield* InstanceState.directory.pipe(
+          Effect.as(true),
+          Effect.catchCause(() => Effect.succeed(false)),
+        )
 
-      yield* sync.run(Event.Deleted, { sessionID, info: session }, { publish: hasInstance })
-      // Native V2 lifecycle emission is published only when instance context is
-      // available, matching the V1 publish above.
-      if (hasInstance) {
-        yield* sync.run(SessionEvent.Deleted.Sync, {
+        yield* sync.run(Event.Deleted, { sessionID, info: session }, { publish: hasInstance })
+        // Native V2 lifecycle emission is published only when instance context is
+        // available, matching the V1 publish above.
+        if (hasInstance) {
+          yield* sync.run(SessionEvent.Deleted.Sync, {
+            sessionID,
+            timestamp: DateTime.makeUnsafe(Date.now()),
+            info: session,
+          })
+        }
+        yield* sync.remove(sessionID)
+      })
+
+      const updateMessage = <T extends MessageV2.Info>(msg: T): Effect.Effect<T> =>
+        Effect.gen(function* () {
+          yield* sync.run(MessageV2.Event.Updated, { sessionID: msg.sessionID, info: msg })
+          return msg
+        }).pipe(Effect.withSpan("Session.updateMessage"))
+
+      const updatePart = <T extends MessageV2.Part>(part: T): Effect.Effect<T> =>
+        Effect.gen(function* () {
+          yield* sync.run(MessageV2.Event.PartUpdated, {
+            sessionID: part.sessionID,
+            part: structuredClone(part),
+            time: Date.now(),
+          })
+          return part
+        }).pipe(Effect.withSpan("Session.updatePart"))
+
+      const updateParts = Effect.fn("Session.updateParts")(function* (parts: MessageV2.Part[]) {
+        if (parts.length === 0) return
+        const sessionID = parts[0].sessionID
+        yield* sync.run(MessageV2.Event.PartUpdatedBatch, {
           sessionID,
-          timestamp: DateTime.makeUnsafe(Date.now()),
-          info: session,
-        })
-      }
-      yield* sync.remove(sessionID)
-    })
-
-    const updateMessage = <T extends MessageV2.Info>(msg: T): Effect.Effect<T> =>
-      Effect.gen(function* () {
-        yield* sync.run(MessageV2.Event.Updated, { sessionID: msg.sessionID, info: msg })
-        return msg
-      }).pipe(Effect.withSpan("Session.updateMessage"))
-
-    const updatePart = <T extends MessageV2.Part>(part: T): Effect.Effect<T> =>
-      Effect.gen(function* () {
-        yield* sync.run(MessageV2.Event.PartUpdated, {
-          sessionID: part.sessionID,
-          part: structuredClone(part),
+          parts: parts.map((part) => structuredClone(part)),
           time: Date.now(),
         })
-        return part
-      }).pipe(Effect.withSpan("Session.updatePart"))
-
-    const updateParts = Effect.fn("Session.updateParts")(function* (parts: MessageV2.Part[]) {
-      if (parts.length === 0) return
-      const sessionID = parts[0].sessionID
-      yield* sync.run(MessageV2.Event.PartUpdatedBatch, {
-        sessionID,
-        parts: parts.map((part) => structuredClone(part)),
-        time: Date.now(),
       })
-    })
 
-    const updateMessages = Effect.fn("Session.updateMessages")(function* (infos: MessageV2.Info[]) {
-      if (infos.length === 0) return
-      const sessionID = infos[0].sessionID
-      yield* sync.run(MessageV2.Event.MessageUpdatedBatch, {
-        sessionID,
-        infos: infos.map((info) => structuredClone(info)),
-        time_created: Date.now(),
+      const updateMessages = Effect.fn("Session.updateMessages")(function* (infos: MessageV2.Info[]) {
+        if (infos.length === 0) return
+        const sessionID = infos[0].sessionID
+        yield* sync.run(MessageV2.Event.MessageUpdatedBatch, {
+          sessionID,
+          infos: infos.map((info) => structuredClone(info)),
+          time_created: Date.now(),
+        })
       })
-    })
 
-    const getPart: Interface["getPart"] = Effect.fn("Session.getPart")(function* (input) {
-      const row = Database.use((db) =>
-        db
-          .select()
-          .from(PartTable)
-          .where(
-            and(
-              eq(PartTable.session_id, input.sessionID),
-              eq(PartTable.message_id, input.messageID),
-              eq(PartTable.id, input.partID),
-            ),
-          )
-          .get(),
-      )
-      if (!row) return
-      return {
-        ...row.data,
-        id: row.id,
-        sessionID: row.session_id,
-        messageID: row.message_id,
-      } as MessageV2.Part
-    })
-
-    const create = Effect.fn("Session.create")(function* (input?: {
-      parentID?: SessionID
-      title?: string
-      agent?: string
-      model?: Schema.Schema.Type<typeof Model>
-      permission?: Permission.Ruleset
-      workspaceID?: WorkspaceID
-    }) {
-      const ctx = yield* InstanceState.context
-      const workspace = yield* InstanceState.workspaceID
-      return yield* createNext({
-        parentID: input?.parentID,
-        directory: ctx.directory,
-        path: sessionPath(ctx.worktree, ctx.directory),
-        title: input?.title,
-        agent: input?.agent,
-        model: input?.model,
-        permission: input?.permission,
-        workspaceID: input?.workspaceID ?? workspace,
+      const getPart: Interface["getPart"] = Effect.fn("Session.getPart")(function* (input) {
+        const row = Database.use((db) =>
+          db
+            .select()
+            .from(PartTable)
+            .where(
+              and(
+                eq(PartTable.session_id, input.sessionID),
+                eq(PartTable.message_id, input.messageID),
+                eq(PartTable.id, input.partID),
+              ),
+            )
+            .get(),
+        )
+        if (!row) return
+        return {
+          ...row.data,
+          id: row.id,
+          sessionID: row.session_id,
+          messageID: row.message_id,
+        } as MessageV2.Part
       })
-    })
 
-    const fork = Effect.fn("Session.fork")(function* (input: { sessionID: SessionID; messageID?: MessageID }) {
-      const ctx = yield* InstanceState.context
-      const original = yield* get(input.sessionID)
-      const title = getForkedTitle(original.title)
-      const session = yield* createNext({
-        directory: ctx.directory,
-        path: sessionPath(ctx.worktree, ctx.directory),
-        workspaceID: original.workspaceID,
-        title,
+      const create = Effect.fn("Session.create")(function* (input?: {
+        parentID?: SessionID
+        title?: string
+        agent?: string
+        model?: Schema.Schema.Type<typeof Model>
+        permission?: Permission.Ruleset
+        workspaceID?: WorkspaceID
+      }) {
+        const ctx = yield* InstanceState.context
+        const workspace = yield* InstanceState.workspaceID
+        return yield* createNext({
+          parentID: input?.parentID,
+          directory: ctx.directory,
+          path: sessionPath(ctx.worktree, ctx.directory),
+          title: input?.title,
+          agent: input?.agent,
+          model: input?.model,
+          permission: input?.permission,
+          workspaceID: input?.workspaceID ?? workspace,
+        })
       })
-      const msgs = yield* messages({ sessionID: input.sessionID })
-      const idMap = new Map<string, MessageID>()
 
-      for (const msg of msgs) {
-        if (input.messageID && msg.info.id >= input.messageID) break
-        const newID = MessageID.ascending()
-        idMap.set(msg.info.id, newID)
+      const fork = Effect.fn("Session.fork")(function* (input: { sessionID: SessionID; messageID?: MessageID }) {
+        const ctx = yield* InstanceState.context
+        const original = yield* get(input.sessionID)
+        const title = getForkedTitle(original.title)
+        const session = yield* createNext({
+          directory: ctx.directory,
+          path: sessionPath(ctx.worktree, ctx.directory),
+          workspaceID: original.workspaceID,
+          title,
+        })
+        const msgs = yield* messages({ sessionID: input.sessionID })
+        const idMap = new Map<string, MessageID>()
 
-        const parentID = msg.info.role === "assistant" && msg.info.parentID ? idMap.get(msg.info.parentID) : undefined
-        const cloned = yield* updateMessage({
-          ...msg.info,
-          sessionID: session.id,
-          id: newID,
-          ...(parentID && { parentID }),
+        for (const msg of msgs) {
+          if (input.messageID && msg.info.id >= input.messageID) break
+          const newID = MessageID.ascending()
+          idMap.set(msg.info.id, newID)
+
+          const parentID = msg.info.role === "assistant" && msg.info.parentID ? idMap.get(msg.info.parentID) : undefined
+          const cloned = yield* updateMessage({
+            ...msg.info,
+            sessionID: session.id,
+            id: newID,
+            ...(parentID && { parentID }),
+          })
+
+          for (const part of msg.parts) {
+            const p: MessageV2.Part = {
+              ...part,
+              id: PartID.ascending(),
+              messageID: cloned.id,
+              sessionID: session.id,
+            }
+            if (p.type === "compaction" && p.tail_start_id) {
+              p.tail_start_id = idMap.get(p.tail_start_id)
+            }
+            yield* updatePart(p)
+          }
+        }
+        return session
+      })
+
+      const patch = (sessionID: SessionID, info: Patch) =>
+        Effect.gen(function* () {
+          // Both emissions must land in one SQLite transaction: runBatch reads
+          // the per-event seq and projects inside a shared "immediate"
+          // transaction, so a crash between them can no longer leave the V1
+          // event recorded while the V2 event is missing.
+          yield* sync.runBatch([
+            { def: Event.Updated, data: { sessionID, info } },
+            {
+              def: SessionEvent.Updated.Sync,
+              data: {
+                sessionID,
+                timestamp: DateTime.makeUnsafe(Date.now()),
+                info,
+              },
+            },
+          ])
         })
 
-        for (const part of msg.parts) {
-          const p: MessageV2.Part = {
-            ...part,
-            id: PartID.ascending(),
-            messageID: cloned.id,
-            sessionID: session.id,
-          }
-          if (p.type === "compaction" && p.tail_start_id) {
-            p.tail_start_id = idMap.get(p.tail_start_id)
-          }
-          yield* updatePart(p)
-        }
-      }
-      return session
-    })
+      const touch = Effect.fn("Session.touch")(function* (sessionID: SessionID) {
+        yield* patch(sessionID, { time: { updated: Date.now() } })
+      })
 
-    const patch = (sessionID: SessionID, info: Patch) =>
-      Effect.gen(function* () {
-        // Both emissions must land in one SQLite transaction: runBatch reads
-        // the per-event seq and projects inside a shared "immediate"
-        // transaction, so a crash between them can no longer leave the V1
-        // event recorded while the V2 event is missing.
-        yield* sync.runBatch([
-          { def: Event.Updated, data: { sessionID, info } },
-          {
-            def: SessionEvent.Updated.Sync,
-            data: {
-              sessionID,
-              timestamp: DateTime.makeUnsafe(Date.now()),
-              info,
-            },
+      const setTitle = Effect.fn("Session.setTitle")(function* (input: { sessionID: SessionID; title: string }) {
+        yield* patch(input.sessionID, { title: input.title })
+      })
+
+      const setAgent = Effect.fn("Session.setAgent")(function* (input: { sessionID: SessionID; agent: string }) {
+        yield* patch(input.sessionID, { agent: input.agent, time: { updated: Date.now() } })
+      })
+
+      const setArchived = Effect.fn("Session.setArchived")(function* (input: { sessionID: SessionID; time?: number }) {
+        yield* patch(input.sessionID, { time: { archived: input.time } })
+      })
+
+      const setPermission = Effect.fn("Session.setPermission")(function* (input: {
+        sessionID: SessionID
+        permission: Permission.Ruleset
+      }) {
+        yield* patch(input.sessionID, { permission: input.permission, time: { updated: Date.now() } })
+      })
+
+      // Emits ModelSwitched so the shared projector (session/projectors-next.ts:172)
+      // writes SessionTable.model and the SessionMessageTable timeline entry — the
+      // same mechanism V2 switchModel uses and the same event createUserMessage
+      // emits at prompt time (issue #384). No provider validation here; that stays
+      // at prompt time (session/loop/model.ts:getModel).
+      const setModel = Effect.fn("Session.setModel")(function* (input: {
+        sessionID: SessionID
+        model: Schema.Schema.Type<typeof Model>
+      }) {
+        yield* sync.run(SessionEvent.ModelSwitched.Sync, {
+          sessionID: input.sessionID,
+          timestamp: DateTime.makeUnsafe(Date.now()),
+          model: {
+            id: input.model.id,
+            providerID: input.model.providerID,
+            variant: Modelv2.VariantID.make(input.model.variant ?? "default"),
           },
-        ])
+        })
       })
 
-    const touch = Effect.fn("Session.touch")(function* (sessionID: SessionID) {
-      yield* patch(sessionID, { time: { updated: Date.now() } })
-    })
-
-    const setTitle = Effect.fn("Session.setTitle")(function* (input: { sessionID: SessionID; title: string }) {
-      yield* patch(input.sessionID, { title: input.title })
-    })
-
-    const setAgent = Effect.fn("Session.setAgent")(function* (input: { sessionID: SessionID; agent: string }) {
-      yield* patch(input.sessionID, { agent: input.agent, time: { updated: Date.now() } })
-    })
-
-    const setArchived = Effect.fn("Session.setArchived")(function* (input: { sessionID: SessionID; time?: number }) {
-      yield* patch(input.sessionID, { time: { archived: input.time } })
-    })
-
-    const setPermission = Effect.fn("Session.setPermission")(function* (input: {
-      sessionID: SessionID
-      permission: Permission.Ruleset
-    }) {
-      yield* patch(input.sessionID, { permission: input.permission, time: { updated: Date.now() } })
-    })
-
-    // Emits ModelSwitched so the shared projector (session/projectors-next.ts:172)
-    // writes SessionTable.model and the SessionMessageTable timeline entry — the
-    // same mechanism V2 switchModel uses and the same event createUserMessage
-    // emits at prompt time (issue #384). No provider validation here; that stays
-    // at prompt time (session/loop/model.ts:getModel).
-    const setModel = Effect.fn("Session.setModel")(function* (input: {
-      sessionID: SessionID
-      model: Schema.Schema.Type<typeof Model>
-    }) {
-      yield* sync.run(SessionEvent.ModelSwitched.Sync, {
-        sessionID: input.sessionID,
-        timestamp: DateTime.makeUnsafe(Date.now()),
-        model: {
-          id: input.model.id,
-          providerID: input.model.providerID,
-          variant: Modelv2.VariantID.make(input.model.variant ?? "default"),
-        },
+      const setRevert = Effect.fn("Session.setRevert")(function* (input: {
+        sessionID: SessionID
+        revert: Info["revert"]
+        summary: Info["summary"]
+      }) {
+        yield* patch(input.sessionID, { summary: input.summary, time: { updated: Date.now() }, revert: input.revert })
       })
-    })
 
-    const setRevert = Effect.fn("Session.setRevert")(function* (input: {
-      sessionID: SessionID
-      revert: Info["revert"]
-      summary: Info["summary"]
-    }) {
-      yield* patch(input.sessionID, { summary: input.summary, time: { updated: Date.now() }, revert: input.revert })
-    })
+      const clearRevert = Effect.fn("Session.clearRevert")(function* (sessionID: SessionID) {
+        yield* patch(sessionID, { time: { updated: Date.now() }, revert: null })
+      })
 
-    const clearRevert = Effect.fn("Session.clearRevert")(function* (sessionID: SessionID) {
-      yield* patch(sessionID, { time: { updated: Date.now() }, revert: null })
-    })
+      const setSummary = Effect.fn("Session.setSummary")(function* (input: {
+        sessionID: SessionID
+        summary: Info["summary"]
+      }) {
+        yield* patch(input.sessionID, { time: { updated: Date.now() }, summary: input.summary })
+      })
 
-    const setSummary = Effect.fn("Session.setSummary")(function* (input: {
-      sessionID: SessionID
-      summary: Info["summary"]
-    }) {
-      yield* patch(input.sessionID, { time: { updated: Date.now() }, summary: input.summary })
-    })
-
-    const diff = Effect.fn("Session.diff")(function* (sessionID: SessionID) {
-      return yield* storage
-        .read<Snapshot.FileDiff[]>(["session_diff", sessionID])
-        .pipe(
+      const diff = Effect.fn("Session.diff")(function* (sessionID: SessionID) {
+        return yield* storage.read<Snapshot.FileDiff[]>(["session_diff", sessionID]).pipe(
           // Cache miss (e.g. a freshly created session whose `summarize` has not
           // run yet): recompute the diff from the session's snapshot boundaries
           // and backfill the cache so subsequent reads are free. Without this,
@@ -741,90 +740,90 @@ export const layer: Layer.Layer<Service, never, Bus.Service | Storage.Service | 
             }),
           ),
         )
-    })
-
-    const messages = Effect.fn("Session.messages")(function* (input: { sessionID: SessionID; limit?: number }) {
-      if (input.limit) {
-        return MessageV2.page({ sessionID: input.sessionID, limit: input.limit }).items
-      }
-      return Array.from(MessageV2.stream(input.sessionID)).reverse()
-    })
-
-    const removeMessage = Effect.fn("Session.removeMessage")(function* (input: {
-      sessionID: SessionID
-      messageID: MessageID
-    }) {
-      yield* sync.run(MessageV2.Event.Removed, {
-        sessionID: input.sessionID,
-        messageID: input.messageID,
       })
-      return input.messageID
-    })
 
-    const removePart = Effect.fn("Session.removePart")(function* (input: {
-      sessionID: SessionID
-      messageID: MessageID
-      partID: PartID
-    }) {
-      yield* sync.run(MessageV2.Event.PartRemoved, {
-        sessionID: input.sessionID,
-        messageID: input.messageID,
-        partID: input.partID,
+      const messages = Effect.fn("Session.messages")(function* (input: { sessionID: SessionID; limit?: number }) {
+        if (input.limit) {
+          return MessageV2.page({ sessionID: input.sessionID, limit: input.limit }).items
+        }
+        return Array.from(MessageV2.stream(input.sessionID)).reverse()
       })
-      return input.partID
-    })
 
-    const updatePartDelta = Effect.fnUntraced(function* (input: {
-      sessionID: SessionID
-      messageID: MessageID
-      partID: PartID
-      field: string
-      delta: string
-    }) {
-      yield* bus.publish(MessageV2.Event.PartDelta, input)
-    })
+      const removeMessage = Effect.fn("Session.removeMessage")(function* (input: {
+        sessionID: SessionID
+        messageID: MessageID
+      }) {
+        yield* sync.run(MessageV2.Event.Removed, {
+          sessionID: input.sessionID,
+          messageID: input.messageID,
+        })
+        return input.messageID
+      })
 
-    /** Finds the first message matching the predicate, searching newest-first. */
-    const findMessage = Effect.fn("Session.findMessage")(function* (
-      sessionID: SessionID,
-      predicate: (msg: MessageV2.WithParts) => boolean,
-    ) {
-      for (const item of MessageV2.stream(sessionID)) {
-        if (predicate(item)) return Option.some(item)
-      }
-      return Option.none<MessageV2.WithParts>()
-    })
+      const removePart = Effect.fn("Session.removePart")(function* (input: {
+        sessionID: SessionID
+        messageID: MessageID
+        partID: PartID
+      }) {
+        yield* sync.run(MessageV2.Event.PartRemoved, {
+          sessionID: input.sessionID,
+          messageID: input.messageID,
+          partID: input.partID,
+        })
+        return input.partID
+      })
 
-    return Service.of({
-      list,
-      create,
-      fork,
-      touch,
-      get,
-      setTitle,
-      setAgent,
-      setArchived,
-      setPermission,
-      setModel,
-      setRevert,
-      clearRevert,
-      setSummary,
-      diff,
-      messages,
-      children,
-      remove,
-      updateMessage,
-      updateMessages,
-      removeMessage,
-      removePart,
-      updatePart,
-      updateParts,
-      getPart,
-      updatePartDelta,
-      findMessage,
-    })
-  }),
-)
+      const updatePartDelta = Effect.fnUntraced(function* (input: {
+        sessionID: SessionID
+        messageID: MessageID
+        partID: PartID
+        field: string
+        delta: string
+      }) {
+        yield* bus.publish(MessageV2.Event.PartDelta, input)
+      })
+
+      /** Finds the first message matching the predicate, searching newest-first. */
+      const findMessage = Effect.fn("Session.findMessage")(function* (
+        sessionID: SessionID,
+        predicate: (msg: MessageV2.WithParts) => boolean,
+      ) {
+        for (const item of MessageV2.stream(sessionID)) {
+          if (predicate(item)) return Option.some(item)
+        }
+        return Option.none<MessageV2.WithParts>()
+      })
+
+      return Service.of({
+        list,
+        create,
+        fork,
+        touch,
+        get,
+        setTitle,
+        setAgent,
+        setArchived,
+        setPermission,
+        setModel,
+        setRevert,
+        clearRevert,
+        setSummary,
+        diff,
+        messages,
+        children,
+        remove,
+        updateMessage,
+        updateMessages,
+        removeMessage,
+        removePart,
+        updatePart,
+        updateParts,
+        getPart,
+        updatePartDelta,
+        findMessage,
+      })
+    }),
+  )
 
 export const defaultLayer = layer.pipe(
   Layer.provide(Bus.layer),

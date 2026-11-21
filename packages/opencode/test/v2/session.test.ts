@@ -850,13 +850,11 @@ describe("v2.session", () => {
         (yield* session.messages({ sessionID: info.id, cursor: { id: idA, direction: "next" } })).map((m) => m.id),
       ).toEqual([idC, idB])
       expect(
-        (
-          yield* session.messages({
-            sessionID: info.id,
-            order: "asc",
-            cursor: { id: idB, direction: "next" },
-          })
-        ).map((m) => m.id),
+        (yield* session.messages({
+          sessionID: info.id,
+          order: "asc",
+          cursor: { id: idB, direction: "next" },
+        })).map((m) => m.id),
       ).toEqual([idC, idA])
       expect(
         (yield* session.messages({ sessionID: info.id, cursor: { id: idB, direction: "previous" } })).map((m) => m.id),
@@ -1156,7 +1154,7 @@ describe("v2.session", () => {
       const session = yield* SessionV2.Service
       const parent = yield* session.create({ agent: "build" })
 
-      const result = (yield* session
+      const result = yield* session
         .subagent({
           parentID: parent.id,
           agent: "nonexistent-agent",
@@ -1167,7 +1165,7 @@ describe("v2.session", () => {
           Effect.catchDefect((defect) =>
             Effect.succeed({ error: defect instanceof Error ? defect.message : String(defect), ok: false }),
           ),
-        ))
+        )
 
       expect(result.error).toContain("Unknown agent type")
     }),
@@ -1276,9 +1274,7 @@ describe("v2.session", () => {
         })
         .pipe(
           Effect.map(() => ({ error: undefined as string | undefined })),
-          Effect.catch((error) =>
-            Effect.succeed({ error: error instanceof Error ? error.message : String(error) }),
-          ),
+          Effect.catch((error) => Effect.succeed({ error: error instanceof Error ? error.message : String(error) })),
         )
 
       expect(result.error).toContain("Permission denied")
@@ -1295,7 +1291,7 @@ describe("v2.session", () => {
       const child2 = yield* session.create({ agent: "general", parentID: child1.id })
       const child3 = yield* session.create({ agent: "general", parentID: child2.id })
 
-      const result = (yield* session
+      const result = yield* session
         .subagent({
           parentID: child3.id,
           agent: "general",
@@ -1306,7 +1302,7 @@ describe("v2.session", () => {
           Effect.catch((error) =>
             Effect.succeed({ error: error instanceof Error ? error.message : String(error), ok: false }),
           ),
-        ))
+        )
 
       expect(result.ok).toBe(false)
       expect(result.error).toContain("Maximum subagent nesting levels")
@@ -1345,52 +1341,54 @@ describe("v2.session", () => {
     },
   )
 
-  it.instance("subagent shapes child permission with parent rules, derived denies, and primary allows last", () =>
-    Effect.gen(function* () {
-      const session = yield* SessionV2.Service
-      // Parent session rules (allow + ask + deny) + parent agent = "build",
-      // whose ruleset carries the default-agent deny rules.
-      const parent = yield* session.create({
-        agent: "build",
-        permission: [
+  it.instance(
+    "subagent shapes child permission with parent rules, derived denies, and primary allows last",
+    () =>
+      Effect.gen(function* () {
+        const session = yield* SessionV2.Service
+        // Parent session rules (allow + ask + deny) + parent agent = "build",
+        // whose ruleset carries the default-agent deny rules.
+        const parent = yield* session.create({
+          agent: "build",
+          permission: [
+            { permission: "read", pattern: "*", action: "allow" },
+            { permission: "edit", pattern: "*", action: "ask" },
+            { permission: "bash", pattern: "*", action: "deny" },
+          ],
+        })
+
+        yield* session.subagent({
+          parentID: parent.id,
+          agent: "general",
+          prompt: { text: "do something" },
+        })
+
+        const lastCall = promptStub.calls.prompt.at(-1) as any
+        const child = yield* session.get(lastCall.sessionID)
+
+        // Full derivation output (last-match-wins order):
+        // 1. EVERY parent session rule (full forwarding, not deny-only)
+        // 2. derived todowrite/task denies (general lacks the allows)
+        // 3. parent-agent (build) deny rules — the default-agent deny set
+        // 4. primary_tools allows appended LAST by subagentSessionPermission
+        expect(child.permission).toEqual([
           { permission: "read", pattern: "*", action: "allow" },
           { permission: "edit", pattern: "*", action: "ask" },
           { permission: "bash", pattern: "*", action: "deny" },
-        ],
-      })
-
-      yield* session.subagent({
-        parentID: parent.id,
-        agent: "general",
-        prompt: { text: "do something" },
-      })
-
-      const lastCall = promptStub.calls.prompt.at(-1) as any
-      const child = yield* session.get(lastCall.sessionID)
-
-      // Full derivation output (last-match-wins order):
-      // 1. EVERY parent session rule (full forwarding, not deny-only)
-      // 2. derived todowrite/task denies (general lacks the allows)
-      // 3. parent-agent (build) deny rules — the default-agent deny set
-      // 4. primary_tools allows appended LAST by subagentSessionPermission
-      expect(child.permission).toEqual([
-        { permission: "read", pattern: "*", action: "allow" },
-        { permission: "edit", pattern: "*", action: "ask" },
-        { permission: "bash", pattern: "*", action: "deny" },
-        { permission: "todowrite", pattern: "*", action: "deny" },
-        { permission: "task", pattern: "*", action: "deny" },
-        // build = defaults deny set (question/plan_enter/plan_exit/repo_clone/
-        // repo_overview); build's later question/plan_exit allows are NOT
-        // denies, so the filtered contribution keeps the defaults' denies.
-        { permission: "question", pattern: "*", action: "deny" },
-        { permission: "plan_enter", pattern: "*", action: "deny" },
-        { permission: "plan_exit", pattern: "*", action: "deny" },
-        { permission: "repo_clone", pattern: "*", action: "deny" },
-        { permission: "repo_overview", pattern: "*", action: "deny" },
-        { permission: "bash", pattern: "*", action: "allow" },
-        { permission: "read", pattern: "*", action: "allow" },
-      ])
-    }),
+          { permission: "todowrite", pattern: "*", action: "deny" },
+          { permission: "task", pattern: "*", action: "deny" },
+          // build = defaults deny set (question/plan_enter/plan_exit/repo_clone/
+          // repo_overview); build's later question/plan_exit allows are NOT
+          // denies, so the filtered contribution keeps the defaults' denies.
+          { permission: "question", pattern: "*", action: "deny" },
+          { permission: "plan_enter", pattern: "*", action: "deny" },
+          { permission: "plan_exit", pattern: "*", action: "deny" },
+          { permission: "repo_clone", pattern: "*", action: "deny" },
+          { permission: "repo_overview", pattern: "*", action: "deny" },
+          { permission: "bash", pattern: "*", action: "allow" },
+          { permission: "read", pattern: "*", action: "allow" },
+        ])
+      }),
     {
       config: {
         experimental: {
@@ -1588,9 +1586,7 @@ describe("v2.session", () => {
         })
         .pipe(
           Effect.map(() => ({ error: undefined as string | undefined })),
-          Effect.catch((error) =>
-            Effect.succeed({ error: error instanceof Error ? error.message : String(error) }),
-          ),
+          Effect.catch((error) => Effect.succeed({ error: error instanceof Error ? error.message : String(error) })),
         )
 
       expect(result.error).toContain("does not belong to this session")
@@ -1661,7 +1657,10 @@ describe("v2.session.error-path", () => {
             .get()
           if (!row) throw new Error("row not found")
           const { opencodeLegacyMessageID: _, ...restMetadata } = (row.data.metadata ?? {}) as Record<string, unknown>
-          const data = { ...row.data, metadata: Object.keys(restMetadata).length ? restMetadata : undefined } as typeof row.data
+          const data = {
+            ...row.data,
+            metadata: Object.keys(restMetadata).length ? restMetadata : undefined,
+          } as typeof row.data
           db.update(SessionMessageTable)
             .set({ data: data as never })
             .where(eq(SessionMessageTable.id, SessionMessage.ID.make(prompted.user!.id)))
@@ -1701,6 +1700,5 @@ describe("v2.session.error-path", () => {
         expect(user?.metadata?.opencodeLegacyMessageID).toBeUndefined()
       }),
     )
-
   })
 })

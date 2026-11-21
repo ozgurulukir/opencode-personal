@@ -58,6 +58,7 @@ export function knownThemes() {
 ```
 
 **Why cache?** `import.meta.glob` is a Vite compile-time feature that returns a fresh object on every call in development mode. Caching prevents:
+
 - Repeated filesystem scans
 - Identity comparisons failing (`===`)
 - Unnecessary re-renders in development
@@ -117,11 +118,7 @@ export function mkTurn(config) { ... }
 Use a stub component to avoid loading the real `@pierre/diffs` web component in stories:
 
 ```tsx
-const FileStub = () => (
-  <div style={{ padding: "8px", color: "var(--text-weak)" }}>
-    File viewer stub
-  </div>
-)
+const FileStub = () => <div style={{ padding: "8px", color: "var(--text-weak)" }}>File viewer stub</div>
 ```
 
 **Why:** The real diff viewer requires a web worker and Shiki highlighter — too heavy for Storybook. Stubs keep stories fast and deterministic.
@@ -131,8 +128,8 @@ const FileStub = () => (
 Use fixed IDs in stories for visual regression testing:
 
 ```ts
-const SESSION_ID = "story-session"  // NOT Date.now()
-const USER_ID = "story-user-1"      // NOT uid()
+const SESSION_ID = "story-session" // NOT Date.now()
+const USER_ID = "story-user-1" // NOT uid()
 ```
 
 **Why:** `Date.now()`-based IDs change on every render, breaking snapshot comparisons. Fixed IDs ensure stable DOM snapshots.

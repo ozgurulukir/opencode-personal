@@ -52,8 +52,22 @@ import {
   shouldFocusTerminalOnKeyDown,
   upsertProject,
 } from "@/pages/session/helpers"
-import { changeModes, newSessionWorktreeFor, resolveVcsMode, reviewDiffsFor, reviewIsReady, type ChangeMode, type VcsMode } from "@/pages/session/review"
-import { deepActiveElement, isEditableTarget, isScrollGestureKey, sessionKeyGuardBlocked, shouldFocusComposer } from "@/pages/session/keyboard"
+import {
+  changeModes,
+  newSessionWorktreeFor,
+  resolveVcsMode,
+  reviewDiffsFor,
+  reviewIsReady,
+  type ChangeMode,
+  type VcsMode,
+} from "@/pages/session/review"
+import {
+  deepActiveElement,
+  isEditableTarget,
+  isScrollGestureKey,
+  sessionKeyGuardBlocked,
+  shouldFocusComposer,
+} from "@/pages/session/keyboard"
 import { computeScrollState, scrollStateChanged } from "@/pages/session/scroll-state"
 import { createSessionHistoryWindow, emptyUserMessages } from "@/pages/session/history-window"
 import { MessageTimeline } from "@/pages/session/message-timeline"
@@ -74,7 +88,6 @@ import { formatServerError } from "@/utils/server-errors"
 type FollowupItem = FollowupDraft & { id: string }
 type FollowupEdit = Pick<FollowupItem, "id" | "prompt" | "context">
 const emptyFollowups: FollowupItem[] = []
-
 
 export default function Page() {
   const globalSync = useGlobalSync()
@@ -369,7 +382,9 @@ export default function Page() {
   const hasReview = () => reviewCount() > 0
   const reviewReady = () => reviewIsReady(store.changes, vcsQuery.isPending)
 
-  const newSessionWorktree = createMemo(() => newSessionWorktreeFor(store.newSessionWorktree, sync.project, sdk.directory))
+  const newSessionWorktree = createMemo(() =>
+    newSessionWorktreeFor(store.newSessionWorktree, sync.project, sdk.directory),
+  )
 
   const setActiveMessage = (message: UserMessage | undefined) => {
     messageMark = scrollMark

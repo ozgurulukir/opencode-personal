@@ -111,10 +111,7 @@ export function mkUser(
       type: "message",
       created_at: Date.now() / 1000,
     },
-    parts: [
-      textPart(text),
-      ...parts,
-    ],
+    parts: [textPart(text), ...parts],
   }
 }
 
@@ -167,10 +164,7 @@ export function mkError(name: string, message: string) {
 // ---------------------------------------------------------------------------
 // Session status factories
 // ---------------------------------------------------------------------------
-export function mkSessionStatus(
-  type: "idle" | "busy" | "working",
-  overrides: Record<string, any> = {},
-) {
+export function mkSessionStatus(type: "idle" | "busy" | "working", overrides: Record<string, any> = {}) {
   return {
     type,
     session_id: "story-session",
@@ -233,7 +227,8 @@ export const TOOL_SAMPLES = {
     tool: "write",
     input: {
       filePath: "src/utils/helpers.ts",
-      content: "export function clamp(value: number, min: number, max: number) {\n  return Math.min(Math.max(value, min), max)\n}\n",
+      content:
+        "export function clamp(value: number, min: number, max: number) {\n  return Math.min(Math.max(value, min), max)\n}\n",
     },
     output: "File written successfully",
     title: "Write src/utils/helpers.ts",
@@ -438,9 +433,7 @@ This should be straightforward given the existing component architecture.`,
 ]
 
 export const DIFF_SAMPLES = {
-  single: [
-    mkDiff("src/components/session-turn.tsx", 5, 2, "modified"),
-  ],
+  single: [mkDiff("src/components/session-turn.tsx", 5, 2, "modified")],
   multi: [
     mkDiff("src/components/session-turn.tsx", 10, 5, "modified"),
     mkDiff("src/components/session-turn-diffs.tsx", 8, 3, "modified"),
@@ -449,7 +442,12 @@ export const DIFF_SAMPLES = {
     mkDiff("src/components/session-turn-mock.ts", 200, 0, "added"),
   ],
   overflow: Array.from({ length: 15 }, (_, i) =>
-    mkDiff(`src/components/file-${i + 1}.tsx`, Math.floor(Math.random() * 20), Math.floor(Math.random() * 10), "modified"),
+    mkDiff(
+      `src/components/file-${i + 1}.tsx`,
+      Math.floor(Math.random() * 20),
+      Math.floor(Math.random() * 10),
+      "modified",
+    ),
   ),
 }
 
@@ -469,18 +467,18 @@ export function mkTurn(config: {
   const sessionID = "story-session"
   const userText = config.text ?? "Fix the bug in the login form"
   const user = mkUser(userText, [], sessionID)
-  
+
   const assistant = mkAssistant(user.message.id, sessionID, {
     error: config.error,
   })
-  
+
   const assistantParts: Part[] = []
-  
+
   // Add reasoning if requested
   if (config.reasoningText) {
     assistantParts.push(reasoningPart(config.reasoningText))
   }
-  
+
   // Add tool parts if requested
   const toolNames = config.toolNames ?? ["bash", "edit", "read", "glob"]
   const toolCount = config.toolCount ?? 0
@@ -491,15 +489,15 @@ export function mkTurn(config: {
       assistantParts.push(toolPart(sample, "completed"))
     }
   }
-  
+
   // Add text response
   assistantParts.push(textPart(config.text ?? MARKDOWN_SAMPLES.short))
-  
+
   // Add compaction part if requested
   if (config.compaction) {
     assistantParts.push(compactionPart(true))
   }
-  
+
   return {
     user: user.message,
     assistant,

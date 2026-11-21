@@ -16,7 +16,24 @@ import { spawn } from "../launch"
 import type { InstanceContext } from "@/project/instance"
 import { venvCandidates, resolveVenvPython } from "../venv"
 
-export { path, os, fs, text, Log, Global, Flag, Process, Filesystem, which, Archive, Module, Npm, spawn, venvCandidates, resolveVenvPython }
+export {
+  path,
+  os,
+  fs,
+  text,
+  Log,
+  Global,
+  Flag,
+  Process,
+  Filesystem,
+  which,
+  Archive,
+  Module,
+  Npm,
+  spawn,
+  venvCandidates,
+  resolveVenvPython,
+}
 export type { ChildProcessWithoutNullStreams, InstanceContext }
 
 export const log = Log.create({ service: "lsp.server" })

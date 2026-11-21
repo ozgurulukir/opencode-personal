@@ -115,15 +115,16 @@ describe("HttpApi CORS", () => {
         { disableLogger: true },
       ).handler
 
-      const checkOrigin = (origin: string) => Effect.promise(async () => {
-        const response = await handler(
-          new Request(new URL("/global/config", "http://localhost"), {
-            headers: { origin },
-          }),
-          ExperimentalHttpApiServer.context,
-        )
-        return response.headers.get("access-control-allow-origin")
-      })
+      const checkOrigin = (origin: string) =>
+        Effect.promise(async () => {
+          const response = await handler(
+            new Request(new URL("/global/config", "http://localhost"), {
+              headers: { origin },
+            }),
+            ExperimentalHttpApiServer.context,
+          )
+          return response.headers.get("access-control-allow-origin")
+        })
 
       // Allowed
       expect(yield* checkOrigin("https://opencode.ai")).toBe("https://opencode.ai")

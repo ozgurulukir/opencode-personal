@@ -1,13 +1,4 @@
-import {
-  type Info,
-  NearestRoot,
-  spawn,
-  which,
-  path,
-  Filesystem,
-  Module,
-  Npm,
-} from "./shared"
+import { type Info, NearestRoot, spawn, which, path, Filesystem, Module, Npm } from "./shared"
 
 export const Biome: Info = {
   id: "biome",

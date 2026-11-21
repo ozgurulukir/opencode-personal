@@ -539,7 +539,9 @@ function InlineTool(props: {
   const [margin, setMargin] = createSignal(0)
   const [hover, setHover] = createSignal(false)
   const [showError, setShowError] = createSignal(false)
-  const error = createMemo(() => (props.part.state.status === "error" ? errorMessage(props.part.state.error) : undefined))
+  const error = createMemo(() =>
+    props.part.state.status === "error" ? errorMessage(props.part.state.error) : undefined,
+  )
   const complete = createMemo(() => !!props.complete)
   const denied = createMemo(() => isDeniedErrorMessage(error()))
   const fg = createMemo(() => {
@@ -631,7 +633,9 @@ function BlockTool(props: {
   const { theme } = useTheme()
   const renderer = useRenderer()
   const [hover, setHover] = createSignal(false)
-  const error = createMemo(() => (props.part?.state.status === "error" ? errorMessage(props.part.state.error) : undefined))
+  const error = createMemo(() =>
+    props.part?.state.status === "error" ? errorMessage(props.part.state.error) : undefined,
+  )
   return (
     <box
       border={["left"]}

@@ -5,8 +5,7 @@ import { Spinner } from "./spinner"
 import { buttonState } from "./button.shared"
 
 export interface ButtonProps
-  extends ComponentProps<typeof Kobalte>,
-    Pick<ComponentProps<"button">, "class" | "classList" | "children"> {
+  extends ComponentProps<typeof Kobalte>, Pick<ComponentProps<"button">, "class" | "classList" | "children"> {
   size?: "small" | "normal" | "large"
   variant?: "primary" | "secondary" | "ghost"
   icon?: IconProps["name"]

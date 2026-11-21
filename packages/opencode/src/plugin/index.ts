@@ -283,9 +283,7 @@ export const layer = Layer.effect(
             log.error("plugin hook failed", { hook: name, error })
             return new NamedError.Unknown({ message: errorMessage(error) })
           },
-        }).pipe(
-          Effect.catch(() => Effect.void),
-        )
+        }).pipe(Effect.catch(() => Effect.void))
       }
       return output
     })

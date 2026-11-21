@@ -43,7 +43,10 @@ function fileName(url: string, filename?: string) {
   return url
 }
 
-function fileSource(file: NonNullable<SessionMessageUser["files"]>[number], text: { start: number; end: number; value: string }) {
+function fileSource(
+  file: NonNullable<SessionMessageUser["files"]>[number],
+  text: { start: number; end: number; value: string },
+) {
   // V2 FileAttachment keeps a flat {start, end, text} range — the V1 FilePart
   // union's path/type detail is not preserved, so always emit a file source.
   return {

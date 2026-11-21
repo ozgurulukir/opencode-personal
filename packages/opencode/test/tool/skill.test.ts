@@ -388,9 +388,11 @@ description: First skill.
             ask: () => Effect.void,
           }
 
-          const error = yield* tool.execute({ names: ["alpha", "missing-1", "missing-2"] }, ctx).pipe(
-            Effect.catchDefect((defect) => Effect.succeed(defect instanceof Error ? defect.message : String(defect))),
-          )
+          const error = yield* tool
+            .execute({ names: ["alpha", "missing-1", "missing-2"] }, ctx)
+            .pipe(
+              Effect.catchDefect((defect) => Effect.succeed(defect instanceof Error ? defect.message : String(defect))),
+            )
           expect(error).toContain(`"missing-1"`)
           expect(error).toContain(`"missing-2"`)
         }),
@@ -424,9 +426,11 @@ description: First skill.
             ask: () => Effect.void,
           }
 
-          const error = yield* tool.execute({}, ctx).pipe(
-            Effect.catchDefect((defect) => Effect.succeed(defect instanceof Error ? defect.message : String(defect))),
-          )
+          const error = yield* tool
+            .execute({}, ctx)
+            .pipe(
+              Effect.catchDefect((defect) => Effect.succeed(defect instanceof Error ? defect.message : String(defect))),
+            )
           expect(error).toContain("invalid JSON arguments")
         }),
       { git: true },
@@ -459,9 +463,11 @@ description: First skill.
             ask: () => Effect.void,
           }
 
-          const error = yield* tool.execute({ names: [] }, ctx).pipe(
-            Effect.catchDefect((defect) => Effect.succeed(defect instanceof Error ? defect.message : String(defect))),
-          )
+          const error = yield* tool
+            .execute({ names: [] }, ctx)
+            .pipe(
+              Effect.catchDefect((defect) => Effect.succeed(defect instanceof Error ? defect.message : String(defect))),
+            )
           expect(error).toContain("invalid JSON arguments")
         }),
       { git: true },
@@ -495,9 +501,11 @@ description: First skill.
           }
 
           const names = Array.from({ length: 11 }, (_, i) => `skill-${i}`)
-          const error = yield* tool.execute({ names }, ctx).pipe(
-            Effect.catchDefect((defect) => Effect.succeed(defect instanceof Error ? defect.message : String(defect))),
-          )
+          const error = yield* tool
+            .execute({ names }, ctx)
+            .pipe(
+              Effect.catchDefect((defect) => Effect.succeed(defect instanceof Error ? defect.message : String(defect))),
+            )
           expect(error).toContain("invalid JSON arguments")
         }),
       { git: true },
@@ -532,9 +540,11 @@ description: First skill.
 
           // Bare property lookup would resolve "__proto__" truthy and crash on
           // path.dirname(undefined); the own-property guard must yield "not found".
-          const error = yield* tool.execute({ names: ["__proto__"] }, ctx).pipe(
-            Effect.catchDefect((defect) => Effect.succeed(defect instanceof Error ? defect.message : String(defect))),
-          )
+          const error = yield* tool
+            .execute({ names: ["__proto__"] }, ctx)
+            .pipe(
+              Effect.catchDefect((defect) => Effect.succeed(defect instanceof Error ? defect.message : String(defect))),
+            )
           expect(error).toContain("not found")
           expect(error).not.toContain("TypeError")
         }),

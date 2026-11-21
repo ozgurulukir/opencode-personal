@@ -27,7 +27,9 @@ function pathToFileUrl(filepath: string): string {
 
 /** Normalize a path for use as a tree key: strip root, trailing slashes, unify separators. */
 export function normalizePath(normalize: (p: string) => string, p: string): string {
-  return normalize(p).replace(/[\\/]+$/, "").replaceAll("\\", "/")
+  return normalize(p)
+    .replace(/[\\/]+$/, "")
+    .replaceAll("\\", "/")
 }
 
 /**

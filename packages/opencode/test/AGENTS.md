@@ -179,6 +179,7 @@ error text when the child loop fails.
 ## Environment-dependent failures (Windows / network)
 
 These fail for environment reasons, not logic — do not attribute them to your change:
+
 - Full `bun test` from `packages/opencode` is very slow on Windows and did not finish in 40 min; prefer targeted runs (`bun test test/<path>`).
 - `test/util/ts-worker.test.ts` asserts POSIX path literals (`/tmp/data`), so it fails on Windows (`path.join` yields `\tmp\data`).
 - `test/config/config.test.ts` remote-config tests ("loads config with defaults…", "project config overrides remote well-known config", "wellknown URL with trailing slash is normalized") fetch from `https://example.com` and fail offline with 404/timeout.

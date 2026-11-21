@@ -256,7 +256,8 @@ export const layer = Layer.effect(
           const handle = await server
             .spawn(root, ctx)
             .then((value) => {
-              if (!value) s.broken.set(key, { attempts: (s.broken.get(key)?.attempts ?? 0) + 1, lastAttempt: Date.now() })
+              if (!value)
+                s.broken.set(key, { attempts: (s.broken.get(key)?.attempts ?? 0) + 1, lastAttempt: Date.now() })
               return value
             })
             .catch((err) => {

@@ -83,7 +83,10 @@ export const layer = Layer.effect(
 
     const state = yield* InstanceState.make(
       Effect.fn("SessionStatus.state")(() =>
-        Effect.succeed({ status: new Map<SessionID, Info>(), waiters: new Map<SessionID, Set<Deferred.Deferred<void>>>() }),
+        Effect.succeed({
+          status: new Map<SessionID, Info>(),
+          waiters: new Map<SessionID, Set<Deferred.Deferred<void>>>(),
+        }),
       ),
     )
 

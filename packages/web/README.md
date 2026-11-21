@@ -8,8 +8,8 @@ The documentation is maintained in English and Turkish under `src/content/docs/`
 
 Install workspace dependencies from the repository root with `bun install`. Then run the site commands from `packages/web`:
 
-| Command | Description |
-| --- | --- |
-| `bun run dev` | Start the local Astro development server. |
-| `bun run build` | Build the static site into `dist/`. |
-| `bun run preview` | Preview the production build locally. |
+| Command           | Description                               |
+| ----------------- | ----------------------------------------- |
+| `bun run dev`     | Start the local Astro development server. |
+| `bun run build`   | Build the static site into `dist/`.       |
+| `bun run preview` | Preview the production build locally.     |

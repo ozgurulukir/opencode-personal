@@ -1,17 +1,4 @@
-import {
-  type Info,
-  NearestRoot,
-  run,
-  spawn,
-  which,
-  path,
-  fs,
-  log,
-  Filesystem,
-  Flag,
-  Global,
-  Archive,
-} from "./shared"
+import { type Info, NearestRoot, run, spawn, which, path, fs, log, Filesystem, Flag, Global, Archive } from "./shared"
 
 export const Tinymist: Info = {
   id: "tinymist",

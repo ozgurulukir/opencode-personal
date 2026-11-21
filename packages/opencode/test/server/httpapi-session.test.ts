@@ -698,12 +698,8 @@ describe("session HttpApi", () => {
         expect(missingSummarize.status).toBe(404)
 
         // todo and diff are empty reads on a fresh session
-        expect(
-          yield* requestJson<unknown[]>(`/api/session/${parent.id}/todo`, { headers }),
-        ).toEqual([])
-        expect(
-          yield* requestJson<unknown[]>(`/api/session/${parent.id}/diff`, { headers }),
-        ).toEqual([])
+        expect(yield* requestJson<unknown[]>(`/api/session/${parent.id}/todo`, { headers })).toEqual([])
+        expect(yield* requestJson<unknown[]>(`/api/session/${parent.id}/diff`, { headers })).toEqual([])
 
         // revert marks the session when the message exists (V1 parity: a
         // not-yet-existing messageID is a no-op returning the session unchanged),
@@ -760,10 +756,10 @@ describe("session HttpApi", () => {
         expect(updatedPart).toMatchObject({ id: target.part.id, type: "text", text: "v2 updated" })
 
         expect(
-          yield* requestJson<boolean>(
-            `/api/session/${parent.id}/message/${target.info.id}/part/${target.part.id}`,
-            { headers, method: "DELETE" },
-          ),
+          yield* requestJson<boolean>(`/api/session/${parent.id}/message/${target.info.id}/part/${target.part.id}`, {
+            headers,
+            method: "DELETE",
+          }),
         ).toBe(true)
         expect(
           yield* requestJson<boolean>(`/api/session/${parent.id}/message/${target.info.id}`, {
@@ -808,107 +804,110 @@ describe("session HttpApi", () => {
       Effect.gen(function* () {
         const events: Array<{ type: string; properties: Record<string, any> }> = []
 
-        yield* runWithServices(tmp.path, Effect.gen(function* () {
-          const bus = yield* Bus.Service
-          const unsubscribe = yield* bus.subscribeAllCallback((event) => {
-            if (event.type.startsWith("session.next.")) {
-              events.push({ type: event.type, properties: event.properties as Record<string, any> })
-            }
-          })
+        yield* runWithServices(
+          tmp.path,
+          Effect.gen(function* () {
+            const bus = yield* Bus.Service
+            const unsubscribe = yield* bus.subscribeAllCallback((event) => {
+              if (event.type.startsWith("session.next.")) {
+                events.push({ type: event.type, properties: event.properties as Record<string, any> })
+              }
+            })
 
-          const session = yield* Session.Service.use((svc) => svc.create({ title: "bridge" }))
+            const session = yield* Session.Service.use((svc) => svc.create({ title: "bridge" }))
 
-                  // setTitle -> session.updated -> session.next.updated (create also
-                  // emits a backwards-compat session.updated, so match the LAST one)
-                  yield* Session.Service.use((svc) => svc.setTitle({ sessionID: session.id, title: "renamed" }))
-                  yield* waitForEvent(events, "session.next.updated")
-                  expect(events.findLast((e) => e.type === "session.next.updated")?.properties).toMatchObject({
-                    sessionID: session.id,
-                    info: { title: "renamed" },
-                  })
+            // setTitle -> session.updated -> session.next.updated (create also
+            // emits a backwards-compat session.updated, so match the LAST one)
+            yield* Session.Service.use((svc) => svc.setTitle({ sessionID: session.id, title: "renamed" }))
+            yield* waitForEvent(events, "session.next.updated")
+            expect(events.findLast((e) => e.type === "session.next.updated")?.properties).toMatchObject({
+              sessionID: session.id,
+              info: { title: "renamed" },
+            })
 
-                  // Wire format: SyncEvent.process encodes DateTime timestamps to
-                  // epoch millis at publish (V2Schema.DateTimeUtcFromMillis contract).
-                  expect(
-                    typeof events.findLast((e) => e.type === "session.next.updated")?.properties.timestamp,
-                  ).toBe("number")
+            // Wire format: SyncEvent.process encodes DateTime timestamps to
+            // epoch millis at publish (V2Schema.DateTimeUtcFromMillis contract).
+            expect(typeof events.findLast((e) => e.type === "session.next.updated")?.properties.timestamp).toBe(
+              "number",
+            )
 
-                  // SessionStatus.set -> session.status -> session.next.status
-                  yield* SessionStatus.Service.use((svc) => svc.set(session.id, { type: "busy" }))
-                  yield* waitForEvent(events, "session.next.status")
-                  expect(events.find((e) => e.type === "session.next.status")?.properties).toMatchObject({
-                    sessionID: session.id,
-                    status: { type: "busy" },
-                  })
+            // SessionStatus.set -> session.status -> session.next.status
+            yield* SessionStatus.Service.use((svc) => svc.set(session.id, { type: "busy" }))
+            yield* waitForEvent(events, "session.next.status")
+            expect(events.find((e) => e.type === "session.next.status")?.properties).toMatchObject({
+              sessionID: session.id,
+              status: { type: "busy" },
+            })
 
-                  // Todo.update -> todo.updated -> session.next.todo
-                  const todos = [{ content: "task", status: "pending" as const, priority: "high" as const }]
-                  yield* Todo.Service.use((svc) => svc.update({ sessionID: session.id, todos }))
-                  yield* waitForEvent(events, "session.next.todo")
-                  expect(events.find((e) => e.type === "session.next.todo")?.properties).toMatchObject({
-                    sessionID: session.id,
-                    todos,
-                  })
+            // Todo.update -> todo.updated -> session.next.todo
+            const todos = [{ content: "task", status: "pending" as const, priority: "high" as const }]
+            yield* Todo.Service.use((svc) => svc.update({ sessionID: session.id, todos }))
+            yield* waitForEvent(events, "session.next.todo")
+            expect(events.find((e) => e.type === "session.next.todo")?.properties).toMatchObject({
+              sessionID: session.id,
+              todos,
+            })
 
-                  // session.diff -> session.next.diff — the V2 emission lives in
-                  // the summary service (the former event-bridge translation is
-                  // gone). Seed a message row so summarize() passes its
-                  // hasMessages guard and publishes an empty diff.
-                  yield* Session.Service.use((svc) =>
-                    svc.updateMessage({
-                      id: MessageID.ascending(),
-                      sessionID: session.id,
-                      role: "user",
-                      agent: "build",
-                      model: { providerID: ProviderID.make("test"), modelID: ModelID.make("test-model") },
-                      time: { created: Date.now() },
-                    }),
-                  )
-                  yield* SessionSummary.Service.use((svc) =>
-                    svc.summarize({ sessionID: session.id, messageID: MessageID.ascending() }),
-                  )
-                  yield* waitForEvent(events, "session.next.diff")
-                  expect(events.find((e) => e.type === "session.next.diff")?.properties).toMatchObject({
-                    sessionID: session.id,
-                    diff: [],
-                  })
+            // session.diff -> session.next.diff — the V2 emission lives in
+            // the summary service (the former event-bridge translation is
+            // gone). Seed a message row so summarize() passes its
+            // hasMessages guard and publishes an empty diff.
+            yield* Session.Service.use((svc) =>
+              svc.updateMessage({
+                id: MessageID.ascending(),
+                sessionID: session.id,
+                role: "user",
+                agent: "build",
+                model: { providerID: ProviderID.make("test"), modelID: ModelID.make("test-model") },
+                time: { created: Date.now() },
+              }),
+            )
+            yield* SessionSummary.Service.use((svc) =>
+              svc.summarize({ sessionID: session.id, messageID: MessageID.ascending() }),
+            )
+            yield* waitForEvent(events, "session.next.diff")
+            expect(events.find((e) => e.type === "session.next.diff")?.properties).toMatchObject({
+              sessionID: session.id,
+              diff: [],
+            })
 
-                  // Permission.ask -> permission.asked -> session.next.permission.asked
-                  const askFiber = yield* Permission.Service.use((svc) =>
-                    svc.ask({
-                      sessionID: session.id,
-                      permission: "bash",
-                      patterns: ["*"],
-                      metadata: {},
-                      always: [],
-                      ruleset: [{ permission: "bash", pattern: "*", action: "ask" }],
-                    }).pipe(Effect.forkChild),
-                  )
-                  yield* waitForEvent(events, "session.next.permission.asked")
-                  const asked = events.find((e) => e.type === "session.next.permission.asked")!
-                  expect(asked.properties).toMatchObject({ sessionID: session.id, request: { permission: "bash" } })
+            // Permission.ask -> permission.asked -> session.next.permission.asked
+            const askFiber = yield* Permission.Service.use((svc) =>
+              svc
+                .ask({
+                  sessionID: session.id,
+                  permission: "bash",
+                  patterns: ["*"],
+                  metadata: {},
+                  always: [],
+                  ruleset: [{ permission: "bash", pattern: "*", action: "ask" }],
+                })
+                .pipe(Effect.forkChild),
+            )
+            yield* waitForEvent(events, "session.next.permission.asked")
+            const asked = events.find((e) => e.type === "session.next.permission.asked")!
+            expect(asked.properties).toMatchObject({ sessionID: session.id, request: { permission: "bash" } })
 
-                  // Permission.reply -> permission.replied -> session.next.permission.replied
-                  yield* Permission.Service.use((svc) =>
-                    svc.reply({ requestID: asked.properties.request.id, reply: "once" }),
-                  )
-                  yield* waitForEvent(events, "session.next.permission.replied")
-                  expect(events.find((e) => e.type === "session.next.permission.replied")?.properties).toMatchObject({
-                    sessionID: session.id,
-                    requestID: asked.properties.request.id,
-                    reply: "once",
-                  })
-                  yield* Fiber.await(askFiber)
+            // Permission.reply -> permission.replied -> session.next.permission.replied
+            yield* Permission.Service.use((svc) => svc.reply({ requestID: asked.properties.request.id, reply: "once" }))
+            yield* waitForEvent(events, "session.next.permission.replied")
+            expect(events.find((e) => e.type === "session.next.permission.replied")?.properties).toMatchObject({
+              sessionID: session.id,
+              requestID: asked.properties.request.id,
+              reply: "once",
+            })
+            yield* Fiber.await(askFiber)
 
-                  // Session.remove -> session.deleted -> session.next.deleted
-                  yield* Session.Service.use((svc) => svc.remove(session.id))
-                  yield* waitForEvent(events, "session.next.deleted")
-                  expect(events.find((e) => e.type === "session.next.deleted")?.properties).toMatchObject({
-                    sessionID: session.id,
-                  })
+            // Session.remove -> session.deleted -> session.next.deleted
+            yield* Session.Service.use((svc) => svc.remove(session.id))
+            yield* waitForEvent(events, "session.next.deleted")
+            expect(events.find((e) => e.type === "session.next.deleted")?.properties).toMatchObject({
+              sessionID: session.id,
+            })
 
-                  unsubscribe()
-        }))
+            unsubscribe()
+          }),
+        )
       }),
     ),
   )

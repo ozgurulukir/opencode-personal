@@ -57,9 +57,9 @@ repeating inline JSON parse logic.
 The catalog is fetched over the network and cached on disk, so it is NOT trusted input. Two rules follow:
 
 - **`JSON.parse` throws a defect, and `Effect.catch` only intercepts typed failures.** A corrupt or truncated cache file therefore used to kill the whole `ModelsDev` service (`Effect.orDie` on the populate path). The parse must live inside a plain `try/catch` (`parseCatalog`), and the disk read is guarded with `Effect.catchDefect`. Never wrap a raw `JSON.parse` in `Effect.catch` and assume it is handled.
-- **Validate before writing.** `fetchAndWrite` parses the payload *before* `writeWithDirs`. A proxy/captive portal answering HTTP 200 with an HTML error page used to be written verbatim to `models.json`, permanently poisoning the cache for every later run.
+- **Validate before writing.** `fetchAndWrite` parses the payload _before_ `writeWithDirs`. A proxy/captive portal answering HTTP 200 with an HTML error page used to be written verbatim to `models.json`, permanently poisoning the cache for every later run.
 
-`fromModelsDevModel` must also tolerate missing fields (`model.limit?.context ?? 0`). The declared `ModelsDev.Model` schema is a *description* of the upstream shape, not a guarantee: 301 of 9200 real models omit `temperature` and 411 omit `cost`, so `temperature` and `limit` are optional in the schema. Do not add non-optional fields to it without checking the live payload.
+`fromModelsDevModel` must also tolerate missing fields (`model.limit?.context ?? 0`). The declared `ModelsDev.Model` schema is a _description_ of the upstream shape, not a guarantee: 301 of 9200 real models omit `temperature` and 411 omit `cost`, so `temperature` and `limit` are optional in the schema. Do not add non-optional fields to it without checking the live payload.
 
 ## `OPENCODE_MODELS_PATH` is authoritative — never fetch over it
 

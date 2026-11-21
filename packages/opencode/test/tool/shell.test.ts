@@ -1095,9 +1095,7 @@ describe("tool.shell permissions", () => {
       fn: async () => {
         const bash = await initBash()
         const requests: Array<Omit<Permission.Request, "id" | "sessionID" | "tool">> = []
-        const result = await Effect.runPromise(
-          bash.execute({ command: "echo hello" }, capture(requests)),
-        )
+        const result = await Effect.runPromise(bash.execute({ command: "echo hello" }, capture(requests)))
         expect(result.output.trim()).toBe("hello")
         expect(result.title).toBe("echo hello")
         expect(result.metadata.description).toBe("echo hello")
@@ -1176,10 +1174,7 @@ describe("tool.shell permissions", () => {
             const requests: Array<Omit<Permission.Request, "id" | "sessionID" | "tool">> = []
             await expect(
               Effect.runPromise(
-                bash.execute(
-                  { command: "FOO=1 echo hi", description: "Echo with env prefix" },
-                  capture(requests, err),
-                ),
+                bash.execute({ command: "FOO=1 echo hi", description: "Echo with env prefix" }, capture(requests, err)),
               ),
             ).rejects.toThrow(err.message)
             const bashReq = requests.find((r) => r.permission === "bash")
@@ -1261,7 +1256,9 @@ describe("tool.shell permissions", () => {
           fn: async () => {
             const bash = await initShell()
             const requests: Array<Omit<Permission.Request, "id" | "sessionID" | "tool">> = []
-            await Effect.runPromise(bash.execute({ command: "FOO=1", description: "Bare assignment" }, capture(requests)))
+            await Effect.runPromise(
+              bash.execute({ command: "FOO=1", description: "Bare assignment" }, capture(requests)),
+            )
             const bashReq = requests.find((r) => r.permission === "bash")
             expect(bashReq).toBeUndefined()
           },

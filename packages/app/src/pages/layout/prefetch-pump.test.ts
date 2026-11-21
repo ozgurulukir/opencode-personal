@@ -3,11 +3,7 @@ import { mergeByID, planPrefetchEnqueue } from "./prefetch-pump"
 
 describe("mergeByID", () => {
   test("sorts incoming ascending by id when current is empty", () => {
-    expect(mergeByID([], [{ id: "c" }, { id: "a" }, { id: "b" }])).toEqual([
-      { id: "a" },
-      { id: "b" },
-      { id: "c" },
-    ])
+    expect(mergeByID([], [{ id: "c" }, { id: "a" }, { id: "b" }])).toEqual([{ id: "a" }, { id: "b" }, { id: "c" }])
   })
 
   test("incoming entries win over current entries with the same id", () => {

@@ -833,8 +833,7 @@ EOF`
         await fs.writeFile(target, "line1\nline2\n", "utf-8")
 
         // Hunk starts with a leading empty line that isn't actually in the file segment we target
-        const patchText =
-          "*** Begin Patch\n*** Update File: leading_empty.txt\n@@\n\n-line2\n+changed\n*** End Patch"
+        const patchText = "*** Begin Patch\n*** Update File: leading_empty.txt\n@@\n\n-line2\n+changed\n*** End Patch"
 
         await execute({ patchText }, ctx)
         expect(await fs.readFile(target, "utf-8")).toBe("line1\nchanged\n")
@@ -856,8 +855,7 @@ EOF`
 
         // Patch specifies a context "}" which exists twice, and old line "value" which matches fuzzily.
         // It should reject as ambiguous because context is ambiguous and old lines are also ambiguous.
-        const patchText =
-          "*** Begin Patch\n*** Update File: ambiguous_ctx.txt\n@@ }\n-value\n+changed\n*** End Patch"
+        const patchText = "*** Begin Patch\n*** Update File: ambiguous_ctx.txt\n@@ }\n-value\n+changed\n*** End Patch"
 
         const result = await execute({ patchText }, ctx)
         expect(result.metadata.failedHunks.length).toBeGreaterThan(0)
@@ -924,8 +922,7 @@ EOF`
 
         // A pure-addition chunk anchored to the "beta" context line must be
         // inserted right after beta, not appended at the end of the file.
-        const patchText =
-          "*** Begin Patch\n*** Update File: addition_ctx.txt\n@@ beta\n+inserted\n*** End Patch"
+        const patchText = "*** Begin Patch\n*** Update File: addition_ctx.txt\n@@ beta\n+inserted\n*** End Patch"
 
         await execute({ patchText }, ctx)
 
@@ -965,5 +962,3 @@ EOF`
     })
   })
 })
-
-

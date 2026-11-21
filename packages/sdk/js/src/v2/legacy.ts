@@ -512,9 +512,7 @@ export function sessionMessagesToLegacy(
                   sessionID,
                   messageID: message.id,
                   text: message.summary,
-                  ...(options.includeTextTime
-                    ? { start: message.time.created, end: message.time.created }
-                    : {}),
+                  ...(options.includeTextTime ? { start: message.time.created, end: message.time.created } : {}),
                 }),
               ]
             : []),

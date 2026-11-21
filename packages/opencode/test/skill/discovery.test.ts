@@ -43,8 +43,7 @@ const cacheRoot = path.join(Global.Path.cache, "skills")
 const SKILL_BASE = "https://skills.example.com/"
 const PUBLIC_IP = "93.184.216.34"
 
-const cleanup = (p: string) =>
-  Effect.promise(() => fs.rm(p, { recursive: true, force: true }).catch(() => {}))
+const cleanup = (p: string) => Effect.promise(() => fs.rm(p, { recursive: true, force: true }).catch(() => {}))
 
 /**
  * The SSRF guard requires a public https target. Route a public-looking host to

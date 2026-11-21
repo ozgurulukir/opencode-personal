@@ -65,7 +65,10 @@ const DEFAULT_TERMINAL_COLORS: Record<"light" | "dark", TerminalColors> = {
 
 export const getTerminalColors = (theme: {
   mode: () => "light" | "dark"
-  themes: () => Record<string, { light?: { seeds?: unknown; palette?: unknown }; dark?: { seeds?: unknown; palette?: unknown } }>
+  themes: () => Record<
+    string,
+    { light?: { seeds?: unknown; palette?: unknown }; dark?: { seeds?: unknown; palette?: unknown } }
+  >
   themeId: () => string
 }): TerminalColors => {
   const mode = theme.mode() === "dark" ? "dark" : "light"

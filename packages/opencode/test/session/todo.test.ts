@@ -12,7 +12,9 @@ describe("session todo autoclose", () => {
     await WithInstance.provide({
       directory: tmp.path,
       fn: async () => {
-        const session = await AppRuntime.runPromise(SessionNs.Service.use((svc) => svc.create({ title: "Todo test session" })))
+        const session = await AppRuntime.runPromise(
+          SessionNs.Service.use((svc) => svc.create({ title: "Todo test session" })),
+        )
         const sessionID = session.id
 
         // Seed initial todos
@@ -21,7 +23,7 @@ describe("session todo autoclose", () => {
           { content: "unrelated task to keep pending", status: "pending" as const, priority: "medium" as const },
           { content: "already completed task", status: "completed" as const, priority: "low" as const },
         ] satisfies Todo.Info[]
-        
+
         await AppRuntime.runPromise(Todo.Service.use((svc) => svc.update({ sessionID, todos: initialTodos })))
 
         // Verify seeded state
@@ -42,7 +44,7 @@ describe("session todo autoclose", () => {
         // Verify status changes
         const updated = await AppRuntime.runPromise(Todo.Service.use((svc) => svc.get(sessionID)))
         expect(updated.length).toBe(3)
-        
+
         // The first todo should be completed
         expect(updated[0].content).toBe("implement verification logic")
         expect(updated[0].status).toBe("completed")

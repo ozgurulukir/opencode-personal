@@ -215,7 +215,16 @@ describe("handleToolPart — tool completed/error", () => {
     const events = [
       makeEvent("message.part.updated", {
         sessionID: "ses_1",
-        part: makeToolPart({ state: { status: "completed", input: {}, output: "ok", title: "read", metadata: {}, time: { start: 1000, end: 2000 } } }),
+        part: makeToolPart({
+          state: {
+            status: "completed",
+            input: {},
+            output: "ok",
+            title: "read",
+            metadata: {},
+            time: { start: 1000, end: 2000 },
+          },
+        }),
         time: 1000,
       }),
     ]
@@ -238,7 +247,13 @@ describe("handleToolPart — tool completed/error", () => {
       makeEvent("message.part.updated", {
         sessionID: "ses_1",
         part: makeToolPart({
-          state: { status: "error", input: {}, error: "something went wrong", metadata: {}, time: { start: 1000, end: 2000 } },
+          state: {
+            status: "error",
+            input: {},
+            error: "something went wrong",
+            metadata: {},
+            time: { start: 1000, end: 2000 },
+          },
         }),
         time: 1000,
       }),
@@ -284,7 +299,16 @@ describe("handleToolPart — tool completed/error", () => {
     const events = [
       makeEvent("message.part.updated", {
         sessionID: "ses_1",
-        part: makeToolPart({ state: { status: "completed", input: {}, output: "ok", title: "read", metadata: {}, time: { start: 1000, end: 2000 } } }),
+        part: makeToolPart({
+          state: {
+            status: "completed",
+            input: {},
+            output: "ok",
+            title: "read",
+            metadata: {},
+            time: { start: 1000, end: 2000 },
+          },
+        }),
         time: 1000,
       }),
     ]
@@ -919,9 +943,7 @@ describe("loop integration", () => {
   test("handles unknown event types gracefully", async () => {
     const ctx = makeCtx()
 
-    const events = [
-      makeEvent("unknown.event", { some: "data" }),
-    ]
+    const events = [makeEvent("unknown.event", { some: "data" })]
 
     // Should not throw
     await loop(ctx, { stream: asyncStream(events) })

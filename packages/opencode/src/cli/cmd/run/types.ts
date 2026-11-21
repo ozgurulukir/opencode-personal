@@ -145,11 +145,7 @@ export type ToolQuestionSnapshot = {
 }
 
 export type ToolSnapshot =
-  | ToolCodeSnapshot
-  | ToolDiffSnapshot
-  | ToolTaskSnapshot
-  | ToolTodoSnapshot
-  | ToolQuestionSnapshot
+  ToolCodeSnapshot | ToolDiffSnapshot | ToolTaskSnapshot | ToolTodoSnapshot | ToolQuestionSnapshot
 
 export type EntryLayout = "inline" | "block"
 

@@ -77,26 +77,26 @@ Connect a model provider with `/connect` in the terminal interface, or configure
 
 This repository is a Bun workspace monorepo. Common commands from the repository root:
 
-| Command | Purpose |
-| --- | --- |
-| `bun dev` | Run OpenCode from source. |
-| `bun run dev:web` | Start the browser app. |
-| `bun run --cwd packages/web dev` | Start the Astro/Starlight documentation site. |
-| `bun run dev:storybook` | Start the UI Storybook. |
-| `bun run lint` | Lint the workspace. |
-| `bun run typecheck` | Typecheck workspace packages. |
-| `bun run --cwd packages/web build` | Build the static documentation site. |
+| Command                            | Purpose                                       |
+| ---------------------------------- | --------------------------------------------- |
+| `bun dev`                          | Run OpenCode from source.                     |
+| `bun run dev:web`                  | Start the browser app.                        |
+| `bun run --cwd packages/web dev`   | Start the Astro/Starlight documentation site. |
+| `bun run dev:storybook`            | Start the UI Storybook.                       |
+| `bun run lint`                     | Lint the workspace.                           |
+| `bun run typecheck`                | Typecheck workspace packages.                 |
+| `bun run --cwd packages/web build` | Build the static documentation site.          |
 
 ## Repository layout
 
-| Package | Contents |
-| --- | --- |
+| Package             | Contents                                                              |
+| ------------------- | --------------------------------------------------------------------- |
 | `packages/opencode` | CLI, terminal interface, server, tools, providers, and agent runtime. |
-| `packages/app` | Browser application. |
-| `packages/ui` | Shared interface components. |
-| `packages/core` | Shared runtime utilities and primitives. |
-| `packages/sdk/js` | JavaScript/TypeScript SDK. |
-| `packages/web` | English and Turkish documentation site. |
+| `packages/app`      | Browser application.                                                  |
+| `packages/ui`       | Shared interface components.                                          |
+| `packages/core`     | Shared runtime utilities and primitives.                              |
+| `packages/sdk/js`   | JavaScript/TypeScript SDK.                                            |
+| `packages/web`      | English and Turkish documentation site.                               |
 
 ## License
 

@@ -17,7 +17,10 @@ describe("sortProvidersByName", () => {
 
   test("does not mutate original array", async () => {
     const { sortProvidersByName } = await import("../../src/acp/session-config")
-    const original = [{ id: "b", name: "Beta" }, { id: "a", name: "Alpha" }]
+    const original = [
+      { id: "b", name: "Beta" },
+      { id: "a", name: "Alpha" },
+    ]
     const copy = [...original]
     sortProvidersByName(original)
     expect(original).toEqual(copy)
@@ -117,10 +120,7 @@ describe("buildAvailableModels", () => {
     ]
     const result = buildAvailableModels(providers as any, { includeVariants: true })
     expect(result.length).toBe(2) // base + 1 variant (default excluded)
-    expect(result.map((m) => m.modelId)).toEqual([
-      "anthropic/claude-sonnet-4",
-      "anthropic/claude-sonnet-4/high",
-    ])
+    expect(result.map((m) => m.modelId)).toEqual(["anthropic/claude-sonnet-4", "anthropic/claude-sonnet-4/high"])
   })
 })
 
@@ -292,7 +292,10 @@ describe("buildConfigOptions", () => {
       currentModelId: "anthropic/claude-3-opus",
       availableModels: [],
       modes: {
-        availableModes: [{ id: "build", name: "Build" }, { id: "plan", name: "Plan" }],
+        availableModes: [
+          { id: "build", name: "Build" },
+          { id: "plan", name: "Plan" },
+        ],
         currentModeId: "build",
       },
     })

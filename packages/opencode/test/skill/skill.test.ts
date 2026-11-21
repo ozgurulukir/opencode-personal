@@ -217,7 +217,7 @@ description: Skill with a glob metacharacter in its name.
               .then(() =>
                 Bun.write(
                   path.join(dir, ".opencode", "skill", "bad*folder", "SKILL.md"),
-              `---
+                  `---
 description: Skill whose folder name is also unsafe.
 ---
 
@@ -1043,10 +1043,10 @@ describe("skill semantic index resilience", () => {
     // so reusing one value would share the InstanceState cache across sessions and
     // never re-run the state init this test needs to observe.
     // Git-init the dir: a non-git directory resolves sandbox="/" and the
-// skill discovery `up` walk then sweeps real ~/.claude/.agents from the
-// whole ancestry instead of stopping at this directory.
-const tmp = await tmpdir({ git: true })
-const dir = tmp.path
+    // skill discovery `up` walk then sweeps real ~/.claude/.agents from the
+    // whole ancestry instead of stopping at this directory.
+    const tmp = await tmpdir({ git: true })
+    const dir = tmp.path
     const cache = path.join(dir, "cache")
     const makeSkillLayer = () =>
       Skill.layer.pipe(

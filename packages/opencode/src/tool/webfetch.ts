@@ -26,8 +26,7 @@ export const Parameters = Schema.Struct({
       description: "The format to return the content in (text, markdown, or html). Defaults to markdown.",
     }),
   timeout: Schema.optional(PositiveInt).annotate({
-    description:
-      "Optional positive timeout in seconds. Values above the configured maximum (default: 120) are capped.",
+    description: "Optional positive timeout in seconds. Values above the configured maximum (default: 120) are capped.",
   }),
 })
 
@@ -55,10 +54,9 @@ export const WebFetchTool = Tool.define(
           })
 
           const configSvc = yield* Effect.serviceOption(Config.Service)
-          const webfetchConfig =
-            Option.isSome(configSvc)
-              ? yield* configSvc.value.get().pipe(Effect.catch(() => Effect.succeed(undefined)))
-              : undefined
+          const webfetchConfig = Option.isSome(configSvc)
+            ? yield* configSvc.value.get().pipe(Effect.catch(() => Effect.succeed(undefined)))
+            : undefined
           const { maxResponseBytes, defaultTimeout, maxTimeout } = resolveLimits(webfetchConfig?.webfetch)
           const timeout = Math.min((params.timeout ?? defaultTimeout / 1000) * 1000, maxTimeout)
 

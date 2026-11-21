@@ -404,7 +404,9 @@ function createPluginScope(load: PluginLoad, id: string) {
     list = []
 
     // Evaluate timeout dynamically so tests can override it at runtime
-    const timeoutMs = process.env.TEST_PLUGIN_TIMEOUT ? parseInt(process.env.TEST_PLUGIN_TIMEOUT, 10) : DISPOSE_TIMEOUT_MS
+    const timeoutMs = process.env.TEST_PLUGIN_TIMEOUT
+      ? parseInt(process.env.TEST_PLUGIN_TIMEOUT, 10)
+      : DISPOSE_TIMEOUT_MS
     const until = Date.now() + timeoutMs
 
     for (const item of queue) {

@@ -1,12 +1,4 @@
-import {
-  type Info,
-  NearestRoot,
-  spawn,
-  which,
-  path,
-  log,
-  Filesystem,
-} from "./shared"
+import { type Info, NearestRoot, spawn, which, path, log, Filesystem } from "./shared"
 
 export const RustAnalyzer: Info = {
   id: "rust",

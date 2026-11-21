@@ -90,9 +90,7 @@ export function editorSelectionLabel(ranges: EditorSelection["ranges"] | undefin
   if (!ranges) return undefined
   const first = ranges.find(hasEditorRangeSelection) ?? ranges[0]
   if (!first) return undefined
-  return [getEditorRangeLabel(first), ranges.length > 1 ? `+${ranges.length - 1}` : undefined]
-    .filter(Boolean)
-    .join(" ")
+  return [getEditorRangeLabel(first), ranges.length > 1 ? `+${ranges.length - 1}` : undefined].filter(Boolean).join(" ")
 }
 
 /** Derive the textarea placeholder (ghost suggestion, shell example, or prompt hint). */

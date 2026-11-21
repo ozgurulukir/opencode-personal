@@ -48,9 +48,7 @@ export function subagentAbortGuard(input: {
         if (Exit.hasInterrupts(exit) && !cancelled) {
           cancelled = true
           yield* input.cancel.pipe(
-            Effect.catch((error) =>
-              Effect.sync(() => log.warn("subagent cancel failed", { error: String(error) })),
-            ),
+            Effect.catch((error) => Effect.sync(() => log.warn("subagent cancel failed", { error: String(error) }))),
           )
         }
       }),

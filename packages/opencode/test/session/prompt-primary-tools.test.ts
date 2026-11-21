@@ -242,42 +242,16 @@ const subagentPermission: Permission.Ruleset = [
   { permission: "read", pattern: "*", action: "allow" },
 ]
 
-it.live("prompt keeps primary_tools allows while still applying restricted-tool denies", () =>
-  provideTmpdirServer(
-    Effect.fnUntraced(function* () {
-      const prompt = yield* SessionPrompt.Service
-      const sessions = yield* Session.Service
-      const chat = yield* sessions.create({ permission: subagentPermission })
+it.live(
+  "prompt keeps primary_tools allows while still applying restricted-tool denies",
+  () =>
+    provideTmpdirServer(
+      Effect.fnUntraced(function* () {
+        const prompt = yield* SessionPrompt.Service
+        const sessions = yield* Session.Service
+        const chat = yield* sessions.create({ permission: subagentPermission })
 
-      yield* prompt.prompt({
-        sessionID: chat.id,
-        agent: "build",
-        noReply: true,
-        tools: restricted,
-        parts: [{ type: "text", text: "hi" }],
-      })
-
-      const saved = yield* sessions.get(chat.id)
-      const rules = saved.permission ?? []
-      expect(Permission.evaluate("bash", "*", rules).action).toBe("allow")
-      expect(Permission.evaluate("read", "*", rules).action).toBe("allow")
-      expect(Permission.evaluate("todowrite", "*", rules).action).toBe("deny")
-      expect(Permission.evaluate("task", "*", rules).action).toBe("deny")
-    }),
-    { git: true, config: primaryCfg },
-  ),
-  30_000,
-)
-
-it.live("re-prompting with the same tools map does not grow session.permission", () =>
-  provideTmpdirServer(
-    Effect.fnUntraced(function* () {
-      const prompt = yield* SessionPrompt.Service
-      const sessions = yield* Session.Service
-      const chat = yield* sessions.create({ permission: subagentPermission })
-
-      const send = () =>
-        prompt.prompt({
+        yield* prompt.prompt({
           sessionID: chat.id,
           agent: "build",
           noReply: true,
@@ -285,17 +259,47 @@ it.live("re-prompting with the same tools map does not grow session.permission",
           parts: [{ type: "text", text: "hi" }],
         })
 
-      yield* send()
-      const first = (yield* sessions.get(chat.id)).permission ?? []
-      yield* send()
-      const second = (yield* sessions.get(chat.id)).permission ?? []
+        const saved = yield* sessions.get(chat.id)
+        const rules = saved.permission ?? []
+        expect(Permission.evaluate("bash", "*", rules).action).toBe("allow")
+        expect(Permission.evaluate("read", "*", rules).action).toBe("allow")
+        expect(Permission.evaluate("todowrite", "*", rules).action).toBe("deny")
+        expect(Permission.evaluate("task", "*", rules).action).toBe("deny")
+      }),
+      { git: true, config: primaryCfg },
+    ),
+  30_000,
+)
 
-      expect(second).toHaveLength(first.length)
-      expect(Permission.evaluate("bash", "*", second).action).toBe("allow")
-      expect(Permission.evaluate("todowrite", "*", second).action).toBe("deny")
-      expect(Permission.evaluate("task", "*", second).action).toBe("deny")
-    }),
-    { git: true, config: primaryCfg },
-  ),
+it.live(
+  "re-prompting with the same tools map does not grow session.permission",
+  () =>
+    provideTmpdirServer(
+      Effect.fnUntraced(function* () {
+        const prompt = yield* SessionPrompt.Service
+        const sessions = yield* Session.Service
+        const chat = yield* sessions.create({ permission: subagentPermission })
+
+        const send = () =>
+          prompt.prompt({
+            sessionID: chat.id,
+            agent: "build",
+            noReply: true,
+            tools: restricted,
+            parts: [{ type: "text", text: "hi" }],
+          })
+
+        yield* send()
+        const first = (yield* sessions.get(chat.id)).permission ?? []
+        yield* send()
+        const second = (yield* sessions.get(chat.id)).permission ?? []
+
+        expect(second).toHaveLength(first.length)
+        expect(Permission.evaluate("bash", "*", second).action).toBe("allow")
+        expect(Permission.evaluate("todowrite", "*", second).action).toBe("deny")
+        expect(Permission.evaluate("task", "*", second).action).toBe("deny")
+      }),
+      { git: true, config: primaryCfg },
+    ),
   30_000,
 )

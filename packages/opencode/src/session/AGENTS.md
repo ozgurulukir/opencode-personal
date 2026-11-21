@@ -43,6 +43,7 @@ The `as Record<string, any>` cast in `mergeOptions` is deliberate — remeda's `
 When replacing per-item loops with batch writes, use the new `Session.updateParts(parts)` and `Session.updateMessages(infos)` methods. They emit a single `PartUpdatedBatch` / `MessageUpdatedBatch` event carrying the full array, and the projector in `projectors.ts` performs one multi-row `INSERT ... ON CONFLICT DO UPDATE` using `sql`excluded.data`` for SQLite upserts. Prefer batch over loops when updating >1 item in the same session.
 
 **Adding new batch event types requires coordinated changes:**
+
 1. Define the schema + event in `message-v2.ts`
 2. Add the projector tuple to `session/projectors.ts` default export **before** `...nextProjectors`
 3. `server/projectors.ts:initProjectors()` runs at module load and freezes the registry — import order matters

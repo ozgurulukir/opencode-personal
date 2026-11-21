@@ -93,4 +93,3 @@ describe("Patch namespace", () => {
     })
   })
 })
-

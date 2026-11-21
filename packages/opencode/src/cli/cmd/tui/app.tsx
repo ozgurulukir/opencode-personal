@@ -207,26 +207,26 @@ export function tui(input: {
                           <ProjectProvider>
                             <SyncProvider>
                               <ThemeProvider mode={mode}>
-                                  <LocalProvider>
-                                    <PromptStashProvider>
-                                      <DialogProvider>
-                                        <CommandPaletteProvider>
-                                          <FrecencyProvider>
-                                            <PromptHistoryProvider>
-                                              <PromptRefProvider>
-                                                <EditorContextProvider>
-                                                  <App onSnapshot={input.onSnapshot} />
-                                                </EditorContextProvider>
-                                              </PromptRefProvider>
-                                            </PromptHistoryProvider>
-                                          </FrecencyProvider>
-                                        </CommandPaletteProvider>
-                                      </DialogProvider>
-                                    </PromptStashProvider>
-                                  </LocalProvider>
-                                 </ThemeProvider>
-                               </SyncProvider>
-                             </ProjectProvider>
+                                <LocalProvider>
+                                  <PromptStashProvider>
+                                    <DialogProvider>
+                                      <CommandPaletteProvider>
+                                        <FrecencyProvider>
+                                          <PromptHistoryProvider>
+                                            <PromptRefProvider>
+                                              <EditorContextProvider>
+                                                <App onSnapshot={input.onSnapshot} />
+                                              </EditorContextProvider>
+                                            </PromptRefProvider>
+                                          </PromptHistoryProvider>
+                                        </FrecencyProvider>
+                                      </CommandPaletteProvider>
+                                    </DialogProvider>
+                                  </PromptStashProvider>
+                                </LocalProvider>
+                              </ThemeProvider>
+                            </SyncProvider>
+                          </ProjectProvider>
                         </SDKProvider>
                       </TuiConfigProvider>
                     </RouteProvider>

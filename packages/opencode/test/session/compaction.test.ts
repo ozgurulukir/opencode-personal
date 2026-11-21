@@ -787,9 +787,7 @@ describe("session.compaction.prune", () => {
           yield* compact.prune({ sessionID: info.id })
 
           const msgs = yield* ssn.messages({ sessionID: info.id })
-          const pruned = msgs
-            .flatMap((msg) => msg.parts)
-            .filter((p): p is MessageV2.ToolPart => p.type === "tool")
+          const pruned = msgs.flatMap((msg) => msg.parts).filter((p): p is MessageV2.ToolPart => p.type === "tool")
           expect(pruned.length).toBe(3)
           expect(
             pruned.every((p) => p.state.status === "completed" && typeof p.state.time.compacted === "number"),
@@ -2227,7 +2225,13 @@ describe("session.compaction.process", () => {
           .at(-1)
         expect(part?.type).toBe("compaction")
         expect(part?.tail_start_id).toBe(u2.id)
-      }).pipe(withCompaction({ llm: stub.layer, plugin: autocontinue(true), config: cfg({ tail_turns: 2, preserve_recent_tokens: 5000 }) }))
+      }).pipe(
+        withCompaction({
+          llm: stub.layer,
+          plugin: autocontinue(true),
+          config: cfg({ tail_turns: 2, preserve_recent_tokens: 5000 }),
+        }),
+      )
     },
     { git: true },
   )

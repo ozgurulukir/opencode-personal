@@ -180,7 +180,7 @@ export class RunScrollbackStream {
       pendingSpacerRows: rows || (!this.rendered && this.wrote ? 1 : 0),
       rendered: false,
       lastSettledContent: "",
-    fallbackWarned: false,
+      fallbackWarned: false,
     }
   }
 

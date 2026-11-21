@@ -1,14 +1,4 @@
-import {
-  type Info,
-  NearestRoot,
-  spawn,
-  which,
-  path,
-  log,
-  Process,
-  Flag,
-  Global,
-} from "./shared"
+import { type Info, NearestRoot, spawn, which, path, log, Process, Flag, Global } from "./shared"
 
 export const Gopls: Info = {
   id: "gopls",

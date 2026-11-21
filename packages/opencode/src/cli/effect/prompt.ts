@@ -34,9 +34,7 @@ export const password = (opts: Parameters<typeof prompts.password>[0]) =>
   Effect.promise(() => prompts.password(opts)).pipe(Effect.map((result) => optional<string>(result)))
 
 export const confirm = (opts: Parameters<typeof prompts.confirm>[0]) =>
-  Effect.promise(() => prompts.confirm(opts)).pipe(
-    Effect.map((result) => !prompts.isCancel(result) && result === true),
-  )
+  Effect.promise(() => prompts.confirm(opts)).pipe(Effect.map((result) => !prompts.isCancel(result) && result === true))
 
 export const spinner = () => {
   const s = prompts.spinner()

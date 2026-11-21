@@ -475,9 +475,10 @@ export function Session() {
           if (ok !== true) return
           kv.set("share_consent", true)
         }
-        await sdk.client.v2.session.share({
-          sessionID: route.sessionID,
-        })
+        await sdk.client.v2.session
+          .share({
+            sessionID: route.sessionID,
+          })
           .then((res) => copy(res.data!.share!.url))
           .catch((error) => {
             toast.show({
@@ -565,7 +566,7 @@ export function Session() {
         const confirmed = await DialogConfirm.show(
           dialog,
           "Compact Session",
-          "Are you sure you want to compact this session? (This will summarize past messages to save context and might hide some message details.)"
+          "Are you sure you want to compact this session? (This will summarize past messages to save context and might hide some message details.)",
         )
         if (!confirmed) return
 
@@ -614,9 +615,10 @@ export function Session() {
         name: "unshare",
       },
       run: async () => {
-        await sdk.client.v2.session.unshare({
-          sessionID: route.sessionID,
-        })
+        await sdk.client.v2.session
+          .unshare({
+            sessionID: route.sessionID,
+          })
           .then(() => toast.show({ message: "Session unshared successfully", variant: "success" }))
           .catch((error) => {
             toast.show({
@@ -1234,7 +1236,11 @@ export function Session() {
                               <Show when={compaction.summary}>
                                 {(summary) => (
                                   <box paddingLeft={3} paddingTop={1}>
-                                    <AssistantMarkdown content={summary().trim()} conceal={conceal()} syntax={syntax()} />
+                                    <AssistantMarkdown
+                                      content={summary().trim()}
+                                      conceal={conceal()}
+                                      syntax={syntax()}
+                                    />
                                   </box>
                                 )}
                               </Show>
@@ -1345,12 +1351,7 @@ const MIME_BADGE: Record<string, string> = {
   "application/x-directory": "dir",
 }
 
-function UserMessage(props: {
-  message: SessionMessageUser
-  onMouseUp: () => void
-  index: number
-  pending?: string
-}) {
+function UserMessage(props: { message: SessionMessageUser; onMouseUp: () => void; index: number; pending?: string }) {
   const ctx = use()
   const local = useLocal()
   const text = createMemo(() => props.message.text)
@@ -1512,10 +1513,7 @@ function AssistantMessage(props: { message: SessionMessageAssistant; sessionID: 
             <text marginTop={1}>
               <span
                 style={{
-                  fg:
-                    aborted()
-                      ? theme.textMuted
-                      : local.agent.color(props.message.agent),
+                  fg: aborted() ? theme.textMuted : local.agent.color(props.message.agent),
                 }}
               >
                 ▣{" "}
@@ -1542,7 +1540,12 @@ const CONTENT_MAPPING = {
   reasoning: ReasoningPart,
 }
 
-function ReasoningPart(props: { last: boolean; part: ReasoningPart; message: SessionMessageAssistant; sessionID: string }) {
+function ReasoningPart(props: {
+  last: boolean
+  part: ReasoningPart
+  message: SessionMessageAssistant
+  sessionID: string
+}) {
   const { theme, subtleSyntax } = useTheme()
   const ctx = use()
   const content = createMemo(() => {
@@ -1749,7 +1752,9 @@ function InlineTool(props: {
     return theme.text
   })
 
-  const error = createMemo(() => (props.part.state.status === "error" ? errorMessage(props.part.state.error) : undefined))
+  const error = createMemo(() =>
+    props.part.state.status === "error" ? errorMessage(props.part.state.error) : undefined,
+  )
 
   const denied = createMemo(() => isDeniedErrorMessage(error()))
 
@@ -1815,7 +1820,9 @@ function BlockTool(props: {
   const { theme } = useTheme()
   const renderer = useRenderer()
   const [hover, setHover] = createSignal(false)
-  const error = createMemo(() => (props.part?.state.status === "error" ? errorMessage(props.part.state.error) : undefined))
+  const error = createMemo(() =>
+    props.part?.state.status === "error" ? errorMessage(props.part.state.error) : undefined,
+  )
   return (
     <box
       border={["left"]}
@@ -2267,7 +2274,7 @@ function Question(props: ToolProps<typeof QuestionTool>) {
 
 function Skill(props: ToolProps<typeof SkillTool>) {
   const input = props.input as { names?: string[]; name?: string }
-  const names = input.names?.length ? input.names : (input.name ? [input.name] : [])
+  const names = input.names?.length ? input.names : input.name ? [input.name] : []
   const label = formatSkillLabel(props.input, names[0])
   return (
     <InlineTool icon="→" pending="Loading skill..." complete={names.join(", ")} part={props.part}>
@@ -2298,5 +2305,3 @@ function Diagnostics(props: { diagnostics?: Record<string, Record<string, any>[]
     </Show>
   )
 }
-
-

@@ -63,7 +63,10 @@ describe("Installation.method", () => {
     const origPlatform = Object.getOwnPropertyDescriptor(process, "platform")
     Object.defineProperty(process, "platform", { value: "linux", configurable: true })
     try {
-      const method = await runWith(recordingSpawner(() => "nothing", seen), "/usr/local/bin/node")
+      const method = await runWith(
+        recordingSpawner(() => "nothing", seen),
+        "/usr/local/bin/node",
+      )
       expect(method).toBe("unknown")
       expect(seen).toContain("npm")
       expect(seen).toContain("yarn")
@@ -82,7 +85,10 @@ describe("Installation.method", () => {
     const origPlatform = Object.getOwnPropertyDescriptor(process, "platform")
     Object.defineProperty(process, "platform", { value: "win32", configurable: true })
     try {
-      await runWith(recordingSpawner(() => "nothing", seen), "C:\\Program Files\\node.exe")
+      await runWith(
+        recordingSpawner(() => "nothing", seen),
+        "C:\\Program Files\\node.exe",
+      )
       expect(seen).toContain("npm")
       expect(seen).toContain("scoop")
       expect(seen).toContain("choco")

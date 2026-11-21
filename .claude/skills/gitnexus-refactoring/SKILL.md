@@ -1,6 +1,6 @@
 ---
 name: gitnexus-refactoring
-description: "Use when the user wants to rename, extract, split, move, or restructure code safely. Examples: \"Rename this function\", \"Extract this into a module\", \"Refactor this class\", \"Move this to a separate file\""
+description: 'Use when the user wants to rename, extract, split, move, or restructure code safely. Examples: "Rename this function", "Extract this into a module", "Refactor this class", "Move this to a separate file"'
 ---
 
 # Refactoring with GitNexus
@@ -131,12 +131,12 @@ RETURN caller.name, caller.filePath ORDER BY caller.filePath
 
 ## Risk Rules
 
-| Risk Factor         | Mitigation                                |
-| ------------------- | ----------------------------------------- |
-| Many callers (>5)   | Use rename for automated updates |
-| Cross-area refs     | Use detect_changes after to verify scope  |
-| String/dynamic refs | query to find them               |
-| External/public API | Version and deprecate properly            |
+| Risk Factor                       | Mitigation                                          |
+| --------------------------------- | --------------------------------------------------- |
+| Many callers (>5)                 | Use rename for automated updates                    |
+| Cross-area refs                   | Use detect_changes after to verify scope            |
+| String/dynamic refs               | query to find them                                  |
+| External/public API               | Version and deprecate properly                      |
 | Same name in another indexed repo | Bind `repo`; verify previewed paths before applying |
 
 ## Example: Rename `validateUser` to `authenticateUser`

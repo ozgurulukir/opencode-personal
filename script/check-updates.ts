@@ -101,7 +101,9 @@ function findPackageJsonFiles(dir: string): string[] {
 
 /** Resolve the root manifest plus every workspace package from `workspaces.packages` globs. */
 function workspaceManifestFiles(root: string): string[] {
-  const rootJson: { workspaces?: { packages?: string[] } } = JSON.parse(readFileSync(join(root, "package.json"), "utf-8"))
+  const rootJson: { workspaces?: { packages?: string[] } } = JSON.parse(
+    readFileSync(join(root, "package.json"), "utf-8"),
+  )
   const files = new Set<string>([join(root, "package.json")])
   for (const pattern of rootJson.workspaces?.packages ?? []) {
     for (const match of new Bun.Glob(`${pattern}/package.json`).scanSync({ cwd: root, onlyFiles: true })) {
@@ -276,7 +278,8 @@ export function collectPinnedDeps(manifests: { file: string; json: Record<string
         if (at <= 0) continue
         const name = key.slice(0, at)
         const patchVersion = key.slice(at + 1)
-        const found = entries.find((e) => e.name === name && e.section === "catalog") ?? entries.find((e) => e.name === name)
+        const found =
+          entries.find((e) => e.name === name && e.section === "catalog") ?? entries.find((e) => e.name === name)
         if (found && found.version !== patchVersion)
           patchMismatches.push({ name, patchVersion, foundVersion: found.version, patchKey: key, patchPath })
       }

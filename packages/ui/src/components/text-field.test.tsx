@@ -35,10 +35,16 @@ describe("forwardKeyDown", () => {
   test("forwards event to SolidJS bound tuple handler as [handler, argument]", () => {
     let receivedArg: unknown
     let receivedEvent: unknown
-    forwardKeyDown([(arg: string, e: KeyboardEvent) => {
-      receivedArg = arg
-      receivedEvent = e
-    }, "data"], escape)
+    forwardKeyDown(
+      [
+        (arg: string, e: KeyboardEvent) => {
+          receivedArg = arg
+          receivedEvent = e
+        },
+        "data",
+      ],
+      escape,
+    )
     expect(receivedArg).toBe("data")
     expect(receivedEvent).toBe(escape)
   })

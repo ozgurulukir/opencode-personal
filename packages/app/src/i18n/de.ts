@@ -583,7 +583,8 @@ export const dict = {
   "settings.general.row.language.title": "Sprache",
   "settings.general.row.language.description": "Die Anzeigesprache für OpenCode ändern",
   "settings.general.row.shell.title": "Terminal-Shell",
-  "settings.general.row.shell.description": "Wählen Sie die Shell, die für Ihr Terminal verwendet wird. Kompatible Shells werden auch für Agent-Tool-Aufrufe verwendet.",
+  "settings.general.row.shell.description":
+    "Wählen Sie die Shell, die für Ihr Terminal verwendet wird. Kompatible Shells werden auch für Agent-Tool-Aufrufe verwendet.",
   "settings.general.row.shell.autoDefault": "Auto (Standard)",
   "settings.general.row.shell.terminalOnly": "nur Terminal",
   "settings.general.row.appearance.title": "Erscheinungsbild",
@@ -607,9 +608,11 @@ export const dict = {
   "settings.general.row.showFileTree.title": "Dateibaum",
   "settings.general.row.showFileTree.description": "Schalter und Panel des Dateibaums in Desktop-Sitzungen anzeigen",
   "settings.general.row.showNavigation.title": "Navigationssteuerelemente",
-  "settings.general.row.showNavigation.description": "Zurück- und Weiter-Schaltflächen in der Desktop-Titelleiste anzeigen",
+  "settings.general.row.showNavigation.description":
+    "Zurück- und Weiter-Schaltflächen in der Desktop-Titelleiste anzeigen",
   "settings.general.row.showSearch.title": "Befehlspalette",
-  "settings.general.row.showSearch.description": "Such- und Befehlspalette-Schaltfläche in der Desktop-Titelleiste anzeigen",
+  "settings.general.row.showSearch.description":
+    "Such- und Befehlspalette-Schaltfläche in der Desktop-Titelleiste anzeigen",
   "settings.general.row.showTerminal.title": "Terminal",
   "settings.general.row.showTerminal.description": "Terminal-Schaltfläche in der Desktop-Titelleiste anzeigen",
   "settings.general.row.showStatus.title": "Serverstatus",

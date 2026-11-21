@@ -633,8 +633,7 @@ export const dict = {
   "settings.general.row.language.title": "语言",
   "settings.general.row.language.description": "更改 OpenCode 的显示语言",
   "settings.general.row.shell.title": "终端 Shell",
-  "settings.general.row.shell.description":
-    "选择终端使用的 shell。兼容的 shell 也用于智能体工具调用。",
+  "settings.general.row.shell.description": "选择终端使用的 shell。兼容的 shell 也用于智能体工具调用。",
   "settings.general.row.shell.autoDefault": "自动（默认）",
   "settings.general.row.shell.terminalOnly": "仅终端",
   "settings.general.row.appearance.title": "外观",
@@ -676,7 +675,6 @@ export const dict = {
   "settings.general.row.wayland.tooltip": "在混合刷新率显示器的 Linux 系统上，原生 Wayland 可能更稳定。",
   "settings.general.row.releaseNotes.title": "发行说明",
   "settings.general.row.releaseNotes.description": "更新后显示“新功能”弹窗",
-
 
   "sound.option.none": "无",
   "sound.option.alert01": "警报 01",

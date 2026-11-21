@@ -848,9 +848,7 @@ test("flushes incomplete code fence content on complete even when the final bloc
     // unstable after settle(), commitMarkdownBlocks returned false and
     // finishActive destroyed the surface -- content was lost from scrollback
     // but persisted in DB (visible after restart).
-    await out.scrollback.append(
-      assistant('# Heading\n\n```js\nconst x = 1\nconst y = 2\n'),
-    )
+    await out.scrollback.append(assistant("# Heading\n\n```js\nconst x = 1\nconst y = 2\n"))
     await out.scrollback.complete()
 
     const commits = claim(out.renderer)

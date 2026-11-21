@@ -100,19 +100,25 @@ function toolContent(state: string, overrides: Record<string, unknown> = {}): an
 describe("Agent.processMessage", () => {
   test("ignores non-replayable message types", async () => {
     const { connection, sessionUpdates, shellSnapshots, toolStarts } = createTestAgent()
-    await processMessage(
-      connection,
-      shellSnapshots,
-      toolStarts,
-      SESSION_ID,
-      { id: "msg_1", type: "synthetic", sessionID: SESSION_ID, text: "note", time: { created: Date.now() } },
-    )
+    await processMessage(connection, shellSnapshots, toolStarts, SESSION_ID, {
+      id: "msg_1",
+      type: "synthetic",
+      sessionID: SESSION_ID,
+      text: "note",
+      time: { created: Date.now() },
+    })
     expect(sessionUpdates).toHaveLength(0)
   })
 
   test("sends agent_message_chunk for assistant text content", async () => {
     const { connection, sessionUpdates, shellSnapshots, toolStarts } = createTestAgent()
-    await processMessage(connection, shellSnapshots, toolStarts, SESSION_ID, assistantMessage([textContent({ text: "hi" })]))
+    await processMessage(
+      connection,
+      shellSnapshots,
+      toolStarts,
+      SESSION_ID,
+      assistantMessage([textContent({ text: "hi" })]),
+    )
     expect(sessionUpdates).toHaveLength(1)
     expect(sessionUpdates[0].update.sessionUpdate).toBe("agent_message_chunk")
     expect(sessionUpdates[0].update.content).toEqual({ type: "text", text: "hi" })
@@ -127,7 +133,13 @@ describe("Agent.processMessage", () => {
 
   test("skips empty text content", async () => {
     const { connection, sessionUpdates, shellSnapshots, toolStarts } = createTestAgent()
-    await processMessage(connection, shellSnapshots, toolStarts, SESSION_ID, assistantMessage([textContent({ text: "" })]))
+    await processMessage(
+      connection,
+      shellSnapshots,
+      toolStarts,
+      SESSION_ID,
+      assistantMessage([textContent({ text: "" })]),
+    )
     expect(sessionUpdates).toHaveLength(0)
   })
 
@@ -253,7 +265,13 @@ describe("Agent.processMessage", () => {
 
   test("sends tool_call then tool_call_update for completed tool content", async () => {
     const { connection, sessionUpdates, shellSnapshots, toolStarts } = createTestAgent()
-    await processMessage(connection, shellSnapshots, toolStarts, SESSION_ID, assistantMessage([toolContent("completed")]))
+    await processMessage(
+      connection,
+      shellSnapshots,
+      toolStarts,
+      SESSION_ID,
+      assistantMessage([toolContent("completed")]),
+    )
     expect(sessionUpdates).toHaveLength(2)
     expect(sessionUpdates[0].update.sessionUpdate).toBe("tool_call")
     expect(sessionUpdates[0].update.status).toBe("pending")
@@ -288,7 +306,9 @@ describe("Agent.processMessage", () => {
             status: "completed",
             input: {},
             structured: {},
-            content: [{ type: "text", text: JSON.stringify([{ content: "task 1", status: "pending", priority: "medium" }]) }],
+            content: [
+              { type: "text", text: JSON.stringify([{ content: "task 1", status: "pending", priority: "medium" }]) },
+            ],
           },
         }),
       ]),
@@ -326,25 +346,21 @@ describe("Agent.processMessage", () => {
 
   test("sends completed tool_call for shell messages", async () => {
     const { connection, sessionUpdates, shellSnapshots, toolStarts } = createTestAgent()
-    await processMessage(
-      connection,
-      shellSnapshots,
-      toolStarts,
-      SESSION_ID,
-      {
-        id: "msg_1",
-        type: "shell",
-        callID: "call_shell",
-        command: "echo hi",
-        output: "hi\n",
-        time: { created: Date.now(), completed: Date.now() },
-      } as any,
-    )
+    await processMessage(connection, shellSnapshots, toolStarts, SESSION_ID, {
+      id: "msg_1",
+      type: "shell",
+      callID: "call_shell",
+      command: "echo hi",
+      output: "hi\n",
+      time: { created: Date.now(), completed: Date.now() },
+    } as any)
     expect(sessionUpdates).toHaveLength(1)
     expect(sessionUpdates[0].update.sessionUpdate).toBe("tool_call")
     expect(sessionUpdates[0].update.status).toBe("completed")
     expect(sessionUpdates[0].update.toolCallId).toBe("call_shell")
     expect(sessionUpdates[0].update.rawInput).toEqual({ command: "echo hi" })
-    expect(sessionUpdates[0].update.content).toEqual([{ type: "content", content: { type: "text", text: "```\nhi\n\n```" } }])
+    expect(sessionUpdates[0].update.content).toEqual([
+      { type: "content", content: { type: "text", text: "```\nhi\n\n```" } },
+    ])
   })
 })

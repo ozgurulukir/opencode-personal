@@ -1,7 +1,12 @@
 import { describe, expect, test } from "bun:test"
 import { Effect, Exit } from "effect"
 import type { EffectBridge } from "../../src/effect/bridge"
-import { parseSubagentTitle, subagentAbortGuard, subagentResultText, subagentTitle } from "../../src/agent/subagent-spawn"
+import {
+  parseSubagentTitle,
+  subagentAbortGuard,
+  subagentResultText,
+  subagentTitle,
+} from "../../src/agent/subagent-spawn"
 
 describe("subagentResultText", () => {
   // Fallback strings are byte-identical to the ones previously inlined in V1
@@ -26,10 +31,7 @@ describe("subagentResultText", () => {
   })
 
   test("a non-text part's text field is ignored (e.g. reasoning parts carry text)", () => {
-    const out = subagentResultText([
-      { type: "reasoning", text: "internal monologue" },
-      { type: "tool" },
-    ])
+    const out = subagentResultText([{ type: "reasoning", text: "internal monologue" }, { type: "tool" }])
     expect(out).toBe("Subagent completed without producing a text response.")
   })
 

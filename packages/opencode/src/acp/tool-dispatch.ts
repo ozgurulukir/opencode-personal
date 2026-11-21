@@ -1,9 +1,4 @@
-import {
-  type AgentSideConnection,
-  type PlanEntry,
-  type ToolCallContent,
-  type ToolKind,
-} from "@agentclientprotocol/sdk"
+import { type AgentSideConnection, type PlanEntry, type ToolCallContent, type ToolKind } from "@agentclientprotocol/sdk"
 import * as Log from "@opencode-ai/core/util/log"
 import { Hash } from "@opencode-ai/core/util/hash"
 import { ShellID } from "@/tool/shell/id"
@@ -228,7 +223,8 @@ export async function handleToolSuccess(
   toolStarts.delete(props.callID)
   shellSnapshots.delete(props.callID)
   const kind = toToolKind(info.tool)
-  const output = textOutput(props.content) || (info.tool === ShellID.ToolID ? structuredShellOutput(props.structured) : undefined)
+  const output =
+    textOutput(props.content) || (info.tool === ShellID.ToolID ? structuredShellOutput(props.structured) : undefined)
   const content = completedToolContent(info.tool, info.input, props.content, kind, output)
 
   if (info.tool === "todowrite") {

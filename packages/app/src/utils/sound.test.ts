@@ -8,7 +8,7 @@ mock.module("./sound", () => {
     soundSrc: async (id: string | undefined) => {
       if (!id || id === "invalid") return undefined
       return "test-sound.aac"
-    }
+    },
   }
 })
 
@@ -83,7 +83,7 @@ describe("sound utilities", () => {
     })
 
     test("handles play rejection gracefully", () => {
-       globalThis.Audio = class AudioMock {
+      globalThis.Audio = class AudioMock {
         src: string
         constructor(src: string) {
           this.src = src
@@ -114,7 +114,7 @@ describe("sound utilities", () => {
       expect(SOUND_OPTIONS).toBeInstanceOf(Array)
       expect(SOUND_OPTIONS.length).toBeGreaterThan(0)
 
-      SOUND_OPTIONS.forEach(option => {
+      SOUND_OPTIONS.forEach((option) => {
         expect(option).toHaveProperty("id")
         expect(option).toHaveProperty("label")
         expect(typeof option.id).toBe("string")

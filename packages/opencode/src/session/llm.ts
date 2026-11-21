@@ -214,9 +214,11 @@ const live: Layer.Layer<
             : undefined,
           topP: input.agent.topP ?? ProviderTransform.topP(input.model),
           topK: ProviderTransform.topK(input.model),
-          maxOutputTokens: input.maxOutputTokens ?? (ProviderTransform.supportsMaxOutputTokens(input.model)
-            ? ProviderTransform.maxOutputTokens(input.model)
-            : undefined),
+          maxOutputTokens:
+            input.maxOutputTokens ??
+            (ProviderTransform.supportsMaxOutputTokens(input.model)
+              ? ProviderTransform.maxOutputTokens(input.model)
+              : undefined),
           options,
         },
       )

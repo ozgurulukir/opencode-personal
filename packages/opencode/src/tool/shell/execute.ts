@@ -309,10 +309,13 @@ export function createShellTool(
           ...(result.exitCode !== undefined && result.exitCode !== null && result.exitCode !== 0
             ? [`Exit code: ${result.exitCode}`]
             : []),
-          ...(exit.kind === "timeout" ? [`shell tool terminated command after exceeding timeout ${input.timeout} ms.`] : []),
+          ...(exit.kind === "timeout"
+            ? [`shell tool terminated command after exceeding timeout ${input.timeout} ms.`]
+            : []),
           ...(exit.kind === "abort" ? ["User aborted the command"] : []),
         ]
-        const finalOutput = metadata.length > 0 ? `${output}\n\n<shell_metadata>\n${metadata.join("\n")}\n</shell_metadata>` : output
+        const finalOutput =
+          metadata.length > 0 ? `${output}\n\n<shell_metadata>\n${metadata.join("\n")}\n</shell_metadata>` : output
         if (ctx.extra?.sync) {
           yield* ctx.extra.sync.run(SessionEvent.Shell.Ended.Sync, {
             sessionID: ctx.sessionID,

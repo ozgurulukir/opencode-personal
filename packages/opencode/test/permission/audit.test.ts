@@ -21,37 +21,52 @@ describe("Permission.evaluateWithSource", () => {
   })
 
   test("last matching ruleset wins (source reflects winning ruleset)", () => {
-    const result = Permission.evaluateWithSource("edit", "file.ts", {
-      source: "agent",
-      rules: [{ permission: "edit", pattern: "*", action: "deny" }],
-    }, {
-      source: "session",
-      rules: [{ permission: "edit", pattern: "file.ts", action: "allow" }],
-    })
+    const result = Permission.evaluateWithSource(
+      "edit",
+      "file.ts",
+      {
+        source: "agent",
+        rules: [{ permission: "edit", pattern: "*", action: "deny" }],
+      },
+      {
+        source: "session",
+        rules: [{ permission: "edit", pattern: "file.ts", action: "allow" }],
+      },
+    )
     expect(result.action).toBe("allow")
     expect(result.source).toBe("session")
   })
 
   test("agent deny wins over session allow when agent comes last", () => {
-    const result = Permission.evaluateWithSource("edit", "file.ts", {
-      source: "session",
-      rules: [{ permission: "edit", pattern: "file.ts", action: "allow" }],
-    }, {
-      source: "agent",
-      rules: [{ permission: "edit", pattern: "*", action: "deny" }],
-    })
+    const result = Permission.evaluateWithSource(
+      "edit",
+      "file.ts",
+      {
+        source: "session",
+        rules: [{ permission: "edit", pattern: "file.ts", action: "allow" }],
+      },
+      {
+        source: "agent",
+        rules: [{ permission: "edit", pattern: "*", action: "deny" }],
+      },
+    )
     expect(result.action).toBe("deny")
     expect(result.source).toBe("agent")
   })
 
   test("multiple rulesets with no match returns ask", () => {
-    const result = Permission.evaluateWithSource("task", "unknown", {
-      source: "agent",
-      rules: [{ permission: "task", pattern: "code-reviewer", action: "deny" }],
-    }, {
-      source: "session",
-      rules: [{ permission: "task", pattern: "general", action: "allow" }],
-    })
+    const result = Permission.evaluateWithSource(
+      "task",
+      "unknown",
+      {
+        source: "agent",
+        rules: [{ permission: "task", pattern: "code-reviewer", action: "deny" }],
+      },
+      {
+        source: "session",
+        rules: [{ permission: "task", pattern: "general", action: "allow" }],
+      },
+    )
     expect(result.action).toBe("ask")
     expect(result.source).toBeUndefined()
   })

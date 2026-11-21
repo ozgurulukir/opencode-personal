@@ -77,14 +77,15 @@ All event handlers follow this signature:
 
 ```ts
 export function handleEventName(
-  data: SessionData,      // mutated in-place
-  event: SpecificEvent,   // typed event
-  sessionID: string,      // filter context
-  ...options              // thinking, limits, etc.
-): SessionDataOutput | undefined  // undefined = no footer update
+  data: SessionData, // mutated in-place
+  event: SpecificEvent, // typed event
+  sessionID: string, // filter context
+  ...options // thinking, limits, etc.
+): SessionDataOutput | undefined // undefined = no footer update
 ```
 
 **Key constraints:**
+
 - Handlers **MUST NOT** call footer APIs directly
 - Handlers **MUST NOT** perform IO (filesystem, network)
 - Handlers **MUST** return `undefined` if no footer update is needed
@@ -93,17 +94,20 @@ export function handleEventName(
 ## Testing Strategy
 
 ### Unit Tests (handlers, utils)
+
 - Import functions directly
 - Construct minimal `SessionData` via `createSessionData()`
 - Assert on returned `SessionDataOutput`
 - No mocks needed (pure functions)
 
 ### Characterization Tests (private functions)
+
 - Test internal functions before refactoring
 - Lock down behavior with exhaustive edge cases
 - Name: `*.characterization.test.ts`
 
 ### Integration Tests (event loop, transport)
+
 - Use `makeCtx()` helper to construct `LoopContext`
 - Mock `client`, `emit`, `tool` as needed
 - Use `asyncStream()` to wrap event arrays

@@ -223,9 +223,7 @@ describe("webfetch limits", () => {
         await expect(
           WebFetchTool.pipe(
             Effect.flatMap((info) => info.init()),
-            Effect.flatMap((tool) =>
-              tool.execute({ url: "http://localhost/large", format: "text" }, ctx),
-            ),
+            Effect.flatMap((tool) => tool.execute({ url: "http://localhost/large", format: "text" }, ctx)),
             Effect.provideService(HttpClient.HttpClient, client),
             Effect.provide(Layer.mergeAll(Truncate.defaultLayer, Agent.defaultLayer, config)),
             Effect.runPromise,
@@ -253,9 +251,7 @@ describe("tool.webfetch", () => {
         const { WebFetchTool } = await import("../../src/tool/webfetch")
         const result = await WebFetchTool.pipe(
           Effect.flatMap((info) => info.init()),
-          Effect.flatMap((tool) =>
-            tool.execute({ url: "http://localhost/image.png", format: "markdown" }, ctx),
-          ),
+          Effect.flatMap((tool) => tool.execute({ url: "http://localhost/image.png", format: "markdown" }, ctx)),
           Effect.provideService(HttpClient.HttpClient, imageClient),
           Effect.provide(Layer.mergeAll(Truncate.defaultLayer, Agent.defaultLayer)),
           Effect.runPromise,
@@ -293,9 +289,7 @@ describe("tool.webfetch", () => {
         const { WebFetchTool } = await import("../../src/tool/webfetch")
         const result = await WebFetchTool.pipe(
           Effect.flatMap((info) => info.init()),
-          Effect.flatMap((tool) =>
-            tool.execute({ url: "http://localhost/image.svg", format: "html" }, ctx),
-          ),
+          Effect.flatMap((tool) => tool.execute({ url: "http://localhost/image.svg", format: "html" }, ctx)),
           Effect.provideService(HttpClient.HttpClient, svgClient),
           Effect.provide(Layer.mergeAll(Truncate.defaultLayer, Agent.defaultLayer)),
           Effect.runPromise,

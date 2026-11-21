@@ -18,11 +18,7 @@ export type SessionInfo = {
   }
 }
 
-export function formatTranscript(
-  session: SessionInfo,
-  messages: SessionMessage[],
-  options: TranscriptOptions,
-): string {
+export function formatTranscript(session: SessionInfo, messages: SessionMessage[], options: TranscriptOptions): string {
   const providers = Model.index(options.providers)
   let transcript = `# ${session.title}\n\n`
   transcript += `**Session ID:** ${session.id}\n`
@@ -86,7 +82,12 @@ export function formatAssistantHeader(
   return `## Assistant (${Locale.titlecase(msg.agent)} · ${modelName}${duration ? ` · ${duration}` : ""})\n\n`
 }
 
-function toolOutput(state: Extract<Extract<SessionMessageAssistant["content"][number], { type: "tool" }>["state"], { status: "completed" }>): string {
+function toolOutput(
+  state: Extract<
+    Extract<SessionMessageAssistant["content"][number], { type: "tool" }>["state"],
+    { status: "completed" }
+  >,
+): string {
   return state.content
     .filter((item) => item.type === "text")
     .map((item) => item.text)

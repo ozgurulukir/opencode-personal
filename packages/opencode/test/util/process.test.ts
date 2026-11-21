@@ -14,9 +14,7 @@ async function node<T>(script: string, fn: (command: string[]) => Promise<T>) {
 
 describe("util.process", () => {
   test("captures stdout and stderr", async () => {
-    const out = await node('process.stdout.write("out");process.stderr.write("err")', (command) =>
-      Process.run(command),
-    )
+    const out = await node('process.stdout.write("out");process.stderr.write("err")', (command) => Process.run(command))
     expect(out.code).toBe(0)
     expect(out.stdout.toString()).toBe("out")
     expect(out.stderr.toString()).toBe("err")

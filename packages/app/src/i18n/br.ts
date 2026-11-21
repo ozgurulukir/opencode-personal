@@ -574,7 +574,8 @@ export const dict = {
   "settings.general.row.language.title": "Idioma",
   "settings.general.row.language.description": "Alterar o idioma de exibição do OpenCode",
   "settings.general.row.shell.title": "Shell do terminal",
-  "settings.general.row.shell.description": "Escolha o shell usado no seu terminal. Shells compatíveis também são usados para chamadas de ferramentas do agente.",
+  "settings.general.row.shell.description":
+    "Escolha o shell usado no seu terminal. Shells compatíveis também são usados para chamadas de ferramentas do agente.",
   "settings.general.row.shell.autoDefault": "Auto (Padrão)",
   "settings.general.row.shell.terminalOnly": "somente o terminal",
   "settings.general.row.appearance.title": "Aparência",
@@ -595,11 +596,14 @@ export const dict = {
   "settings.general.row.followup.option.queue": "Fila",
   "settings.general.row.followup.option.steer": "Orientar",
   "settings.general.row.showFileTree.title": "Árvore de arquivos",
-  "settings.general.row.showFileTree.description": "Mostrar o interruptor e o painel da árvore de arquivos nas sessões desktop",
+  "settings.general.row.showFileTree.description":
+    "Mostrar o interruptor e o painel da árvore de arquivos nas sessões desktop",
   "settings.general.row.showNavigation.title": "Controles de navegação",
-  "settings.general.row.showNavigation.description": "Mostrar os botões de voltar e avançar na barra de título do desktop",
+  "settings.general.row.showNavigation.description":
+    "Mostrar os botões de voltar e avançar na barra de título do desktop",
   "settings.general.row.showSearch.title": "Paleta de comandos",
-  "settings.general.row.showSearch.description": "Mostrar o botão de pesquisa e a paleta de comandos na barra de título do desktop",
+  "settings.general.row.showSearch.description":
+    "Mostrar o botão de pesquisa e a paleta de comandos na barra de título do desktop",
   "settings.general.row.showTerminal.title": "Terminal",
   "settings.general.row.showTerminal.description": "Mostrar o botão do terminal na barra de título do desktop",
   "settings.general.row.showStatus.title": "Status do servidor",

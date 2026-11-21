@@ -1,14 +1,4 @@
-import {
-  type Info,
-  NearestRoot,
-  spawn,
-  which,
-  path,
-  log,
-  Flag,
-  Module,
-  Npm,
-} from "./shared"
+import { type Info, NearestRoot, spawn, which, path, log, Flag, Module, Npm } from "./shared"
 
 export const Astro: Info = {
   id: "astro",

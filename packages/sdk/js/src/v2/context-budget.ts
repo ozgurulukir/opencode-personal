@@ -89,11 +89,7 @@ export function usable(cfg: CompactionSettingsInput, model: BudgetModel) {
   return usableWith(cfg, model, compactionConfig(cfg))
 }
 
-function usableWith(
-  cfg: CompactionSettingsInput,
-  model: BudgetModel,
-  cc: ReturnType<typeof compactionConfig>,
-) {
+function usableWith(cfg: CompactionSettingsInput, model: BudgetModel, cc: ReturnType<typeof compactionConfig>) {
   const context = model.limit.context
   if (!cc.contextLimit && context === 0) return 0
 

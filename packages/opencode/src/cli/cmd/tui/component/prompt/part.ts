@@ -17,21 +17,17 @@ export function fromUserMessage(msg: SessionMessageUser): PromptInfo {
   return {
     input: msg.text,
     parts: [
-      ...(msg.files ?? []).map(
-        (f): Item => ({
-          type: "file",
-          url: f.uri,
-          mime: f.mime,
-          filename: f.name,
-        }),
-      ),
-      ...(msg.agents ?? []).map(
-        (a): Item => ({
-          type: "agent",
-          name: a.name,
-          source: a.source ? { value: a.source.text, start: a.source.start, end: a.source.end } : undefined,
-        }),
-      ),
+      ...(msg.files ?? []).map((f): Item => ({
+        type: "file",
+        url: f.uri,
+        mime: f.mime,
+        filename: f.name,
+      })),
+      ...(msg.agents ?? []).map((a): Item => ({
+        type: "agent",
+        name: a.name,
+        source: a.source ? { value: a.source.text, start: a.source.start, end: a.source.end } : undefined,
+      })),
     ],
   }
 }

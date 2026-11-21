@@ -708,20 +708,14 @@ export function latest(msgs: WithParts[]) {
     const info = msg.info
     if (info.role === "user" && (!user || info.id > user.id)) user = info
     if (info.role === "assistant" && (!assistant || info.id > assistant.id)) assistant = info
-    if (
-      info.role === "assistant" &&
-      info.finish &&
-      (!finished || info.id > finished.id)
-    ) {
+    if (info.role === "assistant" && info.finish && (!finished || info.id > finished.id)) {
       finished = info
     }
   }
   const tasks = msgs.flatMap((m) =>
     finished && m.info.id <= finished.id
       ? []
-      : m.parts.filter(
-          (p): p is CompactionPart | SubtaskPart => p.type === "compaction" || p.type === "subtask",
-        ),
+      : m.parts.filter((p): p is CompactionPart | SubtaskPart => p.type === "compaction" || p.type === "subtask"),
   )
   return { user, assistant, finished, tasks }
 }
@@ -734,14 +728,8 @@ function handleOutputLengthError(e: unknown): NonNullable<Assistant["error"]> {
   return e as NonNullable<Assistant["error"]>
 }
 
-function handleLoadAPIKeyError(
-  e: LoadAPIKeyError,
-  providerID: ProviderID,
-): NonNullable<Assistant["error"]> {
-  return new AuthError(
-    { providerID, message: e.message },
-    { cause: e },
-  ).toObject()
+function handleLoadAPIKeyError(e: LoadAPIKeyError, providerID: ProviderID): NonNullable<Assistant["error"]> {
+  return new AuthError({ providerID, message: e.message }, { cause: e }).toObject()
 }
 
 function handleECONNRESET(e: SystemError): NonNullable<Assistant["error"]> {
@@ -759,10 +747,7 @@ function handleECONNRESET(e: SystemError): NonNullable<Assistant["error"]> {
   ).toObject()
 }
 
-function handleZlibError(
-  e: FetchDecompressionError,
-  aborted?: boolean,
-): NonNullable<Assistant["error"]> {
+function handleZlibError(e: FetchDecompressionError, aborted?: boolean): NonNullable<Assistant["error"]> {
   if (aborted) {
     return new AbortedError({ message: e.message }, { cause: e }).toObject()
   }
@@ -779,10 +764,7 @@ function handleZlibError(
   ).toObject()
 }
 
-function handleAPICallError(
-  e: APICallError,
-  providerID: ProviderID,
-): NonNullable<Assistant["error"]> {
+function handleAPICallError(e: APICallError, providerID: ProviderID): NonNullable<Assistant["error"]> {
   const parsed = ProviderError.parseAPICallError({
     providerID,
     error: e,

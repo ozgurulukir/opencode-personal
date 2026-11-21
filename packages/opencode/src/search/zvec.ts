@@ -79,10 +79,7 @@ function toZvecError(op: string, e: unknown): ZvecError {
   if (e instanceof ZvecError) return e
   const msg = e instanceof Error ? e.message : String(e)
   const code = isZVecError(e) ? e.code : op
-  if (
-    op === "OPEN_FAILED" &&
-    isWriteLockError({ code, message: msg })
-  ) {
+  if (op === "OPEN_FAILED" && isWriteLockError({ code, message: msg })) {
     return new ZvecError(
       code,
       "The workspace search index is busy because another opencode process is writing it. Close the other process or retry shortly.",
@@ -427,30 +424,26 @@ export class ZvecIndex {
         })
         self.collection = null
       }
-      yield* self.fs
-        .remove(self.path, { recursive: true, force: true })
-        .pipe(
-          Effect.catch((e) =>
-            Effect.sync(() =>
-              log.warn("zvec reset: index dir removal failed", {
-                path: self.path,
-                error: e instanceof Error ? e.message : String(e),
-              }),
-            ),
+      yield* self.fs.remove(self.path, { recursive: true, force: true }).pipe(
+        Effect.catch((e) =>
+          Effect.sync(() =>
+            log.warn("zvec reset: index dir removal failed", {
+              path: self.path,
+              error: e instanceof Error ? e.message : String(e),
+            }),
           ),
-        )
-      yield* self.fs
-        .remove(manifestPathFor(self.path), { force: true })
-        .pipe(
-          Effect.catch((e) =>
-            Effect.sync(() =>
-              log.warn("zvec reset: manifest removal failed", {
-                path: manifestPathFor(self.path),
-                error: e instanceof Error ? e.message : String(e),
-              }),
-            ),
+        ),
+      )
+      yield* self.fs.remove(manifestPathFor(self.path), { force: true }).pipe(
+        Effect.catch((e) =>
+          Effect.sync(() =>
+            log.warn("zvec reset: manifest removal failed", {
+              path: manifestPathFor(self.path),
+              error: e instanceof Error ? e.message : String(e),
+            }),
           ),
-        )
+        ),
+      )
     })
   }
 

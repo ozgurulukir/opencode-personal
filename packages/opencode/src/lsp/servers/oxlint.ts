@@ -1,13 +1,4 @@
-import {
-  type Info,
-  NearestRoot,
-  spawn,
-  which,
-  path,
-  log,
-  Filesystem,
-  text,
-} from "./shared"
+import { type Info, NearestRoot, spawn, which, path, log, Filesystem, text } from "./shared"
 
 export const Oxlint: Info = {
   id: "oxlint",

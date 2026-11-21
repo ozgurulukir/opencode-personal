@@ -642,7 +642,8 @@ export const dict = {
   "settings.general.row.language.title": "Idioma",
   "settings.general.row.language.description": "Cambiar el idioma de visualización para OpenCode",
   "settings.general.row.shell.title": "Shell de la terminal",
-  "settings.general.row.shell.description": "Elige el shell que se usa en tu terminal. Los shells compatibles también se usan para las llamadas de herramientas del agente.",
+  "settings.general.row.shell.description":
+    "Elige el shell que se usa en tu terminal. Los shells compatibles también se usan para las llamadas de herramientas del agente.",
   "settings.general.row.shell.autoDefault": "Auto (Predeterminado)",
   "settings.general.row.shell.terminalOnly": "solo terminal",
   "settings.general.row.appearance.title": "Apariencia",
@@ -663,15 +664,20 @@ export const dict = {
   "settings.general.row.followup.option.queue": "Cola",
   "settings.general.row.followup.option.steer": "Dirigir",
   "settings.general.row.showFileTree.title": "Árbol de archivos",
-  "settings.general.row.showFileTree.description": "Mostrar el interruptor y el panel del árbol de archivos en las sesiones de escritorio",
+  "settings.general.row.showFileTree.description":
+    "Mostrar el interruptor y el panel del árbol de archivos en las sesiones de escritorio",
   "settings.general.row.showNavigation.title": "Controles de navegación",
-  "settings.general.row.showNavigation.description": "Mostrar los botones de volver y avanzar en la barra de título del escritorio",
+  "settings.general.row.showNavigation.description":
+    "Mostrar los botones de volver y avanzar en la barra de título del escritorio",
   "settings.general.row.showSearch.title": "Paleta de comandos",
-  "settings.general.row.showSearch.description": "Mostrar el botón de búsqueda y la paleta de comandos en la barra de título del escritorio",
+  "settings.general.row.showSearch.description":
+    "Mostrar el botón de búsqueda y la paleta de comandos en la barra de título del escritorio",
   "settings.general.row.showTerminal.title": "Terminal",
-  "settings.general.row.showTerminal.description": "Mostrar el botón de la terminal en la barra de título del escritorio",
+  "settings.general.row.showTerminal.description":
+    "Mostrar el botón de la terminal en la barra de título del escritorio",
   "settings.general.row.showStatus.title": "Estado del servidor",
-  "settings.general.row.showStatus.description": "Mostrar el botón de estado del servidor en la barra de título del escritorio",
+  "settings.general.row.showStatus.description":
+    "Mostrar el botón de estado del servidor en la barra de título del escritorio",
   "settings.general.row.reasoningSummaries.title": "Mostrar resúmenes de razonamiento",
   "settings.general.row.reasoningSummaries.description":
     "Mostrar resúmenes del razonamiento del modelo en la línea de tiempo",

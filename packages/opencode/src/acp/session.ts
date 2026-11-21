@@ -47,9 +47,7 @@ export class ACPSessionManager {
   }
 
   private async loadFromServer(sessionId: string): Promise<ACPSessionState> {
-    const session = await this.sdk.v2.session
-      .get({ sessionID: sessionId }, { throwOnError: true })
-      .then((x) => x.data!)
+    const session = await this.sdk.v2.session.get({ sessionID: sessionId }, { throwOnError: true }).then((x) => x.data!)
 
     const state: ACPSessionState = {
       id: sessionId,

@@ -377,7 +377,7 @@ opencode-personal run --attach http://localhost:4096 "Explain async/await in Jav
 | <nobr><code>{"--password"}</code></nobr>                     | `-p`  | Basic auth password (defaults to `OPENCODE_SERVER_PASSWORD`)               |
 | <nobr><code>{"--username"}</code></nobr>                     | `-u`  | Basic auth username (defaults to `OPENCODE_SERVER_USERNAME` or `opencode`) |
 | <nobr><code>{"--dir"}</code></nobr>                          |       | Directory to run in, or path on the remote server when attaching           |
-| <nobr><code>{"--port"}</code></nobr>                         |       | Port for the local server (tries 4096, then falls back to a free port)       |
+| <nobr><code>{"--port"}</code></nobr>                         |       | Port for the local server (tries 4096, then falls back to a free port)     |
 | <nobr><code>{"--variant"}</code></nobr>                      |       | Model variant (provider-specific reasoning effort)                         |
 | <nobr><code>{"--thinking"}</code></nobr>                     |       | Show thinking blocks                                                       |
 | <nobr><code>{"--dangerously-skip-permissions"}</code></nobr> |       | Auto-approve permissions that are not explicitly denied (dangerous!)       |
@@ -659,7 +659,7 @@ OpenCode can be configured using environment variables.
 | `OPENCODE_CONFIG_CONTENT`             | string  | Inline json config content                        |
 | `OPENCODE_DISABLE_PRUNE`              | boolean | Disable pruning of old data                       |
 | `OPENCODE_DISABLE_TERMINAL_TITLE`     | boolean | Disable automatic terminal title updates          |
-| `OPENCODE_SHOW_TTFD`                  | boolean | Show time to first token diagnostics               |
+| `OPENCODE_SHOW_TTFD`                  | boolean | Show time to first token diagnostics              |
 | `OPENCODE_PERMISSION`                 | string  | Inlined json permissions config                   |
 | `OPENCODE_DISABLE_DEFAULT_PLUGINS`    | boolean | Disable default plugins                           |
 | `OPENCODE_DISABLE_LSP_DOWNLOAD`       | boolean | Disable automatic LSP server downloads            |
@@ -681,13 +681,13 @@ OpenCode can be configured using environment variables.
 | `OPENCODE_MODELS_PATH`                | string  | Read models configuration from a local file       |
 | `OPENCODE_DB`                         | string  | Override the SQLite database path                 |
 | `OPENCODE_DISABLE_CHANNEL_DB`         | boolean | Use the shared database for every build channel   |
-| `OPENCODE_SKIP_MIGRATIONS`            | boolean | Skip database migrations                           |
+| `OPENCODE_SKIP_MIGRATIONS`            | boolean | Skip database migrations                          |
 | `OPENCODE_STRICT_CONFIG_DEPS`         | boolean | Fail on unresolved config dependencies            |
-| `OPENCODE_DISABLE_PROJECT_CONFIG`     | boolean | Ignore project-local config files                |
+| `OPENCODE_DISABLE_PROJECT_CONFIG`     | boolean | Ignore project-local config files                 |
 | `OPENCODE_DISABLE_EMBEDDED_WEB_UI`    | boolean | Disable the embedded web UI                       |
 | `OPENCODE_PURE`                       | boolean | Run without external plugins                      |
 | `OPENCODE_PLUGIN_META_FILE`           | string  | Path to plugin metadata                           |
-| `OPENCODE_WORKSPACE_ID`               | string  | Select a workspace                               |
+| `OPENCODE_WORKSPACE_ID`               | string  | Select a workspace                                |
 
 ---
 
@@ -695,23 +695,23 @@ OpenCode can be configured using environment variables.
 
 These environment variables enable experimental features that may change or be removed.
 
-| Variable                                        | Type    | Description                             |
-| ----------------------------------------------- | ------- | --------------------------------------- |
-| `OPENCODE_EXPERIMENTAL`                         | boolean | Enable the experimental feature bundle  |
-| `OPENCODE_EXPERIMENTAL_ICON_DISCOVERY`          | boolean | Enable icon discovery                   |
-| `OPENCODE_EXPERIMENTAL_DISABLE_COPY_ON_SELECT`  | boolean | Disable copy on select in TUI           |
-| `OPENCODE_EXPERIMENTAL_BASH_DEFAULT_TIMEOUT_MS` | number  | Default timeout for bash commands in ms |
-| `OPENCODE_EXPERIMENTAL_OUTPUT_TOKEN_MAX`        | number  | Max output tokens for LLM responses     |
-| `OPENCODE_EXPERIMENTAL_FILEWATCHER`             | boolean | Enable file watcher for entire dir      |
-| `OPENCODE_EXPERIMENTAL_OXFMT`                   | boolean | Enable oxfmt formatter                  |
-| `OPENCODE_EXPERIMENTAL_LSP_TOOL`                | boolean | Enable experimental LSP tool            |
-| `OPENCODE_EXPERIMENTAL_DISABLE_FILEWATCHER`     | boolean | Disable file watcher                    |
-| `OPENCODE_EXPERIMENTAL_EXA`                     | boolean | Enable experimental Exa features        |
-| `OPENCODE_EXPERIMENTAL_LSP_TY`                  | boolean | Enable TY LSP for python files          |
-| `OPENCODE_EXPERIMENTAL_MARKDOWN`                | boolean | Enable experimental markdown features   |
-| `OPENCODE_EXPERIMENTAL_PLAN_MODE`               | boolean | Enable plan mode                        |
-| `OPENCODE_EXPERIMENTAL_SCOUT`                   | boolean | Enable the Scout research agent        |
-| `OPENCODE_ENABLE_PARALLEL`                      | boolean | Enable parallel web search            |
-| `OPENCODE_EXPERIMENTAL_PARALLEL`                | boolean | Alias for parallel web search         |
-| `OPENCODE_EXPERIMENTAL_WORKSPACES`              | boolean | Enable experimental workspaces         |
+| Variable                                        | Type    | Description                                                           |
+| ----------------------------------------------- | ------- | --------------------------------------------------------------------- |
+| `OPENCODE_EXPERIMENTAL`                         | boolean | Enable the experimental feature bundle                                |
+| `OPENCODE_EXPERIMENTAL_ICON_DISCOVERY`          | boolean | Enable icon discovery                                                 |
+| `OPENCODE_EXPERIMENTAL_DISABLE_COPY_ON_SELECT`  | boolean | Disable copy on select in TUI                                         |
+| `OPENCODE_EXPERIMENTAL_BASH_DEFAULT_TIMEOUT_MS` | number  | Default timeout for bash commands in ms                               |
+| `OPENCODE_EXPERIMENTAL_OUTPUT_TOKEN_MAX`        | number  | Max output tokens for LLM responses                                   |
+| `OPENCODE_EXPERIMENTAL_FILEWATCHER`             | boolean | Enable file watcher for entire dir                                    |
+| `OPENCODE_EXPERIMENTAL_OXFMT`                   | boolean | Enable oxfmt formatter                                                |
+| `OPENCODE_EXPERIMENTAL_LSP_TOOL`                | boolean | Enable experimental LSP tool                                          |
+| `OPENCODE_EXPERIMENTAL_DISABLE_FILEWATCHER`     | boolean | Disable file watcher                                                  |
+| `OPENCODE_EXPERIMENTAL_EXA`                     | boolean | Enable experimental Exa features                                      |
+| `OPENCODE_EXPERIMENTAL_LSP_TY`                  | boolean | Enable TY LSP for python files                                        |
+| `OPENCODE_EXPERIMENTAL_MARKDOWN`                | boolean | Enable experimental markdown features                                 |
+| `OPENCODE_EXPERIMENTAL_PLAN_MODE`               | boolean | Enable plan mode                                                      |
+| `OPENCODE_EXPERIMENTAL_SCOUT`                   | boolean | Enable the Scout research agent                                       |
+| `OPENCODE_ENABLE_PARALLEL`                      | boolean | Enable parallel web search                                            |
+| `OPENCODE_EXPERIMENTAL_PARALLEL`                | boolean | Alias for parallel web search                                         |
+| `OPENCODE_EXPERIMENTAL_WORKSPACES`              | boolean | Enable experimental workspaces                                        |
 | `OPENCODE_EXPERIMENTAL_CUSTOMIZE_SKILL`         | boolean | Enable skill customization (on by default in dev/beta/local channels) |

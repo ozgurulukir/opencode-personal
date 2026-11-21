@@ -1,5 +1,10 @@
 import { describe, expect, test } from "bun:test"
-import { latestAssistantUsage, totalAssistantCost, type UsageConfig, type UsageProvider } from "../../../../src/cli/cmd/tui/context-usage.shared"
+import {
+  latestAssistantUsage,
+  totalAssistantCost,
+  type UsageConfig,
+  type UsageProvider,
+} from "../../../../src/cli/cmd/tui/context-usage.shared"
 import { isOverflow, used as budgetUsed } from "@opencode-ai/sdk/v2/context-budget"
 import type { SessionMessage, SessionMessageAssistant, SessionMessageUser } from "@opencode-ai/sdk/v2"
 
@@ -98,7 +103,9 @@ describe("latestAssistantUsage", () => {
   })
 
   test("numerator reconstructs the provider total (reasoning included, like the trigger)", () => {
-    const withReasoning = [assistant({ tokens: { input: 100, output: 50, reasoning: 999, cache: { read: 0, write: 0 } } })]
+    const withReasoning = [
+      assistant({ tokens: { input: 100, output: 50, reasoning: 999, cache: { read: 0, write: 0 } } }),
+    ]
     expect(latestAssistantUsage(withReasoning, [provider])?.tokens).toBe(100 + 50 + 999)
   })
 
@@ -136,7 +143,10 @@ describe("latestAssistantUsage", () => {
 
   test("returns undefined when all completed assistants have zero total tokens", () => {
     const messages = [
-      assistant({ time: { created: 1000, completed: 1000 }, tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } } }),
+      assistant({
+        time: { created: 1000, completed: 1000 },
+        tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+      }),
     ]
     expect(latestAssistantUsage(messages, [provider])).toBeUndefined()
   })
@@ -160,10 +170,14 @@ describe("display percent agrees with the compaction trigger", () => {
         assistant({ tokens: { input: tokens - 1, output: 1, reasoning: 0, cache: { read: 0, write: 0 } } }),
       ]
       const percent = latestAssistantUsage(messages, [provider], config)?.percent
-      const overflow = isOverflow(config ?? {}, { input: tokens, output: 0, cache: { read: 0, write: 0 } }, {
-        id: "claude-3-5-sonnet",
-        limit: { context: 200000, output: 32000 },
-      })
+      const overflow = isOverflow(
+        config ?? {},
+        { input: tokens, output: 0, cache: { read: 0, write: 0 } },
+        {
+          id: "claude-3-5-sonnet",
+          limit: { context: 200000, output: 32000 },
+        },
+      )
       expect(percent).not.toBeNull()
       // Display percent rounds to the nearest integer, so it can read 100%
       // marginally below the exact threshold. The guaranteed invariant is
@@ -194,18 +208,18 @@ describe("display percent agrees with the compaction trigger", () => {
     const display = latestAssistantUsage([assistant({ tokens })], [provider])
     expect(display?.percent).toBeGreaterThanOrEqual(100)
     expect(
-      isOverflow({}, { ...tokens, total: 168_000 }, { id: "claude-3-5-sonnet", limit: { context: 200_000, output: 32_000 } }),
+      isOverflow(
+        {},
+        { ...tokens, total: 168_000 },
+        { id: "claude-3-5-sonnet", limit: { context: 200_000, output: 32_000 } },
+      ),
     ).toBe(true)
   })
 })
 
 describe("totalAssistantCost", () => {
   test("sums assistant costs only, ignores user messages", () => {
-    const messages = [
-      user("hello"),
-      assistant({ cost: 0.01 }),
-      assistant({ cost: 0.02 }),
-    ]
+    const messages = [user("hello"), assistant({ cost: 0.01 }), assistant({ cost: 0.02 })]
     expect(totalAssistantCost(messages)).toBeCloseTo(0.03)
   })
 

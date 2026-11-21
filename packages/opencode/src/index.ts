@@ -166,7 +166,8 @@ const cli = yargs(args)
       process.stderr.write("Database migration complete." + EOL)
       if (stats.errors.length > 0) {
         process.stderr.write(
-          `Warning: ${stats.errors.length} item(s) could not be migrated and could not be retried on the next boot; see the log file for details.` + EOL,
+          `Warning: ${stats.errors.length} item(s) could not be migrated and could not be retried on the next boot; see the log file for details.` +
+            EOL,
         )
       }
     }

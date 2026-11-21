@@ -26,10 +26,7 @@ const toModelMessages = (
   input: Parameters<typeof MessageV2.toModelMessagesEffect>[0],
   model: Parameters<typeof MessageV2.toModelMessagesEffect>[1],
   options?: Parameters<typeof MessageV2.toModelMessagesEffect>[2],
-) =>
-  Effect.runPromise(
-    MessageV2.toModelMessagesEffect(input, model, options).pipe(Effect.provide(EffectLogger.layer)),
-  )
+) => Effect.runPromise(MessageV2.toModelMessagesEffect(input, model, options).pipe(Effect.provide(EffectLogger.layer)))
 
 async function getModel(providerID: ProviderID, modelID: ModelID) {
   return AppRuntime.runPromise(

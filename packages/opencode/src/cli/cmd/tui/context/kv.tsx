@@ -55,7 +55,10 @@ export const { use: useKV, provider: KVProvider } = createSimpleContext({
             return result.get(name, defaultValue)
           },
           function setter(next: Setter<T>) {
-            result.set(name, typeof next === "function" ? (next as (prev: T) => T)(result.get(name, defaultValue)) : next)
+            result.set(
+              name,
+              typeof next === "function" ? (next as (prev: T) => T)(result.get(name, defaultValue)) : next,
+            )
           },
         ] as const
       },

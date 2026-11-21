@@ -8,8 +8,7 @@ import { cloneSelectedLineRange, formatSelectedLineLabel, lineInSelectedRange } 
 import { LineComment, LineCommentEditor, type LineCommentEditorProps } from "./line-comment"
 
 export type LineCommentAnnotationMeta<T> =
-  | { kind: "comment"; key: string; comment: T }
-  | { kind: "draft"; key: string; range: SelectedLineRange }
+  { kind: "comment"; key: string; comment: T } | { kind: "draft"; key: string; range: SelectedLineRange }
 
 export type LineCommentAnnotation<T> = {
   lineNumber: number
@@ -109,7 +108,6 @@ export function createLineCommentAnnotationRenderer<T>(props: {
   >()
 
   const mount = (meta: LineCommentAnnotationMeta<T>) => {
-
     if (typeof document === "undefined") return undefined
 
     const host = document.createElement("div")

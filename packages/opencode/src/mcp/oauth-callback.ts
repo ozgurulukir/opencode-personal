@@ -30,13 +30,17 @@ const HTML_SUCCESS = `<!DOCTYPE html>
 </html>`
 
 function escapeHtml(str: string): string {
-  return str.replace(/[&<>"']/g, (c) => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    '"': "&quot;",
-    "'": "&#39;",
-  }[c] || c))
+  return str.replace(
+    /[&<>"']/g,
+    (c) =>
+      ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;",
+      })[c] || c,
+  )
 }
 
 export { escapeHtml as _escapeHtml }

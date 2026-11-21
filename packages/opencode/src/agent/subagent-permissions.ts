@@ -59,10 +59,10 @@ export function taskDenyGate(input: {
  * TaskTool evaluates the gate through this variant; V2 uses the raw-input
  * `taskDenyGate`. Behavior is identical.
  */
-export function taskDenyGateFromRuleset(input: {
-  permissionRuleset?: Permission.Ruleset
-  subagentType: string
-}): { denied: boolean; message?: string } {
+export function taskDenyGateFromRuleset(input: { permissionRuleset?: Permission.Ruleset; subagentType: string }): {
+  denied: boolean
+  message?: string
+} {
   const rule = Permission.evaluate("task", input.subagentType, input.permissionRuleset ?? [])
   if (rule.action === "deny") {
     return {
@@ -211,7 +211,7 @@ export function checkNesting(input: {
 }): Effect.Effect<void, Error> {
   const max = input.max ?? MAX_SUBAGENT_NESTING_LEVELS
   return Effect.gen(function* () {
-    for (let depth = 0, currentParentID: SessionID | undefined = input.startID; currentParentID; ) {
+    for (let depth = 0, currentParentID: SessionID | undefined = input.startID; currentParentID;) {
       depth++
       if (depth > max) {
         return yield* Effect.fail(

@@ -251,7 +251,9 @@ function createGlobalSync() {
             directory,
             limit,
             list: (query) =>
-              sdkFor(directory).v2.session.list(query).then((r) => ({ data: r.data?.items ?? [] })),
+              sdkFor(directory)
+                .v2.session.list(query)
+                .then((r) => ({ data: r.data?.items ?? [] })),
           })
             .then((x) => {
               const nonArchived = (x.data ?? [])

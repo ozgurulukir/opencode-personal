@@ -8,9 +8,9 @@ function mockProps(todos: Array<{ status?: string }>, hasTime?: boolean): ToolPr
   let time: any = {}
 
   if (hasTime) {
-      const end = Date.now()
-      const start = end - 1000 // 1s
-      time = { start, end }
+    const end = Date.now()
+    const start = end - 1000 // 1s
+    time = { start, end }
   }
 
   return {
@@ -26,10 +26,7 @@ describe("scrollTodoFinal", () => {
   })
 
   it("handles all completed", () => {
-    const props = mockProps([
-      { status: "completed" },
-      { status: "completed" },
-    ])
+    const props = mockProps([{ status: "completed" }, { status: "completed" }])
     expect(scrollTodoFinal(props)).toBe("2 total · 2 done")
     expect(scrollTodoFinal(mockProps([{ status: "completed" }], true))).toMatch(/1 total · 1 done · 1\.0s/)
   })

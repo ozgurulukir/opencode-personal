@@ -38,7 +38,13 @@ describe("tui spinner ui utilities", () => {
 })
 
 describe("tui spinner-config factories", () => {
-  const { createDotsSpinner, createKnightRiderSpinner, createBlocksSpinner, getSpinnerConfig, SPINNER_FRAMES } = require("../../../src/cli/cmd/tui/ui/spinner-config")
+  const {
+    createDotsSpinner,
+    createKnightRiderSpinner,
+    createBlocksSpinner,
+    getSpinnerConfig,
+    SPINNER_FRAMES,
+  } = require("../../../src/cli/cmd/tui/ui/spinner-config")
 
   test("createDotsSpinner returns dots frames and interval 80", () => {
     const config = createDotsSpinner("#ffffff")

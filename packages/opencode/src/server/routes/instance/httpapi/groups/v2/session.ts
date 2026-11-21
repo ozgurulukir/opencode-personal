@@ -14,7 +14,11 @@ import { Schema } from "effect"
 import { HttpApiEndpoint, HttpApiError, HttpApiGroup, HttpApiSchema, OpenApi } from "effect/unstable/httpapi"
 import { Authorization } from "../../middleware/authorization"
 import { InstanceContextMiddleware } from "../../middleware/instance-context"
-import { WorkspaceRoutingMiddleware, WorkspaceRoutingQuery, WorkspaceRoutingQueryFields } from "../../middleware/workspace-routing"
+import {
+  WorkspaceRoutingMiddleware,
+  WorkspaceRoutingQuery,
+  WorkspaceRoutingQueryFields,
+} from "../../middleware/workspace-routing"
 import { ApiNotFoundError } from "../../errors"
 import {
   CommandPayload,
@@ -414,7 +418,8 @@ export const SessionGroup = HttpApiGroup.make("v2.session")
       OpenApi.annotations({
         identifier: "v2.session.predict",
         summary: "Predict next v2 prompt",
-        description: "Predict the next prompt for a v2 session. Returns an empty string when no suggestion is available.",
+        description:
+          "Predict the next prompt for a v2 session. Returns an empty string when no suggestion is available.",
       }),
     ),
   )

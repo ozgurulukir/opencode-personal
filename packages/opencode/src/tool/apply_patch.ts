@@ -71,7 +71,7 @@ export const ApplyPatchTool = Tool.define<
         hunks = parseResult.hunks
       } catch (error) {
         return yield* Effect.fail(
-          new Error(`apply_patch verification failed: ${error instanceof Error ? error.message : String(error)}`)
+          new Error(`apply_patch verification failed: ${error instanceof Error ? error.message : String(error)}`),
         )
       }
 
@@ -221,7 +221,9 @@ export const ApplyPatchTool = Tool.define<
                 if (change.removed) deletions += change.count || 0
               }
 
-              const movePath = hunk.move_path ? resolvePath(path.resolve(instance.directory, hunk.move_path)) : undefined
+              const movePath = hunk.move_path
+                ? resolvePath(path.resolve(instance.directory, hunk.move_path))
+                : undefined
               if (movePath) {
                 // A move whose destination resolves to the source path would write the
                 // new content and then delete that same file, destroying it entirely.

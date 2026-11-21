@@ -178,15 +178,11 @@ describe("promptPlaceholder", () => {
   })
 
   test("shows a shell example in shell mode", () => {
-    expect(promptPlaceholder({ ...base, mode: "shell", shell: ["ls"], index: 0 })).toBe(
-      'Run a command... "ls"',
-    )
+    expect(promptPlaceholder({ ...base, mode: "shell", shell: ["ls"], index: 0 })).toBe('Run a command... "ls"')
   })
 
   test("shows the prompt hint in normal mode", () => {
-    expect(promptPlaceholder({ ...base, mode: "normal", list: ["hi"], index: 0 })).toBe(
-      'Ask anything... "hi"',
-    )
+    expect(promptPlaceholder({ ...base, mode: "normal", list: ["hi"], index: 0 })).toBe('Ask anything... "hi"')
   })
 
   test("returns undefined when the list is empty", () => {

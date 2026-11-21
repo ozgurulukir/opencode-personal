@@ -1,13 +1,6 @@
 import type { ToolPart } from "@opencode-ai/sdk/v2"
 import type { RunEntryBody, StreamCommit, ToolSnapshot } from "./types"
-import type {
-  ToolDict,
-  ToolFrame,
-  ToolInline,
-  ToolPermissionInfo,
-  ToolPermissionProps,
-  ToolView,
-} from "./tool.types"
+import type { ToolDict, ToolFrame, ToolInline, ToolPermissionInfo, ToolPermissionProps, ToolView } from "./tool.types"
 import { dict, fallbackFinal, fallbackInline, fallbackStart, props, text } from "./tool.helpers"
 import { rule, taskResult } from "./tool.rules"
 import path from "path"

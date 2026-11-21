@@ -80,17 +80,13 @@ export const layer: Layer.Layer<Service, never, HttpClient.HttpClient | ChildPro
           // Run the remaining probes concurrently. Effect.all preserves input
           // order, so the execPath-sorted priority is kept when selecting a match.
           const results = yield* Effect.all(
-            checks.map((check) =>
-              check.command().pipe(Effect.map((output) => ({ name: check.name, output }))),
-            ),
+            checks.map((check) => check.command().pipe(Effect.map((output) => ({ name: check.name, output })))),
             { concurrency: "unbounded" },
           )
 
           for (const result of results) {
             const installedName =
-              result.name === "brew" || result.name === "choco" || result.name === "scoop"
-                ? "opencode"
-                : "opencode-ai"
+              result.name === "brew" || result.name === "choco" || result.name === "scoop" ? "opencode" : "opencode-ai"
             if (result.output.includes(installedName)) {
               return result.name
             }

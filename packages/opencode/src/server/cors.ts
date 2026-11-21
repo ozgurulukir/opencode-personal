@@ -13,10 +13,7 @@ export function isAllowedCorsOrigin(input: string | undefined, opts?: CorsOption
 
   try {
     const url = new URL(input)
-    if (
-      url.protocol === "http:" &&
-      (url.hostname === "localhost" || url.hostname === "127.0.0.1")
-    ) {
+    if (url.protocol === "http:" && (url.hostname === "localhost" || url.hostname === "127.0.0.1")) {
       return true
     }
     if (url.protocol === "oc:" && url.hostname === "renderer") {

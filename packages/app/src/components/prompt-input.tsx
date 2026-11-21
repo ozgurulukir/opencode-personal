@@ -3,14 +3,7 @@ import { useSpring } from "@opencode-ai/ui/motion-spring"
 import { createEffect, on, Component, Show, onCleanup, createMemo, createSignal, createResource } from "solid-js"
 import { createStore } from "solid-js/store"
 import { selectionFromLines, type SelectedLineRange, useFile } from "@/context/file"
-import {
-  ContentPart,
-  DEFAULT_PROMPT,
-  isPromptEqual,
-  Prompt,
-  usePrompt,
-  ImageAttachmentPart,
-} from "@/context/prompt"
+import { ContentPart, DEFAULT_PROMPT, isPromptEqual, Prompt, usePrompt, ImageAttachmentPart } from "@/context/prompt"
 import { useLayout } from "@/context/layout"
 import { useSDK } from "@/context/sdk"
 import { useSync } from "@/context/sync"
@@ -27,7 +20,13 @@ import { usePlatform } from "@/context/platform"
 import { useSessionLayout } from "@/pages/session/session-layout"
 import { createSessionTabs } from "@/pages/session/helpers"
 import { createTextFragment, getCursorPosition, setCursorPosition, setRangeEdge } from "./prompt-input/editor-dom"
-import { atOptionGroup, atOptionKey, atSelectPart, compareAtGroups, createAtMentionItems } from "./prompt-input/at-mentions"
+import {
+  atOptionGroup,
+  atOptionKey,
+  atSelectPart,
+  compareAtGroups,
+  createAtMentionItems,
+} from "./prompt-input/at-mentions"
 import { createPill, isNormalizedEditor, parseFromDOM, renderEditor } from "./prompt-input/editor-sync"
 import { buildSlashCommands } from "./prompt-input/slash-commands"
 import { createPromptAttachments } from "./prompt-input/attachments"
@@ -63,8 +62,6 @@ interface PromptInputProps {
   onAbort?: () => void
   onSubmit?: () => void
 }
-
-
 
 const NON_EMPTY_TEXT = /[^\s\u200B]/
 
@@ -319,7 +316,11 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     promptPlaceholder({
       mode: store.mode,
       commentCount: commentCount(),
-      example: suggest() ? (store.mode === "shell" ? "git status" : language.t(PROMPT_EXAMPLES[store.placeholder])) : "",
+      example: suggest()
+        ? store.mode === "shell"
+          ? "git status"
+          : language.t(PROMPT_EXAMPLES[store.placeholder])
+        : "",
       suggest: suggest(),
       t: (key, params) => language.t(key as Parameters<typeof language.t>[0], params as never),
     }),
@@ -646,7 +647,6 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
       },
     ),
   )
-
 
   const handleInput = () => {
     const rawParts = parseFromDOM(editorRef)

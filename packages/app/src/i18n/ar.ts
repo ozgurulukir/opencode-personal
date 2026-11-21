@@ -567,7 +567,8 @@ export const dict = {
   "settings.general.row.language.title": "اللغة",
   "settings.general.row.language.description": "تغيير لغة العرض لـ OpenCode",
   "settings.general.row.shell.title": "Shell الطرفية",
-  "settings.general.row.shell.description": "اختر shell المستخدم في المحطة الطرفية. كما يُستخدم shell المتوافق لاستدعاءات أدوات الوكيل.",
+  "settings.general.row.shell.description":
+    "اختر shell المستخدم في المحطة الطرفية. كما يُستخدم shell المتوافق لاستدعاءات أدوات الوكيل.",
   "settings.general.row.shell.autoDefault": "تلقائي (افتراضي)",
   "settings.general.row.shell.terminalOnly": "الطرفية فقط",
   "settings.general.row.appearance.title": "المظهر",

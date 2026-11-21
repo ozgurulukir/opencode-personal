@@ -162,7 +162,10 @@ export const layer = Layer.effect(
           const messages = yield* session.messages({ sessionID })
           for (const item of messages) {
             yield* sync(sessionID, [{ type: "message", data: item.info }])
-            yield* sync(sessionID, item.parts.map((part) => ({ type: "part" as const, data: part })))
+            yield* sync(
+              sessionID,
+              item.parts.map((part) => ({ type: "part" as const, data: part })),
+            )
             if (item.info.role !== "user") continue
             const model = yield* provider.getModel(item.info.model.providerID, item.info.model.modelID)
             yield* sync(sessionID, [{ type: "model", data: [model] }])

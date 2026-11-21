@@ -184,7 +184,10 @@ export const layer: Layer.Layer<Service, never, AppFileSystem.Service | HttpClie
       // @ts-ignore — generated at build time, may not exist in dev
       try: () => import("./models-snapshot.js").then((m) => m.snapshot),
       catch: () => undefined,
-    }).pipe(Effect.catch(() => Effect.succeed(undefined)), Effect.map(toCatalog))
+    }).pipe(
+      Effect.catch(() => Effect.succeed(undefined)),
+      Effect.map(toCatalog),
+    )
 
     /**
      * Fetches the catalog and persists it. The payload is parsed and validated

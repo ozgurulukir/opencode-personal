@@ -377,8 +377,7 @@ describe("HttpApi UI fallback", () => {
           "/",
           {
             ...fs,
-            readFile: () =>
-              Effect.succeed(new TextEncoder().encode("<html><body>opencode</body></html>")),
+            readFile: () => Effect.succeed(new TextEncoder().encode("<html><body>opencode</body></html>")),
           },
           { "index.html": "/$bunfs/root/index.html" },
         )

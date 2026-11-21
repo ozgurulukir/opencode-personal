@@ -46,10 +46,7 @@ const mockSkill = Layer.mock(Skill.Service, {
 
 const mockProvider = Layer.mock(Provider.Service, {})
 
-const pluginLayer = Plugin.layer.pipe(
-  Layer.provide(Bus.layer),
-  Layer.provide(mockConfig),
-)
+const pluginLayer = Plugin.layer.pipe(Layer.provide(Bus.layer), Layer.provide(mockConfig))
 
 const agentLayer = Agent.layer.pipe(
   Layer.provide(pluginLayer),

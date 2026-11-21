@@ -91,9 +91,7 @@ describe("sameChannelVersion", () => {
         "1.0.0-beta.24",
       ]),
     ).toBe("1.0.0-beta.24")
-    expect(sameChannelVersion(parsed("1.0.0-beta.9-e89174b"), ["1.0.0-beta.19-d95b7a4"])).toBe(
-      "1.0.0-beta.19-d95b7a4",
-    )
+    expect(sameChannelVersion(parsed("1.0.0-beta.9-e89174b"), ["1.0.0-beta.19-d95b7a4"])).toBe("1.0.0-beta.19-d95b7a4")
   })
 
   test("hash-aware ordering: hash-suffixed build outranks the equal clean build (expansion, not strip)", () => {
@@ -258,9 +256,7 @@ describe("applyTargets", () => {
 
   test("zero-match records missed and leaves content unchanged", () => {
     const content = `{\n  "dependencies": {\n    "lodash": "4.17.20"\n  }\n}`
-    const { content: out, missed } = applyTargets(content, [
-      update({ name: "lodash", from: "4.17.19", to: "4.17.21" }),
-    ])
+    const { content: out, missed } = applyTargets(content, [update({ name: "lodash", from: "4.17.19", to: "4.17.21" })])
     expect(out).toBe(content)
     expect(missed).toEqual(["lodash@4.17.19 in package.json"])
   })

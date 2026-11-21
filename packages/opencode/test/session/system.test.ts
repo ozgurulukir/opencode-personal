@@ -62,9 +62,7 @@ const skillService = (matched: Skill.Info[]) =>
     matchBySemantics: () => Effect.succeed(matched),
   })
 
-const it = testEffect(
-  SystemPrompt.layer.pipe(Layer.provide(Layer.succeed(Skill.Service, skillService([])))),
-)
+const it = testEffect(SystemPrompt.layer.pipe(Layer.provide(Layer.succeed(Skill.Service, skillService([])))))
 
 // Auto-match returns the semantic-search relevance order (skill/index.ts:matchBySemantics),
 // which is intentionally NOT alphabetical. Stub it with zeta before alpha so the

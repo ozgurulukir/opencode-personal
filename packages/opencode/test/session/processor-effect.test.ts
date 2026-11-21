@@ -561,7 +561,9 @@ it.live("session.processor retries discard parts persisted by the failed attempt
 
         // First attempt emits partial text, then fails with a retryable server error.
         yield* llm.push(
-          reply().text("partial").streamError({ type: "error", error: { code: "server_error", message: "boom" } }),
+          reply()
+            .text("partial")
+            .streamError({ type: "error", error: { code: "server_error", message: "boom" } }),
         )
         // Second attempt succeeds.
         yield* llm.text("after")

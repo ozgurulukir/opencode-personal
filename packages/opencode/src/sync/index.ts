@@ -439,12 +439,15 @@ function process<Def extends Definition>(
         // EventTable stores the encoded form (epoch millis). Raw `DateTime`
         // instances do NOT round-trip (`toJSON` → ISO string); `def.revive`
         // reconstructs the type form for projectors on replay.
-        const publish = (data: unknown) => ProjectBus.publish(def, encodeDateTimes(data) as Properties<Def>, { id: event.id })
+        const publish = (data: unknown) =>
+          ProjectBus.publish(def, encodeDateTimes(data) as Properties<Def>, { id: event.id })
         // ProjectBus.publish is a runPromise wrapper: it always returns a
         // promise, so both branches need the rejection guard (an async
         // convertEvent adds a stage before publish).
         const published = result instanceof Promise ? result.then(publish) : Promise.resolve(publish(result))
-        published.catch((error) => log.error("event publish failed", { type: def.type, id: event.id, error: errorData(error) }))
+        published.catch((error) =>
+          log.error("event publish failed", { type: def.type, id: event.id, error: errorData(error) }),
+        )
 
         GlobalBus.emit("event", {
           directory: options.context.instance.directory,

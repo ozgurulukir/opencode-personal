@@ -40,15 +40,27 @@ describe("network safety", () => {
     })
 
     test("rejects private IPv4 addresses even with https", async () => {
-      await expect(assertSafeRemoteUrl("https://10.0.0.1/config", "test")).rejects.toThrow("private/internal network target")
-      await expect(assertSafeRemoteUrl("https://192.168.1.1/config", "test")).rejects.toThrow("private/internal network target")
-      await expect(assertSafeRemoteUrl("https://172.16.0.1/config", "test")).rejects.toThrow("private/internal network target")
-      await expect(assertSafeRemoteUrl("https://169.254.169.254/latest", "test")).rejects.toThrow("private/internal network target")
+      await expect(assertSafeRemoteUrl("https://10.0.0.1/config", "test")).rejects.toThrow(
+        "private/internal network target",
+      )
+      await expect(assertSafeRemoteUrl("https://192.168.1.1/config", "test")).rejects.toThrow(
+        "private/internal network target",
+      )
+      await expect(assertSafeRemoteUrl("https://172.16.0.1/config", "test")).rejects.toThrow(
+        "private/internal network target",
+      )
+      await expect(assertSafeRemoteUrl("https://169.254.169.254/latest", "test")).rejects.toThrow(
+        "private/internal network target",
+      )
     })
 
     test("rejects loopback when allowLocalhost is false", async () => {
-      await expect(assertSafeRemoteUrl("https://127.0.0.1/config", "test")).rejects.toThrow("private/internal network target")
-      await expect(assertSafeRemoteUrl("https://localhost/config", "test")).rejects.toThrow("private/internal network target")
+      await expect(assertSafeRemoteUrl("https://127.0.0.1/config", "test")).rejects.toThrow(
+        "private/internal network target",
+      )
+      await expect(assertSafeRemoteUrl("https://localhost/config", "test")).rejects.toThrow(
+        "private/internal network target",
+      )
     })
 
     test("fails closed on ambiguous octal or malformed IPv4", () => {
@@ -59,7 +71,9 @@ describe("network safety", () => {
 
     test("resolves non-IP hostnames via DNS instead of treating them as IPs", async () => {
       const originalLookup = dns.promises.lookup
-      dns.promises.lookup = (async () => [{ address: "93.184.216.34", family: 4 }]) as unknown as typeof dns.promises.lookup
+      dns.promises.lookup = (async () => [
+        { address: "93.184.216.34", family: 4 },
+      ]) as unknown as typeof dns.promises.lookup
       try {
         const url = await assertSafeRemoteUrl("https://example.com/config", "test")
         expect(url.hostname).toBe("example.com")

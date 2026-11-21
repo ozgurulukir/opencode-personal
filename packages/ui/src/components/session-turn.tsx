@@ -17,7 +17,16 @@ import { SessionTurnThinking } from "./session-turn-thinking"
 import { SessionTurnHeader } from "./session-turn-header"
 import { createAutoScroll } from "../hooks"
 import { useI18n } from "../context/i18n"
-import { assistantErrorState, list, partState, same, summaryDiff, type SummaryDiff, unwrap, heading } from "./session-turn-utils"
+import {
+  assistantErrorState,
+  list,
+  partState,
+  same,
+  summaryDiff,
+  type SummaryDiff,
+  unwrap,
+  heading,
+} from "./session-turn-utils"
 
 export function SessionTurn(
   props: ParentProps<{
@@ -267,11 +276,7 @@ export function SessionTurn(
               <div data-slot="session-turn-message-content" aria-live="off">
                 <Message message={message()!} parts={parts()} actions={props.actions} />
               </div>
-              <SessionTurnHeader
-                divider={divider()}
-                error={error()}
-                errorText={errorText()}
-              />
+              <SessionTurnHeader divider={divider()} error={error()} errorText={errorText()} />
               <Show when={assistantMessages().length > 0}>
                 <div data-slot="session-turn-assistant-content" aria-hidden={working()}>
                   <AssistantParts

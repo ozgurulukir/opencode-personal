@@ -37,7 +37,13 @@ import { AppRuntime } from "@/effect/app-runtime"
 import { MessageV2 } from "@/session/message-v2"
 import { ConfigMCP } from "@/config/mcp"
 import { LoadAPIKeyError } from "ai"
-import type { Event, OpencodeClient, SessionMessage, SessionMessageAssistant, SessionMessageUser } from "@opencode-ai/sdk/v2"
+import type {
+  Event,
+  OpencodeClient,
+  SessionMessage,
+  SessionMessageAssistant,
+  SessionMessageUser,
+} from "@opencode-ai/sdk/v2"
 import { InstallationVersion } from "@opencode-ai/core/installation/version"
 import {
   handleToolCalled,
@@ -261,14 +267,10 @@ export class Agent implements ACPAgent {
         const session = await this.sessionManager.tryGetOrLoad(props.sessionID)
         if (!session) return
         this.trackCall(session.id, props.callID)
-        await handleShellStarted(
-          this.connection,
-          this.shellSnapshots,
-          this.toolStarts,
-          this.toolCalls,
-          session.id,
-          { ...props, terminalId: terminalId(props.sessionID, props.callID) },
-        )
+        await handleShellStarted(this.connection, this.shellSnapshots, this.toolStarts, this.toolCalls, session.id, {
+          ...props,
+          terminalId: terminalId(props.sessionID, props.callID),
+        })
         return
       }
 
@@ -277,19 +279,17 @@ export class Agent implements ACPAgent {
         const session = await this.sessionManager.tryGetOrLoad(props.sessionID)
         if (!session) return
         this.untrackCall(session.id, props.callID)
-        await handleShellEnded(
-          this.connection,
-          this.shellSnapshots,
-          this.toolStarts,
-          this.toolCalls,
-          session.id,
-          props,
-        )
+        await handleShellEnded(this.connection, this.shellSnapshots, this.toolStarts, this.toolCalls, session.id, props)
         return
       }
 
       case "session.next.tool.called": {
-        const props = event.properties as { sessionID: string; callID: string; tool: string; input: Record<string, unknown> }
+        const props = event.properties as {
+          sessionID: string
+          callID: string
+          tool: string
+          input: Record<string, unknown>
+        }
         const session = await this.sessionManager.tryGetOrLoad(props.sessionID)
         if (!session) return
         this.trackCall(session.id, props.callID)
@@ -321,7 +321,14 @@ export class Agent implements ACPAgent {
         const session = await this.sessionManager.tryGetOrLoad(props.sessionID)
         if (!session) return
         this.untrackCall(session.id, props.callID)
-        await handleToolSuccess(this.connection, this.shellSnapshots, this.toolStarts, this.toolCalls, session.id, props)
+        await handleToolSuccess(
+          this.connection,
+          this.shellSnapshots,
+          this.toolStarts,
+          this.toolCalls,
+          session.id,
+          props,
+        )
         return
       }
 
@@ -396,17 +403,19 @@ export class Agent implements ACPAgent {
           const newContent = getNewContent(content, diff)
 
           if (newContent) {
-            await this.connection.writeTextFile({
-              sessionId: session.id,
-              path: filepath,
-              content: newContent,
-            }).catch((error) => {
-              log.error("failed to apply permission diff through ACP", {
-                error,
-                sessionID: session.id,
-                filepath,
+            await this.connection
+              .writeTextFile({
+                sessionId: session.id,
+                path: filepath,
+                content: newContent,
               })
-            })
+              .catch((error) => {
+                log.error("failed to apply permission diff through ACP", {
+                  error,
+                  sessionID: session.id,
+                  filepath,
+                })
+              })
           }
         }
 
@@ -581,8 +590,7 @@ export class Agent implements ACPAgent {
       const filtered = cursor
         ? sorted.filter(
             (s) =>
-              s.time.updated < cursor.updated ||
-              (s.time.updated === cursor.updated && compareID(s.id, cursor.id) < 0),
+              s.time.updated < cursor.updated || (s.time.updated === cursor.updated && compareID(s.id, cursor.id) < 0),
           )
         : sorted
       const page = filtered.slice(0, limit)
@@ -1069,13 +1077,13 @@ export class Agent implements ACPAgent {
           variant: this.sessionManager.getVariant(sessionID),
           prompt: {
             text: parts
-              .filter((p): p is { type: "text"; text: string; synthetic?: boolean; ignored?: boolean } => p.type === "text")
+              .filter(
+                (p): p is { type: "text"; text: string; synthetic?: boolean; ignored?: boolean } => p.type === "text",
+              )
               .filter((p) => !p.synthetic && !p.ignored)
               .map((p) => p.text)
               .join("\n"),
-            files: parts.flatMap((p) =>
-              p.type === "file" ? [{ uri: p.url, mime: p.mime, name: p.filename }] : [],
-            ),
+            files: parts.flatMap((p) => (p.type === "file" ? [{ uri: p.url, mime: p.mime, name: p.filename }] : [])),
             synthetic: parts.flatMap((p) => (p.type === "text" && p.synthetic ? [p.text] : [])),
             ignored: parts.flatMap((p) => (p.type === "text" && p.ignored ? [p.text] : [])),
           },
@@ -1186,6 +1194,5 @@ export class Agent implements ACPAgent {
     }
   }
 }
-
 
 export * as ACP from "./agent"

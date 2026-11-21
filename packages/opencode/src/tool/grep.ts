@@ -102,7 +102,10 @@ export const GrepTool = Tool.define(
                 // the match with mtime 0 so it sorts as oldest instead of being lost.
                 if (info?.type === "Directory") return undefined
                 const mtime = info
-                  ? info.mtime.pipe(Option.map((time) => time.getTime()), Option.getOrElse(() => 0))
+                  ? info.mtime.pipe(
+                      Option.map((time) => time.getTime()),
+                      Option.getOrElse(() => 0),
+                    )
                   : 0
                 return [file, mtime] as const
               }),

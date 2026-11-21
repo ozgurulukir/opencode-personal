@@ -66,7 +66,6 @@ export function resolveServerList(input: {
   return [...deduped.values()]
 }
 
-
 export const { use: useServer, provider: ServerProvider } = createSimpleContext({
   name: "Server",
   init: (props: {

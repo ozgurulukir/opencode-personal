@@ -73,7 +73,10 @@ export const Event = {
 export interface Interface {
   readonly update: (input: { sessionID: SessionID; todos: Info[] }) => Effect.Effect<void>
   readonly get: (sessionID: SessionID) => Effect.Effect<Info[]>
-  readonly autoclose: (sessionID: SessionID, fileChanges: Array<{ filePath: string; diff: string }>) => Effect.Effect<void>
+  readonly autoclose: (
+    sessionID: SessionID,
+    fileChanges: Array<{ filePath: string; diff: string }>,
+  ) => Effect.Effect<void>
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/SessionTodo") {}
@@ -123,7 +126,10 @@ export const layer = Layer.effect(
         priority: normalizePriority(row.priority),
       }))
     })
-    const autoclose = Effect.fn("Todo.autoclose")(function* (sessionID: SessionID, fileChanges: Array<{ filePath: string; diff: string }>) {
+    const autoclose = Effect.fn("Todo.autoclose")(function* (
+      sessionID: SessionID,
+      fileChanges: Array<{ filePath: string; diff: string }>,
+    ) {
       // Read-modify-write inside one immediate transaction: two autocloses for
       // the same session can otherwise read the same snapshot and the second
       // update clobbers the first (tools execute concurrently per LLM step).

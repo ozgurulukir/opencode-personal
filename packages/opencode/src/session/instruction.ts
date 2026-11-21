@@ -28,10 +28,7 @@ function stripHashFragment(entry: string): { url: string; hash?: string } {
   return { url: entry.slice(0, index), hash: entry.slice(index + SHA256_FRAGMENT.length) }
 }
 
-const FILES = [
-  "AGENTS.md",
-  ...(Flag.OPENCODE_DISABLE_CLAUDE_CODE_PROMPT ? [] : ["CLAUDE.md"]),
-]
+const FILES = ["AGENTS.md", ...(Flag.OPENCODE_DISABLE_CLAUDE_CODE_PROMPT ? [] : ["CLAUDE.md"])]
 
 function extract(messages: MessageV2.WithParts[]) {
   const paths = new Set<string>()

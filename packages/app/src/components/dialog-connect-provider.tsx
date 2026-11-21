@@ -276,7 +276,14 @@ export function DialogConnectProvider(props: { provider: string }) {
                 setFormStore("value", prompt.key, value)
               }}
             />
-            <Button class="w-auto" type="submit" size="large" variant="primary" disabled={!valid()} loading={formStore.pending}>
+            <Button
+              class="w-auto"
+              type="submit"
+              size="large"
+              variant="primary"
+              disabled={!valid()}
+              loading={formStore.pending}
+            >
               {language.t("common.continue")}
             </Button>
           </Match>

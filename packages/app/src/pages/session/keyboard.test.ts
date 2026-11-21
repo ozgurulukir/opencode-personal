@@ -21,14 +21,16 @@ describe("session keyboard guard and classification", () => {
   })
 
   test("guard blocks protected targets and editable targets", () => {
-    expect(sessionKeyGuardBlocked({
-      protectedTarget: true,
-      targetEditable: false,
-      activeElement: undefined,
-      activeElementProtected: false,
-      activeElementEditable: false,
-      dialogActive: false,
-    })).toBe(true)
+    expect(
+      sessionKeyGuardBlocked({
+        protectedTarget: true,
+        targetEditable: false,
+        activeElement: undefined,
+        activeElementProtected: false,
+        activeElementEditable: false,
+        dialogActive: false,
+      }),
+    ).toBe(true)
     expect(
       sessionKeyGuardBlocked({
         protectedTarget: false,
@@ -103,7 +105,13 @@ describe("session keyboard guard and classification", () => {
       shouldFocusComposer({ key: "a", ctrlKey: false, metaKey: false, composerBlocked: false, childSession: false }),
     ).toBe(true)
     expect(
-      shouldFocusComposer({ key: "Escape", ctrlKey: false, metaKey: false, composerBlocked: false, childSession: false }),
+      shouldFocusComposer({
+        key: "Escape",
+        ctrlKey: false,
+        metaKey: false,
+        composerBlocked: false,
+        childSession: false,
+      }),
     ).toBe(false)
     expect(
       shouldFocusComposer({ key: "a", ctrlKey: true, metaKey: false, composerBlocked: false, childSession: false }),
@@ -121,7 +129,13 @@ describe("session keyboard guard and classification", () => {
       shouldFocusComposer({ key: "a", ctrlKey: false, metaKey: false, composerBlocked: false, childSession: true }),
     ).toBe(false)
     expect(
-      shouldFocusComposer({ key: "Unidentified", ctrlKey: false, metaKey: false, composerBlocked: false, childSession: false }),
+      shouldFocusComposer({
+        key: "Unidentified",
+        ctrlKey: false,
+        metaKey: false,
+        composerBlocked: false,
+        childSession: false,
+      }),
     ).toBe(false)
   })
 })

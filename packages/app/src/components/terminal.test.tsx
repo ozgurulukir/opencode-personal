@@ -123,8 +123,20 @@ describe("terminal pure helpers", () => {
       const term = { rows: 40, cols: 120, getViewportY: () => 0 }
       const addon = { serialize: () => "hello" }
 
-      persistTerminal({ term: undefined as never, addon: addon as never, cursor: 0, id: "1", onCleanup: (state) => captured.push(state) })
-      persistTerminal({ term: term as never, addon: undefined as never, cursor: 0, id: "2", onCleanup: (state) => captured.push(state) })
+      persistTerminal({
+        term: undefined as never,
+        addon: addon as never,
+        cursor: 0,
+        id: "1",
+        onCleanup: (state) => captured.push(state),
+      })
+      persistTerminal({
+        term: term as never,
+        addon: undefined as never,
+        cursor: 0,
+        id: "2",
+        onCleanup: (state) => captured.push(state),
+      })
       persistTerminal({ term: term as never, addon: addon as never, cursor: 0, id: "3", onCleanup: undefined })
 
       expect(captured).toHaveLength(0)
@@ -138,7 +150,9 @@ describe("terminal pure helpers", () => {
       const container = document.createElement("div")
       const term = {
         getSelection: () => "sel",
-        paste: (text: string) => { capturedPaste = text },
+        paste: (text: string) => {
+          capturedPaste = text
+        },
         options: { cursorBlink: false },
         textarea: document.createElement("textarea"),
       }

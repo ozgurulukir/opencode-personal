@@ -54,7 +54,11 @@ const makeFakeHttpLayer = (countRef: Ref.Ref<number>, body: string, urlsRef?: Re
   )
 
 const provideInstructionWithHttp =
-  (global: Partial<Global.Interface>, httpLayer: Layer.Layer<HttpClient.HttpClient>, config: Partial<Config.Interface>) =>
+  (
+    global: Partial<Global.Interface>,
+    httpLayer: Layer.Layer<HttpClient.HttpClient>,
+    config: Partial<Config.Interface>,
+  ) =>
   <A, E, R>(self: Effect.Effect<A, E, R>) =>
     self.pipe(
       Effect.provide(
@@ -368,9 +372,7 @@ describe("Instruction.system", () => {
           const rules = yield* svc.system()
           // Local content is emitted first and wins; the remote source carrying
           // the identical body is skipped by the content-level de-dupe.
-          expect(rules).toEqual([
-            `<instructions source="${path.join(dir, "AGENTS.md")}">\n${body}\n</instructions>`,
-          ])
+          expect(rules).toEqual([`<instructions source="${path.join(dir, "AGENTS.md")}">\n${body}\n</instructions>`])
         }).pipe(
           provideInstructionWithHttp({ home: dir, config: dir }, layer, {
             get: () => Effect.succeed({ instructions: [url] }),
@@ -633,10 +635,9 @@ describe("Instruction.systemPaths non-git leaks", () => {
 
         // init a real git repo at `repo` so fromDirectory sees worktree = repo
         yield* Effect.promise(() =>
-          import("node:child_process").then(({ execFile }) =>
-            new Promise<void>((res, rej) =>
-              execFile("git", ["init", "-q", repo], (err) => (err ? rej(err) : res())),
-            ),
+          import("node:child_process").then(
+            ({ execFile }) =>
+              new Promise<void>((res, rej) => execFile("git", ["init", "-q", repo], (err) => (err ? rej(err) : res()))),
           ),
         )
         yield* write(path.join(repo, "AGENTS.md"), "# Project Instructions")

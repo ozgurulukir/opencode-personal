@@ -40,7 +40,9 @@ export function MessageNav(
                     tabindex={0}
                     onClick={handleClick}
                     onKeyDown={handleKeyPress}
-                    aria-label={local.getLabel?.(message) ?? message.summary?.title ?? i18n.t("ui.messageNav.newMessage")}
+                    aria-label={
+                      local.getLabel?.(message) ?? message.summary?.title ?? i18n.t("ui.messageNav.newMessage")
+                    }
                   >
                     <div data-slot="message-nav-tick-line" />
                   </div>
@@ -51,7 +53,9 @@ export function MessageNav(
                     aria-current={message.id === local.current?.id ? "true" : undefined}
                     onClick={handleClick}
                     onKeyDown={handleKeyPress}
-                    aria-label={local.getLabel?.(message) ?? message.summary?.title ?? i18n.t("ui.messageNav.newMessage")}
+                    aria-label={
+                      local.getLabel?.(message) ?? message.summary?.title ?? i18n.t("ui.messageNav.newMessage")
+                    }
                   >
                     <DiffChanges changes={message.summary?.diffs ?? []} variant="bars" />
                     <div

@@ -1,16 +1,4 @@
-import {
-  type Info,
-  NearestRoot,
-  spawn,
-  which,
-  path,
-  fs,
-  log,
-  Filesystem,
-  Flag,
-  Global,
-  Archive,
-} from "./shared"
+import { type Info, NearestRoot, spawn, which, path, fs, log, Filesystem, Flag, Global, Archive } from "./shared"
 
 export const TerraformLS: Info = {
   id: "terraform",

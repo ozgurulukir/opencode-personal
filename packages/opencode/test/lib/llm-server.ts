@@ -635,147 +635,150 @@ export class TestLLMServer extends Context.Service<TestLLMServer, TestLLMServer.
         Effect.gen(function* () {
           const closed = yield* Deferred.make<void>()
           const server = yield* HttpServer.HttpServer
-      const router = yield* HttpRouter.HttpRouter
+          const router = yield* HttpRouter.HttpRouter
 
-      let hits: Hit[] = []
-      let list: Queue[] = []
-      let waits: Wait[] = []
-      let misses: Hit[] = []
+          let hits: Hit[] = []
+          let list: Queue[] = []
+          let waits: Wait[] = []
+          let misses: Hit[] = []
 
-      const queue = (...input: (Item | Reply)[]) => {
-        list = [...list, ...input.map((value) => ({ item: item(value) }))]
-      }
+          const queue = (...input: (Item | Reply)[]) => {
+            list = [...list, ...input.map((value) => ({ item: item(value) }))]
+          }
 
-      const queueMatch = (match: Match, ...input: (Item | Reply)[]) => {
-        list = [...list, ...input.map((value) => ({ item: item(value), match }))]
-      }
+          const queueMatch = (match: Match, ...input: (Item | Reply)[]) => {
+            list = [...list, ...input.map((value) => ({ item: item(value), match }))]
+          }
 
-      const notify = Effect.fnUntraced(function* () {
-        const ready = waits.filter((item) => hits.length >= item.count)
-        if (!ready.length) return
-        waits = waits.filter((item) => hits.length < item.count)
-        yield* Effect.forEach(ready, (item) => Deferred.succeed(item.ready, void 0))
-      })
+          const notify = Effect.fnUntraced(function* () {
+            const ready = waits.filter((item) => hits.length >= item.count)
+            if (!ready.length) return
+            waits = waits.filter((item) => hits.length < item.count)
+            yield* Effect.forEach(ready, (item) => Deferred.succeed(item.ready, void 0))
+          })
 
-      const pull = (hit: Hit) => {
-        const index = list.findIndex((entry) => !entry.match || entry.match(hit))
-        if (index === -1) return
-        const first = list[index]
-        list = [...list.slice(0, index), ...list.slice(index + 1)]
-        return first.item
-      }
+          const pull = (hit: Hit) => {
+            const index = list.findIndex((entry) => !entry.match || entry.match(hit))
+            if (index === -1) return
+            const first = list[index]
+            list = [...list.slice(0, index), ...list.slice(index + 1)]
+            return first.item
+          }
 
-      const handle = Effect.fn("TestLLMServer.handle")(function* (mode: "chat" | "responses") {
-        const req = yield* HttpServerRequest.HttpServerRequest
-        const body = yield* req.json.pipe(Effect.orElseSucceed(() => ({})))
-        const current = hit(req.originalUrl, body)
-        if (isTitleRequest(body)) {
-          hits = [...hits, current]
-          yield* notify()
-          const auto: Sse = { type: "sse", head: [role()], tail: [textLine("E2E Title"), finishLine("stop")] }
-          if (mode === "responses") return send(responses(auto, modelFrom(body)), closed)
-          return send(auto, closed)
-        }
-        const next = pull(current)
-        if (!next) {
-          hits = [...hits, current]
-          yield* notify()
-          const auto: Sse = { type: "sse", head: [role()], tail: [textLine("ok"), finishLine("stop")] }
-          if (mode === "responses") return send(responses(auto, modelFrom(body)), closed)
-          return send(auto, closed)
-        }
-        hits = [...hits, current]
-        yield* notify()
-        if (next.type !== "sse") return fail(next)
-        if (mode === "responses") return send(responses(next, modelFrom(body)), closed)
-        if (next.reset) {
-          yield* reset(next)
-          return HttpServerResponse.empty()
-        }
-        return send(next, closed)
-      })
+          const handle = Effect.fn("TestLLMServer.handle")(function* (mode: "chat" | "responses") {
+            const req = yield* HttpServerRequest.HttpServerRequest
+            const body = yield* req.json.pipe(Effect.orElseSucceed(() => ({})))
+            const current = hit(req.originalUrl, body)
+            if (isTitleRequest(body)) {
+              hits = [...hits, current]
+              yield* notify()
+              const auto: Sse = { type: "sse", head: [role()], tail: [textLine("E2E Title"), finishLine("stop")] }
+              if (mode === "responses") return send(responses(auto, modelFrom(body)), closed)
+              return send(auto, closed)
+            }
+            const next = pull(current)
+            if (!next) {
+              hits = [...hits, current]
+              yield* notify()
+              const auto: Sse = { type: "sse", head: [role()], tail: [textLine("ok"), finishLine("stop")] }
+              if (mode === "responses") return send(responses(auto, modelFrom(body)), closed)
+              return send(auto, closed)
+            }
+            hits = [...hits, current]
+            yield* notify()
+            if (next.type !== "sse") return fail(next)
+            if (mode === "responses") return send(responses(next, modelFrom(body)), closed)
+            if (next.reset) {
+              yield* reset(next)
+              return HttpServerResponse.empty()
+            }
+            return send(next, closed)
+          })
 
-      yield* router.add("POST", "/v1/chat/completions", handle("chat"))
-      yield* router.add("POST", "/v1/responses", handle("responses"))
+          yield* router.add("POST", "/v1/chat/completions", handle("chat"))
+          yield* router.add("POST", "/v1/responses", handle("responses"))
 
-      yield* server.serve(router.asHttpEffect())
-      yield* Effect.addFinalizer(() =>
-        Deferred.succeed(closed, void 0).pipe(
-          Effect.andThen(Effect.sync(() => httpServer.closeAllConnections())),
-          Effect.ignore,
-        ),
-      )
+          yield* server.serve(router.asHttpEffect())
+          yield* Effect.addFinalizer(() =>
+            Deferred.succeed(closed, void 0).pipe(
+              Effect.andThen(Effect.sync(() => httpServer.closeAllConnections())),
+              Effect.ignore,
+            ),
+          )
 
-      return TestLLMServer.of({
-        url:
-          server.address._tag === "TcpAddress"
-            ? `http://127.0.0.1:${server.address.port}/v1`
-            : `unix://${server.address.path}/v1`,
-        push: Effect.fn("TestLLMServer.push")(function* (...input: (Item | Reply)[]) {
-          queue(...input)
-        }),
-        pushMatch: Effect.fn("TestLLMServer.pushMatch")(function* (match: Match, ...input: (Item | Reply)[]) {
-          queueMatch(match, ...input)
-        }),
-        textMatch: Effect.fn("TestLLMServer.textMatch")(function* (
-          match: Match,
-          value: string,
-          opts?: { usage?: Usage },
-        ) {
-          const out = reply().text(value)
-          if (opts?.usage) out.usage(opts.usage)
-          queueMatch(match, out.stop().item())
-        }),
-        toolMatch: Effect.fn("TestLLMServer.toolMatch")(function* (match: Match, name: string, input: unknown) {
-          queueMatch(match, reply().tool(name, input).item())
-        }),
-        text: Effect.fn("TestLLMServer.text")(function* (value: string, opts?: { usage?: Usage }) {
-          const out = reply().text(value)
-          if (opts?.usage) out.usage(opts.usage)
-          queue(out.stop().item())
-        }),
-        tool: Effect.fn("TestLLMServer.tool")(function* (name: string, input: unknown) {
-          queue(reply().tool(name, input).item())
-        }),
-        toolHang: Effect.fn("TestLLMServer.toolHang")(function* (name: string, input: unknown) {
-          queue(reply().pendingTool(name, input).hang().item())
-        }),
-        reason: Effect.fn("TestLLMServer.reason")(function* (value: string, opts?: { text?: string; usage?: Usage }) {
-          const out = reply().reason(value)
-          if (opts?.text) out.text(opts.text)
-          if (opts?.usage) out.usage(opts.usage)
-          queue(out.stop().item())
-        }),
-        fail: Effect.fn("TestLLMServer.fail")(function* (message: unknown = "boom") {
-          queue(reply().streamError(message).item())
-        }),
-        error: Effect.fn("TestLLMServer.error")(function* (status: number, body: unknown) {
-          queue(httpError(status, body))
-        }),
-        hang: Effect.gen(function* () {
-          queue(reply().hang().item())
-        }).pipe(Effect.withSpan("TestLLMServer.hang")),
-        hold: Effect.fn("TestLLMServer.hold")(function* (value: string, wait: PromiseLike<unknown>) {
-          queue(reply().wait(wait).text(value).stop().item())
-        }),
-        reset: Effect.sync(() => {
-          hits = []
-          list = []
-          waits = []
-          misses = []
-        }),
-        hits: Effect.sync(() => [...hits]),
-        calls: Effect.sync(() => hits.length),
-        wait: Effect.fn("TestLLMServer.wait")(function* (count: number) {
-          if (hits.length >= count) return
-          const ready = yield* Deferred.make<void>()
-          waits = [...waits, { count, ready }]
-          yield* Deferred.await(ready)
-        }),
-        inputs: Effect.sync(() => hits.map((hit) => hit.body)),
-        pending: Effect.sync(() => list.length),
-        misses: Effect.sync(() => [...misses]),
-      })
+          return TestLLMServer.of({
+            url:
+              server.address._tag === "TcpAddress"
+                ? `http://127.0.0.1:${server.address.port}/v1`
+                : `unix://${server.address.path}/v1`,
+            push: Effect.fn("TestLLMServer.push")(function* (...input: (Item | Reply)[]) {
+              queue(...input)
+            }),
+            pushMatch: Effect.fn("TestLLMServer.pushMatch")(function* (match: Match, ...input: (Item | Reply)[]) {
+              queueMatch(match, ...input)
+            }),
+            textMatch: Effect.fn("TestLLMServer.textMatch")(function* (
+              match: Match,
+              value: string,
+              opts?: { usage?: Usage },
+            ) {
+              const out = reply().text(value)
+              if (opts?.usage) out.usage(opts.usage)
+              queueMatch(match, out.stop().item())
+            }),
+            toolMatch: Effect.fn("TestLLMServer.toolMatch")(function* (match: Match, name: string, input: unknown) {
+              queueMatch(match, reply().tool(name, input).item())
+            }),
+            text: Effect.fn("TestLLMServer.text")(function* (value: string, opts?: { usage?: Usage }) {
+              const out = reply().text(value)
+              if (opts?.usage) out.usage(opts.usage)
+              queue(out.stop().item())
+            }),
+            tool: Effect.fn("TestLLMServer.tool")(function* (name: string, input: unknown) {
+              queue(reply().tool(name, input).item())
+            }),
+            toolHang: Effect.fn("TestLLMServer.toolHang")(function* (name: string, input: unknown) {
+              queue(reply().pendingTool(name, input).hang().item())
+            }),
+            reason: Effect.fn("TestLLMServer.reason")(function* (
+              value: string,
+              opts?: { text?: string; usage?: Usage },
+            ) {
+              const out = reply().reason(value)
+              if (opts?.text) out.text(opts.text)
+              if (opts?.usage) out.usage(opts.usage)
+              queue(out.stop().item())
+            }),
+            fail: Effect.fn("TestLLMServer.fail")(function* (message: unknown = "boom") {
+              queue(reply().streamError(message).item())
+            }),
+            error: Effect.fn("TestLLMServer.error")(function* (status: number, body: unknown) {
+              queue(httpError(status, body))
+            }),
+            hang: Effect.gen(function* () {
+              queue(reply().hang().item())
+            }).pipe(Effect.withSpan("TestLLMServer.hang")),
+            hold: Effect.fn("TestLLMServer.hold")(function* (value: string, wait: PromiseLike<unknown>) {
+              queue(reply().wait(wait).text(value).stop().item())
+            }),
+            reset: Effect.sync(() => {
+              hits = []
+              list = []
+              waits = []
+              misses = []
+            }),
+            hits: Effect.sync(() => [...hits]),
+            calls: Effect.sync(() => hits.length),
+            wait: Effect.fn("TestLLMServer.wait")(function* (count: number) {
+              if (hits.length >= count) return
+              const ready = yield* Deferred.make<void>()
+              waits = [...waits, { count, ready }]
+              yield* Deferred.await(ready)
+            }),
+            inputs: Effect.sync(() => hits.map((hit) => hit.body)),
+            pending: Effect.sync(() => list.length),
+            misses: Effect.sync(() => [...misses]),
+          })
         }),
       ).pipe(
         Layer.provide(HttpRouter.layer),

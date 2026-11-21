@@ -40,10 +40,7 @@ export function createBlocksSpinner(options: KnightRiderOptions = {}): SpinnerCo
   })
 }
 
-export function getSpinnerConfig(
-  variant: SpinnerVariant = "dots",
-  options: KnightRiderOptions = {},
-): SpinnerConfig {
+export function getSpinnerConfig(variant: SpinnerVariant = "dots", options: KnightRiderOptions = {}): SpinnerConfig {
   switch (variant) {
     case "knight-rider":
       return createKnightRiderSpinner(options)

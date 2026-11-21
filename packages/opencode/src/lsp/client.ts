@@ -650,9 +650,7 @@ export async function create(input: { serverID: string; server: LSPServer.Handle
         const MAX_OPEN_FILES = 50
         const openPaths = Object.keys(files)
         if (openPaths.length >= MAX_OPEN_FILES && !files[request.path]) {
-          const sorted = openPaths.sort(
-            (a, b) => files[a].lastUsed - files[b].lastUsed,
-          )
+          const sorted = openPaths.sort((a, b) => files[a].lastUsed - files[b].lastUsed)
           const oldest = sorted[0]
           pushDiagnostics.delete(oldest)
           pullDiagnostics.delete(oldest)

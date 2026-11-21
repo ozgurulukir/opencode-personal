@@ -91,9 +91,9 @@ Block these headers when proxying upstream responses (prevent info disclosure + 
 
 ```ts
 const securitySensitive = new Set([
-  "set-cookie",        // upstream cookie leak
-  "x-forwarded-for",   // IP spoofing
-  "x-forwarded-host",  // host spoofing
+  "set-cookie", // upstream cookie leak
+  "x-forwarded-for", // IP spoofing
+  "x-forwarded-host", // host spoofing
   "x-forwarded-proto", // protocol spoofing
   "forwarded",
   "x-real-ip",
@@ -106,8 +106,14 @@ Filter virtual interfaces when showing network IPs:
 
 ```ts
 const virtualPatterns = [
-  /^docker\d+$/i, /^br-[0-9a-f]+$/i, /^veth/i,
-  /^virbr\d+$/i, /^vboxnet/i, /^tun/i, /^tap/i, /^wsl/i
+  /^docker\d+$/i,
+  /^br-[0-9a-f]+$/i,
+  /^veth/i,
+  /^virbr\d+$/i,
+  /^vboxnet/i,
+  /^tun/i,
+  /^tap/i,
+  /^wsl/i,
 ]
 ```
 

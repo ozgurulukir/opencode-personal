@@ -634,7 +634,8 @@ export const dict = {
   "settings.general.row.language.title": "Sprog",
   "settings.general.row.language.description": "Ændr visningssproget for OpenCode",
   "settings.general.row.shell.title": "Terminalshell",
-  "settings.general.row.shell.description": "Vælg den shell, der bruges til din terminal. Kompatible shells bruges også til agentens værktøjskald.",
+  "settings.general.row.shell.description":
+    "Vælg den shell, der bruges til din terminal. Kompatible shells bruges også til agentens værktøjskald.",
   "settings.general.row.shell.autoDefault": "Auto (Standard)",
   "settings.general.row.shell.terminalOnly": "kun terminal",
   "settings.general.row.appearance.title": "Udseende",
@@ -681,7 +682,6 @@ export const dict = {
 
   "settings.general.row.releaseNotes.title": "Udgivelsesnoter",
   "settings.general.row.releaseNotes.description": 'Vis "Hvad er nyt"-popups efter opdateringer',
-
 
   "sound.option.none": "Ingen",
   "sound.option.alert01": "Alarm 01",

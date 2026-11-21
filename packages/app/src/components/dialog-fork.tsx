@@ -68,7 +68,8 @@ export const DialogFork: Component = () => {
     })
     const dir = base64Encode(sdk.directory)
 
-    sdk.client.v2.session.fork({ sessionID, messageID: item.id })
+    sdk.client.v2.session
+      .fork({ sessionID, messageID: item.id })
       .then((forked) => {
         if (!forked.data) {
           showToast({ title: language.t("common.requestFailed") })

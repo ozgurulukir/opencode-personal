@@ -704,7 +704,15 @@ function createLayer(input: StreamInput) {
           bootstrapSubagentData({
             data: state.subagent,
             messages: messagesList,
-            children: [...state.subagent.tabs.keys()].map((id) => ({ id, slug: id, projectID: "", directory: "", title: id, version: "1", time: { created: 0, updated: 0 } })),
+            children: [...state.subagent.tabs.keys()].map((id) => ({
+              id,
+              slug: id,
+              projectID: "",
+              directory: "",
+              title: id,
+              version: "1",
+              time: { created: 0, updated: 0 },
+            })),
             permissions,
             questions,
           })
@@ -880,7 +888,7 @@ function createLayer(input: StreamInput) {
           )
         })
 
-const reconnect = Effect.fn("RunStreamTransport.reconnect")(function* () {
+        const reconnect = Effect.fn("RunStreamTransport.reconnect")(function* () {
           let attempt = 0
           const maxAttempts = 3
           const baseDelay = 1000
@@ -1001,21 +1009,23 @@ const reconnect = Effect.fn("RunStreamTransport.reconnect")(function* () {
               }).pipe(
                 Effect.andThen(
                   Effect.promise(() =>
-                    input.sdk.v2.session.command({
-                      sessionID: input.sessionID,
-                      agent: next.agent,
-                      model: next.model ? `${next.model.providerID}/${next.model.modelID}` : undefined,
-                      variant: next.variant,
-                      command: command.name,
-                      arguments: command.arguments,
-                      parts: [
-                        ...(next.includeFiles ? next.files : []),
-                        ...next.prompt.parts.filter(
-                          (item): item is Extract<RunPromptPart, { type: "file" }> => item.type === "file",
-                        ),
-                      ],
-                    },
-                    { signal: turn.signal },),
+                    input.sdk.v2.session.command(
+                      {
+                        sessionID: input.sessionID,
+                        agent: next.agent,
+                        model: next.model ? `${next.model.providerID}/${next.model.modelID}` : undefined,
+                        variant: next.variant,
+                        command: command.name,
+                        arguments: command.arguments,
+                        parts: [
+                          ...(next.includeFiles ? next.files : []),
+                          ...next.prompt.parts.filter(
+                            (item): item is Extract<RunPromptPart, { type: "file" }> => item.type === "file",
+                          ),
+                        ],
+                      },
+                      { signal: turn.signal },
+                    ),
                   ).pipe(
                     Effect.tap(() =>
                       Effect.sync(() => {
@@ -1175,7 +1185,9 @@ export async function createSessionTransport(input: StreamInput): Promise<Sessio
   return {
     runPromptTurn: (next) => runtime.runPromise((svc) => svc.runPromptTurn(next)),
     selectSubagent: (sessionID) => {
-      void runtime.runPromise((svc) => svc.selectSubagent(sessionID)).catch((error) => safeCatch("subagent.select", error))
+      void runtime
+        .runPromise((svc) => svc.selectSubagent(sessionID))
+        .catch((error) => safeCatch("subagent.select", error))
     },
     close: () => runtime.runPromise((svc) => svc.close()),
   }

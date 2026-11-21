@@ -1,11 +1,4 @@
-import {
-  type Info,
-  spawn,
-  which,
-  path,
-  log,
-  Filesystem,
-} from "./shared"
+import { type Info, spawn, which, path, log, Filesystem } from "./shared"
 
 export const Deno: Info = {
   id: "deno",

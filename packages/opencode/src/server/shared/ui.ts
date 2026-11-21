@@ -118,11 +118,7 @@ function notFound() {
   return HttpServerResponse.jsonUnsafe({ error: "Not Found" }, { status: 404 })
 }
 
-function embeddedUIResponse(
-  file: string,
-  body: Uint8Array,
-  request?: HttpServerRequest.HttpServerRequest,
-) {
+function embeddedUIResponse(file: string, body: Uint8Array, request?: HttpServerRequest.HttpServerRequest) {
   const mime = AppFileSystem.mimeType(file)
   const headers = new Headers({ "content-type": mime })
 

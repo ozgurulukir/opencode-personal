@@ -10,7 +10,7 @@ let optimisticAddFn: typeof import("./useOptimisticSend").optimisticAdd
 let optimisticRemoveFn: typeof import("./useOptimisticSend").optimisticRemove
 
 beforeAll(async () => {
-    const sendFollowupDraftMod = await import("./sendFollowupDraft")
+  const sendFollowupDraftMod = await import("./sendFollowupDraft")
   sendFollowupDraftFn = sendFollowupDraftMod.sendFollowupDraft
 
   const detectCommandMod = await import("./detectCommand")
@@ -153,7 +153,9 @@ describe("sendFollowupDraft", () => {
     const sync = createSync()
     const draft = createDraft("/test args")
 
-    const result = await sendFollowupDraftFn(sendInput({ client, globalSync: { child }, sync, draft, before: () => false }))
+    const result = await sendFollowupDraftFn(
+      sendInput({ client, globalSync: { child }, sync, draft, before: () => false }),
+    )
 
     expect(result).toBe(false)
     expect(setStoreCalls).toEqual([
@@ -168,9 +170,9 @@ describe("sendFollowupDraft", () => {
     const sync = createSync()
     const draft = createDraft("/test args")
 
-    await expect(
-      sendFollowupDraftFn(sendInput({ client, globalSync: { child }, sync, draft })),
-    ).rejects.toThrow("command failed")
+    await expect(sendFollowupDraftFn(sendInput({ client, globalSync: { child }, sync, draft }))).rejects.toThrow(
+      "command failed",
+    )
     expect(setStoreCalls).toEqual([
       ["session_status", "session-1", { type: "busy" }],
       ["session_status", "session-1", { type: "idle" }],
@@ -195,7 +197,9 @@ describe("sendFollowupDraft", () => {
     const sync = createSync()
     const draft = createDraft("hello")
 
-    const result = await sendFollowupDraftFn(sendInput({ client, globalSync: { child }, sync, draft, before: () => false }))
+    const result = await sendFollowupDraftFn(
+      sendInput({ client, globalSync: { child }, sync, draft, before: () => false }),
+    )
 
     expect(result).toBe(false)
     expect(setStoreCalls).toEqual([
@@ -210,9 +214,9 @@ describe("sendFollowupDraft", () => {
     const sync = createSync()
     const draft = createDraft("hello")
 
-    await expect(
-      sendFollowupDraftFn(sendInput({ client, globalSync: { child }, sync, draft })),
-    ).rejects.toThrow("prompt failed")
+    await expect(sendFollowupDraftFn(sendInput({ client, globalSync: { child }, sync, draft }))).rejects.toThrow(
+      "prompt failed",
+    )
     expect(setStoreCalls).toEqual([
       ["session_status", "session-1", { type: "busy" }],
       ["session_status", "session-1", { type: "idle" }],

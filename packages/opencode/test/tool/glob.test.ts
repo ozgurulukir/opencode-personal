@@ -80,26 +80,28 @@ describe("tool.glob", () => {
     }),
   )
 
-  it.instance("prompts before following a symlink outside the project", () =>
-    Effect.gen(function* () {
-      const test = yield* TestInstance
-      const outside = yield* Effect.promise(() => mkdtemp(path.join(path.dirname(test.directory), "glob-outside-")))
-      const link = path.join(test.directory, "linked")
-      try {
-        yield* Effect.promise(() => Bun.write(path.join(outside, "secret.ts"), "secret\n"))
-        yield* Effect.promise(() => symlink(outside, link, "dir"))
-        const requests: string[] = []
-        const info = yield* GlobTool
-        const glob = yield* info.init()
-        yield* glob.execute(
-          { pattern: "*.ts", path: link },
-          { ...ctx, ask: (request) => Effect.sync(() => requests.push(request.permission)) },
-        )
-        expect(requests).toContain("external_directory")
-      } finally {
-        yield* Effect.promise(() => rm(outside, { recursive: true, force: true }))
-      }
-    }),
+  it.instance(
+    "prompts before following a symlink outside the project",
+    () =>
+      Effect.gen(function* () {
+        const test = yield* TestInstance
+        const outside = yield* Effect.promise(() => mkdtemp(path.join(path.dirname(test.directory), "glob-outside-")))
+        const link = path.join(test.directory, "linked")
+        try {
+          yield* Effect.promise(() => Bun.write(path.join(outside, "secret.ts"), "secret\n"))
+          yield* Effect.promise(() => symlink(outside, link, "dir"))
+          const requests: string[] = []
+          const info = yield* GlobTool
+          const glob = yield* info.init()
+          yield* glob.execute(
+            { pattern: "*.ts", path: link },
+            { ...ctx, ask: (request) => Effect.sync(() => requests.push(request.permission)) },
+          )
+          expect(requests).toContain("external_directory")
+        } finally {
+          yield* Effect.promise(() => rm(outside, { recursive: true, force: true }))
+        }
+      }),
     { git: true },
   )
 })

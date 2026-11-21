@@ -9,7 +9,13 @@ export type OptimisticSend = {
   }
 }
 
-export const optimisticAdd = (sync: OptimisticSend, directory: string, sessionID: string, message: Message, parts: Part[]) => {
+export const optimisticAdd = (
+  sync: OptimisticSend,
+  directory: string,
+  sessionID: string,
+  message: Message,
+  parts: Part[],
+) => {
   sync.session.optimistic.add({ directory, sessionID, message, parts })
 }
 

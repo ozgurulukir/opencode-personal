@@ -483,18 +483,21 @@ export const layer = Layer.effect(
               content: `Create an agent configuration based on this request: "${input.description}".\n\nIMPORTANT: The following identifiers already exist and must NOT be used: ${existing.map((i) => i.name).join(", ")}\n  Return ONLY the JSON object, no other text, do not wrap in backticks`,
             },
           ],
-          system: delivery.type !== "messages" ? undefined : (function() {
-            // ⚡ Bolt Optimization: Replace chained .filter().map() with direct push to reduce GC pressure.
-            // An IIFE is used here to avoid polluting the outer scope and strictly type the array.
-            const systemArray: Array<{ role: "system"; content: string }> = []
-            for (const part of ProviderTransform.systemPromptMessages(
-              resolved,
-              [system.prefix, system.suffix].filter((x) => x),
-            )) {
-              systemArray.push({ role: "system" as const, content: part })
-            }
-            return systemArray
-          })(),
+          system:
+            delivery.type !== "messages"
+              ? undefined
+              : (function () {
+                  // ⚡ Bolt Optimization: Replace chained .filter().map() with direct push to reduce GC pressure.
+                  // An IIFE is used here to avoid polluting the outer scope and strictly type the array.
+                  const systemArray: Array<{ role: "system"; content: string }> = []
+                  for (const part of ProviderTransform.systemPromptMessages(
+                    resolved,
+                    [system.prefix, system.suffix].filter((x) => x),
+                  )) {
+                    systemArray.push({ role: "system" as const, content: part })
+                  }
+                  return systemArray
+                })(),
           model: language,
           schema: z.object({
             // Slug-only: the identifier becomes a filename under agents/ and is
@@ -514,7 +517,10 @@ export const layer = Layer.effect(
               ...params,
               providerOptions: ProviderTransform.providerOptions(resolved, {
                 // ⚡ Bolt Optimization: Avoid intermediate array allocation for join
-                instructions: (system.prefix && system.suffix) ? `${system.prefix}\n${system.suffix}` : (system.prefix || system.suffix || ""),
+                instructions:
+                  system.prefix && system.suffix
+                    ? `${system.prefix}\n${system.suffix}`
+                    : system.prefix || system.suffix || "",
                 store: false,
               }),
               onError: () => {},

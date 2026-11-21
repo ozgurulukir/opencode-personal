@@ -85,7 +85,10 @@ export function DialogStatus() {
                       <Match when={(item.status as string) === "needs_client_registration" && item}>
                         {(val) => {
                           const state = val()
-                          return state && typeof state === "object" && "error" in state && typeof state.error === "string"
+                          return state &&
+                            typeof state === "object" &&
+                            "error" in state &&
+                            typeof state.error === "string"
                             ? state.error
                             : ""
                         }}

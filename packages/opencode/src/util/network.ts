@@ -150,7 +150,9 @@ export async function assertSafeRemoteUrl(url: string, what: string, options?: S
   try {
     addresses = await dns.promises.lookup(bareHost, { all: true })
   } catch (error) {
-    throw new Error(`DNS lookup failed for ${what} host (${parsed.hostname}): ${error instanceof Error ? error.message : String(error)}`)
+    throw new Error(
+      `DNS lookup failed for ${what} host (${parsed.hostname}): ${error instanceof Error ? error.message : String(error)}`,
+    )
   }
 
   if (addresses.length === 0) {
@@ -181,7 +183,9 @@ export async function safeFetchJson<T = unknown>(
   if (contentLength) {
     const size = parseInt(contentLength, 10)
     if (Number.isFinite(size) && size > maxBytes) {
-      throw new Error(`Response size for ${what} from ${url} (${size} bytes) exceeds maximum allowed size of ${maxBytes} bytes`)
+      throw new Error(
+        `Response size for ${what} from ${url} (${size} bytes) exceeds maximum allowed size of ${maxBytes} bytes`,
+      )
     }
   }
 

@@ -13,12 +13,7 @@ export function SessionTurnThinking(props: {
       <div data-slot="session-turn-thinking">
         <TextShimmer text={props.t("ui.sessionTurn.status.thinking")} />
         <Show when={!props.showReasoningSummaries}>
-          <TextReveal
-            text={props.reasoningHeading}
-            class="session-turn-thinking-heading"
-            travel={25}
-            duration={700}
-          />
+          <TextReveal text={props.reasoningHeading} class="session-turn-thinking-heading" travel={25} duration={700} />
         </Show>
       </div>
     </Show>

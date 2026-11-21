@@ -46,10 +46,12 @@ Debug/validation commands that need to see every skill on disk (including invali
 ## Skill tool prepends warnings to output
 
 When the model invokes the `skill` tool on a skill that has `warnings`, the tool output starts with:
+
 ```
 ⚠️ Skill "name" has validation issues:
   - <warning text>
 ```
+
 This gives the LLM immediate feedback about what's wrong, so it can fix the skill or stop using it.
 
 ## `skill.warning` bus events are for logging, not TUI toasts

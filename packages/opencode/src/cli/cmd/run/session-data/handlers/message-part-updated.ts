@@ -194,8 +194,7 @@ function handleToolError(
 
   data.ids.add(part.id)
   const error = part.state.status === "error" ? part.state.error : undefined
-  const text =
-    typeof error === "string" && error.trim() ? error : "unknown error"
+  const text = typeof error === "string" && error.trim() ? error : "unknown error"
   commits.push(failTool(part, text))
   return out(data, commits, view)
 }

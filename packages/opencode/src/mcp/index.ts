@@ -177,17 +177,12 @@ function listTools(key: string, client: MCPClient, timeout: number) {
           ),
         catch: (err) => (err instanceof Error ? err : new Error(String(err))),
       }).pipe(
-        Effect.map(
-          (result: {
-            tools: Array<{ name: string; description?: string; inputSchema: unknown }>
-          }) =>
-            result.tools.map(
-              (tool): MCPToolDef => ({
-                name: tool.name,
-                description: tool.description,
-                inputSchema: tool.inputSchema as MCPToolDef["inputSchema"],
-              }),
-            ),
+        Effect.map((result: { tools: Array<{ name: string; description?: string; inputSchema: unknown }> }) =>
+          result.tools.map((tool): MCPToolDef => ({
+            name: tool.name,
+            description: tool.description,
+            inputSchema: tool.inputSchema as MCPToolDef["inputSchema"],
+          })),
         ),
       )
     }),
@@ -1104,7 +1099,9 @@ export const layer = Layer.effect(
         ),
         Effect.catch(() => {
           log.warn("failed to open browser, user must open URL manually", { mcpName })
-          return Effect.promise(() => Bus.publish(BrowserOpenFailed, { mcpName, url: result.authorizationUrl })).pipe(Effect.ignore)
+          return Effect.promise(() => Bus.publish(BrowserOpenFailed, { mcpName, url: result.authorizationUrl })).pipe(
+            Effect.ignore,
+          )
         }),
       )
 

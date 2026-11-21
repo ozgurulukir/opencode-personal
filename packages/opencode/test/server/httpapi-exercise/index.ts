@@ -759,10 +759,7 @@ const scenarios: Scenario[] = [
     }))
     .json(200, (body, ctx) => {
       object(body)
-      check(
-        isRecord(body) && body.type === "user",
-        "v2 prompt should return a user message",
-      )
+      check(isRecord(body) && body.type === "user", "v2 prompt should return a user message")
       check(
         isRecord(body) && typeof body.text === "string" && body.text.includes("hello v2"),
         "v2 user message should contain the prompt text",

@@ -377,7 +377,13 @@ export function createV2EventAdapter() {
           return [
             legacy(`${event.id}:part`, "message.part.updated", {
               sessionID,
-              part: legacyTextPart({ id: state.textID, sessionID, messageID: state.assistantID, text: "", start: timestamp }),
+              part: legacyTextPart({
+                id: state.textID,
+                sessionID,
+                messageID: state.assistantID,
+                text: "",
+                start: timestamp,
+              }),
               time: timestamp,
             }),
           ]

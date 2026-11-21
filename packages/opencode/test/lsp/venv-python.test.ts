@@ -69,7 +69,11 @@ describe("venvCandidates (characterization)", () => {
     const prev = process.env["VIRTUAL_ENV"]
     process.env["VIRTUAL_ENV"] = "/tmp/some-env"
     try {
-      expect(venvCandidates("/proj")).toEqual(["/tmp/some-env", path.join("/proj", ".venv"), path.join("/proj", "venv")])
+      expect(venvCandidates("/proj")).toEqual([
+        "/tmp/some-env",
+        path.join("/proj", ".venv"),
+        path.join("/proj", "venv"),
+      ])
     } finally {
       if (prev === undefined) delete process.env["VIRTUAL_ENV"]
       else process.env["VIRTUAL_ENV"] = prev

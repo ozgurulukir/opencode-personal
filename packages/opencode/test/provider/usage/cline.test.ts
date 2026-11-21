@@ -45,9 +45,9 @@ describe("clineUsageProvider.supports", () => {
 
 describe("parseCurrentUser", () => {
   test("maps the documented users/me shape to id, email and accountId", () => {
-    expect(parseCurrentUser({ id: "user_1", email: "user@example.com", name: "User", active_account_id: "acct_1" })).toEqual(
-      { id: "user_1", email: "user@example.com", accountId: "acct_1" },
-    )
+    expect(
+      parseCurrentUser({ id: "user_1", email: "user@example.com", name: "User", active_account_id: "acct_1" }),
+    ).toEqual({ id: "user_1", email: "user@example.com", accountId: "acct_1" })
   })
 
   test("omits optional fields that are absent", () => {

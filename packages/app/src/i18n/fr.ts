@@ -580,7 +580,8 @@ export const dict = {
   "settings.general.row.language.title": "Langue",
   "settings.general.row.language.description": "Changer la langue d'affichage pour OpenCode",
   "settings.general.row.shell.title": "Shell du terminal",
-  "settings.general.row.shell.description": "Choisissez le shell utilisé pour votre terminal. Les shells compatibles sont également utilisés pour les appels d'outils de l'agent.",
+  "settings.general.row.shell.description":
+    "Choisissez le shell utilisé pour votre terminal. Les shells compatibles sont également utilisés pour les appels d'outils de l'agent.",
   "settings.general.row.shell.autoDefault": "Auto (Défaut)",
   "settings.general.row.shell.terminalOnly": "terminal uniquement",
   "settings.general.row.appearance.title": "Apparence",
@@ -601,15 +602,19 @@ export const dict = {
   "settings.general.row.followup.option.queue": "File d'attente",
   "settings.general.row.followup.option.steer": "Diriger",
   "settings.general.row.showFileTree.title": "Arborescence des fichiers",
-  "settings.general.row.showFileTree.description": "Afficher le commutateur et le panneau de l'arborescence des fichiers dans les sessions de bureau",
+  "settings.general.row.showFileTree.description":
+    "Afficher le commutateur et le panneau de l'arborescence des fichiers dans les sessions de bureau",
   "settings.general.row.showNavigation.title": "Commandes de navigation",
-  "settings.general.row.showNavigation.description": "Afficher les boutons retour et avant dans la barre de titre du bureau",
+  "settings.general.row.showNavigation.description":
+    "Afficher les boutons retour et avant dans la barre de titre du bureau",
   "settings.general.row.showSearch.title": "Palette de commandes",
-  "settings.general.row.showSearch.description": "Afficher le bouton de recherche et la palette de commandes dans la barre de titre du bureau",
+  "settings.general.row.showSearch.description":
+    "Afficher le bouton de recherche et la palette de commandes dans la barre de titre du bureau",
   "settings.general.row.showTerminal.title": "Terminal",
   "settings.general.row.showTerminal.description": "Afficher le bouton du terminal dans la barre de titre du bureau",
   "settings.general.row.showStatus.title": "État du serveur",
-  "settings.general.row.showStatus.description": "Afficher le bouton d'état du serveur dans la barre de titre du bureau",
+  "settings.general.row.showStatus.description":
+    "Afficher le bouton d'état du serveur dans la barre de titre du bureau",
   "settings.general.row.reasoningSummaries.title": "Afficher les résumés de raisonnement",
   "settings.general.row.reasoningSummaries.description":
     "Afficher les résumés de raisonnement du modèle dans la chronologie",

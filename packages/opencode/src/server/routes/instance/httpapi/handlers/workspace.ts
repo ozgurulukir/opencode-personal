@@ -47,7 +47,11 @@ export const workspaceHandlers = HttpApiBuilder.group(InstanceHttpApi, "workspac
     const remove = Effect.fn("WorkspaceHttpApi.remove")(function* (ctx: { params: { id: Workspace.Info["id"] } }) {
       const instance = yield* InstanceState.context
       const row = Database.use((db) =>
-        db.select({ projectID: WorkspaceTable.project_id }).from(WorkspaceTable).where(eq(WorkspaceTable.id, ctx.params.id)).get(),
+        db
+          .select({ projectID: WorkspaceTable.project_id })
+          .from(WorkspaceTable)
+          .where(eq(WorkspaceTable.id, ctx.params.id))
+          .get(),
       )
       if (!row || row.projectID !== instance.project.id) {
         return yield* new HttpApiError.NotFound({})
@@ -58,7 +62,11 @@ export const workspaceHandlers = HttpApiBuilder.group(InstanceHttpApi, "workspac
     const warp = Effect.fn("WorkspaceHttpApi.warp")(function* (ctx: { payload: typeof WarpPayload.Type }) {
       const instance = yield* InstanceState.context
       const sessionRow = Database.use((db) =>
-        db.select({ projectID: SessionTable.project_id }).from(SessionTable).where(eq(SessionTable.id, ctx.payload.sessionID)).get(),
+        db
+          .select({ projectID: SessionTable.project_id })
+          .from(SessionTable)
+          .where(eq(SessionTable.id, ctx.payload.sessionID))
+          .get(),
       )
       if (!sessionRow || sessionRow.projectID !== instance.project.id) {
         return yield* new HttpApiError.NotFound({})
@@ -66,7 +74,11 @@ export const workspaceHandlers = HttpApiBuilder.group(InstanceHttpApi, "workspac
       if (ctx.payload.id !== null) {
         const workspaceID = ctx.payload.id
         const workspaceRow = Database.use((db) =>
-          db.select({ projectID: WorkspaceTable.project_id }).from(WorkspaceTable).where(eq(WorkspaceTable.id, workspaceID)).get(),
+          db
+            .select({ projectID: WorkspaceTable.project_id })
+            .from(WorkspaceTable)
+            .where(eq(WorkspaceTable.id, workspaceID))
+            .get(),
         )
         if (!workspaceRow || workspaceRow.projectID !== instance.project.id) {
           return yield* new HttpApiError.NotFound({})

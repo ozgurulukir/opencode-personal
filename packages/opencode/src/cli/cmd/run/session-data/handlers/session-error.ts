@@ -7,11 +7,7 @@ import { formatError, out } from "../utils"
 
 export type SessionErrorEvent = Event & { type: "session.error" }
 
-export function handleSessionError(
-  data: SessionData,
-  event: SessionErrorEvent,
-  sessionID: string,
-): SessionDataOutput {
+export function handleSessionError(data: SessionData, event: SessionErrorEvent, sessionID: string): SessionDataOutput {
   const commits: SessionCommit[] = []
 
   if (event.properties.sessionID !== sessionID || !event.properties.error) {

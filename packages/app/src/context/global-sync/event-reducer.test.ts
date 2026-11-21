@@ -866,9 +866,7 @@ describe("applyDirectoryEvent", () => {
       loadLsp() {},
     })
     const parts = store.part["evt_2"] ?? []
-    const bash = parts.find(
-      (p): p is Extract<Part, { type: "tool" }> => p.type === "tool" && p.callID === "call_x",
-    )
+    const bash = parts.find((p): p is Extract<Part, { type: "tool" }> => p.type === "tool" && p.callID === "call_x")
     expect(bash?.state.status).toBe("running")
 
     applyDirectoryEvent({
@@ -888,9 +886,7 @@ describe("applyDirectoryEvent", () => {
       directory: "/tmp",
       loadLsp() {},
     })
-    const sibling = parts.find(
-      (p): p is Extract<Part, { type: "tool" }> => p.type === "tool" && p.callID === "call_y",
-    )
+    const sibling = parts.find((p): p is Extract<Part, { type: "tool" }> => p.type === "tool" && p.callID === "call_y")
     expect(sibling).toMatchObject({ state: { status: "completed", metadata: { exit: 0 } } })
   })
 
@@ -2269,13 +2265,7 @@ describe("missing event.id", () => {
       }),
     )
 
-    cleanupDroppedSessionCaches(
-      store,
-      setStore,
-      [rootSession({ id: keptSessionID })],
-      undefined,
-      [preservedSessionID],
-    )
+    cleanupDroppedSessionCaches(store, setStore, [rootSession({ id: keptSessionID })], undefined, [preservedSessionID])
 
     // keptSessionID and preservedSessionID messages/parts are preserved
     expect(store.message[keptSessionID]).toBeDefined()

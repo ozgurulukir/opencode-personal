@@ -680,7 +680,6 @@ export const dict = {
   "settings.general.row.releaseNotes.title": "บันทึกการอัปเดต",
   "settings.general.row.releaseNotes.description": "แสดงป๊อปอัพ What's New หลังจากอัปเดต",
 
-
   "sound.option.none": "ไม่มี",
   "sound.option.alert01": "เสียงเตือน 01",
   "sound.option.alert02": "เสียงเตือน 02",

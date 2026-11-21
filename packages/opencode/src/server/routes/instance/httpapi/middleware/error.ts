@@ -17,10 +17,9 @@ function errorResponse(body: unknown, status: number) {
   try {
     return HttpServerResponse.jsonUnsafe(body, { status })
   } catch {
-    return HttpServerResponse.jsonUnsafe(
-      new NamedError.Unknown({ message: "Internal server error" }).toObject(),
-      { status: 500 },
-    )
+    return HttpServerResponse.jsonUnsafe(new NamedError.Unknown({ message: "Internal server error" }).toObject(), {
+      status: 500,
+    })
   }
 }
 

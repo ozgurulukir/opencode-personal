@@ -174,7 +174,9 @@ export const layer = Layer.effect(
       return yield* on(ps, def.type, callback)
     })
 
-    const subscribeAllCallback = Effect.fn("Bus.subscribeAllCallback")(function* (callback: (event: Payload) => unknown) {
+    const subscribeAllCallback = Effect.fn("Bus.subscribeAllCallback")(function* (
+      callback: (event: Payload) => unknown,
+    ) {
       const s = yield* InstanceState.get(state)
       return yield* on(s.wildcard, "*", callback)
     })

@@ -110,13 +110,13 @@ describe("Color Utils", () => {
     test("generates 12 colors for light mode", () => {
       const scale = generateScale("#ff0000", false)
       expect(scale.length).toBe(12)
-      scale.forEach(c => expect(c).toMatch(/^#[0-9a-f]{6}$/i))
+      scale.forEach((c) => expect(c).toMatch(/^#[0-9a-f]{6}$/i))
     })
 
     test("generates 12 colors for dark mode", () => {
       const scale = generateScale("#ff0000", true)
       expect(scale.length).toBe(12)
-      scale.forEach(c => expect(c).toMatch(/^#[0-9a-f]{6}$/i))
+      scale.forEach((c) => expect(c).toMatch(/^#[0-9a-f]{6}$/i))
     })
   })
 
@@ -124,25 +124,25 @@ describe("Color Utils", () => {
     test("generates 12 colors for light mode without ink", () => {
       const scale = generateNeutralScale("#808080", false)
       expect(scale.length).toBe(12)
-      scale.forEach(c => expect(c).toMatch(/^#[0-9a-f]{6}$/i))
+      scale.forEach((c) => expect(c).toMatch(/^#[0-9a-f]{6}$/i))
     })
 
     test("generates 12 colors for dark mode without ink", () => {
       const scale = generateNeutralScale("#808080", true)
       expect(scale.length).toBe(12)
-      scale.forEach(c => expect(c).toMatch(/^#[0-9a-f]{6}$/i))
+      scale.forEach((c) => expect(c).toMatch(/^#[0-9a-f]{6}$/i))
     })
 
     test("generates 12 colors for light mode with ink", () => {
       const scale = generateNeutralScale("#808080", false, "#111111")
       expect(scale.length).toBe(12)
-      scale.forEach(c => expect(c).toMatch(/^#[0-9a-f]{6}$/i))
+      scale.forEach((c) => expect(c).toMatch(/^#[0-9a-f]{6}$/i))
     })
 
     test("generates 12 colors for dark mode with ink", () => {
       const scale = generateNeutralScale("#808080", true, "#111111")
       expect(scale.length).toBe(12)
-      scale.forEach(c => expect(c).toMatch(/^#[0-9a-f]{6}$/i))
+      scale.forEach((c) => expect(c).toMatch(/^#[0-9a-f]{6}$/i))
     })
   })
 
@@ -151,14 +151,14 @@ describe("Color Utils", () => {
       const scale = generateScale("#ff0000", false)
       const alphaScale = generateAlphaScale(scale, false)
       expect(alphaScale.length).toBe(12)
-      alphaScale.forEach(c => expect(c).toMatch(/^#[0-9a-f]{6}$/i))
+      alphaScale.forEach((c) => expect(c).toMatch(/^#[0-9a-f]{6}$/i))
     })
 
     test("generates 12 colors for dark mode", () => {
       const scale = generateScale("#ff0000", true)
       const alphaScale = generateAlphaScale(scale, true)
       expect(alphaScale.length).toBe(12)
-      alphaScale.forEach(c => expect(c).toMatch(/^#[0-9a-f]{6}$/i))
+      alphaScale.forEach((c) => expect(c).toMatch(/^#[0-9a-f]{6}$/i))
     })
   })
 

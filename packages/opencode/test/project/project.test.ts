@@ -117,7 +117,11 @@ describe("Project.fromDirectory", () => {
     await using tmp = await tmpdir({ git: true })
     // Compute the real ID first, then corrupt the cache with a traversal string.
     const real = await run((svc) => svc.fromDirectory(tmp.path))
-    const gitdir = await $`git rev-parse --git-dir`.cwd(tmp.path).quiet().text().then((t) => t.trim())
+    const gitdir = await $`git rev-parse --git-dir`
+      .cwd(tmp.path)
+      .quiet()
+      .text()
+      .then((t) => t.trim())
     await Bun.write(path.join(tmp.path, gitdir, "opencode"), "../../elsewhere")
     const { project } = await run((svc) => svc.fromDirectory(tmp.path))
     // The traversal value must NOT become the project ID; discovery falls back

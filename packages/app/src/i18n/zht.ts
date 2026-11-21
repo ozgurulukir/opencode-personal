@@ -628,8 +628,7 @@ export const dict = {
   "settings.general.row.language.title": "語言",
   "settings.general.row.language.description": "變更 OpenCode 的顯示語言",
   "settings.general.row.shell.title": "終端 Shell",
-  "settings.general.row.shell.description":
-    "選擇終端使用的 shell。相容的 shell 也用於代理程式工具呼叫。",
+  "settings.general.row.shell.description": "選擇終端使用的 shell。相容的 shell 也用於代理程式工具呼叫。",
   "settings.general.row.shell.autoDefault": "自動（預設）",
   "settings.general.row.shell.terminalOnly": "僅終端",
   "settings.general.row.appearance.title": "外觀",
@@ -673,7 +672,6 @@ export const dict = {
 
   "settings.general.row.releaseNotes.title": "發行說明",
   "settings.general.row.releaseNotes.description": "更新後顯示「新功能」彈出視窗",
-
 
   "sound.option.none": "無",
   "sound.option.alert01": "警報 01",

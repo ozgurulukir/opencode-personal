@@ -287,13 +287,11 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       const workspace = yield* InstanceState.workspaceID
       // Best-effort: predict never throws upward — the TUI treats an empty
       // string the same as a hidden suggestion.
-      const prediction = yield* promptSvc
-        .predict({ sessionID: ctx.params.sessionID })
-        .pipe(
-          Effect.provideService(InstanceRef, instance),
-          Effect.provideService(WorkspaceRef, workspace),
-          Effect.catch(() => Effect.succeed("")),
-        )
+      const prediction = yield* promptSvc.predict({ sessionID: ctx.params.sessionID }).pipe(
+        Effect.provideService(InstanceRef, instance),
+        Effect.provideService(WorkspaceRef, workspace),
+        Effect.catch(() => Effect.succeed("")),
+      )
       return { prediction }
     })
 

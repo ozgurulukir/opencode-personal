@@ -1,11 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import {
-  clamp,
-  extractLineRange,
-  removeLineRange,
-  slashHead,
-  slashQuery,
-} from "@/cli/cmd/run/prompt/autocomplete"
+import { clamp, extractLineRange, removeLineRange, slashHead, slashQuery } from "@/cli/cmd/run/prompt/autocomplete"
 
 describe("clamp", () => {
   test("clamps below minimum", () => {

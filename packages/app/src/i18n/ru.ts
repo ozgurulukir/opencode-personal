@@ -661,7 +661,8 @@ export const dict = {
   "settings.general.row.followup.option.queue": "Очередь",
   "settings.general.row.followup.option.steer": "Направлять",
   "settings.general.row.showFileTree.title": "Дерево файлов",
-  "settings.general.row.showFileTree.description": "Показывать переключатель и панель дерева файлов в настольных сессиях",
+  "settings.general.row.showFileTree.description":
+    "Показывать переключатель и панель дерева файлов в настольных сессиях",
   "settings.general.row.showNavigation.title": "Элементы навигации",
   "settings.general.row.showNavigation.description": "Показывать кнопки «назад» и «вперёд» на заголовке окна",
   "settings.general.row.showSearch.title": "Командная палитра",

@@ -22,8 +22,8 @@ export namespace ServerConnection {
     http: HttpBase
   } & (
     | // Regular desktop server
-    { variant: "base" }
-    // WSL server (windows only)
+      { variant: "base" }
+      // WSL server (windows only)
     | {
         variant: "wsl"
         distro: string

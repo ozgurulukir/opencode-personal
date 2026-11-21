@@ -277,7 +277,12 @@ function computeReplacements(
     // Handle context-based seeking
     if (chunk.change_context) {
       // If the context itself is ambiguous, force requireUnique to be true for old_lines
-      const { ambiguous } = findPatternAmbiguity(originalLines, [chunk.change_context], lineIndex, Comparators.normalized)
+      const { ambiguous } = findPatternAmbiguity(
+        originalLines,
+        [chunk.change_context],
+        lineIndex,
+        Comparators.normalized,
+      )
       if (ambiguous) {
         requireUnique = true
       }

@@ -98,9 +98,10 @@ export function createPromptSubmit(input: PromptSubmitInput) {
       pending.delete(sessionID)
       return Promise.resolve()
     }
-    return sdk.client.v2.session.abort({
-      sessionID,
-    })
+    return sdk.client.v2.session
+      .abort({
+        sessionID,
+      })
       .catch(() => {})
   }
 
@@ -326,21 +327,22 @@ export function createPromptSubmit(input: PromptSubmitInput) {
     if (customCommand) {
       clearInput()
       setOptimisticBusy()
-      client.v2.session.command({
-        sessionID: session.id,
-        command: customCommand.name,
-        arguments: customCommand.arguments,
-        agent,
-        model: `${model.providerID}/${model.modelID}`,
-        variant,
-        parts: images.map((attachment) => ({
-          id: Identifier.ascending("part"),
-          type: "file" as const,
-          mime: attachment.mime,
-          url: attachment.dataUrl,
-          filename: attachment.filename,
-        })),
-      })
+      client.v2.session
+        .command({
+          sessionID: session.id,
+          command: customCommand.name,
+          arguments: customCommand.arguments,
+          agent,
+          model: `${model.providerID}/${model.modelID}`,
+          variant,
+          parts: images.map((attachment) => ({
+            id: Identifier.ascending("part"),
+            type: "file" as const,
+            mime: attachment.mime,
+            url: attachment.dataUrl,
+            filename: attachment.filename,
+          })),
+        })
         .catch((err) => {
           setOptimisticIdle()
           showToast({

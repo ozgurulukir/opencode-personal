@@ -33,7 +33,7 @@ This package follows the root [AGENTS.md](../../../AGENTS.md) for general repo r
 
 ## Regenerating the SDK can break downstream typecheck — run the `opencode` gate
 
-Regeneration has ripple effects beyond this package. Two examples: the client's `RequestResult` types `response`/`request` as **optional** (`response?: Response | undefined`) even under `responseStyle: "fields"` — so test/caller types that assume required `response` (e.g. `type SdkResult = { response: Response; ... }`) will fail typecheck. And adding new `Event`-union members (e.g. `message.part.updated.batch`) silently invalidates `@ts-expect-error` directives that guarded the *absence* of those events → `error TS2578: Unused '@ts-expect-error' directive`. Always `bun typecheck` from `packages/opencode` (which the pre-push hook also runs) after regenerating, and expect to update consumers.
+Regeneration has ripple effects beyond this package. Two examples: the client's `RequestResult` types `response`/`request` as **optional** (`response?: Response | undefined`) even under `responseStyle: "fields"` — so test/caller types that assume required `response` (e.g. `type SdkResult = { response: Response; ... }`) will fail typecheck. And adding new `Event`-union members (e.g. `message.part.updated.batch`) silently invalidates `@ts-expect-error` directives that guarded the _absence_ of those events → `error TS2578: Unused '@ts-expect-error' directive`. Always `bun typecheck` from `packages/opencode` (which the pre-push hook also runs) after regenerating, and expect to update consumers.
 
 ## Test conventions
 

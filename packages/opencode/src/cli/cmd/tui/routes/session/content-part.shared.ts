@@ -1,9 +1,4 @@
-import type {
-  SessionMessageAssistant,
-  ToolPart,
-  TextPart,
-  ReasoningPart,
-} from "@opencode-ai/sdk/v2"
+import type { SessionMessageAssistant, ToolPart, TextPart, ReasoningPart } from "@opencode-ai/sdk/v2"
 
 // V2 content items → V1-shaped parts so the ~15 tool renderers stay untouched.
 // structured→metadata, text content join→output, item-level time→state time.
@@ -61,7 +56,11 @@ export function contentPartFromV2(
             .join("\n"),
           title: "",
           metadata: item.state.structured,
-          time: { start: item.time.created, end: item.time.completed ?? item.time.created, compacted: item.time.pruned },
+          time: {
+            start: item.time.created,
+            end: item.time.completed ?? item.time.created,
+            compacted: item.time.pruned,
+          },
         },
       }
     case "error":

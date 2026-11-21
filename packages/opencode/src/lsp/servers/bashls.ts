@@ -1,10 +1,4 @@
-import {
-  type Info,
-  spawn,
-  which,
-  Flag,
-  Npm,
-} from "./shared"
+import { type Info, spawn, which, Flag, Npm } from "./shared"
 
 export const BashLS: Info = {
   id: "bash",

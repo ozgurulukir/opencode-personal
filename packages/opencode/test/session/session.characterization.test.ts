@@ -54,9 +54,7 @@ describe("Session public API — characterization", () => {
       directory: projectRoot,
       fn: async () => {
         const parent = await create({ title: "Fork Parent" })
-        const child = await AppRuntime.runPromise(
-          SessionNs.Service.use((svc) => svc.fork({ sessionID: parent.id })),
-        )
+        const child = await AppRuntime.runPromise(SessionNs.Service.use((svc) => svc.fork({ sessionID: parent.id })))
         expect(child).toBeDefined()
         expect(child.id).toBeDefined()
         expect(child.id).not.toBe(parent.id)
@@ -87,9 +85,7 @@ describe("Session public API — characterization", () => {
       fn: async () => {
         const info = await create({ title: "Archive Me" })
         const now = Date.now()
-        await AppRuntime.runPromise(
-          SessionNs.Service.use((svc) => svc.setArchived({ sessionID: info.id, time: now })),
-        )
+        await AppRuntime.runPromise(SessionNs.Service.use((svc) => svc.setArchived({ sessionID: info.id, time: now })))
         const updated = await AppRuntime.runPromise(SessionNs.Service.use((svc) => svc.get(info.id)))
         expect(updated.time.archived).toBe(now)
       },

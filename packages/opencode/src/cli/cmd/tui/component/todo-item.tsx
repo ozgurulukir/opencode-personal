@@ -34,7 +34,10 @@ function priorityBadge(priority?: Todo.TodoPriority): string {
   }
 }
 
-function priorityColor(priority: Todo.TodoPriority | undefined, theme: ReturnType<typeof useTheme>["theme"]): RGBA | undefined {
+function priorityColor(
+  priority: Todo.TodoPriority | undefined,
+  theme: ReturnType<typeof useTheme>["theme"],
+): RGBA | undefined {
   switch (priority) {
     case "high":
       return theme.error
@@ -55,10 +58,12 @@ export function TodoItem(props: TodoItemProps) {
       <text
         flexShrink={0}
         style={{
-          fg: priorityColor(props.priority, theme) ?? (props.status === "in_progress" ? theme.warning : theme.textMuted),
+          fg:
+            priorityColor(props.priority, theme) ?? (props.status === "in_progress" ? theme.warning : theme.textMuted),
         }}
       >
-        {priorityBadge(props.priority)}{todoIcon(props.status)}{" "}
+        {priorityBadge(props.priority)}
+        {todoIcon(props.status)}{" "}
       </text>
       <text
         flexGrow={1}

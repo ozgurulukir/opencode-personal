@@ -128,10 +128,7 @@ export function permissionAlwaysLines(request: PermissionRequest): string[] {
     return [`This will allow ${request.permission} for this project.`]
   }
 
-  return [
-    "This will allow the following patterns for this project.",
-    ...request.always.map((item) => `- ${item}`),
-  ]
+  return ["This will allow the following patterns for this project.", ...request.always.map((item) => `- ${item}`)]
 }
 
 export function permissionLabel(option: PermissionOption): string {

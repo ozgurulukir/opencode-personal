@@ -22,7 +22,11 @@ export function registerConnection(sessionID: string, connection: AgentSideConne
 
 export async function unregisterConnection(sessionID: string) {
   sessions.delete(sessionID)
-  await Promise.all(Array.from(terminals.values()).filter((value) => value.sessionID === sessionID).map((value) => terminateClientTerminal(value)))
+  await Promise.all(
+    Array.from(terminals.values())
+      .filter((value) => value.sessionID === sessionID)
+      .map((value) => terminateClientTerminal(value)),
+  )
 }
 
 export async function unregisterConnectionTerminals(connection: AgentSideConnection) {

@@ -11,9 +11,8 @@ afterAll(() => mock.restore())
 
 // Static import would run before mock.module (imports are hoisted) — dynamic import
 // after the mock is required. Top-level await is supported in bun test files.
-const { ToolRegistry, registerTool, getTool, getToolInfo, PART_MAPPING, registerPartComponent } = await import(
-  "./message-part"
-)
+const { ToolRegistry, registerTool, getTool, getToolInfo, PART_MAPPING, registerPartComponent } =
+  await import("./message-part")
 
 describe("ToolRegistry", () => {
   test("registerTool stores the renderer under the given name and returns the input", () => {

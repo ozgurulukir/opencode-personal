@@ -227,7 +227,6 @@ function selectAzureLanguageModel(sdk: any, modelID: string, useChat: boolean) {
   return sdk.languageModel(modelID)
 }
 
-
 const utf8Decoder = new TextDecoder()
 const utf8Encoder = new TextEncoder()
 
@@ -243,9 +242,8 @@ export const __exportTestFetchFn = (options: any, model: any, customFetch: any, 
     if (chunkAbortCtl) signals.push(chunkAbortCtl.signal)
     if (timeout !== false) signals.push(AbortSignal.timeout(timeout))
 
-    const { signal: combined, cleanup } = signals.length <= 1
-      ? { signal: signals[0] ?? null, cleanup: () => {} }
-      : combineSignals(signals)
+    const { signal: combined, cleanup } =
+      signals.length <= 1 ? { signal: signals[0] ?? null, cleanup: () => {} } : combineSignals(signals)
     if (combined) opts.signal = combined
 
     // Strip openai itemId metadata following what codex does

@@ -39,8 +39,6 @@ import type {
 } from "./types"
 import { RUN_THEME_FALLBACK, type RunTheme } from "./theme"
 
-
-
 const EMPTY_BORDER = {
   topLeft: "",
   bottomLeft: "",

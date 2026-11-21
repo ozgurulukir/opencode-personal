@@ -194,12 +194,14 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "v2.session
       .handle(
         "update",
         Effect.fn(function* (ctx) {
-          return yield* withNotFound(session.update({
-            sessionID: ctx.params.sessionID,
-            title: ctx.payload.title,
-            permission: ctx.payload.permission,
-            archived: ctx.payload.time?.archived,
-          }))
+          return yield* withNotFound(
+            session.update({
+              sessionID: ctx.params.sessionID,
+              title: ctx.payload.title,
+              permission: ctx.payload.permission,
+              archived: ctx.payload.time?.archived,
+            }),
+          )
         }),
       )
       .handle(
@@ -215,9 +217,12 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "v2.session
           return true
         }),
       )
-      .handle("status", Effect.fn(function* () {
-        return Object.fromEntries(yield* statusSvc.list())
-      }))
+      .handle(
+        "status",
+        Effect.fn(function* () {
+          return Object.fromEntries(yield* statusSvc.list())
+        }),
+      )
       .handle(
         "create",
         Effect.fn(function* (ctx) {
@@ -233,32 +238,40 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "v2.session
       .handle(
         "fork",
         Effect.fn(function* (ctx) {
-          return yield* withNotFound(session.fork({ sessionID: ctx.params.sessionID, messageID: ctx.payload.messageID }))
+          return yield* withNotFound(
+            session.fork({ sessionID: ctx.params.sessionID, messageID: ctx.payload.messageID }),
+          )
         }),
       )
       .handle(
         "share",
         Effect.fn(function* (ctx) {
-          yield* shareSvc.share(ctx.params.sessionID).pipe(Effect.mapError(() => new HttpApiError.InternalServerError({})))
+          yield* shareSvc
+            .share(ctx.params.sessionID)
+            .pipe(Effect.mapError(() => new HttpApiError.InternalServerError({})))
           return yield* withNotFound(session.get(ctx.params.sessionID))
         }),
       )
       .handle(
         "unshare",
         Effect.fn(function* (ctx) {
-          yield* shareSvc.unshare(ctx.params.sessionID).pipe(Effect.mapError(() => new HttpApiError.InternalServerError({})))
+          yield* shareSvc
+            .unshare(ctx.params.sessionID)
+            .pipe(Effect.mapError(() => new HttpApiError.InternalServerError({})))
           return yield* withNotFound(session.get(ctx.params.sessionID))
         }),
       )
       .handle(
         "summarize",
         Effect.fn(function* (ctx) {
-          return yield* withNotFound(session.summarize({
-            sessionID: ctx.params.sessionID,
-            providerID: ctx.payload.providerID,
-            modelID: ctx.payload.modelID,
-            auto: ctx.payload.auto,
-          }))
+          return yield* withNotFound(
+            session.summarize({
+              sessionID: ctx.params.sessionID,
+              providerID: ctx.payload.providerID,
+              modelID: ctx.payload.modelID,
+              auto: ctx.payload.auto,
+            }),
+          )
         }),
       )
       .handle(
@@ -306,11 +319,13 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "v2.session
       .handle(
         "revert",
         Effect.fn(function* (ctx) {
-          return yield* withNotFound(session.revert({
-            sessionID: ctx.params.sessionID,
-            messageID: ctx.payload.messageID,
-            partID: ctx.payload.partID,
-          }))
+          return yield* withNotFound(
+            session.revert({
+              sessionID: ctx.params.sessionID,
+              messageID: ctx.payload.messageID,
+              partID: ctx.payload.partID,
+            }),
+          )
         }),
       )
       .handle(
@@ -326,13 +341,11 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "v2.session
           const workspace = yield* InstanceState.workspaceID
           // Best-effort: predict never throws upward — the TUI treats an empty
           // string the same as a hidden suggestion.
-          const prediction = yield* promptSvc
-            .predict({ sessionID: ctx.params.sessionID })
-            .pipe(
-              Effect.provideService(InstanceRef, instance),
-              Effect.provideService(WorkspaceRef, workspace),
-              Effect.catch(() => Effect.succeed("")),
-            )
+          const prediction = yield* promptSvc.predict({ sessionID: ctx.params.sessionID }).pipe(
+            Effect.provideService(InstanceRef, instance),
+            Effect.provideService(WorkspaceRef, workspace),
+            Effect.catch(() => Effect.succeed("")),
+          )
           return { prediction }
         }),
       )

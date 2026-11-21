@@ -37,10 +37,13 @@ describe("i18n parity", () => {
       Object.entries(locales)
         .map(([name, dict]) => {
           const keys = new Set(Object.keys(dict))
-          return [name, {
-            missing: enKeys.filter((k) => !keys.has(k)),
-            extra: [...keys].filter((k) => !enKeySet.has(k)),
-          }] as const
+          return [
+            name,
+            {
+              missing: enKeys.filter((k) => !keys.has(k)),
+              extra: [...keys].filter((k) => !enKeySet.has(k)),
+            },
+          ] as const
         })
         .filter(([, v]) => v.missing.length > 0 || v.extra.length > 0),
     )

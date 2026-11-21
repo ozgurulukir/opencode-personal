@@ -27,7 +27,13 @@ describe("prompt-input at-mentions", () => {
   })
 
   test("compareAtGroups orders agent before recent before file", () => {
-    const groups = [{ category: "file" }, { category: "recent" }, { category: "agent" }, { category: "file" }, { category: "recent" }]
+    const groups = [
+      { category: "file" },
+      { category: "recent" },
+      { category: "agent" },
+      { category: "file" },
+      { category: "recent" },
+    ]
     const sorted = [...groups].sort(compareAtGroups).map((group) => group.category)
     expect(sorted).toEqual(["agent", "recent", "recent", "file", "file"])
   })

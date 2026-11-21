@@ -256,8 +256,15 @@ function useServerFormState(input: {
     if (!isFormMode()) return input.language.t("dialog.server.title")
     return (
       <div class="flex items-center gap-2 -ml-2">
-        <IconButton icon="arrow-left" variant="ghost" onClick={resetForm} aria-label={input.language.t("common.goBack")} />
-        <span>{isAddMode() ? input.language.t("dialog.server.add.title") : input.language.t("dialog.server.edit.title")}</span>
+        <IconButton
+          icon="arrow-left"
+          variant="ghost"
+          onClick={resetForm}
+          aria-label={input.language.t("common.goBack")}
+        />
+        <span>
+          {isAddMode() ? input.language.t("dialog.server.add.title") : input.language.t("dialog.server.edit.title")}
+        </span>
       </div>
     )
   })
@@ -309,7 +316,8 @@ function useServerMutations(input: {
       }
       if (input.form.store.addServer.name.trim()) conn.displayName = input.form.store.addServer.name.trim()
       if (input.form.store.addServer.password) conn.http.password = input.form.store.addServer.password
-      if (input.form.store.addServer.password && input.form.store.addServer.username) conn.http.username = input.form.store.addServer.username
+      if (input.form.store.addServer.password && input.form.store.addServer.username)
+        conn.http.username = input.form.store.addServer.username
       const result = await input.checkServerHealth(conn.http)
       if (!result.healthy) {
         input.form.setStore("addServer", { error: input.language.t("dialog.server.add.error") })
@@ -719,12 +727,14 @@ export function DialogSelectServer() {
               </Button>
             }
           >
-            <Button variant="primary" size="large" onClick={mutations.submitForm} loading={mutations.formBusy()} class="px-3 py-1.5">
-              {form.isAddMode() ? (
-                language.t("dialog.server.add.button")
-              ) : (
-                language.t("common.save")
-              )}
+            <Button
+              variant="primary"
+              size="large"
+              onClick={mutations.submitForm}
+              loading={mutations.formBusy()}
+              class="px-3 py-1.5"
+            >
+              {form.isAddMode() ? language.t("dialog.server.add.button") : language.t("common.save")}
             </Button>
           </Show>
         </div>

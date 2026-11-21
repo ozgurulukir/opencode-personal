@@ -99,7 +99,13 @@ function makeDeps(
           finish: "stop",
         },
         parts: [
-          { id: PartID.ascending(), messageID: id, sessionID: input.sessionID, type: "text" as const, text: "stub output" },
+          {
+            id: PartID.ascending(),
+            messageID: id,
+            sessionID: input.sessionID,
+            type: "text" as const,
+            text: "stub output",
+          },
         ],
       } satisfies MessageV2.WithParts) // same reply() shape as subtask.test.ts / task.test.ts
     },

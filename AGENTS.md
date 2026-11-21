@@ -56,16 +56,19 @@ Bun workspace monorepo: `packages/*`, `packages/sdk/js`. Catalog versioning via 
 Add JSDoc **only** to complex, non-obvious functions — not self-documenting code:
 
 **Add JSDoc:**
+
 - Complex algorithms (50+ lines, cognitive complexity > 20)
 - Non-obvious behavior ("does X but in Y case does Z")
 - Side effects not apparent from the name
 
 **Skip JSDoc:**
+
 - Simple data transformations (`themeIDs()`, `knownThemes()`)
 - Self-documenting names (`handlePermissionAsked`)
 - Internal helpers used in 1-2 places
 
 **Example:**
+
 ```ts
 /**
  * Flushes in-flight parts as interrupted commits.
@@ -137,12 +140,7 @@ export function reduceSessionData(input: SessionDataInput): SessionDataOutput {
 Modules ending in `.shared.ts` (e.g., `prompt.shared.ts`, `permission.shared.ts`) export **pure functions** that take state as input and return new state as output — no side effects, no IO, no mutations. Tested via characterization tests.
 
 ```ts
-export function movePromptHistory(
-  state: PromptHistoryState,
-  dir: -1 | 1,
-  text: string,
-  cursor: number,
-): PromptMove // { state, text?, cursor?, apply: boolean }
+export function movePromptHistory(state: PromptHistoryState, dir: -1 | 1, text: string, cursor: number): PromptMove // { state, text?, cursor?, apply: boolean }
 ```
 
 This enables deterministic unit tests without mocks, safe extraction from reactive UI components, and clear separation between computation (`.shared.ts`) and rendering (`.tsx`).
@@ -224,12 +222,12 @@ const table = sqliteTable("session", {
 ## Known Issues
 
 - Root `test` script always fails: `echo 'do not run tests from root' && exit 1`
- - `packages/opencode/src/session/loop/run-loop.ts:89` — `runLoop` is a ~346-line `Effect.fn("SessionPrompt.run")` infinite loop (`run-loop.ts:89-434`); the `SessionPrompt` engine layer generator that invokes it spans `session/prompt.ts:85-279` (called via `loop` at `prompt.ts:228-263`). Future extraction target — the blueprint in `_plan/` decomposes it into `ToolExecutor` + `CompactionPolicy` + `PromptAssembler` + `SubtaskRouter` + an `AgentLoop` orchestrator.
+- `packages/opencode/src/session/loop/run-loop.ts:89` — `runLoop` is a ~346-line `Effect.fn("SessionPrompt.run")` infinite loop (`run-loop.ts:89-434`); the `SessionPrompt` engine layer generator that invokes it spans `session/prompt.ts:85-279` (called via `loop` at `prompt.ts:228-263`). Future extraction target — the blueprint in `_plan/` decomposes it into `ToolExecutor` + `CompactionPolicy` + `PromptAssembler` + `SubtaskRouter` + an `AgentLoop` orchestrator.
 - `as any` casts (verified 2026-09): 67 total — `packages/opencode/src` (29), `packages/ui/src` (33), `packages/core/src` (5). The provider layer is clean (1 cast, `provider/provider.ts:1272`). Known library-internal casts: `packages/core/src/effect-zod.ts` (3, Effect Schema annotations), `packages/opencode/src/plugin/index.ts` (1, `(hook as any).config?.(cfg)`, reflective hook invocation), `packages/opencode/src/mcp/index.ts` (1, `TolerantListToolsResultSchema`, SDK zod version boundary). `packages/desktop` was deleted; its Electron-HTTP-proxy cast is gone.
 - `useFilteredList` (`packages/ui/src/hooks/use-filtered-list.tsx`) must use `createResource` (not `createMemo`) for grouped data when `items` can be async. Commit `016a457` replaced `createResource` with `createMemo` + `asyncItems` resource + `Object.assign` to mock the `Resource` shape — silently broke reactivity: API calls succeeded (200 OK) but `List`-based dialogs (`dialog-select-directory`, `dialog-select-model`) rendered empty. Reverted; the `keys` memo optimization (`6541fdf`) is safe and preserved.
 - TypeScript conditional types in parameter positions can cause the compiler to skip parameters (both `tsc` and `tsgo`). Example: `[Extract<T, ...>["properties"]] extends [never] ? ...` caused `id: string` to be skipped in `@openauthjs/openauth`'s `OnSuccessResponder.subject()`.
 - Permission evaluation: `evaluate(permission, pattern, ...rulesets)` flattens then uses `findLast` — last match wins. A bug previously passed `(approved, ruleset)` in wrong order, making config always override DB-persisted "always allow". Fixed by checking deny from config first, then allow from approved, then allow from config. Pre-existing `ScopedCache` state leakage between `withDir` tests masks this — `disposeAllInstances()` invalidates async, so "always" replies leak. 2 flaky tests remain.
- - Subagent permission wiring: normal tools merge `agent.permission + session.permission` (`session/loop/tools.ts:83,118`), but subagent task's own ask merges `parentAgent.permission` (resolved at `subtask.ts:138`) + PARENT session permission at `subtask.ts:148` (not subagent session) — `taskAgent` at `subtask.ts:139` is an existence-check only, and command subtasks set `bypassAgentCheck: true` at `subtask.ts:159`.
+- Subagent permission wiring: normal tools merge `agent.permission + session.permission` (`session/loop/tools.ts:83,118`), but subagent task's own ask merges `parentAgent.permission` (resolved at `subtask.ts:138`) + PARENT session permission at `subtask.ts:148` (not subagent session) — `taskAgent` at `subtask.ts:139` is an existence-check only, and command subtasks set `bypassAgentCheck: true` at `subtask.ts:159`.
 - Effect Schema cross-file identity: Moving `Schema.Struct` definitions to separate files breaks type identity under `verbatimModuleSyntax`. Schema.Struct types are not stable across module boundaries. Keep schema definitions in the module where they're consumed.
 - `session.system > skills output is sorted by name and stable across calls` — was failing deterministically (Expected: > 495, Received: 188), not intermittently. Root cause: the test stub returned an unsorted list containing an invalid skill while asserting the real `Skill.available()` contract (sort + hide invalid). Fixed in the test; `fmt()` still preserves input order by design (locked by `test/skill/skill.test.ts`).
 - `usage.characterization.test.ts:76` — `getUsage` returns `tokens.cache.write: 0` when `inputTokenDetails.cacheWriteTokens: 0` and `metadata.anthropic.cacheCreationInputTokens: 75`. See `??` vs `||` note below.
@@ -239,7 +237,7 @@ const table = sqliteTable("session", {
 - Compiled-binary markdown rendering is owned by the pre-bundled tree-sitter worker (commit `8707e5892`, 2026-09-11). Bun 1.3.14 cannot load `files`-map virtual files as Worker entries (proven `ModuleNotFound` with a dependency-free minimal repro, in every URL form) and the old `OTUI_TREE_SITTER_WORKER_PATH` define pointed at an unhashed path that never exists (real embedded paths carry a content hash), so `script/build.ts` pre-bundles `parser.worker.js` (web-tree-sitter inlined, engine wasm inlined as bytes via `Parser.init({ wasmBinary })`, build-time assertions fail the build instead of shipping raw-text) and embeds it as text via an `embedded:ts-worker-bundle` virtual module; `src/util/ts-worker.ts` extracts it versioned (`parser.worker.bundle-<WORKER_BUNDLE_VERSION>.js`) to the data dir at boot and sets the env var the client checks first. No-op in dev and when overridden. On `@opentui/core`/`web-tree-sitter` upgrades: refresh `patches/@opentui%2Fcore@0.2.16.patch`, bump `WORKER_BUNDLE_VERSION`, rebuild.
 - Dev-mode worker specifier is kept current via `patches/@opentui%2Fcore@0.2.16.patch` (bun patch flow): web-tree-sitter 0.26.11 renamed `tree-sitter.wasm` → `web-tree-sitter.wasm` but the 0.2.16 worker still requests the old name, failing `Parser.init` everywhere with the error swallowed by `highlightOnce` (raw text, no log).
 - Pre-existing flaky permission test: `reply - reject cancels all pending for same session` fails intermittently in the full suite but passes in isolation. Not caused by recent changes.
-- Compiled binary TUI "immediately returns to terminal" after a `git reset`/branch switch (verified 2026-09): the compiled binary **embeds the `node_modules` state at build time**, and `bun install` after a source rollback is *incremental* - it adds missing packages but does not prune stale content left by a prior dependency era (e.g. an `@opentui` 0.5.9 upgrade later reverted to 0.2.16 in both `package.json` and `bun.lock`). The stale/duplicate module graph (double `@opentui/core` or `solid-js` instances) makes the SolidJS TUI render then quit **silently**: exit code 0, no stack trace, server log ends with `worker shutting down` (`cli/cmd/tui/worker.ts:111`) after the TUI client connects successfully. Diagnosis signals: server + `/agent` + `/config` requests all succeed, then instant clean exit; a worktree with a fresh `bun install` of the SAME commit builds a working binary (isolates `node_modules`, not source, as the variable). Fix: delete ALL `node_modules` (root + every `packages/*`, incl. `packages/sdk/js`) then `bun install` + rebuild. Check the binary version stamp (`opencode --version` -> `0.0.0-main-<UTC yyyymmddhhmm>`) to confirm which build you are running; the PATH `opencode` (`~/.local/bin/opencode.exe`) is a symlink into `packages/opencode/dist/.../bin/opencode.exe`, so it always reflects the latest local build.
+- Compiled binary TUI "immediately returns to terminal" after a `git reset`/branch switch (verified 2026-09): the compiled binary **embeds the `node_modules` state at build time**, and `bun install` after a source rollback is _incremental_ - it adds missing packages but does not prune stale content left by a prior dependency era (e.g. an `@opentui` 0.5.9 upgrade later reverted to 0.2.16 in both `package.json` and `bun.lock`). The stale/duplicate module graph (double `@opentui/core` or `solid-js` instances) makes the SolidJS TUI render then quit **silently**: exit code 0, no stack trace, server log ends with `worker shutting down` (`cli/cmd/tui/worker.ts:111`) after the TUI client connects successfully. Diagnosis signals: server + `/agent` + `/config` requests all succeed, then instant clean exit; a worktree with a fresh `bun install` of the SAME commit builds a working binary (isolates `node_modules`, not source, as the variable). Fix: delete ALL `node_modules` (root + every `packages/*`, incl. `packages/sdk/js`) then `bun install` + rebuild. Check the binary version stamp (`opencode --version` -> `0.0.0-main-<UTC yyyymmddhhmm>`) to confirm which build you are running; the PATH `opencode` (`~/.local/bin/opencode.exe`) is a symlink into `packages/opencode/dist/.../bin/opencode.exe`, so it always reflects the latest local build.
 
 ## Notes
 
@@ -257,7 +255,7 @@ const table = sqliteTable("session", {
 - Error handling: use `safeCatch` (`packages/opencode/src/util/error.ts`) for promise error wrapping instead of manual try/catch — logs context automatically
 - Message continuation: `wrapMessageContinuation` (`packages/opencode/src/session/message-continuation.ts`) — pure function that returns new message arrays without mutation; operate on a message-array copy before calling
 - Provider usage: `packages/opencode/src/provider/usage/` — types.ts (interfaces), claude.ts (Anthropic OAuth fetcher), zai.ts (ZAI API key fetcher), registry.ts (auth.json reader + dispatcher). `/usage` TUI dialog: `cli/cmd/tui/component/dialog-usage.tsx`
- - Double compaction fix: overflow guard checks `compaction_continue` metadata to prevent `Event.Compacted` double-fire (`session/compaction-trigger.ts:isCurrentTurnContinue`, consumed at `session/loop/run-loop.ts:192,217-248`). The guard checks the active user turn's message for a text part carrying `metadata.compaction_continue`; `MessageV2.latest()` (not array position) must be used to find the latest assistant or the `summary !== true` guard is bypassed.
+- Double compaction fix: overflow guard checks `compaction_continue` metadata to prevent `Event.Compacted` double-fire (`session/compaction-trigger.ts:isCurrentTurnContinue`, consumed at `session/loop/run-loop.ts:192,217-248`). The guard checks the active user turn's message for a text part carrying `metadata.compaction_continue`; `MessageV2.latest()` (not array position) must be used to find the latest assistant or the `summary !== true` guard is bypassed.
 - Security (secret comparisons): a `constantTimeEqual()` helper wrapping `node:crypto` `timingSafeEqual` is referenced in older notes but **does NOT exist in this fork** (verified 2026-08: zero matches in `packages/`). For secret comparisons (API keys, tokens), prefer defining a local `constantTimeEqual(a, b)` that handles length mismatch before `timingSafeEqual`, rather than `!==`. This is aspirational guidance, not a built-in helper.
 - Provider system prompt: `ProviderTransform.systemPromptDelivery(providerID, authInfo)` (`packages/opencode/src/provider/transform.ts:36-39`) returns `{ type: "instructions" }` for OpenAI OAuth (no `system` role support — passed via `instructions` field). Used in `session/llm.ts:118` and `agent/agent.ts:458`.
 - WSL path resolution (historical pattern, `packages/desktop` is now deleted): the `wslPath()` pattern resolved `$HOME` separately (no user input) then passed the path as an `execFileSync` array argument to prevent shell injection. Never interpolate user-controlled paths into `sh -lc` strings — always use the array-argument form of `execFileSync`.
@@ -267,8 +265,8 @@ const table = sqliteTable("session", {
 - `@ts-expect-error` is acceptable for genuine library type-definition bugs that can't be patched. Always include an explanatory comment.
 - Permission system: `packages/opencode/src/permission/AGENTS.md` (`disabled()` semantics, `Wildcard.match`, `fromConfig`); `packages/opencode/src/agent/AGENTS.md` (subagent inheritance, tool restrictions); `packages/opencode/src/mcp/AGENTS.md` (MCP tool permission keys, pattern derivation).
 - V1/V2 subagent parity: `tool/task.ts` (V1 TaskTool) and `v2/session.ts` (V2 subagent) share `subagentSessionPermission()` and `subagentToolRestrictions()` from `agent/subagent-permissions.ts`, plus `resolveParentAgent()` (parent-agent resolution + fallback) and `checkNesting()` (depth walk). Any change to permission derivation or tool restrictions must go through these helpers. V2 `subagent()` requires `Agent.Service` + `Config.Service` in test layers.
- - V2 `subagent()` abort: cancel runs through EffectBridge — `bridge.promise(cancelChild).catch(...)` at `v2/session.ts:783` (onAbort), with the release wrap at `v2/session.ts:854-860` (`Effect.catch` + `log.warn`). V1 `tool/task.ts` matches: `bridge.promise(cancel).catch(...)` at `tool/task.ts:151` (onAbort `tool/task.ts:148`), release wrap at `tool/task.ts:199-206` (`log.warn` at `:203`). Bare `Effect.runPromise` on a cancel effect drops the Effect runtime — never use it for subagent cancel.
- - V2 `subagent()` parent agent lookup: shared `resolveParentAgent()` (`agent/subagent-permissions.ts:104-137`) logs a warning and applies `FALLBACK_DENY` — 5 rules `edit`/`write`/`bash`/`task`/`todowrite` (`subagent-permissions.ts:16-22`) — on null-agent (`:112`), not-found (`:121`), and defect (`:129`) branches; a null agent now applies fallback (finding 8), so silent failure no longer weakens deny-rule inheritance. V1 `tool/task.ts` uses the same helper.
+- V2 `subagent()` abort: cancel runs through EffectBridge — `bridge.promise(cancelChild).catch(...)` at `v2/session.ts:783` (onAbort), with the release wrap at `v2/session.ts:854-860` (`Effect.catch` + `log.warn`). V1 `tool/task.ts` matches: `bridge.promise(cancel).catch(...)` at `tool/task.ts:151` (onAbort `tool/task.ts:148`), release wrap at `tool/task.ts:199-206` (`log.warn` at `:203`). Bare `Effect.runPromise` on a cancel effect drops the Effect runtime — never use it for subagent cancel.
+- V2 `subagent()` parent agent lookup: shared `resolveParentAgent()` (`agent/subagent-permissions.ts:104-137`) logs a warning and applies `FALLBACK_DENY` — 5 rules `edit`/`write`/`bash`/`task`/`todowrite` (`subagent-permissions.ts:16-22`) — on null-agent (`:112`), not-found (`:121`), and defect (`:129`) branches; a null agent now applies fallback (finding 8), so silent failure no longer weakens deny-rule inheritance. V1 `tool/task.ts` uses the same helper.
 - Three distinct spinner systems coexist: TUI unified spinner (`component/spinner.tsx` via `ui/spinner-config.ts`), web/desktop SVG spinner (`packages/ui/src/components/spinner.tsx`), and `@clack/prompts` CLI spinner. They share no code and have different APIs. The TUI `Spinner` component wraps the native `<spinner>` element with an `animations_enabled` KV check and supports variants (`dots`, `knight-rider`, `blocks`). All TUI views use `<Spinner>` instead of native `<spinner>` directly.
 - Nullish coalescing `??` does not fall through for `0` or `""` (only `null`/`undefined`). Use `||` when the intention is to fall through for all falsy values. Discovered in `getUsage`: `inputTokenDetails.cacheWriteTokens: 0` returned `0` instead of falling back to `metadata.anthropic.cacheCreationInputTokens`.
 - SSRF DNS rebinding: DNS checks before HTTP requests are bypassed if the HTTP client re-resolves DNS independently. Pin the resolved IP in the request URL and set the `Host` header to the original hostname. See `tool/webfetch.ts` for the pattern.
@@ -325,6 +323,7 @@ Practical rule:
 - combine both when a task spans TypeScript code and surrounding docs/config
 
 <!-- gitnexus:start -->
+
 # GitNexus — Code Intelligence
 
 This project is indexed by GitNexus as **opencode-personal** (60209 symbols, 168291 relationships, 1343 execution flows).
@@ -350,23 +349,23 @@ This project is indexed by GitNexus as **opencode-personal** (60209 symbols, 168
 
 ## Resources
 
-| Resource | Use for |
-| --- | --- |
-| `gitnexus://repo/opencode-personal/context` | Codebase overview, check index freshness |
-| `gitnexus://repo/opencode-personal/clusters` | All functional areas |
-| `gitnexus://repo/opencode-personal/processes` | All execution flows |
-| `gitnexus://repo/opencode-personal/process/{name}` | Step-by-step execution trace |
+| Resource                                           | Use for                                  |
+| -------------------------------------------------- | ---------------------------------------- |
+| `gitnexus://repo/opencode-personal/context`        | Codebase overview, check index freshness |
+| `gitnexus://repo/opencode-personal/clusters`       | All functional areas                     |
+| `gitnexus://repo/opencode-personal/processes`      | All execution flows                      |
+| `gitnexus://repo/opencode-personal/process/{name}` | Step-by-step execution trace             |
 
 ## CLI
 
-| Task | Read this skill file |
-| --- | --- |
-| Understand architecture / "How does X work?" | `.claude/skills/gitnexus-exploring/SKILL.md` |
-| Blast radius / "What breaks if I change X?" | `.claude/skills/gitnexus-impact-analysis/SKILL.md` |
-| Trace bugs / "Why is X failing?" | `.claude/skills/gitnexus-debugging/SKILL.md` |
-| Rename / extract / split / refactor | `.claude/skills/gitnexus-refactoring/SKILL.md` |
-| Tools, resources, schema reference | `.claude/skills/gitnexus-guide/SKILL.md` |
-| Index, status, clean, wiki CLI commands | `.claude/skills/gitnexus-cli/SKILL.md` |
+| Task                                         | Read this skill file                               |
+| -------------------------------------------- | -------------------------------------------------- |
+| Understand architecture / "How does X work?" | `.claude/skills/gitnexus-exploring/SKILL.md`       |
+| Blast radius / "What breaks if I change X?"  | `.claude/skills/gitnexus-impact-analysis/SKILL.md` |
+| Trace bugs / "Why is X failing?"             | `.claude/skills/gitnexus-debugging/SKILL.md`       |
+| Rename / extract / split / refactor          | `.claude/skills/gitnexus-refactoring/SKILL.md`     |
+| Tools, resources, schema reference           | `.claude/skills/gitnexus-guide/SKILL.md`           |
+| Index, status, clean, wiki CLI commands      | `.claude/skills/gitnexus-cli/SKILL.md`             |
 
 ## Notes
 

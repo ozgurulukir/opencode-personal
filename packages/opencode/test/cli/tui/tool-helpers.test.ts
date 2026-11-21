@@ -1,8 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import {
-  formatToolInput,
-  resolveToolFiletype,
-} from "@/cli/cmd/tui/routes/session/tool-helpers.shared"
+import { formatToolInput, resolveToolFiletype } from "@/cli/cmd/tui/routes/session/tool-helpers.shared"
 
 describe("tool-helpers.shared", () => {
   test("formatToolInput formats primitive values into bracketed string", () => {

@@ -198,7 +198,9 @@ describe("HttpApi Server.listen", () => {
         const nextInfo = await createCat(restarted, tmp.path)
         const nextTicket = await connectTicket(restarted, nextInfo.id, tmp.path)
         const nextWs = await openSocket(socketURL(restarted, nextInfo.id, tmp.path, nextTicket.ticket))
-        const nextClosed = new Promise<void>((resolve) => nextWs.addEventListener("close", () => resolve(), { once: true }))
+        const nextClosed = new Promise<void>((resolve) =>
+          nextWs.addEventListener("close", () => resolve(), { once: true }),
+        )
         const nextMessage = waitForMessage(nextWs, (message) => message.includes("ping-restarted"))
         nextWs.send("ping-restarted\n")
         expect(await nextMessage).toContain("ping-restarted")

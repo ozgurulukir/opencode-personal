@@ -57,20 +57,20 @@ Or you can set it up manually.
        permissions:
          id-token: write
        steps:
-       - name: Checkout repository
-         uses: actions/checkout@v6
-         with:
-           fetch-depth: 1
-           persist-credentials: false
+         - name: Checkout repository
+           uses: actions/checkout@v6
+           with:
+             fetch-depth: 1
+             persist-credentials: false
 
-       - name: Run OpenCode
-         uses: anomalyco/opencode/github@latest
-         env:
-           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-         with:
-           model: anthropic/claude-sonnet-4-5-20250929
-           # share: true
-           # use_github_token: true
+         - name: Run OpenCode
+           uses: anomalyco/opencode/github@latest
+           env:
+             ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+           with:
+             model: anthropic/claude-sonnet-4-5-20250929
+             # share: true
+             # use_github_token: true
    ```
 
 3. **Store the API keys in secrets**

@@ -103,7 +103,9 @@ describe("getSessionContextMetrics", () => {
   test("usage divides by the compaction budget, not the raw context window", () => {
     // 200K context with a 32K output reserve -> 168K usable; 168K tokens
     // reads 100% (the old raw-window formula would have reported 84%).
-    const messages = [assistant("a1", { input: 100_000, output: 20_000, reasoning: 30_000, read: 16_000, write: 2_000 }, 0.5)]
+    const messages = [
+      assistant("a1", { input: 100_000, output: 20_000, reasoning: 30_000, read: 16_000, write: 2_000 }, 0.5),
+    ]
     const providers = [
       { id: "openai", models: { "gpt-4.1": { name: "GPT-4.1", limit: { context: 200_000, output: 32_000 } } } },
     ]
@@ -148,7 +150,9 @@ describe("getSessionContextMetrics", () => {
   })
 
   test("usage can exceed 100 when tokens pass the budget", () => {
-    const messages = [assistant("a1", { input: 200_000, output: 40_000, reasoning: 60_000, read: 32_000, write: 4_000 }, 0.5)]
+    const messages = [
+      assistant("a1", { input: 200_000, output: 40_000, reasoning: 60_000, read: 32_000, write: 4_000 }, 0.5),
+    ]
     const providers = [
       { id: "openai", models: { "gpt-4.1": { name: "GPT-4.1", limit: { context: 200_000, output: 32_000 } } } },
     ]

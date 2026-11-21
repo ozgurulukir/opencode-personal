@@ -26,7 +26,11 @@ import { convertToOpenAICompatibleChatMessages } from "./convert-to-openai-compa
 import { getResponseMetadata } from "./get-response-metadata"
 import { mapOpenAICompatibleFinishReason } from "./map-openai-compatible-finish-reason"
 import { type OpenAICompatibleChatModelId, openaiCompatibleProviderOptions } from "./openai-compatible-chat-options"
-import { defaultOpenAICompatibleErrorStructure, openaiCompatibleErrorDataSchema, type ProviderErrorStructure } from "../openai-compatible-error"
+import {
+  defaultOpenAICompatibleErrorStructure,
+  openaiCompatibleErrorDataSchema,
+  type ProviderErrorStructure,
+} from "../openai-compatible-error"
 import type { MetadataExtractor } from "./openai-compatible-metadata-extractor"
 import { prepareTools } from "./openai-compatible-prepare-tools"
 
@@ -58,7 +62,9 @@ export class OpenAICompatibleChatLanguageModel implements LanguageModelV3 {
   readonly modelId: OpenAICompatibleChatModelId
   private readonly config: OpenAICompatibleChatConfig
   private readonly failedResponseHandler: ResponseHandler<APICallError>
-  private readonly chunkSchema: ReturnType<typeof createOpenAICompatibleChatChunkSchema<typeof openaiCompatibleErrorDataSchema>>
+  private readonly chunkSchema: ReturnType<
+    typeof createOpenAICompatibleChatChunkSchema<typeof openaiCompatibleErrorDataSchema>
+  >
 
   constructor(modelId: OpenAICompatibleChatModelId, config: OpenAICompatibleChatConfig) {
     this.modelId = modelId
@@ -66,7 +72,9 @@ export class OpenAICompatibleChatLanguageModel implements LanguageModelV3 {
 
     // initialize error handling:
     const errorStructure = config.errorStructure ?? defaultOpenAICompatibleErrorStructure
-    this.chunkSchema = createOpenAICompatibleChatChunkSchema(errorStructure.errorSchema) as unknown as typeof this.chunkSchema
+    this.chunkSchema = createOpenAICompatibleChatChunkSchema(
+      errorStructure.errorSchema,
+    ) as unknown as typeof this.chunkSchema
     this.failedResponseHandler = createJsonErrorResponseHandler(errorStructure)
 
     this.supportsStructuredOutputs = config.supportsStructuredOutputs ?? false

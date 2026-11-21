@@ -95,7 +95,14 @@ describe("file-read.linesWithHunks", () => {
     const filepath = path.join(tmp.path, "file.txt")
     await fs.writeFile(filepath, "1\n2\n3\n4\n5\n6")
     // Ranges 2-2 and 4-4 with context 1 merge into 1-5
-    const result = await linesWithHunks(filepath, [{ start: 2, end: 2 }, { start: 4, end: 4 }], 1)
+    const result = await linesWithHunks(
+      filepath,
+      [
+        { start: 2, end: 2 },
+        { start: 4, end: 4 },
+      ],
+      1,
+    )
     expect(result.raw).toEqual(["1: 1", "2: 2", "3: 3", "4: 4", "5: 5"])
   })
 

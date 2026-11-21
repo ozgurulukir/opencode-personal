@@ -5,10 +5,16 @@ import { STORAGE_KEYS, clearThemeCss, drop, normalize, read, write } from "./the
 const store = new Map<string, string>()
 const mockLocalStorage = {
   getItem: (key: string) => store.get(key) ?? null,
-  setItem: (key: string, value: string) => { store.set(key, value) },
-  removeItem: (key: string) => { store.delete(key) },
+  setItem: (key: string, value: string) => {
+    store.set(key, value)
+  },
+  removeItem: (key: string) => {
+    store.delete(key)
+  },
   clear: () => store.clear(),
-  get length() { return store.size },
+  get length() {
+    return store.size
+  },
   key: (index: number) => [...store.keys()][index] ?? null,
 }
 

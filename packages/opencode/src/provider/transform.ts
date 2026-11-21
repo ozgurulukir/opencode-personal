@@ -29,9 +29,7 @@ function mimeToModality(mime: string): Modality | undefined {
 // context-budget module so server and client meters floor output identically.
 export { OUTPUT_TOKEN_MAX } from "@opencode-ai/sdk/v2/context-budget"
 
-export type SystemPromptDelivery =
-  | { type: "messages" }
-  | { type: "instructions" }
+export type SystemPromptDelivery = { type: "messages" } | { type: "instructions" }
 
 // OpenAI OAuth doesn't support `system` role messages — system prompt
 // must be passed via `instructions` in providerOptions instead.
@@ -1215,9 +1213,7 @@ export function schema(model: Model, schema: JSONSchema.BaseSchema | JSONSchema7
  * including non-Qwen ones routed through that gateway.
  */
 export function isQwen3Model(model: Pick<Model, "id" | "providerID" | "api">): boolean {
-  return [model.id, model.providerID, model.api.id].some((s) =>
-    s.toLowerCase().includes("qwen3"),
-  )
+  return [model.id, model.providerID, model.api.id].some((s) => s.toLowerCase().includes("qwen3"))
 }
 
 export * as ProviderTransform from "./transform"

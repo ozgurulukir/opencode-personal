@@ -25,7 +25,7 @@ function msgEvent(overrides: Record<string, unknown> = {}): Event & { type: "mes
         providerID: "anthropic",
         tokens: { input: 10, output: 20 },
         cost: 0.0015,
-        ...(overrides.info as Record<string, unknown> ?? {}),
+        ...((overrides.info as Record<string, unknown>) ?? {}),
       },
       ...overrides,
     },
@@ -47,7 +47,10 @@ function deltaEvent(overrides: Record<string, unknown> = {}): Event & { type: "m
   } as any
 }
 
-function partUpdatedEvent(part: Partial<Part> = {}, overrides: Record<string, unknown> = {}): Event & { type: "message.part.updated" } {
+function partUpdatedEvent(
+  part: Partial<Part> = {},
+  overrides: Record<string, unknown> = {},
+): Event & { type: "message.part.updated" } {
   return {
     id: "evt_3",
     type: "message.part.updated",
@@ -237,7 +240,14 @@ describe("pickBlockerView", () => {
   })
 
   test("returns permission view when permission exists", () => {
-    const perm: PermissionRequest = { id: "p1", sessionID: SESSION_ID, permission: "write", patterns: [], metadata: {}, always: [] }
+    const perm: PermissionRequest = {
+      id: "p1",
+      sessionID: SESSION_ID,
+      permission: "write",
+      patterns: [],
+      metadata: {},
+      always: [],
+    }
     const result = pickBlockerView({ permission: perm })
     expect(result.type).toBe("permission")
     expect((result as any).request).toBe(perm)
@@ -251,7 +261,14 @@ describe("pickBlockerView", () => {
   })
 
   test("permission takes priority over question", () => {
-    const perm: PermissionRequest = { id: "p1", sessionID: SESSION_ID, permission: "write", patterns: [], metadata: {}, always: [] }
+    const perm: PermissionRequest = {
+      id: "p1",
+      sessionID: SESSION_ID,
+      permission: "write",
+      patterns: [],
+      metadata: {},
+      always: [],
+    }
     const q: QuestionRequest = { id: "q1", sessionID: SESSION_ID, questions: [] }
     const result = pickBlockerView({ permission: perm, question: q })
     expect(result.type).toBe("permission")
@@ -318,7 +335,9 @@ describe("reduceSessionData: message.updated", () => {
 
   test("includes usage info in footer patch when tokens present", () => {
     const data = createSessionData()
-    const event = msgEvent({ info: { id: "msg_1", role: "assistant", tokens: { input: 10, output: 20 }, cost: 0.0015 } })
+    const event = msgEvent({
+      info: { id: "msg_1", role: "assistant", tokens: { input: 10, output: 20 }, cost: 0.0015 },
+    })
     const out = reduceSessionData(makeInput(data, event))
     expect(out.footer?.patch?.usage).toBeTruthy()
     expect(out.footer?.patch?.usage).toContain("30")
@@ -326,7 +345,9 @@ describe("reduceSessionData: message.updated", () => {
 
   test("emits error commit when message has error", () => {
     const data = createSessionData()
-    const event = msgEvent({ info: { id: "msg_1", role: "assistant", error: { name: "APIError", message: "Server error" } } })
+    const event = msgEvent({
+      info: { id: "msg_1", role: "assistant", error: { name: "APIError", message: "Server error" } },
+    })
     const out = reduceSessionData(makeInput(data, event))
     expect(out.commits.length).toBeGreaterThan(0)
     expect(out.commits.some((c) => c.kind === "error")).toBe(true)
@@ -335,16 +356,22 @@ describe("reduceSessionData: message.updated", () => {
 
   test("does not emit error for MessageAbortedError", () => {
     const data = createSessionData()
-    const event = msgEvent({ info: { id: "msg_1", role: "assistant", error: { name: "MessageAbortedError", message: "Aborted" } } })
+    const event = msgEvent({
+      info: { id: "msg_1", role: "assistant", error: { name: "MessageAbortedError", message: "Aborted" } },
+    })
     const out = reduceSessionData(makeInput(data, event))
     expect(out.commits.some((c) => c.kind === "error")).toBe(false)
   })
 
   test("does not emit duplicate error for same message", () => {
     const data = createSessionData()
-    const event1 = msgEvent({ info: { id: "msg_1", role: "assistant", error: { name: "APIError", message: "Server error" } } })
+    const event1 = msgEvent({
+      info: { id: "msg_1", role: "assistant", error: { name: "APIError", message: "Server error" } },
+    })
     reduceSessionData(makeInput(data, event1))
-    const event2 = msgEvent({ info: { id: "msg_1", role: "assistant", error: { name: "APIError", message: "Server error" } } })
+    const event2 = msgEvent({
+      info: { id: "msg_1", role: "assistant", error: { name: "APIError", message: "Server error" } },
+    })
     const out = reduceSessionData(makeInput(data, event2))
     expect(out.commits.filter((c) => c.kind === "error").length).toBe(0)
   })
@@ -381,7 +408,13 @@ describe("reduceSessionData: message.updated", () => {
   test("keeps reasoning parts when thinking is enabled", () => {
     const data = createSessionData()
     // reasoning part with time.end, sent with thinking=true so it's buffered
-    const partEvt = partUpdatedEvent({ id: "part_1", messageID: "msg_1", type: "reasoning", text: "thinking...", time: { start: 100, end: 200 } })
+    const partEvt = partUpdatedEvent({
+      id: "part_1",
+      messageID: "msg_1",
+      type: "reasoning",
+      text: "thinking...",
+      time: { start: 100, end: 200 },
+    })
     reduceSessionData(makeInput(data, partEvt, { thinking: true }))
     const msgEvt = msgEvent({ info: { id: "msg_1", role: "assistant" } })
     const out = reduceSessionData(makeInput(data, msgEvt, { thinking: true }))
@@ -560,7 +593,10 @@ describe("reduceSessionData: message.part.updated (text)", () => {
 describe("reduceSessionData: message.part.updated (tool)", () => {
   test("emits start commit for running tool", () => {
     const data = createSessionData()
-    const event = toolPartUpdatedEvent({ id: "tool_1", state: { status: "running", input: { command: "ls" }, time: { start: 100 } } })
+    const event = toolPartUpdatedEvent({
+      id: "tool_1",
+      state: { status: "running", input: { command: "ls" }, time: { start: 100 } },
+    })
     const out = reduceSessionData(makeInput(data, event))
     expect(out.commits.length).toBeGreaterThan(0)
     expect(out.commits[0].phase).toBe("start")
@@ -571,7 +607,10 @@ describe("reduceSessionData: message.part.updated (tool)", () => {
   test("does not emit duplicate start for already-seen tool", () => {
     const data = createSessionData()
     data.tools.add("tool_1")
-    const event = toolPartUpdatedEvent({ id: "tool_1", state: { status: "running", input: { command: "ls" }, time: { start: 100 } } })
+    const event = toolPartUpdatedEvent({
+      id: "tool_1",
+      state: { status: "running", input: { command: "ls" }, time: { start: 100 } },
+    })
     const out = reduceSessionData(makeInput(data, event))
     expect(out.commits.filter((c) => c.phase === "start").length).toBe(0)
   })
@@ -659,7 +698,10 @@ describe("reduceSessionData: message.part.updated (tool)", () => {
   test("ignores already-committed tool part", () => {
     const data = createSessionData()
     data.ids.add("tool_1")
-    const event = toolPartUpdatedEvent({ id: "tool_1", state: { status: "completed", input: {}, output: "", title: "", metadata: {}, time: { start: 100, end: 200 } } })
+    const event = toolPartUpdatedEvent({
+      id: "tool_1",
+      state: { status: "completed", input: {}, output: "", title: "", metadata: {}, time: { start: 100, end: 200 } },
+    })
     const out = reduceSessionData(makeInput(data, event))
     expect(out.commits).toEqual([])
   })
@@ -705,7 +747,11 @@ describe("reduceSessionData: message.part.updated (tool)", () => {
 
   test("updates status patch for running tool", () => {
     const data = createSessionData()
-    const event = toolPartUpdatedEvent({ id: "tool_1", tool: "bash", state: { status: "running", input: { command: "ls" }, time: { start: 100 } } })
+    const event = toolPartUpdatedEvent({
+      id: "tool_1",
+      tool: "bash",
+      state: { status: "running", input: { command: "ls" }, time: { start: 100 } },
+    })
     const out = reduceSessionData(makeInput(data, event))
     expect(out.footer?.patch?.status).toContain("running bash")
   })
@@ -763,7 +809,14 @@ describe("reduceSessionData: permission events", () => {
 
   test("removes permission on permission.replied", () => {
     const data = createSessionData()
-    data.permissions.push({ id: "perm_1", sessionID: SESSION_ID, permission: "write", patterns: [], metadata: {}, always: [] })
+    data.permissions.push({
+      id: "perm_1",
+      sessionID: SESSION_ID,
+      permission: "write",
+      patterns: [],
+      metadata: {},
+      always: [],
+    })
     const event = permissionRepliedEvent()
     const out = reduceSessionData(makeInput(data, event))
     expect(data.permissions.length).toBe(0)
@@ -845,7 +898,10 @@ describe("reduceSessionData: question events", () => {
   test("upserts question (replaces existing with same id)", () => {
     const data = createSessionData()
     reduceSessionData(makeInput(data, questionAskedEvent({ id: "q_1" })))
-    const event2 = questionAskedEvent({ id: "q_1", questions: [{ header: "Updated", question: "Really?", options: [{ label: "No", description: "Nope" }] }] })
+    const event2 = questionAskedEvent({
+      id: "q_1",
+      questions: [{ header: "Updated", question: "Really?", options: [{ label: "No", description: "Nope" }] }],
+    })
     const out = reduceSessionData(makeInput(data, event2))
     expect(data.questions.length).toBe(1)
     expect(data.questions[0].questions[0].header).toBe("Updated")
@@ -1016,9 +1072,7 @@ describe("bootstrapSessionData", () => {
       data,
       messages: [
         {
-          parts: [
-            { type: "text", id: "text_1", messageID: "msg_1", text: "hello" } as Part,
-          ],
+          parts: [{ type: "text", id: "text_1", messageID: "msg_1", text: "hello" } as Part],
         },
       ],
       permissions: [],

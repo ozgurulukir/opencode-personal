@@ -30,7 +30,10 @@ export const schemaErrorLayer = HttpApiMiddleware.layerSchemaErrorTransform(Sche
   log.warn("schema rejection", { kind: error.kind, reason })
   try {
     return Effect.succeed(
-      HttpServerResponse.jsonUnsafe({ name: "BadRequest", data: { message: reason, kind: error.kind } }, { status: 400 }),
+      HttpServerResponse.jsonUnsafe(
+        { name: "BadRequest", data: { message: reason, kind: error.kind } },
+        { status: 400 },
+      ),
     )
   } catch {
     return Effect.succeed(

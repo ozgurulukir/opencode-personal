@@ -20,12 +20,10 @@ describe("file-path.resolvePath", () => {
     await using outside = await tmpdir()
     await using fixture = await tmpdir()
     await fs.writeFile(path.join(outside.path, "secret.txt"), "s")
-    await fs.symlink(
-      outside.path,
-      path.join(fixture.path, "evil"),
-      process.platform === "win32" ? "junction" : "dir",
+    await fs.symlink(outside.path, path.join(fixture.path, "evil"), process.platform === "win32" ? "junction" : "dir")
+    expect(resolvePath(path.join(fixture.path, "evil", "secret.txt"))).toBe(
+      await fs.realpath(path.join(outside.path, "secret.txt")),
     )
-    expect(resolvePath(path.join(fixture.path, "evil", "secret.txt"))).toBe(await fs.realpath(path.join(outside.path, "secret.txt")))
   })
 
   test("falls back to resolving the parent dir for not-yet-created files", async () => {
@@ -38,11 +36,7 @@ describe("file-path.resolvePath", () => {
   test("handles nonexistent files under a symlinked parent", async () => {
     await using outside = await tmpdir()
     await using fixture = await tmpdir()
-    await fs.symlink(
-      outside.path,
-      path.join(fixture.path, "link"),
-      process.platform === "win32" ? "junction" : "dir",
-    )
+    await fs.symlink(outside.path, path.join(fixture.path, "link"), process.platform === "win32" ? "junction" : "dir")
     const resolved = resolvePath(path.join(fixture.path, "link", "future.ts"))
     expect(resolved).toContain(await fs.realpath(outside.path))
   })
@@ -50,15 +44,13 @@ describe("file-path.resolvePath", () => {
   test("handles nested nonexistent subdirectories under a symlinked ancestor", async () => {
     await using outside = await tmpdir()
     await using fixture = await tmpdir()
-    await fs.symlink(
-      outside.path,
-      path.join(fixture.path, "link"),
-      process.platform === "win32" ? "junction" : "dir",
-    )
+    await fs.symlink(outside.path, path.join(fixture.path, "link"), process.platform === "win32" ? "junction" : "dir")
     const target = path.join(fixture.path, "link", "nested", "deep", "future.ts")
     const resolved = resolvePath(target)
     expect(resolved).toBe(path.join(await fs.realpath(outside.path), "nested", "deep", "future.ts"))
-    expect(projectContainmentError(resolved, await fs.realpath(fixture.path))).toContain("Path escapes project directory")
+    expect(projectContainmentError(resolved, await fs.realpath(fixture.path))).toContain(
+      "Path escapes project directory",
+    )
   })
 })
 

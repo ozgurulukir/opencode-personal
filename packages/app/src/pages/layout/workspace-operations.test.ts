@@ -1,11 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { base64Encode } from "@opencode-ai/core/util/encode"
 import type { Session } from "@opencode-ai/sdk/v2/client"
-import {
-  createWorkspaceOperations,
-  needsPostDeleteRedirect,
-  shouldLeaveDeletedWorkspace,
-} from "./workspace-operations"
+import { createWorkspaceOperations, needsPostDeleteRedirect, shouldLeaveDeletedWorkspace } from "./workspace-operations"
 import type { useGlobalSDK } from "@/context/global-sdk"
 import type { useGlobalSync } from "@/context/global-sync"
 import type { useLanguage } from "@/context/language"
@@ -81,7 +77,9 @@ const session = (id: string, archived?: number) =>
   }) as Session
 
 describe("createWorkspaceOperations", () => {
-  function setup(overrides: { currentDir?: () => string; removeResult?: { data: unknown }; resetResult?: { data: unknown } } = {}) {
+  function setup(
+    overrides: { currentDir?: () => string; removeResult?: { data: unknown }; resetResult?: { data: unknown } } = {},
+  ) {
     const calls: string[] = []
     const { removeResult = { data: true }, resetResult = { data: true }, ...rest } = overrides
     const input = {

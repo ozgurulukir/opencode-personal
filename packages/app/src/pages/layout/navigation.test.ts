@@ -38,7 +38,10 @@ describe("pickOffsetIndex", () => {
 })
 
 describe("pickUnseenOffsetIndex", () => {
-  const input = (unseen: (index: number) => boolean, overrides: Partial<Parameters<typeof pickUnseenOffsetIndex>[0]> = {}) => ({
+  const input = (
+    unseen: (index: number) => boolean,
+    overrides: Partial<Parameters<typeof pickUnseenOffsetIndex>[0]> = {},
+  ) => ({
     offset: 1,
     length: 5,
     activeIndex: -1,
@@ -46,7 +49,10 @@ describe("pickUnseenOffsetIndex", () => {
     ...overrides,
   })
   const none = () => false
-  const only = (...indexes: number[]) => (index: number) => indexes.includes(index)
+  const only =
+    (...indexes: number[]) =>
+    (index: number) =>
+      indexes.includes(index)
 
   test("returns undefined when nothing is unseen", () => {
     expect(pickUnseenOffsetIndex(input(none))).toBeUndefined()

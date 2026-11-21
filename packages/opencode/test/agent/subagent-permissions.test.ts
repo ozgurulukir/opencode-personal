@@ -214,7 +214,9 @@ describe("taskDenyGate", () => {
 
   test("undefined permissions pass (no rules → evaluate defaults to ask, not deny)", () => {
     expect(taskDenyGate({ subagentType: "general" })).toEqual({ denied: false })
-    expect(taskDenyGate({ gateAgentPermission: undefined, parentSessionPermission: undefined, subagentType: "x" })).toEqual({
+    expect(
+      taskDenyGate({ gateAgentPermission: undefined, parentSessionPermission: undefined, subagentType: "x" }),
+    ).toEqual({
       denied: false,
     })
   })
@@ -289,13 +291,7 @@ describe("checkNesting", () => {
     const great = SessionID.make("ses_great")
     const get = (id: SessionID) =>
       Effect.succeed(
-        id === start
-          ? { parentID: mid }
-          : id === mid
-            ? { parentID: root }
-            : id === root
-              ? { parentID: great }
-              : {},
+        id === start ? { parentID: mid } : id === mid ? { parentID: root } : id === root ? { parentID: great } : {},
       )
     expect(() => Effect.runSync(checkNesting({ startID: start, get }))).toThrow(
       new Error("Maximum subagent nesting levels (3) exceeded"),

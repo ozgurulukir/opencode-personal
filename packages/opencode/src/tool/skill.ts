@@ -20,13 +20,11 @@ export const Parameters = Schema.Struct({
 
 // Each loaded skill spawns a ripgrep process and injects its full content into
 // the output. The model can split larger batches across calls.
-function formatSkillOutput(
-  info: Skill.Info,
-  files: string,
-): string[] {
-  const warningHeader = info.warnings && info.warnings.length > 0
-    ? [`⚠️ Skill "${info.name}" has validation issues:`, ...info.warnings.map((w) => `  - ${w}`), ""]
-    : []
+function formatSkillOutput(info: Skill.Info, files: string): string[] {
+  const warningHeader =
+    info.warnings && info.warnings.length > 0
+      ? [`⚠️ Skill "${info.name}" has validation issues:`, ...info.warnings.map((w) => `  - ${w}`), ""]
+      : []
 
   const dir = path.dirname(info.location)
   const base = pathToFileURL(dir).href
@@ -115,13 +113,12 @@ export const SkillTool = Tool.define(
           }
 
           // Combined output with separator between skills
-          const combinedOutput = outputParts.flatMap((part, idx) =>
-            idx === 0 ? part : ["", "---", "", ...part],
-          )
+          const combinedOutput = outputParts.flatMap((part, idx) => (idx === 0 ? part : ["", "---", "", ...part]))
 
-          const title = uniqueNames.length === 1
-            ? `Loaded skill: ${uniqueNames[0]}`
-            : `Loaded ${uniqueNames.length} skills: ${uniqueNames.join(", ")}`
+          const title =
+            uniqueNames.length === 1
+              ? `Loaded skill: ${uniqueNames[0]}`
+              : `Loaded ${uniqueNames.length} skills: ${uniqueNames.join(", ")}`
 
           return {
             title,

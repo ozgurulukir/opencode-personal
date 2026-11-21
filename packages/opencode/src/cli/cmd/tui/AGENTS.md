@@ -12,7 +12,7 @@ This file covers TUI-specific patterns for `packages/opencode/src/cli/cmd/tui/`.
 
 **Fix:** `stderr-capture.ts` overrides BOTH `process.stderr.write` AND `console.{error,warn,log,info,debug}` to route everything to the log file (via `appendFileSync`). It does NOT touch `process.stdout.write`. Bun Workers share the parent's stderr/stdout, so worker output also needs capture at the parent level.
 
-**Specific leak vector:** `tui/plugin/runtime.ts:fail()` calls `console.error(\`[tui.plugin] ${text}\`, next)` where `next = {...data, error: errorData(error)}`. `errorData()` includes `cause: errorFormat(error.cause)` which JSON.stringifies non-Error object causes — meaning API request/response bodies attached as `error.cause` leak to the terminal. Always capture before calling plugin loading code, and prefer logging sensitive payloads via `log.error(...)` (which goes through `Log.write` → file) over `console.error`.
+**Specific leak vector:** `tui/plugin/runtime.ts:fail()` calls `console.error(\`[tui.plugin] ${text}\`, next)`where`next = {...data, error: errorData(error)}`. `errorData()`includes`cause: errorFormat(error.cause)`which JSON.stringifies non-Error object causes — meaning API request/response bodies attached as`error.cause`leak to the terminal. Always capture before calling plugin loading code, and prefer logging sensitive payloads via`log.error(...)`(which goes through`Log.write`→ file) over`console.error`.
 
 ## OpenTUI keymap — event order and global keys
 
@@ -56,6 +56,7 @@ This file covers TUI-specific patterns for `packages/opencode/src/cli/cmd/tui/`.
 **Gate/iteration consistency**: Use single source `props.input.todos` for both gate and iteration. Avoid `<Match when={props.metadata.todos?.length}>` + `<For each={props.input.todos ?? []}>` mismatch.
 
 **Pattern**:
+
 ```tsx
 {(() => {
   const todos = props.input.todos ?? []

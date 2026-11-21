@@ -121,10 +121,7 @@ function mergeConfigConcatArrays(target: Info, source: Info): Info {
     }
   }
   if (target.experimental?.primary_tools || source.experimental?.primary_tools) {
-    const primary_tools = concatUnique(
-      target.experimental?.primary_tools,
-      source.experimental?.primary_tools,
-    )
+    const primary_tools = concatUnique(target.experimental?.primary_tools, source.experimental?.primary_tools)
     if (primary_tools) {
       merged.experimental = { ...merged.experimental, primary_tools }
     }
@@ -387,8 +384,7 @@ export const Info = Schema.Struct({
         description: `Tool names whose output is never pruned during compaction (default: ${JSON.stringify(COMPACTION_DEFAULTS.pruneProtectedTools)})`,
       }),
       summary_max_tokens: Schema.optional(NonNegativeInt).annotate({
-        description:
-          `Maximum token budget for the compaction summary, passed both as maxOutputTokens to the compaction LLM call and as the target length hint in the summary prompt. Defaults to min(model output limit, ${COMPACTION_DEFAULTS.maxSummaryTokens}).`,
+        description: `Maximum token budget for the compaction summary, passed both as maxOutputTokens to the compaction LLM call and as the target length hint in the summary prompt. Defaults to min(model output limit, ${COMPACTION_DEFAULTS.maxSummaryTokens}).`,
       }),
       autocontinue: Schema.optional(Schema.Boolean).annotate({
         description:
@@ -554,7 +550,10 @@ export const layer = Layer.effect(
       yield* Effect.promise(() => resolveLoadedPlugins(data, options.path))
       if (!data.$schema) {
         data.$schema = "https://ozgurulukir.github.io/opencode-personal/config.json"
-        const updated = text.replace(/^\s*\{/, '{\n  "$schema": "https://ozgurulukir.github.io/opencode-personal/config.json",')
+        const updated = text.replace(
+          /^\s*\{/,
+          '{\n  "$schema": "https://ozgurulukir.github.io/opencode-personal/config.json",',
+        )
         yield* fs.writeFileString(options.path, updated).pipe(Effect.catch(() => Effect.void))
       }
       return data
@@ -700,7 +699,9 @@ export const layer = Layer.effect(
         for (const [key, value] of Object.entries(auth)) {
           if (value.type === "wellknown") {
             const url = key.replace(/\/+$/, "")
-            yield* Effect.promise(() => assertSafeRemoteUrl(url, "well-known auth provider URL", { allowLocalhost: true }))
+            yield* Effect.promise(() =>
+              assertSafeRemoteUrl(url, "well-known auth provider URL", { allowLocalhost: true }),
+            )
             if (/^[A-Z_][A-Z0-9_]*$/.test(value.key) && !UNSAFE_ENV_KEYS.has(value.key)) {
               process.env[value.key] = value.token
             } else {
@@ -708,9 +709,13 @@ export const layer = Layer.effect(
             }
             log.debug("fetching remote config", { url: `${url}/.well-known/opencode` })
             const wellknown = (yield* Effect.promise(() =>
-              safeFetchJson<Record<string, unknown>>(`${url}/.well-known/opencode`, "well-known auth provider metadata", {
-                allowLocalhost: true,
-              }),
+              safeFetchJson<Record<string, unknown>>(
+                `${url}/.well-known/opencode`,
+                "well-known auth provider metadata",
+                {
+                  allowLocalhost: true,
+                },
+              ),
             )) as {
               config?: Record<string, unknown>
               remote_config?: unknown
@@ -733,7 +738,8 @@ export const layer = Layer.effect(
                 })) as Record<string, unknown>)
               : {}
             const remoteConfig = mergeConfig(wellknown.config ?? {}, fetchedConfig as Info)
-            if (!remoteConfig.$schema) remoteConfig.$schema = "https://ozgurulukir.github.io/opencode-personal/config.json"
+            if (!remoteConfig.$schema)
+              remoteConfig.$schema = "https://ozgurulukir.github.io/opencode-personal/config.json"
             const source = `${url}/.well-known/opencode`
             const next = yield* loadConfig(JSON.stringify(remoteConfig), {
               dir: path.dirname(source),

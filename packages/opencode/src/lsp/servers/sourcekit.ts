@@ -1,10 +1,4 @@
-import {
-  type Info,
-  NearestRoot,
-  output,
-  spawn,
-  which,
-} from "./shared"
+import { type Info, NearestRoot, output, spawn, which } from "./shared"
 
 export const SourceKit: Info = {
   id: "sourcekit-lsp",

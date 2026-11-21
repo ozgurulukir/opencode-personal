@@ -1,14 +1,4 @@
-import {
-  Component,
-  createMemo,
-  createSignal,
-  For,
-  Match,
-  Show,
-  Switch,
-  Index,
-  type JSX,
-} from "solid-js"
+import { Component, createMemo, createSignal, For, Match, Show, Switch, Index, type JSX } from "solid-js"
 import { createStore } from "solid-js/store"
 import { findLastTextPart, parseUserMessageParts } from "./message-part-utils"
 import { PacedMarkdown } from "./message-part-paced"
@@ -34,10 +24,7 @@ import { ToolErrorCard } from "./tool-error-card"
 import { Markdown } from "./markdown"
 import { ImagePreview } from "./image-preview"
 
-import {
-  ToolRegistry,
-  webSearchProviderLabel,
-} from "./message-part-registry"
+import { ToolRegistry, webSearchProviderLabel } from "./message-part-registry"
 import {
   groupParts,
   index,
@@ -542,7 +529,8 @@ PART_MAPPING["tool"] = function ToolPartDisplay(props) {
   const emptyMetadata: Record<string, unknown> = {}
 
   const input = () => part().state?.input ?? emptyInput
-  const partMetadata = () => part().metadata ?? (part().state as { metadata?: Record<string, unknown> })?.metadata ?? emptyMetadata
+  const partMetadata = () =>
+    part().metadata ?? (part().state as { metadata?: Record<string, unknown> })?.metadata ?? emptyMetadata
   const taskId = createMemo(() => {
     if (part().tool !== "task") return
     const value = partMetadata().sessionId

@@ -178,7 +178,7 @@ export function DialogSessionList() {
           value: x.id,
           category,
           footer,
-          gutter: isDeletingProcess ? () => <Spinner /> : (isWorking ? () => <Spinner /> : undefined),
+          gutter: isDeletingProcess ? () => <Spinner /> : isWorking ? () => <Spinner /> : undefined,
         }
       })
   })

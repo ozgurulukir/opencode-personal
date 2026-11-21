@@ -28,9 +28,7 @@ describe("MCP tool key collisions", () => {
 
   test("distinct sanitized keys are all kept", () => {
     const client = {} as any
-    const map = MCP.buildToolMap([
-      { clientName: "server", client, tools: [tool("get-weather"), tool("get.weather")] },
-    ])
+    const map = MCP.buildToolMap([{ clientName: "server", client, tools: [tool("get-weather"), tool("get.weather")] }])
 
     expect(Object.keys(map).sort()).toEqual(["mcp_server_get-weather", "mcp_server_get_weather"])
   })

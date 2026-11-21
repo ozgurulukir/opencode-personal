@@ -20,16 +20,8 @@ import {
 import { FOOTER_MENU_ROWS, createFooterMenuState, type RunFooterMenuItem } from "../footer.menu"
 import type { RunFooterTheme } from "../theme"
 import type { FooterKeybinds, FooterState, RunAgent, RunCommand, RunPrompt, RunPromptPart, RunResource } from "../types"
-import {
-  clamp,
-  extractLineRange,
-  removeLineRange,
-  slashQuery,
-} from "./autocomplete"
-import {
-  parseSlashCommand,
-  type ValidationResult,
-} from "./submit"
+import { clamp, extractLineRange, removeLineRange, slashQuery } from "./autocomplete"
+import { parseSlashCommand, type ValidationResult } from "./submit"
 import {
   clearParts,
   clonePrompt,

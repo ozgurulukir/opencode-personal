@@ -316,7 +316,11 @@ export default function Layout(props: ParentProps) {
   }
 
   function cycleTheme(direction = 1) {
-    const nextThemeId = pickCycleNext(availableThemeEntries().map(([id]) => id), theme.themeId(), direction)
+    const nextThemeId = pickCycleNext(
+      availableThemeEntries().map(([id]) => id),
+      theme.themeId(),
+      direction,
+    )
     if (!nextThemeId) return
     theme.setTheme(nextThemeId)
     showToast({
@@ -1195,7 +1199,10 @@ export default function Layout(props: ParentProps) {
   })
 
   createEffect(() => {
-    document.documentElement.style.setProperty("--dialog-left-margin", `${dialogLeftMargin(layout.sidebar.opened(), layout.sidebar.width())}px`)
+    document.documentElement.style.setProperty(
+      "--dialog-left-margin",
+      `${dialogLeftMargin(layout.sidebar.opened(), layout.sidebar.width())}px`,
+    )
   })
 
   const side = createMemo(() => panelSide(layout.sidebar.width()))
@@ -1216,7 +1223,9 @@ export default function Layout(props: ParentProps) {
         for (const directory of next) {
           if (loadedSessionDirs.has(directory)) continue
           // background bootstrap — failure leaves sessions unloaded; later syncs retry
-          globalSync.project.loadSessions(directory).catch((error) => console.warn("failed to load sessions; later syncs will retry", error))
+          globalSync.project
+            .loadSessions(directory)
+            .catch((error) => console.warn("failed to load sessions; later syncs will retry", error))
         }
 
         loadedSessionDirs.clear()
@@ -1277,11 +1286,7 @@ export default function Layout(props: ParentProps) {
     setActiveWorkspace: (id) => setStore("activeWorkspace", id),
     setWorkspaceOrder: (worktree, order) => setStore("workspaceOrder", worktree, order),
   })
-  const {
-    handleWorkspaceDragStart,
-    handleWorkspaceDragOver,
-    handleWorkspaceDragEnd,
-  } = workspaceDrag
+  const { handleWorkspaceDragStart, handleWorkspaceDragOver, handleWorkspaceDragEnd } = workspaceDrag
 
   const createWorkspace = async (project: LocalProject) => {
     clearSidebarHoverState()

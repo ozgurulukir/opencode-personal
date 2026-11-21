@@ -153,36 +153,85 @@ export async function installMockApi(page: Page): Promise<MockApiHandles> {
       }
       const url = new URL(request.url())
       if (request.method() !== "GET") {
-        await route.fulfill({ status: 404, contentType: "application/json", body: JSON.stringify({ message: `No mock for ${request.method()} ${url.pathname}` }) })
+        await route.fulfill({
+          status: 404,
+          contentType: "application/json",
+          body: JSON.stringify({ message: `No mock for ${request.method()} ${url.pathname}` }),
+        })
         return
       }
       await json(route, {})
     },
   )
 
-  await page.route((url) => url.pathname === "/global/health", (route) => json(route, { healthy: true, version: "e2e" }))
-  await page.route((url) => url.pathname === "/global/config", (route) => json(route, {}))
-  await page.route((url) => url.pathname === "/provider", (route) => json(route, providerList))
-  await page.route((url) => url.pathname === "/path", (route) => json(route, mockPath))
+  await page.route(
+    (url) => url.pathname === "/global/health",
+    (route) => json(route, { healthy: true, version: "e2e" }),
+  )
+  await page.route(
+    (url) => url.pathname === "/global/config",
+    (route) => json(route, {}),
+  )
+  await page.route(
+    (url) => url.pathname === "/provider",
+    (route) => json(route, providerList),
+  )
+  await page.route(
+    (url) => url.pathname === "/path",
+    (route) => json(route, mockPath),
+  )
   // Empty list → home empty state; directory bootstrap falls through to /project/current.
-  await page.route((url) => url.pathname === "/project", (route) => json(route, []))
-  await page.route((url) => url.pathname === "/project/current", (route) => json(route, mockProject))
-  await page.route((url) => url.pathname === "/agent", (route) => json(route, [mockAgent]))
-  await page.route((url) => url.pathname === "/config", (route) => json(route, {}))
-  await page.route((url) => url.pathname === "/vcs", (route) => json(route, null))
-  await page.route((url) => url.pathname === "/command", (route) => json(route, []))
-  await page.route((url) => url.pathname === "/permission", (route) => json(route, []))
-  await page.route((url) => url.pathname === "/question", (route) => json(route, []))
-  await page.route((url) => url.pathname === "/mcp", (route) => json(route, {}))
+  await page.route(
+    (url) => url.pathname === "/project",
+    (route) => json(route, []),
+  )
+  await page.route(
+    (url) => url.pathname === "/project/current",
+    (route) => json(route, mockProject),
+  )
+  await page.route(
+    (url) => url.pathname === "/agent",
+    (route) => json(route, [mockAgent]),
+  )
+  await page.route(
+    (url) => url.pathname === "/config",
+    (route) => json(route, {}),
+  )
+  await page.route(
+    (url) => url.pathname === "/vcs",
+    (route) => json(route, null),
+  )
+  await page.route(
+    (url) => url.pathname === "/command",
+    (route) => json(route, []),
+  )
+  await page.route(
+    (url) => url.pathname === "/permission",
+    (route) => json(route, []),
+  )
+  await page.route(
+    (url) => url.pathname === "/question",
+    (route) => json(route, []),
+  )
+  await page.route(
+    (url) => url.pathname === "/mcp",
+    (route) => json(route, {}),
+  )
 
-  await page.route((url) => url.pathname === "/api/session", (route) => json(route, { items: [], cursor: {} }))
+  await page.route(
+    (url) => url.pathname === "/api/session",
+    (route) => json(route, { items: [], cursor: {} }),
+  )
   await page.route(
     (url) => /^\/api\/session\/[^/]+\/message$/.test(url.pathname),
     (route) => json(route, { items: [], cursor: {} }),
   )
   // Busy-turn todo poll (`sync.session.todo`): must be an array — a `{}` body
   // truthily passes `todo.data ?? []` and crashes the todo dock's `<Index>`.
-  await page.route((url) => /^\/api\/session\/[^/]+\/todo$/.test(url.pathname), (route) => json(route, []))
+  await page.route(
+    (url) => /^\/api\/session\/[^/]+\/todo$/.test(url.pathname),
+    (route) => json(route, []),
+  )
   await page.route(
     (url) => /^\/api\/session\/[^/]+\/prompt_async$/.test(url.pathname),
     async (route) => {
@@ -211,7 +260,10 @@ export async function installMockApi(page: Page): Promise<MockApiHandles> {
   // Registered after the single-segment detail route: Playwright checks the
   // most recently registered route first, so status must win over the detail
   // pattern (both match `/api/session/status`).
-  await page.route((url) => url.pathname === "/api/session/status", (route) => json(route, {}))
+  await page.route(
+    (url) => url.pathname === "/api/session/status",
+    (route) => json(route, {}),
+  )
 
   await page.route(
     (url) => url.pathname === "/global/event",

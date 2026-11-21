@@ -571,7 +571,8 @@ export const dict = {
   "settings.general.row.language.title": "言語",
   "settings.general.row.language.description": "OpenCodeの表示言語を変更します",
   "settings.general.row.shell.title": "ターミナルのシェル",
-  "settings.general.row.shell.description": "ターミナルで使用するシェルを選択します。互換性のあるシェルはエージェントのツール呼び出しにも使用されます。",
+  "settings.general.row.shell.description":
+    "ターミナルで使用するシェルを選択します。互換性のあるシェルはエージェントのツール呼び出しにも使用されます。",
   "settings.general.row.shell.autoDefault": "自動 (デフォルト)",
   "settings.general.row.shell.terminalOnly": "ターミナルのみ",
   "settings.general.row.appearance.title": "外観",

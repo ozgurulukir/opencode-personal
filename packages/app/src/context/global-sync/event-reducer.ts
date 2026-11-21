@@ -40,7 +40,6 @@ import {
 
 type MessageEvent = { id?: string; type: string; properties?: unknown }
 
-
 export function applyGlobalEvent(input: {
   event: { type: string; properties?: unknown }
   project: Project[]
@@ -275,11 +274,7 @@ function handleSessionDeleted(input: {
   input.setStore("sessionTotal", (value) => Math.max(0, value - 1))
 }
 
-function handleSessionDiff(input: {
-  setStore: SetStoreFunction<State>
-  sessionID: string
-  diff: SnapshotFileDiff[]
-}) {
+function handleSessionDiff(input: { setStore: SetStoreFunction<State>; sessionID: string; diff: SnapshotFileDiff[] }) {
   input.setStore("session_diff", input.sessionID, reconcile(list(input.diff), { key: "file" }))
 }
 
@@ -293,11 +288,7 @@ function handleTodoUpdated(input: {
   input.setSessionTodo?.(input.sessionID, input.todos)
 }
 
-function handleSessionStatus(input: {
-  setStore: SetStoreFunction<State>
-  sessionID: string
-  status: SessionStatus
-}) {
+function handleSessionStatus(input: { setStore: SetStoreFunction<State>; sessionID: string; status: SessionStatus }) {
   input.setStore("session_status", input.sessionID, reconcile(input.status))
 }
 
@@ -456,7 +447,10 @@ function handlePrompted(input: MessageHandlerInput, event: MessageEvent) {
     parts.push(filePart({ messageID: id, sessionID: props.sessionID, index: index++, file }))
   for (const agent of props.prompt.agents ?? [])
     parts.push(agentPart({ messageID: id, sessionID: props.sessionID, index: index++, agent }))
-  if (props.prompt.subtask) parts.push(subtaskPart({ messageID: id, sessionID: props.sessionID, index: index++, subtask: props.prompt.subtask }))
+  if (props.prompt.subtask)
+    parts.push(
+      subtaskPart({ messageID: id, sessionID: props.sessionID, index: index++, subtask: props.prompt.subtask }),
+    )
 
   // Evict the optimistic entry matching this text before inserting, so the
   // timeline never shows both. V2 message ids are event ids, not the client's
@@ -492,10 +486,7 @@ function handleShellStarted(input: MessageHandlerInput, event: MessageEvent) {
   // assistant carrying the bash tool part.
   const wrapperID = requireEventID(event)
   if (!wrapperID) return
-  insertMessage(
-    input,
-    userMessage({ id: wrapperID, sessionID: props.sessionID, agent, model, created }),
-  )
+  insertMessage(input, userMessage({ id: wrapperID, sessionID: props.sessionID, agent, model, created }))
   insertParts(input, wrapperID, [
     textPart({
       messageID: wrapperID,
@@ -538,18 +529,22 @@ function handleShellEnded(input: MessageHandlerInput, event: MessageEvent) {
   // stranding sibling tool parts. The "tool part exists" trick cannot be used
   // here — a `!` shell's wrapper DOES have a tool part at ended time.
   if (!active.assistant.id.endsWith(":assistant")) return
-  input.setStore("part", active.assistant.id, produce((draft) => {
-    const match = findToolPart(draft, props.callID)
-    if (match?.state.status !== "running") return
-    match.state = {
-      status: "completed",
-      input: match.state.input,
-      output: props.output,
-      title: "",
-      metadata: { output: props.output, description: "" },
-      time: { ...match.state.time, end: completed },
-    }
-  }))
+  input.setStore(
+    "part",
+    active.assistant.id,
+    produce((draft) => {
+      const match = findToolPart(draft, props.callID)
+      if (match?.state.status !== "running") return
+      match.state = {
+        status: "completed",
+        input: match.state.input,
+        output: props.output,
+        title: "",
+        metadata: { output: props.output, description: "" },
+        time: { ...match.state.time, end: completed },
+      }
+    }),
+  )
   updateAssistant(input, props.sessionID, active.assistant.id, (assistant) => {
     if (assistant.time.completed === undefined) assistant.time.completed = completed
   })
@@ -640,36 +635,44 @@ function handleTextDelta(input: MessageHandlerInput, event: MessageEvent) {
   const props = event.properties as { sessionID: string; delta: string }
   const active = activeAssistantParts(input, props.sessionID)
   if (!active) return
-  input.setStore("part", active.assistant.id, produce((draft) => {
-    // ⚡ Bolt Optimization: Using backward loop instead of .findLast() to avoid GC pressure and O(N) traversal overhead
-    let target: Extract<Part, { type: "text" }> | undefined
-    for (let i = draft.length - 1; i >= 0; i--) {
-      if (draft[i].type === "text") {
-        target = draft[i] as Extract<Part, { type: "text" }>
-        break
+  input.setStore(
+    "part",
+    active.assistant.id,
+    produce((draft) => {
+      // ⚡ Bolt Optimization: Using backward loop instead of .findLast() to avoid GC pressure and O(N) traversal overhead
+      let target: Extract<Part, { type: "text" }> | undefined
+      for (let i = draft.length - 1; i >= 0; i--) {
+        if (draft[i].type === "text") {
+          target = draft[i] as Extract<Part, { type: "text" }>
+          break
+        }
       }
-    }
-    if (!target) return
-    target.text += props.delta
-  }))
+      if (!target) return
+      target.text += props.delta
+    }),
+  )
 }
 
 function handleTextEnded(input: MessageHandlerInput, event: MessageEvent) {
   const props = event.properties as { sessionID: string; text: string }
   const active = activeAssistantParts(input, props.sessionID)
   if (!active) return
-  input.setStore("part", active.assistant.id, produce((draft) => {
-    // ⚡ Bolt Optimization: Using backward loop instead of .findLast() to avoid GC pressure and O(N) traversal overhead
-    let target: Extract<Part, { type: "text" }> | undefined
-    for (let i = draft.length - 1; i >= 0; i--) {
-      if (draft[i].type === "text") {
-        target = draft[i] as Extract<Part, { type: "text" }>
-        break
+  input.setStore(
+    "part",
+    active.assistant.id,
+    produce((draft) => {
+      // ⚡ Bolt Optimization: Using backward loop instead of .findLast() to avoid GC pressure and O(N) traversal overhead
+      let target: Extract<Part, { type: "text" }> | undefined
+      for (let i = draft.length - 1; i >= 0; i--) {
+        if (draft[i].type === "text") {
+          target = draft[i] as Extract<Part, { type: "text" }>
+          break
+        }
       }
-    }
-    if (!target) return
-    target.text = props.text
-  }))
+      if (!target) return
+      target.text = props.text
+    }),
+  )
 }
 
 function findToolPart(parts: Part[] | undefined, callID: string) {
@@ -699,11 +702,15 @@ function handleToolInputDelta(input: MessageHandlerInput, event: MessageEvent) {
   const props = event.properties as { sessionID: string; callID: string; delta: string }
   const active = activeAssistantParts(input, props.sessionID)
   if (!active || findToolPart(active.parts, props.callID)?.state.status !== "pending") return
-  input.setStore("part", active.assistant.id, produce((draft) => {
-    const match = findToolPart(draft, props.callID)
-    if (match?.state.status !== "pending") return
-    match.state.raw += props.delta
-  }))
+  input.setStore(
+    "part",
+    active.assistant.id,
+    produce((draft) => {
+      const match = findToolPart(draft, props.callID)
+      if (match?.state.status !== "pending") return
+      match.state.raw += props.delta
+    }),
+  )
 }
 
 function handleToolCalled(input: MessageHandlerInput, event: MessageEvent) {
@@ -715,15 +722,19 @@ function handleToolCalled(input: MessageHandlerInput, event: MessageEvent) {
   }
   const active = activeAssistantParts(input, props.sessionID)
   if (!active) return
-  input.setStore("part", active.assistant.id, produce((draft) => {
-    const match = findToolPart(draft, props.callID)
-    if (!match) return
-    match.state = {
-      status: "running",
-      input: props.input,
-      time: { start: eventTime(props.timestamp) },
-    }
-  }))
+  input.setStore(
+    "part",
+    active.assistant.id,
+    produce((draft) => {
+      const match = findToolPart(draft, props.callID)
+      if (!match) return
+      match.state = {
+        status: "running",
+        input: props.input,
+        time: { start: eventTime(props.timestamp) },
+      }
+    }),
+  )
 }
 
 function handleToolProgress(input: MessageHandlerInput, event: MessageEvent) {
@@ -734,11 +745,15 @@ function handleToolProgress(input: MessageHandlerInput, event: MessageEvent) {
   }
   const active = activeAssistantParts(input, props.sessionID)
   if (!active || findToolPart(active.parts, props.callID)?.state.status !== "running") return
-  input.setStore("part", active.assistant.id, produce((draft) => {
-    const match = findToolPart(draft, props.callID)
-    if (match?.state.status !== "running") return
-    match.state.metadata = props.structured
-  }))
+  input.setStore(
+    "part",
+    active.assistant.id,
+    produce((draft) => {
+      const match = findToolPart(draft, props.callID)
+      if (match?.state.status !== "running") return
+      match.state.metadata = props.structured
+    }),
+  )
 }
 
 function handleToolSuccess(input: MessageHandlerInput, event: MessageEvent) {
@@ -755,29 +770,33 @@ function handleToolSuccess(input: MessageHandlerInput, event: MessageEvent) {
     .filter((item): item is Extract<(typeof props.content)[number], { type: "text" }> => item.type === "text")
     .map((item) => item.text)
     .join("\n")
-  input.setStore("part", active.assistant.id, produce((draft) => {
-    const match = findToolPart(draft, props.callID)
-    if (match?.state.status !== "running") return
-    const attachments = props.content
-      .filter((item): item is Extract<(typeof props.content)[number], { type: "file" }> => item.type === "file")
-      .map((file, index) =>
-        toolAttachmentPart({
-          id: `${match.id}:attachment:${index}`,
-          sessionID: props.sessionID,
-          messageID: active.assistant.id,
-          file,
-        }),
-      )
-    match.state = {
-      status: "completed",
-      input: match.state.input,
-      output,
-      title: "",
-      metadata: props.structured,
-      time: { ...match.state.time, end: eventTime(props.timestamp) },
-      ...(attachments.length ? { attachments } : {}),
-    }
-  }))
+  input.setStore(
+    "part",
+    active.assistant.id,
+    produce((draft) => {
+      const match = findToolPart(draft, props.callID)
+      if (match?.state.status !== "running") return
+      const attachments = props.content
+        .filter((item): item is Extract<(typeof props.content)[number], { type: "file" }> => item.type === "file")
+        .map((file, index) =>
+          toolAttachmentPart({
+            id: `${match.id}:attachment:${index}`,
+            sessionID: props.sessionID,
+            messageID: active.assistant.id,
+            file,
+          }),
+        )
+      match.state = {
+        status: "completed",
+        input: match.state.input,
+        output,
+        title: "",
+        metadata: props.structured,
+        time: { ...match.state.time, end: eventTime(props.timestamp) },
+        ...(attachments.length ? { attachments } : {}),
+      }
+    }),
+  )
 }
 
 function handleToolFailed(input: MessageHandlerInput, event: MessageEvent) {
@@ -789,17 +808,21 @@ function handleToolFailed(input: MessageHandlerInput, event: MessageEvent) {
   }
   const active = activeAssistantParts(input, props.sessionID)
   if (!active || findToolPart(active.parts, props.callID)?.state.status !== "running") return
-  input.setStore("part", active.assistant.id, produce((draft) => {
-    const match = findToolPart(draft, props.callID)
-    if (match?.state.status !== "running") return
-    match.state = {
-      status: "error",
-      input: match.state.input,
-      error: props.error.message,
-      metadata: match.state.metadata,
-      time: { ...match.state.time, end: eventTime(props.timestamp) },
-    }
-  }))
+  input.setStore(
+    "part",
+    active.assistant.id,
+    produce((draft) => {
+      const match = findToolPart(draft, props.callID)
+      if (match?.state.status !== "running") return
+      match.state = {
+        status: "error",
+        input: match.state.input,
+        error: props.error.message,
+        metadata: match.state.metadata,
+        time: { ...match.state.time, end: eventTime(props.timestamp) },
+      }
+    }),
+  )
 }
 
 function handleReasoningStarted(input: MessageHandlerInput, event: MessageEvent) {
@@ -823,23 +846,35 @@ function handleReasoningDelta(input: MessageHandlerInput, event: MessageEvent) {
   const props = event.properties as { sessionID: string; reasoningID: string; delta: string }
   const active = activeAssistantParts(input, props.sessionID)
   if (!active) return
-  input.setStore("part", active.assistant.id, produce((draft) => {
-    const target = draft.find((part) => part.type === "reasoning" && part.id === `${active.assistant.id}:reasoning:${props.reasoningID}`)
-    if (target?.type !== "reasoning") return
-    target.text += props.delta
-  }))
+  input.setStore(
+    "part",
+    active.assistant.id,
+    produce((draft) => {
+      const target = draft.find(
+        (part) => part.type === "reasoning" && part.id === `${active.assistant.id}:reasoning:${props.reasoningID}`,
+      )
+      if (target?.type !== "reasoning") return
+      target.text += props.delta
+    }),
+  )
 }
 
 function handleReasoningEnded(input: MessageHandlerInput, event: MessageEvent) {
   const props = event.properties as { sessionID: string; timestamp?: number; reasoningID: string; text: string }
   const active = activeAssistantParts(input, props.sessionID)
   if (!active) return
-  input.setStore("part", active.assistant.id, produce((draft) => {
-    const target = draft.find((part) => part.type === "reasoning" && part.id === `${active.assistant.id}:reasoning:${props.reasoningID}`)
-    if (target?.type !== "reasoning") return
-    target.text = props.text
-    if (typeof props.timestamp === "number") target.time.end = props.timestamp
-  }))
+  input.setStore(
+    "part",
+    active.assistant.id,
+    produce((draft) => {
+      const target = draft.find(
+        (part) => part.type === "reasoning" && part.id === `${active.assistant.id}:reasoning:${props.reasoningID}`,
+      )
+      if (target?.type !== "reasoning") return
+      target.text = props.text
+      if (typeof props.timestamp === "number") target.time.end = props.timestamp
+    }),
+  )
 }
 
 function handleCompactionStarted(input: MessageHandlerInput, event: MessageEvent) {
@@ -871,7 +906,13 @@ function handleCompactionDelta(input: MessageHandlerInput, event: MessageEvent) 
 }
 
 function handleCompactionEnded(input: MessageHandlerInput, event: MessageEvent) {
-  const props = event.properties as { sessionID: string; text: string; include?: string; status?: "ok" | "failed"; error?: string }
+  const props = event.properties as {
+    sessionID: string
+    text: string
+    include?: string
+    status?: "ok" | "failed"
+    error?: string
+  }
   const compaction = activeCompaction(input, props.sessionID)
   if (!compaction) return
   updateCompactionText(input, compaction.messageID, compaction.sessionID, props.text, "set")
@@ -898,31 +939,35 @@ function updateCompactionText(
   text: string,
   mode: "append" | "set",
 ) {
-  input.setStore("part", messageID, produce((draft) => {
-    if (!text) {
-      // A failed compaction ends with empty text; drop any partial summary so
-      // the live store matches reload, which omits empty summaries.
-      if (mode === "set") {
-        for (let i = draft.length - 1; i >= 0; i--) {
-          if (draft[i].type === "text") draft.splice(i, 1)
+  input.setStore(
+    "part",
+    messageID,
+    produce((draft) => {
+      if (!text) {
+        // A failed compaction ends with empty text; drop any partial summary so
+        // the live store matches reload, which omits empty summaries.
+        if (mode === "set") {
+          for (let i = draft.length - 1; i >= 0; i--) {
+            if (draft[i].type === "text") draft.splice(i, 1)
+          }
+        }
+        return
+      }
+      let target: TextPart | undefined
+      for (let i = draft.length - 1; i >= 0; i--) {
+        if (draft[i].type === "text") {
+          target = draft[i] as TextPart
+          break
         }
       }
-      return
-    }
-    let target: TextPart | undefined
-    for (let i = draft.length - 1; i >= 0; i--) {
-      if (draft[i].type === "text") {
-        target = draft[i] as TextPart
-        break
+      const next = mode === "set" ? text : (target?.text ?? "") + text
+      if (!target) {
+        draft.push(textPart({ messageID, sessionID, index: draft.length, text: next }))
+        return
       }
-    }
-    const next = mode === "set" ? text : (target?.text ?? "") + text
-    if (!target) {
-      draft.push(textPart({ messageID, sessionID, index: draft.length, text: next }))
-      return
-    }
-    target.text = next
-  }))
+      target.text = next
+    }),
+  )
 }
 
 function handleVcsBranchUpdated(input: {

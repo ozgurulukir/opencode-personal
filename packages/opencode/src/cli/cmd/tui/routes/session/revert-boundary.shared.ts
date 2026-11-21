@@ -13,9 +13,7 @@ import type { SessionMessage, SessionMessageUser } from "@opencode-ai/sdk/v2"
  */
 
 export function lastUserBeforeBoundary(messages: SessionMessage[], boundary: string | undefined) {
-  return messages.findLast(
-    (x): x is SessionMessageUser => (!boundary || x.id < boundary) && x.type === "user",
-  )
+  return messages.findLast((x): x is SessionMessageUser => (!boundary || x.id < boundary) && x.type === "user")
 }
 
 export function firstUserAfterBoundary(messages: SessionMessage[], boundary: string) {

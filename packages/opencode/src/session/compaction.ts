@@ -401,8 +401,12 @@ export const layer: Layer.Layer<
           log.error("compaction failed", { err })
           if (parent && parent.info.role === "user") {
             const ctx = yield* InstanceState.context.pipe(
-              Effect.catch(() => Effect.succeed({ directory: "", worktree: "" } as { directory: string; worktree: string })),
-              Effect.catchDefect(() => Effect.succeed({ directory: "", worktree: "" } as { directory: string; worktree: string })),
+              Effect.catch(() =>
+                Effect.succeed({ directory: "", worktree: "" } as { directory: string; worktree: string }),
+              ),
+              Effect.catchDefect(() =>
+                Effect.succeed({ directory: "", worktree: "" } as { directory: string; worktree: string }),
+              ),
             )
             const failMsg: MessageV2.Assistant = assistantMsg ?? {
               id: MessageID.ascending(),
@@ -517,12 +521,13 @@ export const layer: Layer.Layer<
         )
         const cc = ContextBudget.compactionConfig(cfg)
         const maxSummaryTokens = ContextBudget.summaryBudget(model, cc)
-        const nextPrompt = compacting.prompt
-          ?? buildPrompt({
-              previousSummary,
-              context: compacting.context,
-              maxTokens: maxSummaryTokens,
-            })
+        const nextPrompt =
+          compacting.prompt ??
+          buildPrompt({
+            previousSummary,
+            context: compacting.context,
+            maxTokens: maxSummaryTokens,
+          })
         const summarizerCapacity = Math.max(1000, ContextBudget.usable(cfg, model) - maxSummaryTokens)
         let msgs = structuredClone(selected.head)
         yield* plugin.trigger("experimental.chat.messages.transform", {}, { messages: msgs })

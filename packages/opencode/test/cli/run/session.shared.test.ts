@@ -17,7 +17,11 @@ const model = {
   modelID: "gpt-5",
 }
 
-function userMessage(id: string, input: { text?: string; files?: SessionMessageUser["files"]; agents?: SessionMessageUser["agents"] }, variant = "high"): SessionMessageUser {
+function userMessage(
+  id: string,
+  input: { text?: string; files?: SessionMessageUser["files"]; agents?: SessionMessageUser["agents"] },
+  variant = "high",
+): SessionMessageUser {
   return {
     id,
     type: "user",

@@ -1,11 +1,4 @@
-import {
-  type Info,
-  NearestRoot,
-  spawn,
-  log,
-  Module,
-  Npm,
-} from "./shared"
+import { type Info, NearestRoot, spawn, log, Module, Npm } from "./shared"
 
 export const Typescript: Info = {
   id: "typescript",

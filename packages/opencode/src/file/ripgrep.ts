@@ -366,9 +366,7 @@ export const layer: Layer.Layer<Service, never, AppFileSystem.Service | ChildPro
             return yield* Effect.fail(new Error(`failed to download ripgrep from ${url}`))
           }
           if (bytes.byteLength > MAX_ARCHIVE_BYTES) {
-            return yield* Effect.fail(
-              new Error(`ripgrep download too large (${bytes.byteLength} bytes) from ${url}`),
-            )
+            return yield* Effect.fail(new Error(`ripgrep download too large (${bytes.byteLength} bytes) from ${url}`))
           }
           // Verify before extraction: never execute a binary from an archive
           // whose checksum is unpinned or does not match.

@@ -131,7 +131,7 @@ export function insertMention(
     return state
   }
 
-  const text = "@" + (part.type === "agent" ? part.name : part.filename ?? "")
+  const text = "@" + (part.type === "agent" ? part.name : (part.filename ?? ""))
   const mention = structuredClone(part)
   if (mention.type === "agent") {
     mention.source = {

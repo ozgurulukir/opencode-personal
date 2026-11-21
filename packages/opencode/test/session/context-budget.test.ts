@@ -14,11 +14,7 @@ import {
   usagePercent,
 } from "@opencode-ai/sdk/v2/context-budget"
 
-function createModel(opts: {
-  context: number
-  output: number
-  input?: number
-}): Provider.Model {
+function createModel(opts: { context: number; output: number; input?: number }): Provider.Model {
   return {
     id: "test-model",
     providerID: "test",

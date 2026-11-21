@@ -794,11 +794,15 @@ export const layer = Layer.effect(
         })
 
         const existing = input.taskID
-          ? yield* result.get(input.taskID).pipe(
-              Effect.catchCause((cause) =>
-                Effect.fail(new Error(`Cannot resume task: session ${input.taskID} not found (${Cause.squash(cause)})`)),
-              ),
-            )
+          ? yield* result
+              .get(input.taskID)
+              .pipe(
+                Effect.catchCause((cause) =>
+                  Effect.fail(
+                    new Error(`Cannot resume task: session ${input.taskID} not found (${Cause.squash(cause)})`),
+                  ),
+                ),
+              )
           : undefined
         if (existing && existing.parentID !== input.parentID) {
           return yield* Effect.fail(new Error(`task_id ${input.taskID} does not belong to this session`))

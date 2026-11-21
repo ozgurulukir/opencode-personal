@@ -42,7 +42,9 @@ export async function sendUsageUpdate(
 
   if (!messages) return
 
-  const assistantMessages = messages.filter((m): m is Extract<SessionMessage, { type: "assistant" }> => m.type === "assistant")
+  const assistantMessages = messages.filter(
+    (m): m is Extract<SessionMessage, { type: "assistant" }> => m.type === "assistant",
+  )
 
   const lastAssistant = assistantMessages[assistantMessages.length - 1]
   if (!lastAssistant) return

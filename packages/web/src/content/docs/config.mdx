@@ -732,13 +732,13 @@ Configure skill discovery and auto-matching through the `skills` option.
 }
 ```
 
-| Field | Type | Default | Description |
-|---|---|---|---|
-| `paths` | `string[]` | `[]` | Additional directories to scan for `SKILL.md` files |
-| `urls` | `string[]` | `[]` | Remote URLs to fetch skill definitions from |
-| `autoMatch` | `boolean` | `false` | Enable semantic search to automatically inject matching skills into context |
-| `autoMatchCount` | `number` | `3` | Number of top-matching skills to inject when `autoMatch` is enabled |
-| `autoMatchThreshold` | `number` | `0.25` | Minimum cosine similarity score (0–1) for auto-match. Skills below this threshold are not injected |
+| Field                | Type       | Default | Description                                                                                        |
+| -------------------- | ---------- | ------- | -------------------------------------------------------------------------------------------------- |
+| `paths`              | `string[]` | `[]`    | Additional directories to scan for `SKILL.md` files                                                |
+| `urls`               | `string[]` | `[]`    | Remote URLs to fetch skill definitions from                                                        |
+| `autoMatch`          | `boolean`  | `false` | Enable semantic search to automatically inject matching skills into context                        |
+| `autoMatchCount`     | `number`   | `3`     | Number of top-matching skills to inject when `autoMatch` is enabled                                |
+| `autoMatchThreshold` | `number`   | `0.25`  | Minimum cosine similarity score (0–1) for auto-match. Skills below this threshold are not injected |
 
 [Learn more about skills](../skills/).
 
@@ -762,12 +762,12 @@ Configure the embedding provider used by workspace semantic search through `sear
 }
 ```
 
-| Field | Type | Default | Description |
-|---|---|---|---|
-| `provider` | `"local"` \| `"openai"` | `"local"` | Embedding provider. The local provider runs on CPU; OpenAI requires an API key. |
-| `model` | `string` | Provider default | Model identifier. For local embeddings, use a Hugging Face model ID; for OpenAI, use an embedding model name. |
-| `dimension` | `number` | `384` local, `1536` OpenAI | Embedding vector size. It must match the selected model's output. |
-| `openaiApiKey` | `string` | `OPENAI_API_KEY` | OpenAI API key. The config value is used when the environment variable is not set. |
+| Field          | Type                    | Default                    | Description                                                                                                   |
+| -------------- | ----------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `provider`     | `"local"` \| `"openai"` | `"local"`                  | Embedding provider. The local provider runs on CPU; OpenAI requires an API key.                               |
+| `model`        | `string`                | Provider default           | Model identifier. For local embeddings, use a Hugging Face model ID; for OpenAI, use an embedding model name. |
+| `dimension`    | `number`                | `384` local, `1536` OpenAI | Embedding vector size. It must match the selected model's output.                                             |
+| `openaiApiKey` | `string`                | `OPENAI_API_KEY`           | OpenAI API key. The config value is used when the environment variable is not set.                            |
 
 See [Tools](../tools/#index_workspace) for indexing a workspace and [semantic search](../tools/#semantic_search) for searching it.
 
@@ -868,31 +868,31 @@ The `experimental` key contains options that are under active development. Each 
 }
 ```
 
-| Option | Type | Default | Description |
-|---|---|---|---|
-| `disable_paste_summary` | `boolean` | — | Disable the summary generated when pasted text is too long. |
-| `batch_tool` | `boolean` | — | Enable the batch tool. |
-| `openTelemetry` | `boolean` | — | Enable OpenTelemetry spans for AI SDK calls. |
-| `primary_tools` | `string[]` | — | Tool names reserved for primary agents; subagents cannot use them directly. |
-| `continue_loop_on_deny` | `boolean` | `false` | Continue the agent loop after a tool call is denied. |
-| `mcp_timeout` | `number` | — | Default timeout in milliseconds for MCP requests when a server has no per-server timeout. |
-| `predict_next_prompt` | `boolean` | enabled | Show a predicted next prompt as ghost text in the empty TUI input; accept it with Tab. Set to `false` to disable. |
+| Option                  | Type       | Default | Description                                                                                                       |
+| ----------------------- | ---------- | ------- | ----------------------------------------------------------------------------------------------------------------- |
+| `disable_paste_summary` | `boolean`  | —       | Disable the summary generated when pasted text is too long.                                                       |
+| `batch_tool`            | `boolean`  | —       | Enable the batch tool.                                                                                            |
+| `openTelemetry`         | `boolean`  | —       | Enable OpenTelemetry spans for AI SDK calls.                                                                      |
+| `primary_tools`         | `string[]` | —       | Tool names reserved for primary agents; subagents cannot use them directly.                                       |
+| `continue_loop_on_deny` | `boolean`  | `false` | Continue the agent loop after a tool call is denied.                                                              |
+| `mcp_timeout`           | `number`   | —       | Default timeout in milliseconds for MCP requests when a server has no per-server timeout.                         |
+| `predict_next_prompt`   | `boolean`  | enabled | Show a predicted next prompt as ghost text in the empty TUI input; accept it with Tab. Set to `false` to disable. |
 
 ### Other options
 
 These top-level options are also part of the config schema:
 
-| Option | Description |
-|---|---|
-| `logLevel` | Minimum log level: `DEBUG`, `INFO`, `WARN`, or `ERROR`. |
-| `username` | Name shown for the user in conversations; also used as the OpenTelemetry user identifier. |
-| `reference` | Named local or Git directories available as `@`-mentioned Scout references. |
+| Option             | Description                                                                                                                                                                |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `logLevel`         | Minimum log level: `DEBUG`, `INFO`, `WARN`, or `ERROR`.                                                                                                                    |
+| `username`         | Name shown for the user in conversations; also used as the OpenTelemetry user identifier.                                                                                  |
+| `reference`        | Named local or Git directories available as `@`-mentioned Scout references.                                                                                                |
 | `attachment.image` | Image attachment resizing and size limits: `auto_resize` (default `true`), `max_width` and `max_height` (default `2000` each), and `max_base64_bytes` (default `4718592`). |
-| `tool_output` | Truncation thresholds for tool results: `max_lines` (default `2000`) and `max_bytes` (default `51200`). Full output is saved when either threshold is exceeded. |
-| `enterprise.url` | Enterprise service URL, when required by an enterprise deployment. |
-| `autoshare` | Deprecated alias for `share: "auto"`; use `share` instead. |
-| `mode` | Deprecated agent configuration key; use `agent` instead. |
-| `layout` | Deprecated layout setting; the application always uses stretch layout. |
+| `tool_output`      | Truncation thresholds for tool results: `max_lines` (default `2000`) and `max_bytes` (default `51200`). Full output is saved when either threshold is exceeded.            |
+| `enterprise.url`   | Enterprise service URL, when required by an enterprise deployment.                                                                                                         |
+| `autoshare`        | Deprecated alias for `share: "auto"`; use `share` instead.                                                                                                                 |
+| `mode`             | Deprecated agent configuration key; use `agent` instead.                                                                                                                   |
+| `layout`           | Deprecated layout setting; the application always uses stretch layout.                                                                                                     |
 
 Top-level config keys are: `$schema`, `shell`, `logLevel`, `server`, `command`, `skills`, `reference`, `watcher`, `snapshot`, `plugin`, `share`, `autoshare`, `disabled_providers`, `enabled_providers`, `model`, `small_model`, `default_agent`, `username`, `mode`, `agent`, `provider`, `mcp`, `formatter`, `lsp`, `instructions`, `layout`, `permission`, `tools`, `attachment`, `enterprise`, `tool_output`, `compaction`, `experimental`, and `search`. Their purposes and nested settings are covered above or in the linked pages.
 

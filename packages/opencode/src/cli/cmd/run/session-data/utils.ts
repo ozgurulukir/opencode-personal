@@ -419,7 +419,13 @@ export function drop(data: SessionData, partID: string) {
 // Called when we learn a message's role (from message.updated). Flushes any
 // buffered text parts that were waiting on role confirmation. User-role
 // parts are silently dropped.
-export function replay(data: SessionData, commits: SessionCommit[], messageID: string, role: MessageRole, thinking: boolean) {
+export function replay(
+  data: SessionData,
+  commits: SessionCommit[],
+  messageID: string,
+  role: MessageRole,
+  thinking: boolean,
+) {
   for (const [partID, msg] of data.msg.entries()) {
     if (msg !== messageID || data.ids.has(partID)) {
       continue

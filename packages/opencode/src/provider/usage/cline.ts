@@ -186,20 +186,18 @@ async function fetchClineUsage(credential: UsageCredential): Promise<UsageReport
     const usageLimitsResponse = await fetch(`${CLINE_BASE_URL}${USER_USAGE_LIMITS_PATH}`, { headers })
     if (usageLimitsResponse.ok) {
       limits.push(
-        ...parsePlanUsageLimits(await usageLimitsResponse.json()).map(
-          (item): UsageLimit => ({
-            id: `cline-pass:limit:${item.type}`,
-            label: LIMIT_TYPE_META[item.type].label,
-            scope: { provider: "cline-pass", windowId: item.type },
-            window: {
-              id: item.type,
-              label: "",
-              ...(item.resetsAt !== undefined ? { resetsAt: item.resetsAt } : {}),
-            },
-            amount: { used: item.percentUsed, unit: "percent" },
-            status: buildUsageStatus(item.percentUsed / 100),
-          }),
-        ),
+        ...parsePlanUsageLimits(await usageLimitsResponse.json()).map((item): UsageLimit => ({
+          id: `cline-pass:limit:${item.type}`,
+          label: LIMIT_TYPE_META[item.type].label,
+          scope: { provider: "cline-pass", windowId: item.type },
+          window: {
+            id: item.type,
+            label: "",
+            ...(item.resetsAt !== undefined ? { resetsAt: item.resetsAt } : {}),
+          },
+          amount: { used: item.percentUsed, unit: "percent" },
+          status: buildUsageStatus(item.percentUsed / 100),
+        })),
       )
     } else {
       log.warn("cline usage: /users/me/plan/usage-limits request was rejected", {

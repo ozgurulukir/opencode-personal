@@ -2853,8 +2853,8 @@ test("rewriteMaxOutputTokens > rewrites max_output_tokens to max_completion_toke
     body: JSON.stringify({
       model: "o1-preview",
       max_output_tokens: 32000,
-      temperature: 0.7
-    })
+      temperature: 0.7,
+    }),
   }
 
   const fetchFn = rewriteMaxOutputTokens(mockFetch)
@@ -2876,11 +2876,13 @@ test("rewriteMaxOutputTokens > rewrites max_output_tokens to max_completion_toke
   }) as any
 
   const init = {
-    body: new TextEncoder().encode(JSON.stringify({
-      model: "o1-preview",
-      max_output_tokens: 32000,
-      temperature: 0.7
-    }))
+    body: new TextEncoder().encode(
+      JSON.stringify({
+        model: "o1-preview",
+        max_output_tokens: 32000,
+        temperature: 0.7,
+      }),
+    ),
   }
 
   const fetchFn = rewriteMaxOutputTokens(mockFetch)
@@ -2906,7 +2908,7 @@ test("rewriteMaxOutputTokens > is a no-op if max_output_tokens is not present", 
     body: JSON.stringify({
       model: "o1-preview",
       max_completion_tokens: 32000,
-    })
+    }),
   }
 
   const fetchFn = rewriteMaxOutputTokens(mockFetch)
@@ -2922,7 +2924,7 @@ test("rewriteMaxOutputTokens > passthroughs non-JSON bodies silently", async () 
   }) as any
 
   const init = {
-    body: "this is not json max_output_tokens=32000"
+    body: "this is not json max_output_tokens=32000",
   }
 
   const fetchFn = rewriteMaxOutputTokens(mockFetch)
@@ -2993,7 +2995,7 @@ test("fetchFn wrapper > strips tool id fields from Uint8Array body", async () =>
   }
 
   const model = {
-    api: { npm: "@ai-sdk/openai" }
+    api: { npm: "@ai-sdk/openai" },
   }
 
   const fetchWrapper = __exportTestFetchFn({ timeout: 1000 }, model, customFetch, false)
@@ -3002,15 +3004,15 @@ test("fetchFn wrapper > strips tool id fields from Uint8Array body", async () =>
     store: false,
     input: [
       { id: "item_1", content: "foo" },
-      { id: "item_2", content: "bar" }
-    ]
+      { id: "item_2", content: "bar" },
+    ],
   }
 
   const encodedBody = new TextEncoder().encode(JSON.stringify(initialBody))
 
   await fetchWrapper("https://api.openai.com/v1/chat/completions", {
     method: "POST",
-    body: encodedBody
+    body: encodedBody,
   })
 
   expect(capturedInit).toBeDefined()
@@ -3162,7 +3164,7 @@ test("rewriteMaxOutputTokens > composes over an existing auth fetch wrapper", as
     body: JSON.stringify({
       model: "gpt-5",
       max_output_tokens: 32000,
-    })
+    }),
   }
 
   await composedFetch("https://api.githubcopilot.com/responses", init)
@@ -3257,10 +3259,7 @@ test("provider merge > openai custom rewrite composes over plugin OAuth fetch (c
 test("provider init survives credentials for a provider absent from the catalog", async () => {
   await using tmp = await tmpdir({
     init: async (dir) => {
-      await Bun.write(
-        path.join(dir, "opencode.json"),
-        JSON.stringify({ $schema: "https://opencode.ai/config.json" }),
-      )
+      await Bun.write(path.join(dir, "opencode.json"), JSON.stringify({ $schema: "https://opencode.ai/config.json" }))
       const root = path.join(dir, ".opencode", "plugin")
       await mkdir(root, { recursive: true })
       await markPluginDependenciesReady(path.join(dir, ".opencode"))
@@ -3290,10 +3289,7 @@ test("provider init survives credentials for a provider absent from the catalog"
     prev = await Filesystem.readText(authPath)
   } catch {}
   try {
-    await Filesystem.write(
-      authPath,
-      JSON.stringify({ "ghost-provider": { type: "api", key: "test-ghost-key" } }),
-    )
+    await Filesystem.write(authPath, JSON.stringify({ "ghost-provider": { type: "api", key: "test-ghost-key" } }))
     await WithInstance.provide({
       directory: tmp.path,
       fn: async () => {

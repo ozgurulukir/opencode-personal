@@ -66,9 +66,7 @@ describe("contextToolDetail", () => {
   })
 
   test("ignores a non-string description and returns undefined when nothing applies", () => {
-    expect(
-      contextToolDetail(part({ state: { status: "pending", input: { description: 42 } } })),
-    ).toBeUndefined()
+    expect(contextToolDetail(part({ state: { status: "pending", input: { description: 42 } } }))).toBeUndefined()
   })
 
   test("metadata passed through to the registry lookup does not break the fallback chain", () => {
@@ -82,7 +80,10 @@ describe("contextToolDetail", () => {
 
 describe("contextToolTrigger", () => {
   test("read shows the filename plus offset/limit args", () => {
-    const p = part({ tool: "read", state: { status: "pending", input: { filePath: "/proj/src/a.ts", offset: 5, limit: 20 } } })
+    const p = part({
+      tool: "read",
+      state: { status: "pending", input: { filePath: "/proj/src/a.ts", offset: 5, limit: 20 } },
+    })
     expect(contextToolTrigger(p, i18n)).toEqual({
       title: "Read",
       subtitle: "a.ts",

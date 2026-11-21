@@ -247,10 +247,7 @@ describe("ModelsDev Service", () => {
       // Fresh: mtime within the 5-minute TTL.
       yield* writeCache(fixture, Date.now() - 1000)
       const state = yield* Ref.make({ ...initialState, body: JSON.stringify(fixture2) })
-      yield* provided(
-        state,
-        withFetchEnabled(ModelsDev.Service.use((s) => s.refresh(false))),
-      )
+      yield* provided(state, withFetchEnabled(ModelsDev.Service.use((s) => s.refresh(false))))
       const final = yield* Ref.get(state)
       expect(final.calls).toEqual([])
     }),
@@ -319,7 +316,10 @@ describe("ModelsDev Service", () => {
       // the schema before it can be used or persisted as the models catalog.
       yield* writeCacheText(JSON.stringify({ broken: { id: "broken", name: "Broken", env: [] } }))
       const state = yield* Ref.make(initialState)
-      const result = yield* provided(state, ModelsDev.Service.use((s) => s.get()))
+      const result = yield* provided(
+        state,
+        ModelsDev.Service.use((s) => s.get()),
+      )
       expect(result.broken).toBeUndefined()
       expect((yield* Ref.get(state)).calls).toEqual([])
     }),
@@ -330,10 +330,7 @@ describe("ModelsDev Service", () => {
       yield* writeCache(fixture)
       // A proxy/captive portal can answer 200 with an HTML error page.
       const state = yield* Ref.make({ ...initialState, body: "<html>502 Bad Gateway</html>" })
-      yield* provided(
-        state,
-        withFetchEnabled(ModelsDev.Service.use((s) => s.refresh(true))),
-      )
+      yield* provided(state, withFetchEnabled(ModelsDev.Service.use((s) => s.refresh(true))))
       const onDisk = yield* readCache()
       expect(onDisk).toBeDefined()
       // The previous, valid cache must survive untouched.
@@ -365,10 +362,7 @@ describe("ModelsDev Service", () => {
       })
       Flag.OPENCODE_MODELS_PATH = customPath
       const state = yield* Ref.make({ ...initialState, body: JSON.stringify(fixture2) })
-      yield* provided(
-        state,
-        withFetchEnabled(ModelsDev.Service.use((s) => s.refresh(true))),
-      )
+      yield* provided(state, withFetchEnabled(ModelsDev.Service.use((s) => s.refresh(true))))
       const final = yield* Ref.get(state)
       // The user's local catalog is authoritative — no upstream fetch.
       expect(final.calls).toEqual([])

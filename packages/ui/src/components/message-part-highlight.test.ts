@@ -74,14 +74,11 @@ describe("highlightSegments", () => {
 
   test("references with partial source ranges are ignored", () => {
     // start present, end missing -> dropped
-    const partial = ({ id: "p", type: "file", source: { text: { start: 2 } } }) as FilePart
+    const partial = { id: "p", type: "file", source: { text: { start: 2 } } } as FilePart
     expect(highlightSegments("abcde", [partial], [])).toEqual([{ text: "abcde" }])
   })
 
   test("a reference extending past the text end clamps to the text length", () => {
-    expect(highlightSegments("abc", [filePart(1, 99)], [])).toEqual([
-      { text: "a" },
-      { text: "bc", type: "file" },
-    ])
+    expect(highlightSegments("abc", [filePart(1, 99)], [])).toEqual([{ text: "a" }, { text: "bc", type: "file" }])
   })
 })

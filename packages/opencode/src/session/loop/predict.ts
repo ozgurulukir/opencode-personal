@@ -127,30 +127,31 @@ export const predict = Effect.fn("SessionPrompt.predict")(function* (
     ? [{ role: "system" as const, content: PREDICT_SYSTEM }, ...msgs, { role: "user" as const, content: PREDICT_NUDGE }]
     : [...msgs, { role: "user" as const, content: PREDICT_NUDGE }]
 
-  const text = yield* Effect.tryPromise(() =>
-    streamText({
-      model: wrapped,
-      allowSystemInMessages: true,
-      system: qwen3 ? undefined : PREDICT_SYSTEM,
-      messages: predictMessages,
-      maxOutputTokens:
-        // Mirrors the codex plugin's chat.params rule, which strips
-        // maxOutputTokens for openai models ("Match codex cli") because the
-        // ChatGPT backend rejects the parameter. predict bypasses plugin
-        // hooks by design, so the rule has to be duplicated here — sending
-        // max_output_tokens to an openai OAuth session fails the request and
-        // silently kills the ghost-text suggestion.
-        model.providerID !== "openai" && ProviderTransform.supportsMaxOutputTokens(model)
-          ? ProviderTransform.maxOutputTokens(model)
-          : undefined,
-      temperature: model.capabilities.temperature ? 0.7 : undefined,
-      providerOptions: ProviderTransform.providerOptions(model, ProviderTransform.smallOptions(model)),
-      headers: {
-        ...model.headers,
-        "User-Agent": `opencode/${InstallationVersion}`,
-      },
-      maxRetries: 1,
-    }).text,
+  const text = yield* Effect.tryPromise(
+    () =>
+      streamText({
+        model: wrapped,
+        allowSystemInMessages: true,
+        system: qwen3 ? undefined : PREDICT_SYSTEM,
+        messages: predictMessages,
+        maxOutputTokens:
+          // Mirrors the codex plugin's chat.params rule, which strips
+          // maxOutputTokens for openai models ("Match codex cli") because the
+          // ChatGPT backend rejects the parameter. predict bypasses plugin
+          // hooks by design, so the rule has to be duplicated here — sending
+          // max_output_tokens to an openai OAuth session fails the request and
+          // silently kills the ghost-text suggestion.
+          model.providerID !== "openai" && ProviderTransform.supportsMaxOutputTokens(model)
+            ? ProviderTransform.maxOutputTokens(model)
+            : undefined,
+        temperature: model.capabilities.temperature ? 0.7 : undefined,
+        providerOptions: ProviderTransform.providerOptions(model, ProviderTransform.smallOptions(model)),
+        headers: {
+          ...model.headers,
+          "User-Agent": `opencode/${InstallationVersion}`,
+        },
+        maxRetries: 1,
+      }).text,
   ).pipe(
     Effect.catchCause((cause) =>
       elog.warn("predict failed", { error: Cause.pretty(cause) }).pipe(Effect.as(undefined)),

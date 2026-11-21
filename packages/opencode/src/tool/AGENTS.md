@@ -61,6 +61,7 @@ and prevent HTML element injection into prompt contexts.
 ## File-mutating tools — autoclose pattern
 
 `apply_patch`, `write`, `edit` tools trigger todo autoclose after file changes. Pattern:
+
 1. Compute diff via `createTwoFilesPatch` (already done for permission metadata)
 2. Publish `FileWatcher.Event.Updated` / `File.Event.Edited`
 3. Call `yield* todo.autoclose(ctx.sessionID, [{ filePath, diff }])`
@@ -75,10 +76,12 @@ and prevent HTML element injection into prompt contexts.
 ## Skill tool shows validation warnings inline
 
 When the `skill` tool loads a skill that has `warnings` in its `Skill.Info`, the tool output prepends a warning block:
+
 ```
 ⚠️ Skill "name" has validation issues:
   - <warning text>
 ```
+
 This gives the LLM immediate feedback about frontmatter problems. The skill is still loaded and its content is returned after the warning block.
 
 ## Ripgrep exit code 2 — regex errors are now surfaced

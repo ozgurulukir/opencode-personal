@@ -88,7 +88,7 @@ export default {
 // Story 1: Turn_UserMessage
 export const Turn_UserMessage = () => {
   const turn = mkTurn({ text: "Fix the bug in the login form", active: true })
-  
+
   return wrap(
     <div style={{ "max-width": "800px", margin: "0 auto", padding: "20px" }}>
       <SessionTurn sessionID={SESSION_ID} messageID={USER_ID} showReasoningSummaries={false} />
@@ -104,7 +104,7 @@ export const Turn_UserMessage = () => {
 // Story 2: Turn_AssistantText
 export const Turn_AssistantText = () => {
   const turn = mkTurn({ text: "I've fixed the bug by updating the validation logic.", active: false })
-  
+
   return wrap(
     <div style={{ "max-width": "800px", margin: "0 auto", padding: "20px" }}>
       <SessionTurn sessionID={SESSION_ID} messageID={ASST_ID} showReasoningSummaries={false} />
@@ -125,7 +125,7 @@ export const Turn_ToolCalls = () => {
     toolNames: ["bash", "edit", "read", "glob"],
     active: false,
   })
-  
+
   return wrap(
     <div style={{ "max-width": "800px", margin: "0 auto", padding: "20px" }}>
       <SessionTurn sessionID={SESSION_ID} messageID={ASST_ID} showReasoningSummaries={false} />
@@ -153,7 +153,7 @@ export const Turn_Interrupted = () => {
     compaction: true,
     active: false,
   })
-  
+
   return wrap(
     <div style={{ "max-width": "800px", margin: "0 auto", padding: "20px" }}>
       <SessionTurn sessionID={SESSION_ID} messageID={ASST_ID} showReasoningSummaries={false} />
@@ -173,7 +173,7 @@ export const Turn_Error = () => {
     error: mkError("ProviderAuthError", "Invalid API key. Please check your credentials."),
     active: false,
   })
-  
+
   return wrap(
     <div style={{ "max-width": "800px", margin: "0 auto", padding: "20px" }}>
       <SessionTurn sessionID={SESSION_ID} messageID={ASST_ID} showReasoningSummaries={false} />
@@ -193,7 +193,7 @@ export const Turn_Thinking = () => {
     reasoningText: "**Analyzing the request**\n\nThe user wants to fix a bug. Let me find the relevant files.",
     active: true,
   })
-  
+
   return wrap(
     <div style={{ "max-width": "800px", margin: "0 auto", padding: "20px" }}>
       <SessionTurn sessionID={SESSION_ID} messageID={ASST_ID} showReasoningSummaries={true} />
@@ -324,11 +324,6 @@ export const Thinking_Visible = () => (
 
 export const Thinking_Hidden = () => (
   <div style={{ "max-width": "800px", margin: "0 auto", padding: "20px" }}>
-    <SessionTurnThinking
-      show={false}
-      showReasoningSummaries={false}
-      reasoningHeading=""
-      t={(key) => key}
-    />
+    <SessionTurnThinking show={false} showReasoningSummaries={false} reasoningHeading="" t={(key) => key} />
   </div>
 )

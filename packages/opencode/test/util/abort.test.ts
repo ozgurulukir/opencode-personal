@@ -83,10 +83,7 @@ describe("util.abort.combineSignals", () => {
 
     // After 200 iterations with cleanup, verify cleanup still works
     // on a fresh combined signal: aborting constituent should not trigger it
-    const { signal: finalCombined, cleanup: finalCleanup } = combineSignals([
-      ctrl.signal,
-      AbortSignal.timeout(1000),
-    ])
+    const { signal: finalCombined, cleanup: finalCleanup } = combineSignals([ctrl.signal, AbortSignal.timeout(1000)])
 
     let finalAborted = false
     finalCombined.addEventListener("abort", () => {

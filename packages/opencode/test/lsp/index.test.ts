@@ -206,7 +206,12 @@ describe("lsp.backoff", () => {
 
             const originalRoots = new Map<string, (file: string, ctx: any) => Promise<string | undefined>>()
             for (const server of Object.values(LSPServer)) {
-              if (typeof server === "object" && server !== null && "root" in server && typeof (server as any).root === "function") {
+              if (
+                typeof server === "object" &&
+                server !== null &&
+                "root" in server &&
+                typeof (server as any).root === "function"
+              ) {
                 const id = (server as any).id
                 if (id === "typescript") continue
                 originalRoots.set(id, (server as any).root)
@@ -248,7 +253,12 @@ describe("lsp.backoff", () => {
           Effect.gen(function* () {
             const originalRoots = new Map<string, (file: string, ctx: any) => Promise<string | undefined>>()
             for (const server of Object.values(LSPServer)) {
-              if (typeof server === "object" && server !== null && "root" in server && typeof (server as any).root === "function") {
+              if (
+                typeof server === "object" &&
+                server !== null &&
+                "root" in server &&
+                typeof (server as any).root === "function"
+              ) {
                 originalRoots.set((server as any).id, (server as any).root)
                 ;(server as any).root = async () => {
                   throw new Error("root fail")

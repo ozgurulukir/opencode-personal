@@ -133,10 +133,9 @@ export const layer: Layer.Layer<
           const singleline = files.filter((file) => !file.includes("\n"))
           const ignored = new Set<string>()
           for (let i = 0; i < singleline.length; i += 1000) {
-            const check = yield* git(
-              [...quote, "check-ignore", "--no-index", "--", ...singleline.slice(i, i + 1000)],
-              { cwd: state.worktree },
-            )
+            const check = yield* git([...quote, "check-ignore", "--no-index", "--", ...singleline.slice(i, i + 1000)], {
+              cwd: state.worktree,
+            })
             if (check.code !== 0 && check.code !== 1) return new Set<string>()
             for (const file of check.text.split("\n").filter((file) => file.length > 0)) {
               ignored.add(file)
@@ -507,7 +506,7 @@ export const layer: Layer.Layer<
 
                 const clash = (a: string, b: string) => a === b || a.startsWith(`${b}/`) || b.startsWith(`${a}/`)
 
-                for (let i = 0; i < ops.length; ) {
+                for (let i = 0; i < ops.length;) {
                   const first = ops[i]!
                   const run = [first]
                   let j = i + 1
@@ -804,7 +803,7 @@ export const layer: Layer.Layer<
                   const [before, after] = row.binary ? ["", ""] : text ? [hit.before, hit.after] : yield* show(row)
                   result.push({
                     file: row.file,
-                    patch: row.binary ? "" : (yield* patch(row.file, before, after)),
+                    patch: row.binary ? "" : yield* patch(row.file, before, after),
                     additions: row.additions,
                     deletions: row.deletions,
                     status: row.status,

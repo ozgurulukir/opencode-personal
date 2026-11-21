@@ -29,10 +29,7 @@ function mockInstanceContext(dir: string): InstanceContext {
 function isGitHubApiReleaseURL(value: string): boolean {
   try {
     const url = new URL(value)
-    return (
-      url.hostname === "api.github.com" &&
-      url.pathname === "/repos/LuaLS/lua-language-server/releases/latest"
-    )
+    return url.hostname === "api.github.com" && url.pathname === "/repos/LuaLS/lua-language-server/releases/latest"
   } catch {
     return false
   }
@@ -78,9 +75,7 @@ describe("LuaLS LSP Info", () => {
 
       const downloadUrl = urls.find((url) => !isGitHubApiReleaseURL(url))
       expect(downloadUrl).toBeDefined()
-      expect(downloadUrl).toBe(
-        `https://github.com/LuaLS/lua-language-server/releases/download/${tag}/${assetName}`,
-      )
+      expect(downloadUrl).toBe(`https://github.com/LuaLS/lua-language-server/releases/download/${tag}/${assetName}`)
       expect(downloadUrl).not.toBe(maliciousUrl)
     } finally {
       Flag.OPENCODE_DISABLE_LSP_DOWNLOAD = prevFlag

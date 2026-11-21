@@ -80,7 +80,10 @@ describe("markdown copy state", () => {
         const visit = (node: StubElement) => {
           for (const child of node.children) {
             if (selector === "pre" && child.tagName === "pre") out.push(child)
-            if (selector === '[data-slot="markdown-copy-button"]' && child.getAttribute("data-slot") === "markdown-copy-button") {
+            if (
+              selector === '[data-slot="markdown-copy-button"]' &&
+              child.getAttribute("data-slot") === "markdown-copy-button"
+            ) {
               out.push(child)
             }
             visit(child)

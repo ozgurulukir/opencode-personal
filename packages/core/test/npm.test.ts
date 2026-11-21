@@ -98,12 +98,7 @@ describe("Npm.add", () => {
     const error = await Effect.gen(function* () {
       const npm = yield* Npm.Service
       return yield* npm.add(spec)
-    }).pipe(
-      Effect.scoped,
-      Effect.provide(npmLayer(cache)),
-      Effect.flip,
-      Effect.runPromise,
-    )
+    }).pipe(Effect.scoped, Effect.provide(npmLayer(cache)), Effect.flip, Effect.runPromise)
     expect(error._tag).toBe("NpmInstallFailedError")
   })
 
@@ -114,11 +109,7 @@ describe("Npm.add", () => {
     const run = Effect.gen(function* () {
       const npm = yield* Npm.Service
       return yield* npm.add(malformedSpec)
-    }).pipe(
-      Effect.scoped,
-      Effect.provide(npmLayer(path.join(tmp.path, "cache"))),
-      Effect.flip,
-    )
+    }).pipe(Effect.scoped, Effect.provide(npmLayer(path.join(tmp.path, "cache"))), Effect.flip)
 
     const error = await Effect.runPromise(run)
     expect(error._tag).toBe("NpmInstallFailedError")
@@ -133,12 +124,7 @@ describe("Npm.add", () => {
       const error = await Effect.gen(function* () {
         const npm = yield* Npm.Service
         return yield* npm.add(spec)
-      }).pipe(
-        Effect.scoped,
-        Effect.provide(npmLayer(path.join(tmp.path, "cache"))),
-        Effect.flip,
-        Effect.runPromise,
-      )
+      }).pipe(Effect.scoped, Effect.provide(npmLayer(path.join(tmp.path, "cache"))), Effect.flip, Effect.runPromise)
       expect(error._tag).toBe("NpmInstallFailedError")
 
       const bin = await Effect.gen(function* () {
@@ -199,12 +185,7 @@ describe("Npm.install", () => {
     const error = await Effect.gen(function* () {
       const npm = yield* Npm.Service
       return yield* npm.install(tmp.path, { add: [{ name, version: "^2.0.0" }] })
-    }).pipe(
-      Effect.scoped,
-      Effect.provide(npmLayer(path.join(tmp.path, "cache"))),
-      Effect.flip,
-      Effect.runPromise,
-    )
+    }).pipe(Effect.scoped, Effect.provide(npmLayer(path.join(tmp.path, "cache"))), Effect.flip, Effect.runPromise)
     expect(error._tag).toBe("NpmInstallFailedError")
   })
 })

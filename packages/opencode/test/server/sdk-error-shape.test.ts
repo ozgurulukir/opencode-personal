@@ -87,10 +87,7 @@ describe("v2 SDK error shape", () => {
     await using tmp = await tmpdir({ git: true, config: { formatter: false, lsp: false } })
     const sdk = client(tmp.path)
 
-    const result = await sdk.session.get(
-      { sessionID: "ses_no_such" },
-      { responseStyle: "data", throwOnError: false },
-    )
+    const result = await sdk.session.get({ sessionID: "ses_no_such" }, { responseStyle: "data", throwOnError: false })
 
     expect(result).toBeDefined()
     expect(result).not.toBeUndefined()
@@ -99,16 +96,21 @@ describe("v2 SDK error shape", () => {
   })
 
   test("buildClientParams ignores prototype-polluting properties", () => {
-    const malicious = JSON.parse('{"__proto__": {"polluted": true}, "constructor": {"polluted": true}, "queryParam": "val"}')
-    const params = buildClientParams([malicious], [
-      {
-        args: [
-          { in: "query", key: "__proto__" },
-          { in: "query", key: "constructor" },
-          { in: "query", key: "queryParam" },
-        ],
-      },
-    ])
+    const malicious = JSON.parse(
+      '{"__proto__": {"polluted": true}, "constructor": {"polluted": true}, "queryParam": "val"}',
+    )
+    const params = buildClientParams(
+      [malicious],
+      [
+        {
+          args: [
+            { in: "query", key: "__proto__" },
+            { in: "query", key: "constructor" },
+            { in: "query", key: "queryParam" },
+          ],
+        },
+      ],
+    )
     expect((Object.prototype as any).polluted).toBeUndefined()
     expect(params.query?.__proto__).toBeUndefined()
     expect(params.query?.constructor).toBeUndefined()

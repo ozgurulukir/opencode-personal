@@ -1088,9 +1088,7 @@ describe("workspace CRUD", () => {
             const session = yield* sessionSvc.create({})
             attachSessionToWorkspace(session.id, previous.id)
 
-            const exit = yield* Effect.exit(
-              workspace.sessionWarp({ workspaceID: target.id, sessionID: session.id }),
-            )
+            const exit = yield* Effect.exit(workspace.sessionWarp({ workspaceID: target.id, sessionID: session.id }))
             expect(exit._tag).toBe("Failure")
 
             // The failed batch must trigger a best-effort cleanup of the

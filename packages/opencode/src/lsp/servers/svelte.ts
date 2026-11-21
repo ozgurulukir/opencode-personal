@@ -1,11 +1,4 @@
-import {
-  type Info,
-  NearestRoot,
-  spawn,
-  which,
-  Flag,
-  Npm,
-} from "./shared"
+import { type Info, NearestRoot, spawn, which, Flag, Npm } from "./shared"
 
 export const Svelte: Info = {
   id: "svelte",

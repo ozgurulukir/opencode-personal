@@ -61,7 +61,10 @@ describe("sanitizedProcessEnv", () => {
     const originalEntries = Object.entries
     Object.entries = (obj: any): [string, any][] => {
       if (obj === process.env) {
-        return [["SOME_VAR", "value"], ["UNDEFINED_VAR", undefined as any]]
+        return [
+          ["SOME_VAR", "value"],
+          ["UNDEFINED_VAR", undefined as any],
+        ]
       }
       return originalEntries(obj)
     }

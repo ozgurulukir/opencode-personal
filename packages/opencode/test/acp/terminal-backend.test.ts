@@ -38,21 +38,44 @@ describe("ACP terminal backend", () => {
       throw new Error("must not be called")
     }
     registerConnection("terminal-test", { createTerminal: create } as unknown as AgentSideConnection, false)
-    expect(await createClientTerminal({ sessionID: "terminal-test", callID: "call", command: "echo", args: [], cwd: ".", env: {} })).toBeUndefined()
+    expect(
+      await createClientTerminal({
+        sessionID: "terminal-test",
+        callID: "call",
+        command: "echo",
+        args: [],
+        cwd: ".",
+        env: {},
+      }),
+    ).toBeUndefined()
   })
 
   test("fails explicitly in client mode when capability is missing", async () => {
     process.env.OPENCODE_ACP_TERMINAL_BACKEND = "client"
     registerConnection("terminal-test", fakeConnection(fakeTerminal([])), false)
-    expect(createClientTerminal({ sessionID: "terminal-test", callID: "call", command: "echo", args: [], cwd: ".", env: {} })).rejects.toThrow(
-      "ACP client terminal capability is unavailable",
-    )
+    expect(
+      createClientTerminal({
+        sessionID: "terminal-test",
+        callID: "call",
+        command: "echo",
+        args: [],
+        cwd: ".",
+        env: {},
+      }),
+    ).rejects.toThrow("ACP client terminal capability is unavailable")
   })
 
   test("kills and releases an active terminal exactly once", async () => {
     const calls: string[] = []
     registerConnection("terminal-test", fakeConnection(fakeTerminal(calls)), true)
-    const execution = await createClientTerminal({ sessionID: "terminal-test", callID: "call", command: "echo", args: [], cwd: ".", env: {} })
+    const execution = await createClientTerminal({
+      sessionID: "terminal-test",
+      callID: "call",
+      command: "echo",
+      args: [],
+      cwd: ".",
+      env: {},
+    })
     if (!execution) throw new Error("expected terminal execution")
     await terminateClientTerminal(execution)
     await terminateClientTerminal(execution)
@@ -62,7 +85,14 @@ describe("ACP terminal backend", () => {
   test("cleans active terminals when a session is unregistered", async () => {
     const calls: string[] = []
     registerConnection("terminal-test", fakeConnection(fakeTerminal(calls)), true)
-    await createClientTerminal({ sessionID: "terminal-test", callID: "call", command: "echo", args: [], cwd: ".", env: {} })
+    await createClientTerminal({
+      sessionID: "terminal-test",
+      callID: "call",
+      command: "echo",
+      args: [],
+      cwd: ".",
+      env: {},
+    })
     await unregisterConnection("terminal-test")
     expect(calls).toEqual(["kill", "release"])
   })

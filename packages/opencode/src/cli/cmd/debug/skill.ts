@@ -39,10 +39,7 @@ const ValidateCommand = effectCmd({
           /^[a-z0-9]+(-[a-z0-9]+)*$/,
           "name must be lowercase alphanumeric with hyphens; no leading/trailing/consecutive hyphens",
         ),
-      description: z
-        .string()
-        .min(1, "description is required")
-        .max(1024, "description must be ≤1024 characters"),
+      description: z.string().min(1, "description is required").max(1024, "description must be ≤1024 characters"),
       license: z.string().optional(),
       compatibility: z
         .string()
@@ -72,7 +69,11 @@ const ValidateCommand = effectCmd({
 
       const folderName = s.location.split(/[\\/]/).slice(-2)[0]
       if (s.name !== folderName) {
-        errors.push({ name: s.name, path: s.location, message: `name "${s.name}" does not match folder "${folderName}"` })
+        errors.push({
+          name: s.name,
+          path: s.location,
+          message: `name "${s.name}" does not match folder "${folderName}"`,
+        })
       }
     }
 

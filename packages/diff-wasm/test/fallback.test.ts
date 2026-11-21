@@ -5,11 +5,11 @@ describe("WASM failure and JS fallback behavior", () => {
   const originalWasmPath = (globalThis as any).OPENCODE_DIFF_WASM_JS_PATH
 
   afterEach(() => {
-    (globalThis as any).OPENCODE_DIFF_WASM_JS_PATH = originalWasmPath
+    ;(globalThis as any).OPENCODE_DIFF_WASM_JS_PATH = originalWasmPath
   })
 
   test("createTwoFilesPatch falls back to JS diffing when WASM path is invalid", async () => {
-    (globalThis as any).OPENCODE_DIFF_WASM_JS_PATH = "./non_existent_wasm_path.js"
+    ;(globalThis as any).OPENCODE_DIFF_WASM_JS_PATH = "./non_existent_wasm_path.js"
 
     const oldText = "hello world\nline 2\n"
     const newText = "hello world\nline 2 changed\nline 3\n"
@@ -24,7 +24,7 @@ describe("WASM failure and JS fallback behavior", () => {
   })
 
   test("diffLines falls back to JS diffing when WASM path is invalid", async () => {
-    (globalThis as any).OPENCODE_DIFF_WASM_JS_PATH = "./non_existent_wasm_path.js"
+    ;(globalThis as any).OPENCODE_DIFF_WASM_JS_PATH = "./non_existent_wasm_path.js"
 
     const oldText = "foo\nbar\n"
     const newText = "foo\nbaz\n"
@@ -40,7 +40,7 @@ describe("WASM failure and JS fallback behavior", () => {
   })
 
   test("structuredPatch falls back to JS diffing when WASM path is invalid", async () => {
-    (globalThis as any).OPENCODE_DIFF_WASM_JS_PATH = "./non_existent_wasm_path.js"
+    ;(globalThis as any).OPENCODE_DIFF_WASM_JS_PATH = "./non_existent_wasm_path.js"
 
     const oldText = "a\nb\nc\n"
     const newText = "a\nx\nc\n"

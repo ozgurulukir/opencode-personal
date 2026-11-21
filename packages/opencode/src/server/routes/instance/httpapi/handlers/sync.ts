@@ -22,14 +22,12 @@ export const syncHandlers = HttpApiBuilder.group(InstanceHttpApi, "sync", (handl
     const sync = yield* SyncEvent.Service
 
     const start = Effect.fn("SyncHttpApi.start")(function* () {
-      yield* workspace
-        .startWorkspaceSyncing((yield* InstanceState.context).project.id)
-        .pipe(
-          Effect.tapError((error) =>
-            Effect.sync(() => log.error("failed to start workspace syncing", { error: errorData(error) })),
-          ),
-          Effect.forkIn(scope),
-        )
+      yield* workspace.startWorkspaceSyncing((yield* InstanceState.context).project.id).pipe(
+        Effect.tapError((error) =>
+          Effect.sync(() => log.error("failed to start workspace syncing", { error: errorData(error) })),
+        ),
+        Effect.forkIn(scope),
+      )
       return true
     })
 
@@ -65,7 +63,11 @@ export const syncHandlers = HttpApiBuilder.group(InstanceHttpApi, "sync", (handl
       if (!workspaceID) throw new Error("Cannot steal session without workspace context")
 
       const sessionRow = Database.use((db) =>
-        db.select({ projectID: SessionTable.project_id }).from(SessionTable).where(eq(SessionTable.id, ctx.payload.sessionID)).get(),
+        db
+          .select({ projectID: SessionTable.project_id })
+          .from(SessionTable)
+          .where(eq(SessionTable.id, ctx.payload.sessionID))
+          .get(),
       )
       if (!sessionRow || sessionRow.projectID !== instance.project.id) {
         return yield* new HttpApiError.NotFound({})

@@ -3,11 +3,11 @@ import { formatSkillLabel } from "../../../../src/cli/cmd/tui/feature-plugins/sy
 
 describe("formatSkillLabel", () => {
   test("renders names-only skill calls", () => {
-    expect(formatSkillLabel({ names: ["alpha", "beta"] })).toBe('2 Skills: alpha, beta')
+    expect(formatSkillLabel({ names: ["alpha", "beta"] })).toBe("2 Skills: alpha, beta")
   })
 
   test("deduplicates name and names while preserving order", () => {
-    expect(formatSkillLabel({ name: "alpha", names: ["alpha", "beta", "alpha"] })).toBe('2 Skills: alpha, beta')
+    expect(formatSkillLabel({ name: "alpha", names: ["alpha", "beta", "alpha"] })).toBe("2 Skills: alpha, beta")
   })
 
   test("keeps the single-skill and pending fallbacks", () => {

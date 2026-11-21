@@ -190,11 +190,7 @@ export const engineLayer = Layer.effect(
         return yield* state.startShell(
           input.sessionID,
           lastAssistant({ sessions }, input.sessionID),
-          shellImpl(
-            { sessions, revert, agents, bus, plugin, config, provider, spawner, sync },
-            input,
-            ready,
-          ),
+          shellImpl({ sessions, revert, agents, bus, plugin, config, provider, spawner, sync }, input, ready),
           ready,
         )
       },
@@ -269,10 +265,7 @@ export const engineLayer = Layer.effect(
       loop,
       shell,
       command: (input) =>
-        command(
-          { commands, bus, agents, config, plugin, sessions, provider, resolvePromptParts, prompt },
-          input,
-        ),
+        command({ commands, bus, agents, config, plugin, sessions, provider, resolvePromptParts, prompt }, input),
       resolvePromptParts,
       predict: (input) => predict({ config, sessions, agents, provider }, input),
     })

@@ -18,7 +18,12 @@ import { showToast } from "@opencode-ai/ui/toast"
 import { Binary } from "@opencode-ai/core/util/binary"
 import { getFilename } from "@opencode-ai/core/util/path"
 import { Popover as KobaltePopover } from "@kobalte/core/popover"
-import { shouldMarkBoundaryGesture, normalizeWheelDelta, boundaryTarget, markBoundaryGesture } from "@/pages/session/message-gesture"
+import {
+  shouldMarkBoundaryGesture,
+  normalizeWheelDelta,
+  boundaryTarget,
+  markBoundaryGesture,
+} from "@/pages/session/message-gesture"
 import { messageComments, taskDescription, type MessageComment } from "@/pages/session/message-comments"
 import { createTimelineStaging, pace } from "@/pages/session/message-staging"
 import { SessionContextUsage } from "@/components/session-context-usage"
@@ -378,7 +383,8 @@ export function MessageTimeline(props: {
     const index = sessions.findIndex((s) => s.id === sessionID)
     const nextSession = index === -1 ? undefined : (sessions[index + 1] ?? sessions[index - 1])
 
-    await sdk.client.v2.session.update({ sessionID, time: { archived: Date.now() } })
+    await sdk.client.v2.session
+      .update({ sessionID, time: { archived: Date.now() } })
       .then(() => {
         sync.set(
           produce((draft) => {
@@ -404,7 +410,8 @@ export function MessageTimeline(props: {
     const index = sessions.findIndex((s) => s.id === sessionID)
     const nextSession = index === -1 ? undefined : (sessions[index + 1] ?? sessions[index - 1])
 
-    const result = await sdk.client.v2.session.remove({ sessionID })
+    const result = await sdk.client.v2.session
+      .remove({ sessionID })
       .then((x) => x.data)
       .catch((err) => {
         showToast({

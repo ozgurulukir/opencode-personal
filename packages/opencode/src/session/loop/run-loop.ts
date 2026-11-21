@@ -44,11 +44,7 @@ import { handleSubtask } from "./subtask"
 import { resolveTools, type CachedToolSchema } from "./tools"
 import { insertReminders } from "./reminders"
 import { assemblePromptSuffix, extractUserText } from "./prompt-assembler"
-import {
-  handleCompactionTask,
-  createAutoCompaction,
-  pruneAndCheckTurnCompaction,
-} from "./compaction-policy"
+import { handleCompactionTask, createAutoCompaction, pruneAndCheckTurnCompaction } from "./compaction-policy"
 
 const elog = EffectLogger.create({ service: "session.prompt" })
 
@@ -80,8 +76,6 @@ export interface RunLoopDeps {
   sync: SyncEvent.Interface
 }
 
-
-
 export const runLoop: (deps: RunLoopDeps, sessionID: SessionID) => Effect.Effect<MessageV2.WithParts> = Effect.fn(
   "SessionPrompt.run",
 )(function* (deps: RunLoopDeps, sessionID: SessionID) {
@@ -96,314 +90,308 @@ export const runLoop: (deps: RunLoopDeps, sessionID: SessionID) => Effect.Effect
 
   yield* Effect.gen(function* () {
     while (true) {
-    yield* deps.status.set(sessionID, { type: "busy" })
-    yield* slog.info("loop", { step })
+      yield* deps.status.set(sessionID, { type: "busy" })
+      yield* slog.info("loop", { step })
 
-    let msgs = yield* MessageV2.filterCompactedEffect(sessionID)
+      let msgs = yield* MessageV2.filterCompactedEffect(sessionID)
 
-    const {
-      user: lastUser,
-      assistant: lastAssistant,
-      finished: lastFinished,
-      tasks,
-    } = MessageV2.latest(msgs) as {
-      user: MessageV2.User | undefined
-      assistant: MessageV2.Assistant | undefined
-      finished: MessageV2.Assistant | undefined
-      tasks: (MessageV2.CompactionPart | MessageV2.SubtaskPart)[]
-    }
-
-    if (!lastUser) throw new Error("No user message found in stream. This should never happen.")
-
-    const lastAssistantMsg = msgs.findLast(
-      (msg) => msg.info.role === "assistant" && msg.info.id === lastAssistant?.id,
-    )
-    // Some providers return "stop" even when the assistant message contains tool calls.
-    // Keep the loop running so tool results can be sent back to the model.
-    // Skip provider-executed tool parts — those were fully handled within the
-    // provider's stream (e.g. DWS Agent Platform) and don't need a re-loop.
-    const hasToolCalls =
-      lastAssistantMsg?.parts.some((part) => part.type === "tool" && !part.metadata?.providerExecuted) ?? false
-
-    if (
-      lastAssistant?.finish &&
-      !["tool-calls"].includes(lastAssistant.finish) &&
-      !hasToolCalls &&
-      lastUser.id < lastAssistant.id
-    ) {
-      yield* slog.info("exiting loop")
-      break
-    }
-
-    step++
-    if (step === 1)
-      yield* title(
-        { agents: deps.agents, provider: deps.provider, llm: deps.llm, sessions: deps.sessions },
-        {
-          session,
-          modelID: lastUser.model.modelID,
-          providerID: lastUser.model.providerID,
-          history: msgs,
-        },
-      ).pipe(Effect.ignore, Effect.forkIn(runScope))
-
-    const model = yield* getModel(
-      { provider: deps.provider, bus: deps.bus },
-      lastUser.model.providerID,
-      lastUser.model.modelID,
-      sessionID,
-    )
-    const task = tasks.shift()
-
-    if (task?.type === "subtask") {
-      yield* handleSubtask(
-        {
-          ops: deps.ops,
-          registry: deps.registry,
-          sessions: deps.sessions,
-          plugin: deps.plugin,
-          agents: deps.agents,
-          bus: deps.bus,
-          permission: deps.permission,
-          provider: deps.provider,
-          sync: deps.sync,
-        },
-        { task, model, lastUser, sessionID, session, msgs },
-      )
-      continue
-    }
-
-    if (task?.type === "compaction") {
-      if (task.auto) {
-        consecutiveAutoCompactions++
-      }
-      const result = yield* handleCompactionTask(
-        { compaction: deps.compaction },
-        { task, lastUser, sessionID, msgs },
-      )
-      if (result === "stop") break
-      continue
-    }
-
-    const isCurrentTurnContinue = CompactionTrigger.isCurrentTurnContinue(msgs, lastUser.id)
-
-    if (!isCurrentTurnContinue && tasks.length === 0) {
-      consecutiveAutoCompactions = 0
-    }
-
-    if (lastFinished && lastFinished.id !== lastPrunedId && !isCurrentTurnContinue) {
-      lastPrunedId = lastFinished.id
-      const compacted = yield* pruneAndCheckTurnCompaction(
-        { compaction: deps.compaction, config: deps.config, bus: deps.bus },
-        {
-          sessionID,
-          lastFinished,
-          isCurrentTurnContinue,
-          consecutiveAutoCompactions,
-          lastUser,
-          model,
-        },
-      ).pipe(
-        // The breaker publishes the error event before failing (its only
-        // failure source), so end the prompt cleanly instead of dying with a
-        // defect.
-        Effect.catch(() => Effect.succeed("breaker" as const)),
-      )
-      if (compacted === "breaker") break
-      if (compacted) continue
-    }
-
-    const agent = yield* deps.agents.get(lastUser.agent)
-    if (!agent) {
-      const available = (yield* deps.agents.list()).filter((a) => !a.hidden).map((a) => a.name)
-      const hint = available.length ? ` Available agents: ${available.join(", ")}` : ""
-      const error = new NamedError.Unknown({ message: `Agent not found: "${lastUser.agent}".${hint}` })
-      yield* deps.bus.publish(Session.Event.Error, { sessionID, error: error.toObject() })
-      throw error
-    }
-    const maxSteps = agent.steps ?? Infinity
-    const isLastStep = step >= maxSteps
-    msgs = yield* insertReminders(
-      { sessions: deps.sessions, fsys: deps.fsys },
-      { messages: msgs, agent, session },
-    )
-
-    const msg: MessageV2.Assistant = {
-      id: MessageID.ascending(),
-      parentID: lastUser.id,
-      role: "assistant",
-      mode: agent.name,
-      agent: agent.name,
-      variant: lastUser.model.variant,
-      path: { cwd: ctx.directory, root: ctx.worktree },
-      cost: 0,
-      tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
-      modelID: model.id,
-      providerID: model.providerID,
-      time: { created: Date.now() },
-      sessionID,
-    }
-    yield* deps.sessions.updateMessage(msg)
-    const handle = yield* deps.processor.create({
-      assistantMessage: msg,
-      sessionID,
-      model,
-    })
-
-    const outcome: "break" | "continue" = yield* Effect.gen(function* () {
-      const lastUserMsg = msgs.findLast((m) => m.info.role === "user")
-      const bypassAgentCheck = lastUserMsg?.parts.some((p) => p.type === "agent") ?? false
-
-      const tools = model.capabilities.toolcall
-        ? yield* resolveTools(
-            {
-              registry: deps.registry,
-              mcp: deps.mcp,
-              permission: deps.permission,
-              plugin: deps.plugin,
-              truncate: deps.truncate,
-              runner: deps.runner,
-              ops: deps.ops,
-              cachedToolSchema: deps.cachedToolSchema,
-              sync: deps.sync,
-            },
-            {
-              agent,
-              session,
-              model,
-              processor: handle,
-              bypassAgentCheck,
-              messages: msgs,
-            },
-          )
-        : {}
-
-      if (model.capabilities.toolcall && lastUser.format?.type === "json_schema") {
-        tools["StructuredOutput"] = createStructuredOutputTool({
-          schema: lastUser.format.schema,
-          onSuccess(output) {
-            structured = output
-          },
-        })
-      }
-
-      if (step === 1)
-        yield* deps.summary
-          .summarize({ sessionID, messageID: lastUser.id })
-          .pipe(Effect.ignore, Effect.forkIn(runScope))
-
-      if (step > 1 && lastFinished) {
-        msgs = wrapMessageContinuation(msgs, lastFinished.id)
-      }
-
-      yield* deps.plugin.trigger("experimental.chat.messages.transform", {}, { messages: msgs })
-
-      const cfg = yield* deps.config.get()
-      const userText = extractUserText(lastUserMsg?.parts)
-      const autoMatchOpts = cfg.skills?.autoMatch
-        ? {
-            autoMatch: true,
-            count: cfg.skills.autoMatchCount ?? SKILLS_DEFAULTS.autoMatchCount,
-            threshold: cfg.skills.autoMatchThreshold ?? SKILLS_DEFAULTS.autoMatchThreshold,
-          }
-        : undefined
-
-      const [skills, env, instructions, modelMsgs] = yield* Effect.all([
-        deps.sys.skills(agent, userText, autoMatchOpts),
-        deps.sys.environment(model),
-        deps.instruction.system().pipe(Effect.orDie),
-        MessageV2.toModelMessagesEffect(msgs, model),
-      ])
-      const format = lastUser.format ?? { type: "text" as const }
-      // Hard-enforce the agent step budget: on the last step the tool map is
-      // emptied so the model cannot keep emitting tool calls past the limit.
-      // The MAX_STEPS reminder text claims tools are disabled — make that true.
-      // StructuredOutput survives when json_schema formatting needs it.
-      const effectiveTools = !isLastStep
-        ? tools
-        : format.type === "json_schema"
-          ? { StructuredOutput: tools["StructuredOutput"] }
-          : {}
-      const suffix = assemblePromptSuffix({
-        env,
-        skills: skills || undefined,
-        modelHasToolcall: Boolean(model.capabilities.toolcall),
-        formatType: format.type,
-        lastUserSystem: lastUser.system,
-      })
-      const system: LLMSystemPrompt = {
-        // Intentionally empty — LLM.stream resolves the prefix from
-        // `agent.prompt ?? SystemPrompt.provider(model).prefix`. See the
-        // SystemPrompt type JSDoc in llm.ts for the two-phase assembly rationale.
-        prefix: "",
-        suffix,
-      }
-      const result = yield* handle.process({
+      const {
         user: lastUser,
-        agent,
-        permission: session.permission,
-        sessionID,
-        parentSessionID: session.parentID,
-        system,
-        messages: [
-          ...(instructions.length > 0 ? [{ role: "user" as const, content: instructions.join("\n\n") }] : []),
-          ...modelMsgs,
-          ...(isLastStep ? [{ role: "assistant" as const, content: MAX_STEPS }] : []),
-        ],
-        tools: effectiveTools,
-        model,
-        toolChoice: format.type === "json_schema" && model.capabilities.toolcall ? "required" : undefined,
-      })
-
-      if (structured !== undefined) {
-        const message: MessageV2.Assistant = {
-          ...handle.message,
-          structured,
-          finish: handle.message.finish ?? "stop",
-        }
-        yield* deps.sessions.updateMessage(message)
-        return "break" as const
+        assistant: lastAssistant,
+        finished: lastFinished,
+        tasks,
+      } = MessageV2.latest(msgs) as {
+        user: MessageV2.User | undefined
+        assistant: MessageV2.Assistant | undefined
+        finished: MessageV2.Assistant | undefined
+        tasks: (MessageV2.CompactionPart | MessageV2.SubtaskPart)[]
       }
 
-      const finished = handle.message.finish && !["tool-calls", "unknown"].includes(handle.message.finish)
-      if (finished && !handle.message.error) {
-        if (format.type === "json_schema") {
+      if (!lastUser) throw new Error("No user message found in stream. This should never happen.")
+
+      const lastAssistantMsg = msgs.findLast(
+        (msg) => msg.info.role === "assistant" && msg.info.id === lastAssistant?.id,
+      )
+      // Some providers return "stop" even when the assistant message contains tool calls.
+      // Keep the loop running so tool results can be sent back to the model.
+      // Skip provider-executed tool parts — those were fully handled within the
+      // provider's stream (e.g. DWS Agent Platform) and don't need a re-loop.
+      const hasToolCalls =
+        lastAssistantMsg?.parts.some((part) => part.type === "tool" && !part.metadata?.providerExecuted) ?? false
+
+      if (
+        lastAssistant?.finish &&
+        !["tool-calls"].includes(lastAssistant.finish) &&
+        !hasToolCalls &&
+        lastUser.id < lastAssistant.id
+      ) {
+        yield* slog.info("exiting loop")
+        break
+      }
+
+      step++
+      if (step === 1)
+        yield* title(
+          { agents: deps.agents, provider: deps.provider, llm: deps.llm, sessions: deps.sessions },
+          {
+            session,
+            modelID: lastUser.model.modelID,
+            providerID: lastUser.model.providerID,
+            history: msgs,
+          },
+        ).pipe(Effect.ignore, Effect.forkIn(runScope))
+
+      const model = yield* getModel(
+        { provider: deps.provider, bus: deps.bus },
+        lastUser.model.providerID,
+        lastUser.model.modelID,
+        sessionID,
+      )
+      const task = tasks.shift()
+
+      if (task?.type === "subtask") {
+        yield* handleSubtask(
+          {
+            ops: deps.ops,
+            registry: deps.registry,
+            sessions: deps.sessions,
+            plugin: deps.plugin,
+            agents: deps.agents,
+            bus: deps.bus,
+            permission: deps.permission,
+            provider: deps.provider,
+            sync: deps.sync,
+          },
+          { task, model, lastUser, sessionID, session, msgs },
+        )
+        continue
+      }
+
+      if (task?.type === "compaction") {
+        if (task.auto) {
+          consecutiveAutoCompactions++
+        }
+        const result = yield* handleCompactionTask({ compaction: deps.compaction }, { task, lastUser, sessionID, msgs })
+        if (result === "stop") break
+        continue
+      }
+
+      const isCurrentTurnContinue = CompactionTrigger.isCurrentTurnContinue(msgs, lastUser.id)
+
+      if (!isCurrentTurnContinue && tasks.length === 0) {
+        consecutiveAutoCompactions = 0
+      }
+
+      if (lastFinished && lastFinished.id !== lastPrunedId && !isCurrentTurnContinue) {
+        lastPrunedId = lastFinished.id
+        const compacted = yield* pruneAndCheckTurnCompaction(
+          { compaction: deps.compaction, config: deps.config, bus: deps.bus },
+          {
+            sessionID,
+            lastFinished,
+            isCurrentTurnContinue,
+            consecutiveAutoCompactions,
+            lastUser,
+            model,
+          },
+        ).pipe(
+          // The breaker publishes the error event before failing (its only
+          // failure source), so end the prompt cleanly instead of dying with a
+          // defect.
+          Effect.catch(() => Effect.succeed("breaker" as const)),
+        )
+        if (compacted === "breaker") break
+        if (compacted) continue
+      }
+
+      const agent = yield* deps.agents.get(lastUser.agent)
+      if (!agent) {
+        const available = (yield* deps.agents.list()).filter((a) => !a.hidden).map((a) => a.name)
+        const hint = available.length ? ` Available agents: ${available.join(", ")}` : ""
+        const error = new NamedError.Unknown({ message: `Agent not found: "${lastUser.agent}".${hint}` })
+        yield* deps.bus.publish(Session.Event.Error, { sessionID, error: error.toObject() })
+        throw error
+      }
+      const maxSteps = agent.steps ?? Infinity
+      const isLastStep = step >= maxSteps
+      msgs = yield* insertReminders({ sessions: deps.sessions, fsys: deps.fsys }, { messages: msgs, agent, session })
+
+      const msg: MessageV2.Assistant = {
+        id: MessageID.ascending(),
+        parentID: lastUser.id,
+        role: "assistant",
+        mode: agent.name,
+        agent: agent.name,
+        variant: lastUser.model.variant,
+        path: { cwd: ctx.directory, root: ctx.worktree },
+        cost: 0,
+        tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+        modelID: model.id,
+        providerID: model.providerID,
+        time: { created: Date.now() },
+        sessionID,
+      }
+      yield* deps.sessions.updateMessage(msg)
+      const handle = yield* deps.processor.create({
+        assistantMessage: msg,
+        sessionID,
+        model,
+      })
+
+      const outcome: "break" | "continue" = yield* Effect.gen(function* () {
+        const lastUserMsg = msgs.findLast((m) => m.info.role === "user")
+        const bypassAgentCheck = lastUserMsg?.parts.some((p) => p.type === "agent") ?? false
+
+        const tools = model.capabilities.toolcall
+          ? yield* resolveTools(
+              {
+                registry: deps.registry,
+                mcp: deps.mcp,
+                permission: deps.permission,
+                plugin: deps.plugin,
+                truncate: deps.truncate,
+                runner: deps.runner,
+                ops: deps.ops,
+                cachedToolSchema: deps.cachedToolSchema,
+                sync: deps.sync,
+              },
+              {
+                agent,
+                session,
+                model,
+                processor: handle,
+                bypassAgentCheck,
+                messages: msgs,
+              },
+            )
+          : {}
+
+        if (model.capabilities.toolcall && lastUser.format?.type === "json_schema") {
+          tools["StructuredOutput"] = createStructuredOutputTool({
+            schema: lastUser.format.schema,
+            onSuccess(output) {
+              structured = output
+            },
+          })
+        }
+
+        if (step === 1)
+          yield* deps.summary
+            .summarize({ sessionID, messageID: lastUser.id })
+            .pipe(Effect.ignore, Effect.forkIn(runScope))
+
+        if (step > 1 && lastFinished) {
+          msgs = wrapMessageContinuation(msgs, lastFinished.id)
+        }
+
+        yield* deps.plugin.trigger("experimental.chat.messages.transform", {}, { messages: msgs })
+
+        const cfg = yield* deps.config.get()
+        const userText = extractUserText(lastUserMsg?.parts)
+        const autoMatchOpts = cfg.skills?.autoMatch
+          ? {
+              autoMatch: true,
+              count: cfg.skills.autoMatchCount ?? SKILLS_DEFAULTS.autoMatchCount,
+              threshold: cfg.skills.autoMatchThreshold ?? SKILLS_DEFAULTS.autoMatchThreshold,
+            }
+          : undefined
+
+        const [skills, env, instructions, modelMsgs] = yield* Effect.all([
+          deps.sys.skills(agent, userText, autoMatchOpts),
+          deps.sys.environment(model),
+          deps.instruction.system().pipe(Effect.orDie),
+          MessageV2.toModelMessagesEffect(msgs, model),
+        ])
+        const format = lastUser.format ?? { type: "text" as const }
+        // Hard-enforce the agent step budget: on the last step the tool map is
+        // emptied so the model cannot keep emitting tool calls past the limit.
+        // The MAX_STEPS reminder text claims tools are disabled — make that true.
+        // StructuredOutput survives when json_schema formatting needs it.
+        const effectiveTools = !isLastStep
+          ? tools
+          : format.type === "json_schema"
+            ? { StructuredOutput: tools["StructuredOutput"] }
+            : {}
+        const suffix = assemblePromptSuffix({
+          env,
+          skills: skills || undefined,
+          modelHasToolcall: Boolean(model.capabilities.toolcall),
+          formatType: format.type,
+          lastUserSystem: lastUser.system,
+        })
+        const system: LLMSystemPrompt = {
+          // Intentionally empty — LLM.stream resolves the prefix from
+          // `agent.prompt ?? SystemPrompt.provider(model).prefix`. See the
+          // SystemPrompt type JSDoc in llm.ts for the two-phase assembly rationale.
+          prefix: "",
+          suffix,
+        }
+        const result = yield* handle.process({
+          user: lastUser,
+          agent,
+          permission: session.permission,
+          sessionID,
+          parentSessionID: session.parentID,
+          system,
+          messages: [
+            ...(instructions.length > 0 ? [{ role: "user" as const, content: instructions.join("\n\n") }] : []),
+            ...modelMsgs,
+            ...(isLastStep ? [{ role: "assistant" as const, content: MAX_STEPS }] : []),
+          ],
+          tools: effectiveTools,
+          model,
+          toolChoice: format.type === "json_schema" && model.capabilities.toolcall ? "required" : undefined,
+        })
+
+        if (structured !== undefined) {
           const message: MessageV2.Assistant = {
             ...handle.message,
-            error: new MessageV2.StructuredOutputError({
-              message: model.capabilities.toolcall
-                ? "Model did not produce structured output"
-                : "The selected model does not support the tool call required for structured output",
-              retries: 0,
-            }).toObject(),
+            structured,
+            finish: handle.message.finish ?? "stop",
           }
           yield* deps.sessions.updateMessage(message)
           return "break" as const
         }
-      }
 
-      if (result === "stop") return "break" as const
-      if (result === "compact") {
-        // create() is Effect<void>; the next iteration re-reads compacted messages.
-        // A failure here is the compaction breaker (create() has an empty error
-        // channel and the breaker publishes the error event before failing) —
-        // end the prompt cleanly instead of dying with a defect.
-        const compacted = yield* createAutoCompaction(
-          { compaction: deps.compaction, bus: deps.bus },
-          {
-            sessionID,
-            consecutiveAutoCompactions,
-            lastUser,
-            overflow: handle.compactionReason === "provider-rejected",
-          },
-        ).pipe(Effect.catch(() => Effect.succeed("breaker" as const)))
-        return compacted === "breaker" ? ("break" as const) : ("continue" as const)
-      }
-      return "continue" as const
-    }).pipe(Effect.ensuring(deps.instruction.clear(handle.message.id)))
-    if (outcome === "break") break
-    continue
-  }
+        const finished = handle.message.finish && !["tool-calls", "unknown"].includes(handle.message.finish)
+        if (finished && !handle.message.error) {
+          if (format.type === "json_schema") {
+            const message: MessageV2.Assistant = {
+              ...handle.message,
+              error: new MessageV2.StructuredOutputError({
+                message: model.capabilities.toolcall
+                  ? "Model did not produce structured output"
+                  : "The selected model does not support the tool call required for structured output",
+                retries: 0,
+              }).toObject(),
+            }
+            yield* deps.sessions.updateMessage(message)
+            return "break" as const
+          }
+        }
+
+        if (result === "stop") return "break" as const
+        if (result === "compact") {
+          // create() is Effect<void>; the next iteration re-reads compacted messages.
+          // A failure here is the compaction breaker (create() has an empty error
+          // channel and the breaker publishes the error event before failing) —
+          // end the prompt cleanly instead of dying with a defect.
+          const compacted = yield* createAutoCompaction(
+            { compaction: deps.compaction, bus: deps.bus },
+            {
+              sessionID,
+              consecutiveAutoCompactions,
+              lastUser,
+              overflow: handle.compactionReason === "provider-rejected",
+            },
+          ).pipe(Effect.catch(() => Effect.succeed("breaker" as const)))
+          return compacted === "breaker" ? ("break" as const) : ("continue" as const)
+        }
+        return "continue" as const
+      }).pipe(Effect.ensuring(deps.instruction.clear(handle.message.id)))
+      if (outcome === "break") break
+      continue
+    }
   }).pipe(Effect.ensuring(Scope.close(runScope, Exit.void)))
 
   yield* deps.compaction.prune({ sessionID }).pipe(Effect.ignore)

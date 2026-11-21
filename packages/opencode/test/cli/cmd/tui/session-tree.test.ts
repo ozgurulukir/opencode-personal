@@ -20,9 +20,7 @@ const session = (id: string, parentID?: string | null, created = 0): TreeSession
 // direct-children semantics stay correct while the aggregation walks the full subtree.
 function navigationTargets(sessions: TreeSession[], root: string): string[] {
   const parentID = sessions.find((x) => x.id === root)?.parentID ?? root
-  return sessions
-    .filter((x) => (x.parentID === parentID || x.id === parentID) && !!x.parentID)
-    .map((x) => x.id)
+  return sessions.filter((x) => (x.parentID === parentID || x.id === parentID) && !!x.parentID).map((x) => x.id)
 }
 
 describe("collectSessionDescendants", () => {
@@ -37,21 +35,12 @@ describe("collectSessionDescendants", () => {
   })
 
   test("depth-2 includes grandchild", () => {
-    const sessions = [
-      session("root"),
-      session("a", "root"),
-      session("a1", "a"),
-    ]
+    const sessions = [session("root"), session("a", "root"), session("a1", "a")]
     expect([...collectSessionDescendants(sessions, "root")].sort()).toEqual(["a", "a1", "root"])
   })
 
   test("depth-3 includes great-grandchild", () => {
-    const sessions = [
-      session("root"),
-      session("a", "root"),
-      session("b", "a"),
-      session("c", "b"),
-    ]
+    const sessions = [session("root"), session("a", "root"), session("b", "a"), session("c", "b")]
     expect([...collectSessionDescendants(sessions, "root")].sort()).toEqual(["a", "b", "c", "root"])
   })
 
@@ -68,12 +57,7 @@ describe("collectSessionDescendants", () => {
   })
 
   test("includes the viewed session's own ID when it is itself a subagent", () => {
-    const sessions = [
-      session("root"),
-      session("sub", "root"),
-      session("grand", "sub"),
-      session("great", "grand"),
-    ]
+    const sessions = [session("root"), session("sub", "root"), session("grand", "sub"), session("great", "grand")]
     // Viewing "sub" directly: own ID + descendants, but NOT the root.
     expect([...collectSessionDescendants(sessions, "sub")].sort()).toEqual(["grand", "great", "sub"])
   })
@@ -94,11 +78,7 @@ describe("collectSessionDescendants", () => {
   })
 
   test("is cycle-safe and terminates on a parentID loop", () => {
-    const sessions = [
-      session("a", "b"),
-      session("b", "a"),
-      session("c", "a"),
-    ]
+    const sessions = [session("a", "b"), session("b", "a"), session("c", "a")]
     expect([...collectSessionDescendants(sessions, "a")].sort()).toEqual(["a", "b", "c"])
   })
 

@@ -77,26 +77,26 @@ Terminal arayüzünde `/connect` ile bir model sağlayıcısına bağlanın veya
 
 Bu depo bir Bun çalışma alanı monorepo'sudur. Depo kökünden çalıştırılan yaygın komutlar:
 
-| Komut | Amaç |
-| --- | --- |
-| `bun dev` | OpenCode'u kaynaktan çalıştırır. |
-| `bun run dev:web` | Tarayıcı uygulamasını başlatır. |
-| `bun run --cwd packages/web dev` | Astro/Starlight dokümantasyon sitesini başlatır. |
-| `bun run dev:storybook` | Arayüz Storybook'unu başlatır. |
-| `bun run lint` | Çalışma alanının lint denetimini yapar. |
-| `bun run typecheck` | Çalışma alanındaki paketlerin tip denetimini yapar. |
-| `bun run --cwd packages/web build` | Statik dokümantasyon sitesini derler. |
+| Komut                              | Amaç                                                |
+| ---------------------------------- | --------------------------------------------------- |
+| `bun dev`                          | OpenCode'u kaynaktan çalıştırır.                    |
+| `bun run dev:web`                  | Tarayıcı uygulamasını başlatır.                     |
+| `bun run --cwd packages/web dev`   | Astro/Starlight dokümantasyon sitesini başlatır.    |
+| `bun run dev:storybook`            | Arayüz Storybook'unu başlatır.                      |
+| `bun run lint`                     | Çalışma alanının lint denetimini yapar.             |
+| `bun run typecheck`                | Çalışma alanındaki paketlerin tip denetimini yapar. |
+| `bun run --cwd packages/web build` | Statik dokümantasyon sitesini derler.               |
 
 ## Depo yapısı
 
-| Paket | İçerik |
-| --- | --- |
+| Paket               | İçerik                                                                       |
+| ------------------- | ---------------------------------------------------------------------------- |
 | `packages/opencode` | CLI, terminal arayüzü, sunucu, araçlar, sağlayıcılar ve ajan çalışma zamanı. |
-| `packages/app` | Tarayıcı uygulaması. |
-| `packages/ui` | Paylaşılan arayüz bileşenleri. |
-| `packages/core` | Paylaşılan çalışma zamanı yardımcıları ve temel yapıları. |
-| `packages/sdk/js` | JavaScript/TypeScript SDK. |
-| `packages/web` | İngilizce ve Türkçe dokümantasyon sitesi. |
+| `packages/app`      | Tarayıcı uygulaması.                                                         |
+| `packages/ui`       | Paylaşılan arayüz bileşenleri.                                               |
+| `packages/core`     | Paylaşılan çalışma zamanı yardımcıları ve temel yapıları.                    |
+| `packages/sdk/js`   | JavaScript/TypeScript SDK.                                                   |
+| `packages/web`      | İngilizce ve Türkçe dokümantasyon sitesi.                                    |
 
 ## Lisans
 

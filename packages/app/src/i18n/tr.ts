@@ -699,7 +699,6 @@ export const dict = {
   "settings.general.row.releaseNotes.title": "Sürüm notları",
   "settings.general.row.releaseNotes.description": "Güncellemelerden sonra Yenilikler bildirimlerini göster",
 
-
   "sound.option.none": "Yok",
   "sound.option.alert01": "Uyarı 01",
   "sound.option.alert02": "Uyarı 02",

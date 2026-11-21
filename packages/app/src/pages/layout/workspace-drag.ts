@@ -28,11 +28,7 @@ export function createWorkspaceDragController(input: {
     const project = input.sidebarProject()
     if (!project) return
 
-    const result = reorderWorkspaceIds(
-      input.workspaceIds(project),
-      draggable.id.toString(),
-      droppable.id.toString(),
-    )
+    const result = reorderWorkspaceIds(input.workspaceIds(project), draggable.id.toString(), droppable.id.toString())
     if (!result) return
 
     input.setWorkspaceOrder(

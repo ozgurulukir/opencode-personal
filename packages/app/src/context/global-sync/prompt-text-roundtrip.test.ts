@@ -72,9 +72,7 @@ function roundTrip(input: {
 
   // Stage B — server projection: non-synthetic text parts joined "\n"
   // (create-user-message.ts:440-445,510). No `ignored` filter — see header.
-  const stageB = requestParts
-    .flatMap((part) => (part.type === "text" && !part.synthetic ? [part.text] : []))
-    .join("\n")
+  const stageB = requestParts.flatMap((part) => (part.type === "text" && !part.synthetic ? [part.text] : [])).join("\n")
 
   // Prompt attachments mapped the way the server projects V1 parts into the
   // prompted event (create-user-message.ts:446-475).
@@ -149,15 +147,13 @@ function roundTrip(input: {
   const loaded = sessionMessagesToV1(
     [
       sessionUser(stageB, files, agents),
-      ...synthetic.map(
-        (text, index): SessionMessage => ({
-          id: `evt_synth_${index}`,
-          type: "synthetic",
-          sessionID,
-          text,
-          time: { created: 1 },
-        }),
-      ),
+      ...synthetic.map((text, index): SessionMessage => ({
+        id: `evt_synth_${index}`,
+        type: "synthetic",
+        sessionID,
+        text,
+        time: { created: 1 },
+      })),
     ],
     sessionID,
   )

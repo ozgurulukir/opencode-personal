@@ -21,7 +21,12 @@ function createTestAgent() {
           get: async (params: any) => {
             if (params?.sessionID !== "ses_1") throw new Error("Session not found on server")
             return {
-              data: { id: "ses_1", directory: "/tmp", title: "test", time: { created: Date.now(), updated: Date.now() } },
+              data: {
+                id: "ses_1",
+                directory: "/tmp",
+                title: "test",
+                time: { created: Date.now(), updated: Date.now() },
+              },
             }
           },
         },
@@ -171,7 +176,9 @@ describe("ACP sync envelope unwrapping", () => {
         "session.next.tool.success",
         v2SuccessProps({
           tool: undefined,
-          content: [{ type: "text", text: JSON.stringify([{ content: "task 1", status: "pending", priority: "medium" }]) }],
+          content: [
+            { type: "text", text: JSON.stringify([{ content: "task 1", status: "pending", priority: "medium" }]) },
+          ],
         }),
       ),
     )
@@ -269,7 +276,10 @@ describe("ACP sync envelope unwrapping", () => {
     )
 
     const completedUpdates = sessionUpdates.filter(
-      (u: any) => u.update.sessionUpdate === "tool_call_update" && u.update.status === "completed" && u.update.toolCallId === callID,
+      (u: any) =>
+        u.update.sessionUpdate === "tool_call_update" &&
+        u.update.status === "completed" &&
+        u.update.toolCallId === callID,
     )
 
     expect(completedUpdates).toHaveLength(1)

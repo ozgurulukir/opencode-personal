@@ -89,12 +89,7 @@ function progressEvent(
   return { directory: cwd, payload }
 }
 
-function bashProgressEvent(
-  sessionId: string,
-  cwd: string,
-  callID: string,
-  output: string,
-): GlobalEventEnvelope {
+function bashProgressEvent(sessionId: string, cwd: string, callID: string, output: string): GlobalEventEnvelope {
   return progressEvent(sessionId, cwd, callID, { output })
 }
 
@@ -332,7 +327,9 @@ describe("acp.agent event subscription", () => {
       directory: tmp.path,
       fn: async () => {
         const { agent, sessionUpdates, stop } = createFakeAgent()
-        const sessionId = await agent.newSession({ cwd: "/tmp/opencode-acp-test", mcpServers: [] } as any).then((x) => x.sessionId)
+        const sessionId = await agent
+          .newSession({ cwd: "/tmp/opencode-acp-test", mcpServers: [] } as any)
+          .then((x) => x.sessionId)
 
         expect(
           sessionUpdates.some(
@@ -807,12 +804,8 @@ describe("acp.agent event subscription", () => {
         const sessionId = await agent.newSession({ cwd, mcpServers: [] } as any).then((x) => x.sessionId)
 
         controller.push(calledEvent(sessionId, cwd, "call_bash_content", "bash", { command: "echo hi" }))
-        controller.push(
-          progressEvent(sessionId, cwd, "call_bash_content", {}, [{ type: "text", text: "hi\n" }]),
-        )
-        controller.push(
-          successEvent(sessionId, cwd, "call_bash_content", "", { output: "hi\n" }),
-        )
+        controller.push(progressEvent(sessionId, cwd, "call_bash_content", {}, [{ type: "text", text: "hi\n" }]))
+        controller.push(successEvent(sessionId, cwd, "call_bash_content", "", { output: "hi\n" }))
         await new Promise((r) => setTimeout(r, 20))
 
         const progress = sessionUpdates.find(
@@ -821,7 +814,8 @@ describe("acp.agent event subscription", () => {
             u.update.sessionUpdate === "tool_call_update" &&
             u.update.status === "in_progress",
         )
-        const progressContent = progress?.update.sessionUpdate === "tool_call_update" ? progress.update.content : undefined
+        const progressContent =
+          progress?.update.sessionUpdate === "tool_call_update" ? progress.update.content : undefined
         expect(progressContent).toContainEqual({
           type: "content",
           content: { type: "text", text: "```\nhi\n\n```" },
@@ -899,43 +893,44 @@ describe("acp.agent event subscription", () => {
         const sessionId = await agent.newSession({ cwd, mcpServers: [] } as any).then((x) => x.sessionId)
         const data = Buffer.from("replay-image").toString("base64")
 
-        sdk.v2.session.messages = async () => ({
-          data: {
-            items: [
-              {
-                type: "assistant",
-                id: "msg_replay",
-                sessionID: sessionId,
-                model: { providerID: "opencode", id: "big-pickle" },
-                tokens: { input: 0, output: 0 },
-                cost: 0,
-                time: { created: Date.now() },
-                content: [
-                  {
-                    id: "call_replay_image",
-                    type: "tool",
-                    callID: "call_replay_image",
-                    name: "webfetch",
-                    state: {
-                      status: "completed",
-                      input: { url: "https://example.com/image.png" },
-                      structured: {},
-                      content: [
-                        { type: "text", text: "Image fetched successfully" },
-                        {
-                          type: "file",
-                          uri: `data:image/jpeg;base64,${data}`,
-                          mime: "image/jpeg",
-                          name: "image.jpg",
-                        },
-                      ],
+        sdk.v2.session.messages = async () =>
+          ({
+            data: {
+              items: [
+                {
+                  type: "assistant",
+                  id: "msg_replay",
+                  sessionID: sessionId,
+                  model: { providerID: "opencode", id: "big-pickle" },
+                  tokens: { input: 0, output: 0 },
+                  cost: 0,
+                  time: { created: Date.now() },
+                  content: [
+                    {
+                      id: "call_replay_image",
+                      type: "tool",
+                      callID: "call_replay_image",
+                      name: "webfetch",
+                      state: {
+                        status: "completed",
+                        input: { url: "https://example.com/image.png" },
+                        structured: {},
+                        content: [
+                          { type: "text", text: "Image fetched successfully" },
+                          {
+                            type: "file",
+                            uri: `data:image/jpeg;base64,${data}`,
+                            mime: "image/jpeg",
+                            name: "image.jpg",
+                          },
+                        ],
+                      },
                     },
-                  },
-                ],
-              },
-            ],
-          },
-        } as any)
+                  ],
+                },
+              ],
+            },
+          }) as any
 
         await agent.loadSession({ sessionId, cwd, mcpServers: [] } as any)
 
@@ -964,37 +959,38 @@ describe("acp.agent event subscription", () => {
         const sessionId = await agent.newSession({ cwd, mcpServers: [] } as any).then((x) => x.sessionId)
         const input = { command: "echo hi", description: "run command" }
 
-        sdk.v2.session.messages = async () => ({
-          data: {
-            items: [
-              {
-                type: "assistant",
-                id: "msg_replay",
-                sessionID: sessionId,
-                model: { providerID: "opencode", id: "big-pickle" },
-                tokens: { input: 0, output: 0 },
-                cost: 0,
-                time: { created: Date.now() },
-                content: [
-                  {
-                    // V2 replay: the tool item id doubles as the ACP toolCallId,
-                    // and the live stream keys progress updates by the same callID.
-                    id: "call_1",
-                    type: "tool",
-                    callID: "call_1",
-                    name: "bash",
-                    state: {
-                      status: "running",
-                      input,
-                      structured: { output: "hi\n" },
-                      content: [],
+        sdk.v2.session.messages = async () =>
+          ({
+            data: {
+              items: [
+                {
+                  type: "assistant",
+                  id: "msg_replay",
+                  sessionID: sessionId,
+                  model: { providerID: "opencode", id: "big-pickle" },
+                  tokens: { input: 0, output: 0 },
+                  cost: 0,
+                  time: { created: Date.now() },
+                  content: [
+                    {
+                      // V2 replay: the tool item id doubles as the ACP toolCallId,
+                      // and the live stream keys progress updates by the same callID.
+                      id: "call_1",
+                      type: "tool",
+                      callID: "call_1",
+                      name: "bash",
+                      state: {
+                        status: "running",
+                        input,
+                        structured: { output: "hi\n" },
+                        content: [],
+                      },
                     },
-                  },
-                ],
-              },
-            ],
-          },
-        } as any)
+                  ],
+                },
+              ],
+            },
+          }) as any
 
         await agent.loadSession({ sessionId, cwd, mcpServers: [] } as any)
         controller.push(calledEvent(sessionId, cwd, "call_1", "bash", input))

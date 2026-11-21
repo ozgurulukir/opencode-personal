@@ -88,6 +88,10 @@ const build = (messages: Message[] = [], providers: Provider[] = [], config?: Co
  * `config` threads the server's compaction settings into the budget;
  * omitted means the trigger's DEFAULTS apply.
  */
-export function getSessionContextMetrics(messages: Message[] = [], providers: Provider[] = [], config?: CompactionSettingsInput) {
+export function getSessionContextMetrics(
+  messages: Message[] = [],
+  providers: Provider[] = [],
+  config?: CompactionSettingsInput,
+) {
   return build(messages, providers, config)
 }

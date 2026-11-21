@@ -262,7 +262,12 @@ export const layer = Layer.effect(
           })
         }
         const approvedRule = evalRule(request.permission, pattern, approved)
-        log.info("evaluated", { permission: request.permission, pattern, config: configRule.action, approved: approvedRule.action })
+        log.info("evaluated", {
+          permission: request.permission,
+          pattern,
+          config: configRule.action,
+          approved: approvedRule.action,
+        })
         if (approvedRule.action === "allow") continue
         if (configRule.action === "allow") continue
         needsAsk = true
@@ -347,11 +352,13 @@ export const layer = Layer.effect(
       // Persist approved ruleset to database so "always allow" survives restarts.
       // Commit to SQLite first before mutating in-memory array to prevent state divergence on write failure.
       const ctx = yield* InstanceState.context
-      const newRules: Array<{ permission: string; pattern: string; action: "allow" }> = existing.info.always.map((pattern) => ({
-        permission: existing.info.permission,
-        pattern,
-        action: "allow",
-      }))
+      const newRules: Array<{ permission: string; pattern: string; action: "allow" }> = existing.info.always.map(
+        (pattern) => ({
+          permission: existing.info.permission,
+          pattern,
+          action: "allow",
+        }),
+      )
       const nextApproved = dedupe([...approved, ...newRules])
       Database.transaction((db) => {
         db.insert(PermissionTable)
@@ -401,9 +408,7 @@ export const layer = Layer.effect(
       const ctx = yield* InstanceState.context
       Database.transaction((db) => {
         if (nextApproved.length === 0) {
-          db.delete(PermissionTable)
-            .where(eq(PermissionTable.project_id, ctx.project.id))
-            .run()
+          db.delete(PermissionTable).where(eq(PermissionTable.project_id, ctx.project.id)).run()
         } else {
           db.insert(PermissionTable)
             .values({ project_id: ctx.project.id, data: nextApproved })
@@ -422,9 +427,7 @@ export const layer = Layer.effect(
 
       const ctx = yield* InstanceState.context
       Database.transaction((db) => {
-        db.delete(PermissionTable)
-          .where(eq(PermissionTable.project_id, ctx.project.id))
-          .run()
+        db.delete(PermissionTable).where(eq(PermissionTable.project_id, ctx.project.id)).run()
       })
 
       approved.splice(0, approved.length)
@@ -480,9 +483,7 @@ export function disabled(tools: string[], ruleset: Ruleset): Set<string> {
     // that isn't overridden by a specific allow/ask rule for this tool.
     // Specific pattern denies (e.g., "rm *": "deny") never disable the tool
     // since non-matching patterns default to "ask" at runtime.
-    const hasCatchAllDeny = matchingRules.some(
-      (rule) => rule.pattern === "*" && rule.action === "deny",
-    )
+    const hasCatchAllDeny = matchingRules.some((rule) => rule.pattern === "*" && rule.action === "deny")
     const hasSpecificOverride = matchingRules.some(
       (rule) => rule.action !== "deny" && (rule.pattern !== "*" || rule.permission !== "*"),
     )

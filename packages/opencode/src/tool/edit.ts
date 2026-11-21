@@ -86,7 +86,8 @@ export const EditTool = Tool.define<
           let diff = ""
           let contentOld = ""
           let contentNew = ""
-          yield* editLocks.withLock(resolvedFilePath,
+          yield* editLocks.withLock(
+            resolvedFilePath,
             Effect.gen(function* () {
               if (params.oldString === "") {
                 const existed = yield* afs.existsSafe(resolvedFilePath)

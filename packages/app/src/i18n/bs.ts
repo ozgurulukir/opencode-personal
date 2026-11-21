@@ -639,7 +639,8 @@ export const dict = {
   "settings.general.row.language.title": "Jezik",
   "settings.general.row.language.description": "Promijeni jezik prikaza u OpenCode-u",
   "settings.general.row.shell.title": "Shell terminala",
-  "settings.general.row.shell.description": "Odaberi shell koji se koristi za tvoj terminal. Kompatibilni shelli se također koriste za pozive alata agenta.",
+  "settings.general.row.shell.description":
+    "Odaberi shell koji se koristi za tvoj terminal. Kompatibilni shelli se također koriste za pozive alata agenta.",
   "settings.general.row.shell.autoDefault": "Automatski (Podrazumijevano)",
   "settings.general.row.shell.terminalOnly": "samo terminal",
   "settings.general.row.appearance.title": "Izgled",
@@ -663,7 +664,8 @@ export const dict = {
   "settings.general.row.showNavigation.title": "Kontrole navigacije",
   "settings.general.row.showNavigation.description": "Prikaži dugmad za nazad i naprijed u naslovnoj traci desktopa",
   "settings.general.row.showSearch.title": "Paleta komandi",
-  "settings.general.row.showSearch.description": "Prikaži dugme za pretragu i paletu komandi u naslovnoj traci desktopa",
+  "settings.general.row.showSearch.description":
+    "Prikaži dugme za pretragu i paletu komandi u naslovnoj traci desktopa",
   "settings.general.row.showTerminal.title": "Terminal",
   "settings.general.row.showTerminal.description": "Prikaži dugme terminala u naslovnoj traci desktopa",
   "settings.general.row.showStatus.title": "Status servera",

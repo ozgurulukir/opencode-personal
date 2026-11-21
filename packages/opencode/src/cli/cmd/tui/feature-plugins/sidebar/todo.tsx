@@ -24,7 +24,15 @@ function View(props: { api: TuiPluginApi; session_id: string }) {
           </text>
         </box>
         <Show when={list().length <= 2 || open()}>
-          <For each={list()}>{(item) => <TodoItem status={normalizeStatus(item.status)} content={item.content} priority={normalizePriority(item.priority)} />}</For>
+          <For each={list()}>
+            {(item) => (
+              <TodoItem
+                status={normalizeStatus(item.status)}
+                content={item.content}
+                priority={normalizePriority(item.priority)}
+              />
+            )}
+          </For>
         </Show>
       </box>
     </Show>

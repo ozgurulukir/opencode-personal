@@ -92,26 +92,28 @@ describe("tool.grep", () => {
     }),
   )
 
-  it.instance("prompts before following a symlink outside the project", () =>
-    Effect.gen(function* () {
-      const test = yield* TestInstance
-      const outside = yield* Effect.promise(() => mkdtemp(path.join(path.dirname(test.directory), "grep-outside-")))
-      const link = path.join(test.directory, "linked")
-      try {
-        yield* Effect.promise(() => Bun.write(path.join(outside, "secret.txt"), "secret\n"))
-        yield* Effect.promise(() => symlink(outside, link, "dir"))
-        const requests: string[] = []
-        const info = yield* GrepTool
-        const grep = yield* info.init()
-        yield* grep.execute(
-          { pattern: "secret", path: link },
-          { ...ctx, ask: (request) => Effect.sync(() => requests.push(request.permission)) },
-        )
-        expect(requests).toContain("external_directory")
-      } finally {
-        yield* Effect.promise(() => rm(outside, { recursive: true, force: true }))
-      }
-    }),
+  it.instance(
+    "prompts before following a symlink outside the project",
+    () =>
+      Effect.gen(function* () {
+        const test = yield* TestInstance
+        const outside = yield* Effect.promise(() => mkdtemp(path.join(path.dirname(test.directory), "grep-outside-")))
+        const link = path.join(test.directory, "linked")
+        try {
+          yield* Effect.promise(() => Bun.write(path.join(outside, "secret.txt"), "secret\n"))
+          yield* Effect.promise(() => symlink(outside, link, "dir"))
+          const requests: string[] = []
+          const info = yield* GrepTool
+          const grep = yield* info.init()
+          yield* grep.execute(
+            { pattern: "secret", path: link },
+            { ...ctx, ask: (request) => Effect.sync(() => requests.push(request.permission)) },
+          )
+          expect(requests).toContain("external_directory")
+        } finally {
+          yield* Effect.promise(() => rm(outside, { recursive: true, force: true }))
+        }
+      }),
     { git: true },
   )
 
@@ -141,10 +143,7 @@ describe("tool.grep", () => {
       const info = yield* GrepTool
       const grep = yield* info.init()
       const exit = yield* grep
-        .execute(
-          { pattern: "test", path: path.join(test.directory, "does-not-exist") },
-          ctx,
-        )
+        .execute({ pattern: "test", path: path.join(test.directory, "does-not-exist") }, ctx)
         .pipe(Effect.exit)
       expect(Exit.isFailure(exit)).toBe(true)
       if (Exit.isFailure(exit)) {
@@ -160,10 +159,7 @@ describe("tool.grep", () => {
       const info = yield* GrepTool
       const grep = yield* info.init()
       const exit = yield* grep
-        .execute(
-          { pattern: "test", path: path.join(test.directory, "no", "such", "dir") },
-          ctx,
-        )
+        .execute({ pattern: "test", path: path.join(test.directory, "no", "such", "dir") }, ctx)
         .pipe(Effect.exit)
       expect(Exit.isFailure(exit)).toBe(true)
       if (Exit.isFailure(exit)) {
@@ -218,12 +214,8 @@ describe("tool.grep", () => {
   it.instance("groups output by file path", () =>
     Effect.gen(function* () {
       const test = yield* TestInstance
-      yield* Effect.promise(() =>
-        Bun.write(path.join(test.directory, "a.ts"), "target\ntarget\n"),
-      )
-      yield* Effect.promise(() =>
-        Bun.write(path.join(test.directory, "b.ts"), "target\n"),
-      )
+      yield* Effect.promise(() => Bun.write(path.join(test.directory, "a.ts"), "target\ntarget\n"))
+      yield* Effect.promise(() => Bun.write(path.join(test.directory, "b.ts"), "target\n"))
       const info = yield* GrepTool
       const grep = yield* info.init()
       const result = yield* grep.execute(

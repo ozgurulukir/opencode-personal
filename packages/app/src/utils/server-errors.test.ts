@@ -87,7 +87,9 @@ describe("formatServerError", () => {
   })
 
   test("returns provided string errors", () => {
-    expect(formatServerError("Failed to connect to server", (key, vars) => language.t(key, vars))).toBe("Failed to connect to server")
+    expect(formatServerError("Failed to connect to server", (key, vars) => language.t(key, vars))).toBe(
+      "Failed to connect to server",
+    )
   })
 
   test("uses translated unknown fallback", () => {
@@ -95,9 +97,9 @@ describe("formatServerError", () => {
   })
 
   test("falls back for unknown error objects and names", () => {
-    expect(formatServerError({ name: "ServerTimeoutError", data: { seconds: 30 } }, (key, vars) => language.t(key, vars))).toBe(
-      "Erro desconhecido",
-    )
+    expect(
+      formatServerError({ name: "ServerTimeoutError", data: { seconds: 30 } }, (key, vars) => language.t(key, vars)),
+    ).toBe("Erro desconhecido")
   })
 
   test("formats provider model errors using provider/model", () => {

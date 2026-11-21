@@ -70,9 +70,7 @@ function walk(ast: SchemaAST.AST): z.ZodTypeAny {
 function walkUncached(ast: SchemaAST.AST): z.ZodTypeAny {
   // Annotations carry symbol-keyed values the AST type doesn't declare; read
   // them through a structural record cast (see ZodOverride above).
-  const override = (ast.annotations as Record<symbol, unknown> | undefined)?.[ZodOverride] as
-    | z.ZodTypeAny
-    | undefined
+  const override = (ast.annotations as Record<symbol, unknown> | undefined)?.[ZodOverride] as z.ZodTypeAny | undefined
   // `description` annotations layer on top of an override so callers can
   // reuse a shared override schema (e.g. `SessionID`) and still add a
   // per-field description on the outer wrapper.

@@ -26,10 +26,7 @@ function handleMessageUpdated(
   }
 }
 
-function handleToolPart(
-  ctx: LoopContext,
-  part: Part,
-) {
+function handleToolPart(ctx: LoopContext, part: Part) {
   if (part.sessionID !== ctx.sessionID) return
 
   if (part.type === "tool") {
@@ -106,10 +103,7 @@ function handleSessionError(
   return next
 }
 
-function handleSessionStatus(
-  ctx: LoopContext,
-  props: { sessionID: string; status: { type: string } },
-): boolean {
+function handleSessionStatus(ctx: LoopContext, props: { sessionID: string; status: { type: string } }): boolean {
   return props.sessionID === ctx.sessionID && props.status.type === "idle"
 }
 

@@ -506,9 +506,7 @@ it.live("poll re-validates the server URL before any outbound request", () =>
       expiry: Duration.seconds(600),
       interval: Duration.seconds(5),
     })
-    const error = yield* Effect.flip(
-      Account.Service.use((s) => s.poll(bad)).pipe(Effect.provide(live(client))),
-    )
+    const error = yield* Effect.flip(Account.Service.use((s) => s.poll(bad)).pipe(Effect.provide(live(client))))
     expect(error).toBeInstanceOf(Account.InvalidServerUrlError)
     expect(requests).toBe(0)
   }),

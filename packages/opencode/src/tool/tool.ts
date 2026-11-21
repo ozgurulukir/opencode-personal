@@ -75,8 +75,7 @@ export interface Info<
 }
 
 type Init<Parameters extends Schema.Decoder<unknown>, M extends Metadata> =
-  | DefWithoutID<Parameters, M>
-  | (() => Effect.Effect<DefWithoutID<Parameters, M>>)
+  DefWithoutID<Parameters, M> | (() => Effect.Effect<DefWithoutID<Parameters, M>>)
 
 export type InferParameters<T> =
   T extends Info<infer P, any>
@@ -96,7 +95,10 @@ export type InferDef<T> =
 
 export function formatToolValidationError(id: string, error: unknown): string {
   const raw = error instanceof Error ? error.message : String(error)
-  const clean = raw.replace(/^SchemaError\((.*)\)$/s, "$1").replace(/^Error:\s*/, "").trim()
+  const clean = raw
+    .replace(/^SchemaError\((.*)\)$/s, "$1")
+    .replace(/^Error:\s*/, "")
+    .trim()
   return (
     `The ${id} tool was called with invalid JSON arguments: ${clean}.\n` +
     `Note: This is a tool parameter schema validation failure, NOT an execution or command syntax error. ` +

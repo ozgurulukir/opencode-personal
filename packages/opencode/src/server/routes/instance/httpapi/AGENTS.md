@@ -55,10 +55,9 @@ const handler = Effect.fn("SessionHttpApi.foo")(function* (ctx) {
   const instance = yield* InstanceState.context
   const workspace = yield* InstanceState.workspaceID
   // pass them into the service call:
-  return yield* someSvc.run(args).pipe(
-    Effect.provideService(InstanceRef, instance),
-    Effect.provideService(WorkspaceRef, workspace),
-  )
+  return yield* someSvc
+    .run(args)
+    .pipe(Effect.provideService(InstanceRef, instance), Effect.provideService(WorkspaceRef, workspace))
 })
 ```
 

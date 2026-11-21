@@ -123,7 +123,10 @@ const nativePatch = Effect.fnUntraced(function* (
 ) {
   const result =
     item.code === "??" || !ref
-      ? yield* git.patchUntracked(worktree, item.file, { context: PATCH_CONTEXT_LINES, maxOutputBytes: MAX_PATCH_BYTES })
+      ? yield* git.patchUntracked(worktree, item.file, {
+          context: PATCH_CONTEXT_LINES,
+          maxOutputBytes: MAX_PATCH_BYTES,
+        })
       : yield* git.patch(cwd, ref, item.file, { context: PATCH_CONTEXT_LINES, maxOutputBytes: MAX_PATCH_BYTES })
   if (!result.truncated && result.text) return result.text
 
@@ -168,7 +171,8 @@ const files = Effect.fnUntraced(function* (
   let capped = false
 
   for (const item of list.toSorted((a, b) => a.file.localeCompare(b.file))) {
-    const stat = map.get(item.file) ?? (item.status === "added" ? yield* git.statUntracked(worktree, item.file) : undefined)
+    const stat =
+      map.get(item.file) ?? (item.status === "added" ? yield* git.statUntracked(worktree, item.file) : undefined)
     const patch = yield* patchForItem(git, cwd, worktree, ref, item, batch, capped)
     const result: { patch: string; capped: boolean } = capped
       ? { patch, capped: true }
@@ -208,12 +212,7 @@ const diffAgainstRef = Effect.fnUntraced(function* (git: Git.Interface, cwd: str
   )
 })
 
-const track = Effect.fnUntraced(function* (
-  git: Git.Interface,
-  cwd: string,
-  worktree: string,
-  ref: string | undefined,
-) {
+const track = Effect.fnUntraced(function* (git: Git.Interface, cwd: string, worktree: string, ref: string | undefined) {
   if (!ref) return yield* files(git, cwd, worktree, ref, yield* git.status(cwd), new Map(), emptyBatch())
   return yield* diffAgainstRef(git, cwd, worktree, ref)
 })
@@ -340,12 +339,7 @@ export const layer: Layer.Layer<Service, never, Git.Service | Bus.Service> = Lay
       const ctx = yield* InstanceState.context
       if (ctx.project.vcs !== "git") return []
       if (mode === "git") {
-        return yield* track(
-          git,
-          ctx.directory,
-          ctx.worktree,
-          (yield* git.hasHead(ctx.directory)) ? "HEAD" : undefined,
-        )
+        return yield* track(git, ctx.directory, ctx.worktree, (yield* git.hasHead(ctx.directory)) ? "HEAD" : undefined)
       }
 
       if (!value.root) return []

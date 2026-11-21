@@ -29,12 +29,7 @@ test("dispatches injected auth, resolves aliases, and isolates provider failures
   })
   expect(reports.map((x) => x.provider)).toEqual(["zai"])
   expect(reports[0].limits[0].amount.usedFraction).toBe(0.25)
-  expect(calls.map((x) => x.authorization)).toEqual([
-    "Bearer claude-token",
-    "token",
-    "token",
-    "Bearer openai-token",
-  ])
+  expect(calls.map((x) => x.authorization)).toEqual(["Bearer claude-token", "token", "token", "Bearer openai-token"])
 })
 
 test("ignores unknown, unsupported, and empty credentials without requesting usage", async () => {

@@ -14,17 +14,14 @@ describe("referencePath", () => {
   })
 
   test("passes through absolute paths unchanged", () => {
-    expect(referencePath({ directory: dir, worktree, value: "/absolute/path" }))
-      .toBe("/absolute/path")
+    expect(referencePath({ directory: dir, worktree, value: "/absolute/path" })).toBe("/absolute/path")
   })
 
   test("resolves relative path against worktree", () => {
-    expect(referencePath({ directory: dir, worktree, value: "sub/file" }))
-      .toBe(path.resolve(worktree, "sub/file"))
+    expect(referencePath({ directory: dir, worktree, value: "sub/file" })).toBe(path.resolve(worktree, "sub/file"))
   })
 
   test("falls back to directory when worktree is root", () => {
-    expect(referencePath({ directory: dir, worktree: "/", value: "sub/file" }))
-      .toBe(path.resolve(dir, "sub/file"))
+    expect(referencePath({ directory: dir, worktree: "/", value: "sub/file" })).toBe(path.resolve(dir, "sub/file"))
   })
 })

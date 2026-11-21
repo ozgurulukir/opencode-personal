@@ -109,7 +109,10 @@ describe("promptSame", () => {
   })
 
   test("returns false for different parts", () => {
-    const a: RunPrompt = { text: "hello", parts: [{ type: "file", mime: "text/plain", url: "file:///a", filename: "a" }] }
+    const a: RunPrompt = {
+      text: "hello",
+      parts: [{ type: "file", mime: "text/plain", url: "file:///a", filename: "a" }],
+    }
     const b: RunPrompt = { text: "hello", parts: [] }
     expect(promptSame(a, b)).toBe(false)
   })
@@ -119,7 +122,10 @@ describe("promptSame", () => {
 
 describe("promptCopy", () => {
   test("creates a deep copy", () => {
-    const original: RunPrompt = { text: "hello", parts: [{ type: "file", mime: "text/plain", url: "file:///a", filename: "a" }] }
+    const original: RunPrompt = {
+      text: "hello",
+      parts: [{ type: "file", mime: "text/plain", url: "file:///a", filename: "a" }],
+    }
     const copy = promptCopy(original)
     expect(copy).toEqual(original)
     expect(copy).not.toBe(original)
@@ -245,7 +251,10 @@ describe("movePromptHistory", () => {
   })
 
   test("moves to last item on first up", () => {
-    const h = createPromptHistory([{ text: "first", parts: [] }, { text: "last", parts: [] }])
+    const h = createPromptHistory([
+      { text: "first", parts: [] },
+      { text: "last", parts: [] },
+    ])
     const result = movePromptHistory(h, -1, "current", 0)
     expect(result.apply).toBe(true)
     expect(result.text).toBe("last")
@@ -255,7 +264,10 @@ describe("movePromptHistory", () => {
   })
 
   test("moves to previous item on subsequent up", () => {
-    const h = createPromptHistory([{ text: "first", parts: [] }, { text: "last", parts: [] }])
+    const h = createPromptHistory([
+      { text: "first", parts: [] },
+      { text: "last", parts: [] },
+    ])
     const first = movePromptHistory(h, -1, "current", 0)
     const result = movePromptHistory(first.state, -1, "last", 0)
     expect(result.apply).toBe(true)
@@ -265,7 +277,10 @@ describe("movePromptHistory", () => {
   })
 
   test("returns apply:false when at first item and pressing up", () => {
-    const h = createPromptHistory([{ text: "first", parts: [] }, { text: "last", parts: [] }])
+    const h = createPromptHistory([
+      { text: "first", parts: [] },
+      { text: "last", parts: [] },
+    ])
     const first = movePromptHistory(h, -1, "current", 0)
     const second = movePromptHistory(first.state, -1, "last", 0)
     const result = movePromptHistory(second.state, -1, "first", 0)
@@ -286,7 +301,11 @@ describe("movePromptHistory", () => {
 
   test("moves to next item on down (within range)", () => {
     // Start with index at 1 (middle item), move down to index 2 (last item)
-    const h = createPromptHistory([{ text: "first", parts: [] }, { text: "middle", parts: [] }, { text: "last", parts: [] }])
+    const h = createPromptHistory([
+      { text: "first", parts: [] },
+      { text: "middle", parts: [] },
+      { text: "last", parts: [] },
+    ])
     // Manually set index to 1 (middle)
     const state = { ...h, index: 1, draft: "current" }
     // text is "middle" (length 6), cursor at end
@@ -313,24 +332,30 @@ describe("movePromptHistory", () => {
 // ─── promptHit ───────────────────────────────────────────────────────────────
 
 describe("promptHit", () => {
-  const bindings = [
-    { name: "return", ctrl: true, meta: false, shift: false, super: false, leader: false },
-  ]
+  const bindings = [{ name: "return", ctrl: true, meta: false, shift: false, super: false, leader: false }]
 
   test("returns true when binding matches", () => {
-    expect(promptHit(bindings, { name: "return", ctrl: true, meta: false, shift: false, super: false, leader: false })).toBe(true)
+    expect(
+      promptHit(bindings, { name: "return", ctrl: true, meta: false, shift: false, super: false, leader: false }),
+    ).toBe(true)
   })
 
   test("returns false when name differs", () => {
-    expect(promptHit(bindings, { name: "escape", ctrl: true, meta: false, shift: false, super: false, leader: false })).toBe(false)
+    expect(
+      promptHit(bindings, { name: "escape", ctrl: true, meta: false, shift: false, super: false, leader: false }),
+    ).toBe(false)
   })
 
   test("returns false when modifier differs", () => {
-    expect(promptHit(bindings, { name: "return", ctrl: false, meta: false, shift: false, super: false, leader: false })).toBe(false)
+    expect(
+      promptHit(bindings, { name: "return", ctrl: false, meta: false, shift: false, super: false, leader: false }),
+    ).toBe(false)
   })
 
   test("returns false for empty bindings", () => {
-    expect(promptHit([], { name: "return", ctrl: true, meta: false, shift: false, super: false, leader: false })).toBe(false)
+    expect(promptHit([], { name: "return", ctrl: true, meta: false, shift: false, super: false, leader: false })).toBe(
+      false,
+    )
   })
 })
 

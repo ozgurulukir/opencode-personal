@@ -221,7 +221,11 @@ const add = Effect.fnUntraced(function* (state: State, match: string, bus: Bus.I
       const message = `${reason}; using folder name "${folderName}"`
       warnings.push(message)
       yield* bus.publish(Event.Warning, { name: skillName, location: match, message })
-      log.warn("unsafe skill name, falling back to folder name", { skill: match, name: skillName, fallback: folderName })
+      log.warn("unsafe skill name, falling back to folder name", {
+        skill: match,
+        name: skillName,
+        fallback: folderName,
+      })
       skillName = folderName
     } else {
       yield* bus.publish(Event.Warning, { name: skillName, location: match, message: `${reason}; skill skipped` })

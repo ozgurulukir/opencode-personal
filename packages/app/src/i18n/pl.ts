@@ -598,7 +598,8 @@ export const dict = {
   "settings.general.row.showNavigation.title": "Sterowanie nawigacją",
   "settings.general.row.showNavigation.description": "Pokaż przyciski wstecz i dalej na pasku tytułowym pulpitu",
   "settings.general.row.showSearch.title": "Paleta poleceń",
-  "settings.general.row.showSearch.description": "Pokaż przycisk wyszukiwania i palety poleceń na pasku tytułowym pulpitu",
+  "settings.general.row.showSearch.description":
+    "Pokaż przycisk wyszukiwania i palety poleceń na pasku tytułowym pulpitu",
   "settings.general.row.showTerminal.title": "Terminal",
   "settings.general.row.showTerminal.description": "Pokaż przycisk terminala na pasku tytułowym pulpitu",
   "settings.general.row.showStatus.title": "Status serwera",

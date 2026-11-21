@@ -11,16 +11,10 @@ export type SlashCommand = {
   arguments: string
 }
 
-export type SlashResult =
-  | { type: "none" }
-  | { type: "pending" }
-  | { type: "command"; command: SlashCommand }
+export type SlashResult = { type: "none" } | { type: "pending" } | { type: "command"; command: SlashCommand }
 
 export type ValidationResult =
-  | { type: "empty" }
-  | { type: "exit" }
-  | { type: "pending" }
-  | { type: "valid"; command?: SlashCommand }
+  { type: "empty" } | { type: "exit" } | { type: "pending" } | { type: "valid"; command?: SlashCommand }
 
 export function parseSlashCommand(text: string, commands: RunCommand[] | undefined): SlashResult {
   const head = slashHead(text)

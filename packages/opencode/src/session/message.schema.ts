@@ -67,8 +67,7 @@ export const SnapshotPart = Schema.Struct({
   ...partBase,
   type: Schema.Literal("snapshot"),
   snapshot: Schema.String,
-})
-  .annotate({ identifier: "SnapshotPart" })
+}).annotate({ identifier: "SnapshotPart" })
 
 export type SnapshotPart = Types.DeepMutable<Schema.Schema.Type<typeof SnapshotPart>>
 
@@ -77,8 +76,7 @@ export const PatchPart = Schema.Struct({
   type: Schema.Literal("patch"),
   hash: Schema.String,
   files: Schema.Array(Schema.String),
-})
-  .annotate({ identifier: "PatchPart" })
+}).annotate({ identifier: "PatchPart" })
 
 export type PatchPart = Types.DeepMutable<Schema.Schema.Type<typeof PatchPart>>
 
@@ -95,8 +93,7 @@ export const TextPart = Schema.Struct({
     }),
   ),
   metadata: Schema.optional(Schema.Record(Schema.String, Schema.Any)),
-})
-  .annotate({ identifier: "TextPart" })
+}).annotate({ identifier: "TextPart" })
 
 export type TextPart = Types.DeepMutable<Schema.Schema.Type<typeof TextPart>>
 
@@ -109,8 +106,7 @@ export const ReasoningPart = Schema.Struct({
     start: NonNegativeInt,
     end: Schema.optional(NonNegativeInt),
   }),
-})
-  .annotate({ identifier: "ReasoningPart" })
+}).annotate({ identifier: "ReasoningPart" })
 
 export type ReasoningPart = Types.DeepMutable<Schema.Schema.Type<typeof ReasoningPart>>
 
@@ -126,8 +122,7 @@ export const FileSource = Schema.Struct({
   ...filePartSourceBase,
   type: Schema.Literal("file"),
   path: Schema.String,
-})
-  .annotate({ identifier: "FileSource" })
+}).annotate({ identifier: "FileSource" })
 
 export const SymbolSource = Schema.Struct({
   ...filePartSourceBase,
@@ -136,18 +131,14 @@ export const SymbolSource = Schema.Struct({
   range: LSP.Range,
   name: Schema.String,
   kind: NonNegativeInt,
-})
-  .annotate({ identifier: "SymbolSource" })
-
+}).annotate({ identifier: "SymbolSource" })
 
 export const ResourceSource = Schema.Struct({
   ...filePartSourceBase,
   type: Schema.Literal("resource"),
   clientName: Schema.String,
   uri: Schema.String,
-})
-  .annotate({ identifier: "ResourceSource" })
-
+}).annotate({ identifier: "ResourceSource" })
 
 const _FilePartSource = Schema.Union([FileSource, SymbolSource, ResourceSource]).annotate({
   discriminator: "type",
@@ -162,8 +153,7 @@ export const FilePart = Schema.Struct({
   filename: Schema.optional(Schema.String),
   url: Schema.String,
   source: Schema.optional(_FilePartSource),
-})
-  .annotate({ identifier: "FilePart" })
+}).annotate({ identifier: "FilePart" })
 
 export type FilePart = Types.DeepMutable<Schema.Schema.Type<typeof FilePart>>
 
@@ -178,8 +168,7 @@ export const AgentPart = Schema.Struct({
       end: NonNegativeInt,
     }),
   ),
-})
-  .annotate({ identifier: "AgentPart" })
+}).annotate({ identifier: "AgentPart" })
 
 export type AgentPart = Types.DeepMutable<Schema.Schema.Type<typeof AgentPart>>
 
@@ -189,8 +178,7 @@ export const CompactionPart = Schema.Struct({
   auto: Schema.Boolean,
   overflow: Schema.optional(Schema.Boolean),
   tail_start_id: Schema.optional(MessageID),
-})
-  .annotate({ identifier: "CompactionPart" })
+}).annotate({ identifier: "CompactionPart" })
 
 export type CompactionPart = Types.DeepMutable<Schema.Schema.Type<typeof CompactionPart>>
 
@@ -207,8 +195,7 @@ export const SubtaskPart = Schema.Struct({
     }),
   ),
   command: Schema.optional(Schema.String),
-})
-  .annotate({ identifier: "SubtaskPart" })
+}).annotate({ identifier: "SubtaskPart" })
 
 export type SubtaskPart = Types.DeepMutable<Schema.Schema.Type<typeof SubtaskPart>>
 
@@ -220,8 +207,7 @@ export const RetryPart = Schema.Struct({
   time: Schema.Struct({
     created: NonNegativeInt,
   }),
-})
-  .annotate({ identifier: "RetryPart" })
+}).annotate({ identifier: "RetryPart" })
 
 export type RetryPart = Omit<Types.DeepMutable<Schema.Schema.Type<typeof RetryPart>>, "error"> & {
   error: APIError
@@ -231,8 +217,7 @@ export const StepStartPart = Schema.Struct({
   ...partBase,
   type: Schema.Literal("step-start"),
   snapshot: Schema.optional(Schema.String),
-})
-  .annotate({ identifier: "StepStartPart" })
+}).annotate({ identifier: "StepStartPart" })
 
 export type StepStartPart = Types.DeepMutable<Schema.Schema.Type<typeof StepStartPart>>
 
@@ -252,8 +237,7 @@ export const StepFinishPart = Schema.Struct({
       write: Schema.Finite,
     }),
   }),
-})
-  .annotate({ identifier: "StepFinishPart" })
+}).annotate({ identifier: "StepFinishPart" })
 
 export type StepFinishPart = Types.DeepMutable<Schema.Schema.Type<typeof StepFinishPart>>
 
@@ -261,8 +245,7 @@ export const ToolStatePending = Schema.Struct({
   status: Schema.Literal("pending"),
   input: Schema.Record(Schema.String, Schema.Any),
   raw: Schema.String,
-})
-  .annotate({ identifier: "ToolStatePending" })
+}).annotate({ identifier: "ToolStatePending" })
 
 export type ToolStatePending = Types.DeepMutable<Schema.Schema.Type<typeof ToolStatePending>>
 
@@ -274,8 +257,7 @@ export const ToolStateRunning = Schema.Struct({
   time: Schema.Struct({
     start: NonNegativeInt,
   }),
-})
-  .annotate({ identifier: "ToolStateRunning" })
+}).annotate({ identifier: "ToolStateRunning" })
 
 export type ToolStateRunning = Types.DeepMutable<Schema.Schema.Type<typeof ToolStateRunning>>
 
@@ -291,8 +273,7 @@ export const ToolStateCompleted = Schema.Struct({
     compacted: Schema.optional(NonNegativeInt),
   }),
   attachments: Schema.optional(Schema.Array(FilePart)),
-})
-  .annotate({ identifier: "ToolStateCompleted" })
+}).annotate({ identifier: "ToolStateCompleted" })
 
 export type ToolStateCompleted = Types.DeepMutable<Schema.Schema.Type<typeof ToolStateCompleted>>
 
@@ -305,8 +286,7 @@ export const ToolStateError = Schema.Struct({
     start: NonNegativeInt,
     end: NonNegativeInt,
   }),
-})
-  .annotate({ identifier: "ToolStateError" })
+}).annotate({ identifier: "ToolStateError" })
 
 export type ToolStateError = Types.DeepMutable<Schema.Schema.Type<typeof ToolStateError>>
 
@@ -328,8 +308,7 @@ export const ToolPart = Schema.Struct({
   tool: Schema.String,
   state: _ToolState,
   metadata: Schema.optional(Schema.Record(Schema.String, Schema.Any)),
-})
-  .annotate({ identifier: "ToolPart" })
+}).annotate({ identifier: "ToolPart" })
 
 export type ToolPart = Omit<Types.DeepMutable<Schema.Schema.Type<typeof ToolPart>>, "state"> & {
   state: ToolState
@@ -487,8 +466,7 @@ export const TextPartInput = Schema.Struct({
     }),
   ),
   metadata: Schema.optional(Schema.Record(Schema.String, Schema.Any)),
-})
-  .annotate({ identifier: "TextPartInput" })
+}).annotate({ identifier: "TextPartInput" })
 
 export type TextPartInput = Types.DeepMutable<Schema.Schema.Type<typeof TextPartInput>>
 
@@ -499,8 +477,7 @@ export const FilePartInput = Schema.Struct({
   filename: Schema.optional(Schema.String),
   url: Schema.String,
   source: Schema.optional(_FilePartSource),
-})
-  .annotate({ identifier: "FilePartInput" })
+}).annotate({ identifier: "FilePartInput" })
 
 export type FilePartInput = Types.DeepMutable<Schema.Schema.Type<typeof FilePartInput>>
 
@@ -515,8 +492,7 @@ export const AgentPartInput = Schema.Struct({
       end: NonNegativeInt,
     }),
   ),
-})
-  .annotate({ identifier: "AgentPartInput" })
+}).annotate({ identifier: "AgentPartInput" })
 
 export type AgentPartInput = Types.DeepMutable<Schema.Schema.Type<typeof AgentPartInput>>
 
@@ -533,7 +509,6 @@ export const SubtaskPartInput = Schema.Struct({
     }),
   ),
   command: Schema.optional(Schema.String),
-})
-  .annotate({ identifier: "SubtaskPartInput" })
+}).annotate({ identifier: "SubtaskPartInput" })
 
 export type SubtaskPartInput = Types.DeepMutable<Schema.Schema.Type<typeof SubtaskPartInput>>

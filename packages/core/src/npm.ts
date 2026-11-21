@@ -160,9 +160,9 @@ export const layer = Layer.effect(
 
       const installedDir = path.join(dir, "node_modules", name)
       if (yield* afs.existsSafe(installedDir)) {
-        const installed = yield* afs.readJson(path.join(installedDir, "package.json")).pipe(
-          Effect.orElseSucceed(() => undefined),
-        )
+        const installed = yield* afs
+          .readJson(path.join(installedDir, "package.json"))
+          .pipe(Effect.orElseSucceed(() => undefined))
         const version =
           installed && typeof installed === "object" ? (installed as { version?: unknown }).version : undefined
         if (satisfiesRequestedVersion(pkg, version)) {

@@ -13,7 +13,9 @@ describe("diagnosticMessageKey", () => {
   })
 
   test("merges the same value regardless of kind", () => {
-    expect(diagnosticMessageKey({ kind: "plain", value: "x" })).toBe(diagnosticMessageKey({ kind: "markdown", value: "x" }))
+    expect(diagnosticMessageKey({ kind: "plain", value: "x" })).toBe(
+      diagnosticMessageKey({ kind: "markdown", value: "x" }),
+    )
   })
 
   test("keeps content-based discrimination for other objects", () => {

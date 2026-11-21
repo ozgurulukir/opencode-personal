@@ -203,13 +203,17 @@ const HTML_SUCCESS = `<!doctype html>
 </html>`
 
 function escapeHtml(str: string): string {
-  return str.replace(/[&<>"']/g, (c) => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    '"': "&quot;",
-    "'": "&#39;",
-  }[c] || c))
+  return str.replace(
+    /[&<>"']/g,
+    (c) =>
+      ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;",
+      })[c] || c,
+  )
 }
 
 const HTML_ERROR = (error: string) => `<!doctype html>

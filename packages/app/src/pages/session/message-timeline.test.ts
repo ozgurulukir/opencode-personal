@@ -125,13 +125,19 @@ describe("messageComments", () => {
 describe("taskDescription", () => {
   test("returns undefined for non-tool parts", () => {
     expect(
-      taskDescription({ type: "text", text: "x", id: "1", sessionID: "s", messageID: "m" } as unknown as Part, "session-1"),
+      taskDescription(
+        { type: "text", text: "x", id: "1", sessionID: "s", messageID: "m" } as unknown as Part,
+        "session-1",
+      ),
     ).toBeUndefined()
   })
 
   test("returns undefined for tool parts that are not task", () => {
     expect(
-      taskDescription({ type: "tool", tool: "bash", id: "1", sessionID: "s", messageID: "m", callID: "c" } as unknown as Part, "session-1"),
+      taskDescription(
+        { type: "tool", tool: "bash", id: "1", sessionID: "s", messageID: "m", callID: "c" } as unknown as Part,
+        "session-1",
+      ),
     ).toBeUndefined()
   })
 
@@ -309,7 +315,7 @@ describe("createTimelineStaging", () => {
   const tick = () => new Promise((resolve) => queueMicrotask(resolve))
 
   test("returns all messages when turnStart is 0", async () => {
-    const messages = Array.from({ length: 5 }, (_, i) => ({ id: `m${i}` } as unknown as UserMessage))
+    const messages = Array.from({ length: 5 }, (_, i) => ({ id: `m${i}` }) as unknown as UserMessage)
     await createRoot(async (dispose) => {
       const staging = createTimelineStaging(makeInput(messages))
       await tick()
@@ -320,7 +326,7 @@ describe("createTimelineStaging", () => {
   })
 
   test("returns init-sized slice when windowed and not completed", async () => {
-    const messages = Array.from({ length: 10 }, (_, i) => ({ id: `m${i}` } as unknown as UserMessage))
+    const messages = Array.from({ length: 10 }, (_, i) => ({ id: `m${i}` }) as unknown as UserMessage)
     await createRoot(async (dispose) => {
       const staging = createTimelineStaging(makeInput(messages, { turnStart: 2 }))
       await tick()
@@ -331,7 +337,7 @@ describe("createTimelineStaging", () => {
   })
 
   test("returns all messages when total is less than init", async () => {
-    const messages = Array.from({ length: 2 }, (_, i) => ({ id: `m${i}` } as unknown as UserMessage))
+    const messages = Array.from({ length: 2 }, (_, i) => ({ id: `m${i}` }) as unknown as UserMessage)
     await createRoot(async (dispose) => {
       const staging = createTimelineStaging(makeInput(messages, { turnStart: 2, config: { init: 5, batch: 3 } }))
       await tick()
@@ -342,7 +348,7 @@ describe("createTimelineStaging", () => {
   })
 
   test("isStaging is true while activeSession matches", async () => {
-    const messages = Array.from({ length: 10 }, (_, i) => ({ id: `m${i}` } as unknown as UserMessage))
+    const messages = Array.from({ length: 10 }, (_, i) => ({ id: `m${i}` }) as unknown as UserMessage)
     await createRoot(async (dispose) => {
       const staging = createTimelineStaging(makeInput(messages, { turnStart: 2 }))
       await tick()
@@ -352,7 +358,7 @@ describe("createTimelineStaging", () => {
   })
 
   test("isStaging is false when turnStart is 0", async () => {
-    const messages = Array.from({ length: 10 }, (_, i) => ({ id: `m${i}` } as unknown as UserMessage))
+    const messages = Array.from({ length: 10 }, (_, i) => ({ id: `m${i}` }) as unknown as UserMessage)
     await createRoot(async (dispose) => {
       const staging = createTimelineStaging(makeInput(messages))
       await tick()

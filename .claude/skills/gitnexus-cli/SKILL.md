@@ -1,6 +1,6 @@
 ---
 name: gitnexus-cli
-description: "Use when the user needs to run GitNexus CLI commands like analyze/index a repo, check status, clean the index, generate a wiki, or list indexed repos. Examples: \"Index this repo\", \"Reanalyze the codebase\", \"Generate a wiki\""
+description: 'Use when the user needs to run GitNexus CLI commands like analyze/index a repo, check status, clean the index, generate a wiki, or list indexed repos. Examples: "Index this repo", "Reanalyze the codebase", "Generate a wiki"'
 ---
 
 # GitNexus CLI Commands
@@ -19,12 +19,12 @@ node .gitnexus/run.cjs analyze
 
 Run from the project root. This parses all source files, builds the knowledge graph, writes it to `.gitnexus/`, and generates CLAUDE.md / AGENTS.md context files.
 
-| Flag           | Effect                                                           |
-| -------------- | ---------------------------------------------------------------- |
-| `--force`      | Force full re-index even if up to date                           |
-| `--embeddings` | Enable embedding generation for semantic search (off by default) |
-| `--drop-embeddings` | Drop existing embeddings on rebuild. By default, an `analyze` without `--embeddings` preserves them. |
-| `--pdg` | Build the program-dependence layers used by `explain` and `pdg_query` (taint, CDG, and REACHING_DEF). |
+| Flag                | Effect                                                                                                |
+| ------------------- | ----------------------------------------------------------------------------------------------------- |
+| `--force`           | Force full re-index even if up to date                                                                |
+| `--embeddings`      | Enable embedding generation for semantic search (off by default)                                      |
+| `--drop-embeddings` | Drop existing embeddings on rebuild. By default, an `analyze` without `--embeddings` preserves them.  |
+| `--pdg`             | Build the program-dependence layers used by `explain` and `pdg_query` (taint, CDG, and REACHING_DEF). |
 
 **When to run:** First time in a project, after major code changes, or when `gitnexus://repo/{name}/context` reports the index is stale. In Claude Code, a PostToolUse hook detects staleness after `git commit` and `git merge` and notifies the agent to run `analyze` — the hook does not run analyze itself, to avoid blocking the agent for up to 120s and risking KuzuDB corruption on timeout.
 
@@ -57,14 +57,14 @@ node .gitnexus/run.cjs wiki
 
 Generates repository documentation from the knowledge graph using an LLM. Requires an API key (saved to `~/.gitnexus/config.json` on first use).
 
-| Flag                | Effect                                    |
-| ------------------- | ----------------------------------------- |
-| `--force`           | Force full regeneration                   |
-| `--model <model>`   | LLM model (default: MiniMax-M3)           |
-| `--base-url <url>`  | LLM API base URL                          |
-| `--api-key <key>`   | LLM API key                               |
-| `--concurrency <n>` | Parallel LLM calls (default: 3)           |
-| `--gist`            | Publish wiki as a public GitHub Gist      |
+| Flag                | Effect                               |
+| ------------------- | ------------------------------------ |
+| `--force`           | Force full regeneration              |
+| `--model <model>`   | LLM model (default: MiniMax-M3)      |
+| `--base-url <url>`  | LLM API base URL                     |
+| `--api-key <key>`   | LLM API key                          |
+| `--concurrency <n>` | Parallel LLM calls (default: 3)      |
+| `--gist`            | Publish wiki as a public GitHub Gist |
 
 ### list — Show all indexed repos
 

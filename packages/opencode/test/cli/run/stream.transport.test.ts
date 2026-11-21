@@ -421,7 +421,9 @@ function sdk(
   spyOn(client.session, "status").mockImplementation(status)
   spyOn(client.session, "messages").mockImplementation(messages)
   spyOn(client.session, "children").mockImplementation(children)
-  spyOn(client.v2.session, "promptAsync").mockImplementation(promptAsync as unknown as OpencodeClient["v2"]["session"]["promptAsync"])
+  spyOn(client.v2.session, "promptAsync").mockImplementation(
+    promptAsync as unknown as OpencodeClient["v2"]["session"]["promptAsync"],
+  )
   spyOn(client.v2.session, "status").mockImplementation(status as unknown as OpencodeClient["v2"]["session"]["status"])
   spyOn(client.v2.session, "messages").mockImplementation((async (params: { sessionID: string }) => {
     const res = await messages(params as unknown as Parameters<OpencodeClient["session"]["messages"]>[0])
@@ -448,24 +450,28 @@ function sdk(
                     structured: part.state.metadata,
                   }
                 : part.state
-          return [{
-            type: "tool" as const,
-            id: part.callID,
-            name: part.tool,
-            time: {
-              created: 1,
-              ran: 1,
-              ...(part.state.status === "completed" ? { completed: 2 } : {}),
+          return [
+            {
+              type: "tool" as const,
+              id: part.callID,
+              name: part.tool,
+              time: {
+                created: 1,
+                ran: 1,
+                ...(part.state.status === "completed" ? { completed: 2 } : {}),
+              },
+              state,
             },
-            state,
-          }]
+          ]
         }
         return []
       }),
     }))
     return { ...res, data: { items: items.slice().reverse() } }
   }) as unknown as OpencodeClient["v2"]["session"]["messages"])
-  spyOn(client.v2.session, "children").mockImplementation(children as unknown as OpencodeClient["v2"]["session"]["children"])
+  spyOn(client.v2.session, "children").mockImplementation(
+    children as unknown as OpencodeClient["v2"]["session"]["children"],
+  )
   spyOn(client.permission, "list").mockImplementation(permissions)
   spyOn(client.question, "list").mockImplementation(questions)
 
@@ -1111,7 +1117,8 @@ describe("run stream transport", () => {
       )
       await waitFor(() => {
         const commit = ui.commits.findLast(
-          (item) => item.kind === "tool" && item.partID === "msg-1:tool:call-question-race-1" && item.toolState === "completed",
+          (item) =>
+            item.kind === "tool" && item.partID === "msg-1:tool:call-question-race-1" && item.toolState === "completed",
         )
         return commit ? true : undefined
       })

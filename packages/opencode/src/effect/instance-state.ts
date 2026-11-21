@@ -75,8 +75,7 @@ export const has = <A, E, R>(self: InstanceState<A, E, R>) =>
     return yield* ScopedCache.has(self.cache, yield* directory)
   })
 
-export const invalidateAll = <A, E, R>(self: InstanceState<A, E, R>) =>
-  ScopedCache.invalidateAll(self.cache)
+export const invalidateAll = <A, E, R>(self: InstanceState<A, E, R>) => ScopedCache.invalidateAll(self.cache)
 
 export const invalidate = <A, E, R>(self: InstanceState<A, E, R>) =>
   Effect.gen(function* () {

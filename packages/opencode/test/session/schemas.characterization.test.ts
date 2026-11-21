@@ -84,7 +84,10 @@ describe("Session schemas — characterization", () => {
   })
 
   test("SetPermissionInput accepts ruleset", () => {
-    const raw = { sessionID: SessionID.make("ses_1"), permission: [{ permission: "read", pattern: "**", action: "allow" as const }] }
+    const raw = {
+      sessionID: SessionID.make("ses_1"),
+      permission: [{ permission: "read", pattern: "**", action: "allow" as const }],
+    }
     const parsed = Session.SetPermissionInput.zod.parse(raw)
     expect(parsed.sessionID).toBe(raw.sessionID)
     expect(parsed.permission).toHaveLength(1)

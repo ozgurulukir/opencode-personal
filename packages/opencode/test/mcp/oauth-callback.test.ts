@@ -5,7 +5,7 @@ import { parseRedirectUri } from "../../src/mcp/oauth-provider"
 describe("escapeHtml", () => {
   test("escapes HTML special characters to prevent reflected XSS", () => {
     expect(_escapeHtml("<script>alert(1)</script>")).toBe("&lt;script&gt;alert(1)&lt;/script&gt;")
-    expect(_escapeHtml('foo "bar" & \'baz\'')).toBe("foo &quot;bar&quot; &amp; &#39;baz&#39;")
+    expect(_escapeHtml("foo \"bar\" & 'baz'")).toBe("foo &quot;bar&quot; &amp; &#39;baz&#39;")
   })
 })
 

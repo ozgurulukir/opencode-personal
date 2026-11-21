@@ -56,7 +56,12 @@ const solidPlugin = createSolidTransformPlugin()
 const skipEmbedWebUi = process.argv.includes("--skip-embed-web-ui")
 const preserveOpenTuiSolidPlugin = {
   name: "preserve-opentui-solid-runtime",
-  setup(build: { onLoad: (options: { filter: RegExp }, callback: (args: { path: string }) => Promise<{ contents: string; loader: "js" }>) => void }) {
+  setup(build: {
+    onLoad: (
+      options: { filter: RegExp },
+      callback: (args: { path: string }) => Promise<{ contents: string; loader: "js" }>,
+    ) => void
+  }) {
     build.onLoad({ filter: /[/\\]node_modules[/\\]@opentui[/\\]solid[/\\].*\.js$/ }, async (args) => ({
       contents: await Bun.file(args.path).text(),
       loader: "js",
@@ -243,11 +248,7 @@ const readOpentuiVersion = (pkgJsonPath: string) => {
 }
 const opentuiLocalVersion = readOpentuiVersion(path.resolve(dir, "node_modules/@opentui/core/package.json"))
 const opentuiRootVersion = readOpentuiVersion(path.resolve(dir, "../../node_modules/@opentui/core/package.json"))
-if (
-  opentuiLocalVersion &&
-  opentuiRootVersion &&
-  opentuiLocalVersion !== opentuiRootVersion
-) {
+if (opentuiLocalVersion && opentuiRootVersion && opentuiLocalVersion !== opentuiRootVersion) {
   throw new Error(
     `Stale duplicate @opentui/core detected: package-local ${opentuiLocalVersion} != root ${opentuiRootVersion}. ` +
       "The compiled binary embeds the module graph as-is, so a stale copy breaks the TUI silently. " +

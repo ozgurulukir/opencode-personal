@@ -16,10 +16,7 @@ const toModelMessages = (
   input: Parameters<typeof MessageV2.toModelMessagesEffect>[0],
   model: Parameters<typeof MessageV2.toModelMessagesEffect>[1],
   options?: Parameters<typeof MessageV2.toModelMessagesEffect>[2],
-) =>
-  Effect.runPromise(
-    MessageV2.toModelMessagesEffect(input, model, options).pipe(Effect.provide(EffectLogger.layer)),
-  )
+) => Effect.runPromise(MessageV2.toModelMessagesEffect(input, model, options).pipe(Effect.provide(EffectLogger.layer)))
 
 const sessionID = SessionID.make("session")
 const providerID = ProviderID.make("test")
@@ -1102,25 +1099,25 @@ describe("session.message-v2.toModelMessage", () => {
       },
     ]
 
-    expect(
-      ProviderTransform.message(await toModelMessages(input, openrouterModel), openrouterModel, {}),
-    ).toStrictEqual([
-      {
-        role: "assistant",
-        content: [
-          {
-            type: "reasoning",
-            text: "thinking",
-            providerOptions: {
-              openrouter: {
-                reasoning_details: reasoningDetails,
+    expect(ProviderTransform.message(await toModelMessages(input, openrouterModel), openrouterModel, {})).toStrictEqual(
+      [
+        {
+          role: "assistant",
+          content: [
+            {
+              type: "reasoning",
+              text: "thinking",
+              providerOptions: {
+                openrouter: {
+                  reasoning_details: reasoningDetails,
+                },
               },
             },
-          },
-          { type: "text", text: "answer" },
-        ],
-      },
-    ])
+            { type: "text", text: "answer" },
+          ],
+        },
+      ],
+    )
   })
 
   test("splits assistant messages on step-start boundaries", async () => {

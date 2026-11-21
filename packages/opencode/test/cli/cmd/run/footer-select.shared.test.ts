@@ -18,7 +18,9 @@ describe("selectApply (characterization of footer select handlers)", () => {
   })
 
   test("emits variants, then variant, then a combined patch, in order", () => {
-    expect(selectApply({ variants: ["low", "high"], variant: "high", modelLabel: "GPT-5 high", status: "ready" })).toEqual([
+    expect(
+      selectApply({ variants: ["low", "high"], variant: "high", modelLabel: "GPT-5 high", status: "ready" }),
+    ).toEqual([
       { type: "variants", variants: ["low", "high"] },
       { type: "variant", variant: "high" },
       { type: "patch", patch: { model: "GPT-5 high", status: "ready" } },

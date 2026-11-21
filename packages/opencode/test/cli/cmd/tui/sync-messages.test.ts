@@ -105,18 +105,24 @@ describe("reduceMessageEvent", () => {
 
   it("step.started closes the current assistant before opening the next", () => {
     const messages: SessionMessage[] = []
-    reduceMessageEvent(messages, ev("evt_1", "session.next.step.started", {
-      sessionID: "ses_1",
-      timestamp: now,
-      agent: "build",
-      model: { id: "m", providerID: "p", variant: "default" },
-    }))
-    reduceMessageEvent(messages, ev("evt_2", "session.next.step.started", {
-      sessionID: "ses_1",
-      timestamp: now + 10,
-      agent: "build",
-      model: { id: "m", providerID: "p", variant: "default" },
-    }))
+    reduceMessageEvent(
+      messages,
+      ev("evt_1", "session.next.step.started", {
+        sessionID: "ses_1",
+        timestamp: now,
+        agent: "build",
+        model: { id: "m", providerID: "p", variant: "default" },
+      }),
+    )
+    reduceMessageEvent(
+      messages,
+      ev("evt_2", "session.next.step.started", {
+        sessionID: "ses_1",
+        timestamp: now + 10,
+        agent: "build",
+        model: { id: "m", providerID: "p", variant: "default" },
+      }),
+    )
     expect(messages).toHaveLength(2)
     expect(messages[1].type).toBe("assistant")
     const closed = messages[1]
@@ -129,46 +135,64 @@ describe("reduceMessageEvent", () => {
 
   it("tool lifecycle: pending input accumulation, running transition, success", () => {
     const messages: SessionMessage[] = []
-    reduceMessageEvent(messages, ev("evt_1", "session.next.step.started", {
-      sessionID: "ses_1",
-      timestamp: now,
-      agent: "build",
-      model: { id: "m", providerID: "p", variant: "default" },
-    }))
-    reduceMessageEvent(messages, ev("evt_2", "session.next.tool.input.started", {
-      sessionID: "ses_1",
-      timestamp: now + 1,
-      callID: "call_1",
-      name: "bash",
-    }))
-    reduceMessageEvent(messages, ev("evt_3", "session.next.tool.input.delta", {
-      sessionID: "ses_1",
-      timestamp: now + 2,
-      callID: "call_1",
-      delta: '{"cmd',
-    }))
-    reduceMessageEvent(messages, ev("evt_4", "session.next.tool.called", {
-      sessionID: "ses_1",
-      timestamp: now + 3,
-      callID: "call_1",
-      input: { command: "ls" },
-      provider: "test",
-    }))
-    reduceMessageEvent(messages, ev("evt_5", "session.next.tool.progress", {
-      sessionID: "ses_1",
-      timestamp: now + 4,
-      callID: "call_1",
-      structured: { step: 1 },
-      content: [{ type: "text", text: "partial" }],
-    }))
-    reduceMessageEvent(messages, ev("evt_6", "session.next.tool.success", {
-      sessionID: "ses_1",
-      timestamp: now + 5,
-      callID: "call_1",
-      structured: { exit: 0 },
-      content: [{ type: "text", text: "done" }],
-      provider: "test",
-    }))
+    reduceMessageEvent(
+      messages,
+      ev("evt_1", "session.next.step.started", {
+        sessionID: "ses_1",
+        timestamp: now,
+        agent: "build",
+        model: { id: "m", providerID: "p", variant: "default" },
+      }),
+    )
+    reduceMessageEvent(
+      messages,
+      ev("evt_2", "session.next.tool.input.started", {
+        sessionID: "ses_1",
+        timestamp: now + 1,
+        callID: "call_1",
+        name: "bash",
+      }),
+    )
+    reduceMessageEvent(
+      messages,
+      ev("evt_3", "session.next.tool.input.delta", {
+        sessionID: "ses_1",
+        timestamp: now + 2,
+        callID: "call_1",
+        delta: '{"cmd',
+      }),
+    )
+    reduceMessageEvent(
+      messages,
+      ev("evt_4", "session.next.tool.called", {
+        sessionID: "ses_1",
+        timestamp: now + 3,
+        callID: "call_1",
+        input: { command: "ls" },
+        provider: "test",
+      }),
+    )
+    reduceMessageEvent(
+      messages,
+      ev("evt_5", "session.next.tool.progress", {
+        sessionID: "ses_1",
+        timestamp: now + 4,
+        callID: "call_1",
+        structured: { step: 1 },
+        content: [{ type: "text", text: "partial" }],
+      }),
+    )
+    reduceMessageEvent(
+      messages,
+      ev("evt_6", "session.next.tool.success", {
+        sessionID: "ses_1",
+        timestamp: now + 5,
+        callID: "call_1",
+        structured: { exit: 0 },
+        content: [{ type: "text", text: "done" }],
+        provider: "test",
+      }),
+    )
 
     const assistant = messages[0]
     if (assistant.type !== "assistant") throw new Error("expected assistant")
@@ -182,39 +206,54 @@ describe("reduceMessageEvent", () => {
 
   it("tool.failed preserves accumulated input, structured, and content", () => {
     const messages: SessionMessage[] = []
-    reduceMessageEvent(messages, ev("evt_1", "session.next.step.started", {
-      sessionID: "ses_1",
-      timestamp: now,
-      agent: "build",
-      model: { id: "m", providerID: "p", variant: "default" },
-    }))
-    reduceMessageEvent(messages, ev("evt_2", "session.next.tool.input.started", {
-      sessionID: "ses_1",
-      timestamp: now + 1,
-      callID: "call_1",
-      name: "bash",
-    }))
-    reduceMessageEvent(messages, ev("evt_3", "session.next.tool.called", {
-      sessionID: "ses_1",
-      timestamp: now + 2,
-      callID: "call_1",
-      input: { command: "boom" },
-      provider: "test",
-    }))
-    reduceMessageEvent(messages, ev("evt_4", "session.next.tool.progress", {
-      sessionID: "ses_1",
-      timestamp: now + 3,
-      callID: "call_1",
-      structured: { n: 1 },
-      content: [{ type: "text", text: "half" }],
-    }))
-    reduceMessageEvent(messages, ev("evt_5", "session.next.tool.failed", {
-      sessionID: "ses_1",
-      timestamp: now + 4,
-      callID: "call_1",
-      error: { type: "unknown", message: "exploded" },
-      provider: "test",
-    }))
+    reduceMessageEvent(
+      messages,
+      ev("evt_1", "session.next.step.started", {
+        sessionID: "ses_1",
+        timestamp: now,
+        agent: "build",
+        model: { id: "m", providerID: "p", variant: "default" },
+      }),
+    )
+    reduceMessageEvent(
+      messages,
+      ev("evt_2", "session.next.tool.input.started", {
+        sessionID: "ses_1",
+        timestamp: now + 1,
+        callID: "call_1",
+        name: "bash",
+      }),
+    )
+    reduceMessageEvent(
+      messages,
+      ev("evt_3", "session.next.tool.called", {
+        sessionID: "ses_1",
+        timestamp: now + 2,
+        callID: "call_1",
+        input: { command: "boom" },
+        provider: "test",
+      }),
+    )
+    reduceMessageEvent(
+      messages,
+      ev("evt_4", "session.next.tool.progress", {
+        sessionID: "ses_1",
+        timestamp: now + 3,
+        callID: "call_1",
+        structured: { n: 1 },
+        content: [{ type: "text", text: "half" }],
+      }),
+    )
+    reduceMessageEvent(
+      messages,
+      ev("evt_5", "session.next.tool.failed", {
+        sessionID: "ses_1",
+        timestamp: now + 4,
+        callID: "call_1",
+        error: { type: "unknown", message: "exploded" },
+        provider: "test",
+      }),
+    )
 
     const assistant = messages[0]
     if (assistant.type !== "assistant") throw new Error("expected assistant")
@@ -228,32 +267,44 @@ describe("reduceMessageEvent", () => {
 
   it("keeps task metadata when progress arrives before tool.called", () => {
     const messages: SessionMessage[] = []
-    reduceMessageEvent(messages, ev("evt_1", "session.next.step.started", {
-      sessionID: "ses_1",
-      timestamp: now,
-      agent: "build",
-      model: { id: "m", providerID: "p", variant: "default" },
-    }))
-    reduceMessageEvent(messages, ev("evt_2", "session.next.tool.input.started", {
-      sessionID: "ses_1",
-      timestamp: now + 1,
-      callID: "call_task",
-      name: "task",
-    }))
-    reduceMessageEvent(messages, ev("evt_3", "session.next.tool.progress", {
-      sessionID: "ses_1",
-      timestamp: now + 2,
-      callID: "call_task",
-      structured: { sessionId: "ses_child" },
-      content: [],
-    }))
-    reduceMessageEvent(messages, ev("evt_4", "session.next.tool.called", {
-      sessionID: "ses_1",
-      timestamp: now + 3,
-      callID: "call_task",
-      input: { description: "inspect" },
-      provider: "test",
-    }))
+    reduceMessageEvent(
+      messages,
+      ev("evt_1", "session.next.step.started", {
+        sessionID: "ses_1",
+        timestamp: now,
+        agent: "build",
+        model: { id: "m", providerID: "p", variant: "default" },
+      }),
+    )
+    reduceMessageEvent(
+      messages,
+      ev("evt_2", "session.next.tool.input.started", {
+        sessionID: "ses_1",
+        timestamp: now + 1,
+        callID: "call_task",
+        name: "task",
+      }),
+    )
+    reduceMessageEvent(
+      messages,
+      ev("evt_3", "session.next.tool.progress", {
+        sessionID: "ses_1",
+        timestamp: now + 2,
+        callID: "call_task",
+        structured: { sessionId: "ses_child" },
+        content: [],
+      }),
+    )
+    reduceMessageEvent(
+      messages,
+      ev("evt_4", "session.next.tool.called", {
+        sessionID: "ses_1",
+        timestamp: now + 3,
+        callID: "call_task",
+        input: { description: "inspect" },
+        provider: "test",
+      }),
+    )
 
     const tool = toolPart(messages, "call_task")
     if (tool.state.status !== "running") throw new Error("expected running state")
@@ -265,111 +316,153 @@ describe("reduceMessageEvent", () => {
     const messages: SessionMessage[] = []
 
     // no active assistant: everything is ignored
-    reduceMessageEvent(messages, ev("evt_1", "session.next.text.delta", {
-      sessionID: "ses_1",
-      timestamp: now,
-      delta: "orphan",
-    }))
-    reduceMessageEvent(messages, ev("evt_2", "session.next.tool.input.started", {
-      sessionID: "ses_1",
-      timestamp: now,
-      callID: "call_1",
-      name: "bash",
-    }))
-    reduceMessageEvent(messages, ev("evt_3", "session.next.step.ended", {
-      sessionID: "ses_1",
-      timestamp: now,
-      finish: "stop",
-      cost: 0,
-      tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
-    }))
+    reduceMessageEvent(
+      messages,
+      ev("evt_1", "session.next.text.delta", {
+        sessionID: "ses_1",
+        timestamp: now,
+        delta: "orphan",
+      }),
+    )
+    reduceMessageEvent(
+      messages,
+      ev("evt_2", "session.next.tool.input.started", {
+        sessionID: "ses_1",
+        timestamp: now,
+        callID: "call_1",
+        name: "bash",
+      }),
+    )
+    reduceMessageEvent(
+      messages,
+      ev("evt_3", "session.next.step.ended", {
+        sessionID: "ses_1",
+        timestamp: now,
+        finish: "stop",
+        cost: 0,
+        tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+      }),
+    )
     expect(messages).toEqual([])
 
     // build one live assistant + pending tool
-    reduceMessageEvent(messages, ev("evt_4", "session.next.step.started", {
-      sessionID: "ses_1",
-      timestamp: now + 1,
-      agent: "build",
-      model: { id: "m", providerID: "p", variant: "default" },
-    }))
-    reduceMessageEvent(messages, ev("evt_5", "session.next.tool.input.started", {
-      sessionID: "ses_1",
-      timestamp: now + 2,
-      callID: "call_1",
-      name: "bash",
-    }))
+    reduceMessageEvent(
+      messages,
+      ev("evt_4", "session.next.step.started", {
+        sessionID: "ses_1",
+        timestamp: now + 1,
+        agent: "build",
+        model: { id: "m", providerID: "p", variant: "default" },
+      }),
+    )
+    reduceMessageEvent(
+      messages,
+      ev("evt_5", "session.next.tool.input.started", {
+        sessionID: "ses_1",
+        timestamp: now + 2,
+        callID: "call_1",
+        name: "bash",
+      }),
+    )
 
     // input.delta after called (running) must not append to the input string
-    reduceMessageEvent(messages, ev("evt_6", "session.next.tool.called", {
-      sessionID: "ses_1",
-      timestamp: now + 3,
-      callID: "call_1",
-      input: { command: "ls" },
-      provider: "test",
-    }))
-    reduceMessageEvent(messages, ev("evt_7", "session.next.tool.input.delta", {
-      sessionID: "ses_1",
-      timestamp: now + 4,
-      callID: "call_1",
-      delta: "late",
-    }))
+    reduceMessageEvent(
+      messages,
+      ev("evt_6", "session.next.tool.called", {
+        sessionID: "ses_1",
+        timestamp: now + 3,
+        callID: "call_1",
+        input: { command: "ls" },
+        provider: "test",
+      }),
+    )
+    reduceMessageEvent(
+      messages,
+      ev("evt_7", "session.next.tool.input.delta", {
+        sessionID: "ses_1",
+        timestamp: now + 4,
+        callID: "call_1",
+        delta: "late",
+      }),
+    )
     const running = toolPart(messages, "call_1")
     if (running.state.status !== "running") throw new Error("expected running state")
     expect(running.state.input).toStrictEqual({ command: "ls" })
 
     // progress/success after completion (no longer running) must not overwrite
-    reduceMessageEvent(messages, ev("evt_8", "session.next.tool.success", {
-      sessionID: "ses_1",
-      timestamp: now + 5,
-      callID: "call_1",
-      structured: { exit: 0 },
-      content: [],
-      provider: "test",
-    }))
-    reduceMessageEvent(messages, ev("evt_9", "session.next.tool.progress", {
-      sessionID: "ses_1",
-      timestamp: now + 6,
-      callID: "call_1",
-      structured: { late: true },
-      content: [],
-    }))
+    reduceMessageEvent(
+      messages,
+      ev("evt_8", "session.next.tool.success", {
+        sessionID: "ses_1",
+        timestamp: now + 5,
+        callID: "call_1",
+        structured: { exit: 0 },
+        content: [],
+        provider: "test",
+      }),
+    )
+    reduceMessageEvent(
+      messages,
+      ev("evt_9", "session.next.tool.progress", {
+        sessionID: "ses_1",
+        timestamp: now + 6,
+        callID: "call_1",
+        structured: { late: true },
+        content: [],
+      }),
+    )
     const completed = toolPart(messages, "call_1")
     if (completed.state.status !== "completed") throw new Error("expected completed state")
     expect(completed.state.structured).toStrictEqual({ exit: 0 })
 
     // shell.ended for an unknown callID is a no-op
-    reduceMessageEvent(messages, ev("evt_10", "session.next.shell.ended", {
-      sessionID: "ses_1",
-      timestamp: now + 7,
-      callID: "nope",
-      output: "x",
-    }))
+    reduceMessageEvent(
+      messages,
+      ev("evt_10", "session.next.shell.ended", {
+        sessionID: "ses_1",
+        timestamp: now + 7,
+        callID: "nope",
+        output: "x",
+      }),
+    )
     expect(messages.filter((m) => m.type === "shell")).toEqual([])
   })
 
   it("accumulates compaction summary and finalizes on ended", () => {
     const messages: SessionMessage[] = []
-    reduceMessageEvent(messages, ev("evt_1", "session.next.compaction.started", {
-      sessionID: "ses_1",
-      timestamp: now,
-      reason: "overflow",
-    }))
-    reduceMessageEvent(messages, ev("evt_2", "session.next.compaction.delta", {
-      sessionID: "ses_1",
-      timestamp: now + 1,
-      text: "par",
-    }))
-    reduceMessageEvent(messages, ev("evt_3", "session.next.compaction.delta", {
-      sessionID: "ses_1",
-      timestamp: now + 2,
-      text: "tial",
-    }))
-    reduceMessageEvent(messages, ev("evt_4", "session.next.compaction.ended", {
-      sessionID: "ses_1",
-      timestamp: now + 3,
-      text: "full summary",
-      include: "msg_123",
-    }))
+    reduceMessageEvent(
+      messages,
+      ev("evt_1", "session.next.compaction.started", {
+        sessionID: "ses_1",
+        timestamp: now,
+        reason: "overflow",
+      }),
+    )
+    reduceMessageEvent(
+      messages,
+      ev("evt_2", "session.next.compaction.delta", {
+        sessionID: "ses_1",
+        timestamp: now + 1,
+        text: "par",
+      }),
+    )
+    reduceMessageEvent(
+      messages,
+      ev("evt_3", "session.next.compaction.delta", {
+        sessionID: "ses_1",
+        timestamp: now + 2,
+        text: "tial",
+      }),
+    )
+    reduceMessageEvent(
+      messages,
+      ev("evt_4", "session.next.compaction.ended", {
+        sessionID: "ses_1",
+        timestamp: now + 3,
+        text: "full summary",
+        include: "msg_123",
+      }),
+    )
     expect(messages).toHaveLength(1)
     const compaction = messages[0]
     if (compaction.type !== "compaction") throw new Error("expected compaction")
@@ -379,18 +472,24 @@ describe("reduceMessageEvent", () => {
 
   it("projects status and error when compaction fails (#339)", () => {
     const messages: SessionMessage[] = []
-    reduceMessageEvent(messages, ev("evt_1", "session.next.compaction.started", {
-      sessionID: "ses_1",
-      timestamp: now,
-      reason: "auto",
-    }))
-    reduceMessageEvent(messages, ev("evt_2", "session.next.compaction.ended", {
-      sessionID: "ses_1",
-      timestamp: now + 1,
-      text: "",
-      status: "failed",
-      error: "Provider rate limit exceeded",
-    }))
+    reduceMessageEvent(
+      messages,
+      ev("evt_1", "session.next.compaction.started", {
+        sessionID: "ses_1",
+        timestamp: now,
+        reason: "auto",
+      }),
+    )
+    reduceMessageEvent(
+      messages,
+      ev("evt_2", "session.next.compaction.ended", {
+        sessionID: "ses_1",
+        timestamp: now + 1,
+        text: "",
+        status: "failed",
+        error: "Provider rate limit exceeded",
+      }),
+    )
     expect(messages).toHaveLength(1)
     const compaction = messages[0]
     if (compaction.type !== "compaction") throw new Error("expected compaction")
@@ -400,29 +499,41 @@ describe("reduceMessageEvent", () => {
 
   it("routes reasoning by reasoningID and finalizes text on ended", () => {
     const messages: SessionMessage[] = []
-    reduceMessageEvent(messages, ev("evt_1", "session.next.step.started", {
-      sessionID: "ses_1",
-      timestamp: now,
-      agent: "build",
-      model: { id: "m", providerID: "p", variant: "default" },
-    }))
-    reduceMessageEvent(messages, ev("evt_2", "session.next.reasoning.started", {
-      sessionID: "ses_1",
-      timestamp: now + 1,
-      reasoningID: "r1",
-    }))
-    reduceMessageEvent(messages, ev("evt_3", "session.next.reasoning.delta", {
-      sessionID: "ses_1",
-      timestamp: now + 2,
-      reasoningID: "r1",
-      delta: "thin",
-    }))
-    reduceMessageEvent(messages, ev("evt_4", "session.next.reasoning.ended", {
-      sessionID: "ses_1",
-      timestamp: now + 3,
-      reasoningID: "r1",
-      text: "thinking",
-    }))
+    reduceMessageEvent(
+      messages,
+      ev("evt_1", "session.next.step.started", {
+        sessionID: "ses_1",
+        timestamp: now,
+        agent: "build",
+        model: { id: "m", providerID: "p", variant: "default" },
+      }),
+    )
+    reduceMessageEvent(
+      messages,
+      ev("evt_2", "session.next.reasoning.started", {
+        sessionID: "ses_1",
+        timestamp: now + 1,
+        reasoningID: "r1",
+      }),
+    )
+    reduceMessageEvent(
+      messages,
+      ev("evt_3", "session.next.reasoning.delta", {
+        sessionID: "ses_1",
+        timestamp: now + 2,
+        reasoningID: "r1",
+        delta: "thin",
+      }),
+    )
+    reduceMessageEvent(
+      messages,
+      ev("evt_4", "session.next.reasoning.ended", {
+        sessionID: "ses_1",
+        timestamp: now + 3,
+        reasoningID: "r1",
+        text: "thinking",
+      }),
+    )
     const assistant = messages[0]
     if (assistant.type !== "assistant") throw new Error("expected assistant")
     expect(assistant.content).toEqual([{ type: "reasoning", id: "r1", text: "thinking" }])
@@ -430,18 +541,24 @@ describe("reduceMessageEvent", () => {
 
   it("shell records accumulate output by callID", () => {
     const messages: SessionMessage[] = []
-    reduceMessageEvent(messages, ev("evt_1", "session.next.shell.started", {
-      sessionID: "ses_1",
-      timestamp: now,
-      callID: "call_1",
-      command: "ls",
-    }))
-    reduceMessageEvent(messages, ev("evt_2", "session.next.shell.ended", {
-      sessionID: "ses_1",
-      timestamp: now + 1,
-      callID: "call_1",
-      output: "files",
-    }))
+    reduceMessageEvent(
+      messages,
+      ev("evt_1", "session.next.shell.started", {
+        sessionID: "ses_1",
+        timestamp: now,
+        callID: "call_1",
+        command: "ls",
+      }),
+    )
+    reduceMessageEvent(
+      messages,
+      ev("evt_2", "session.next.shell.ended", {
+        sessionID: "ses_1",
+        timestamp: now + 1,
+        callID: "call_1",
+        output: "files",
+      }),
+    )
     expect(messages).toHaveLength(1)
     const shell = messages[0]
     if (shell.type !== "shell") throw new Error("expected shell")
@@ -455,25 +572,34 @@ describe("reduceMessageEvent", () => {
   // shell record — the predicate's negative case must survive the fix.
   it("shell.started creates a shell record when the active assistant has no matching tool item", () => {
     const messages: SessionMessage[] = []
-    reduceMessageEvent(messages, ev("evt_1", "session.next.step.started", {
-      sessionID: "ses_1",
-      timestamp: now,
-      agent: "build",
-      model: { id: "m", providerID: "p", variant: "default" },
-    }))
-    reduceMessageEvent(messages, ev("evt_2", "session.next.shell.started", {
-      sessionID: "ses_1",
-      timestamp: now + 1,
-      callID: "call_1",
-      command: "ls",
-    }))
+    reduceMessageEvent(
+      messages,
+      ev("evt_1", "session.next.step.started", {
+        sessionID: "ses_1",
+        timestamp: now,
+        agent: "build",
+        model: { id: "m", providerID: "p", variant: "default" },
+      }),
+    )
+    reduceMessageEvent(
+      messages,
+      ev("evt_2", "session.next.shell.started", {
+        sessionID: "ses_1",
+        timestamp: now + 1,
+        callID: "call_1",
+        command: "ls",
+      }),
+    )
     expect(messages.filter((m) => m.type === "shell")).toHaveLength(1)
-    reduceMessageEvent(messages, ev("evt_3", "session.next.shell.ended", {
-      sessionID: "ses_1",
-      timestamp: now + 2,
-      callID: "call_1",
-      output: "files",
-    }))
+    reduceMessageEvent(
+      messages,
+      ev("evt_3", "session.next.shell.ended", {
+        sessionID: "ses_1",
+        timestamp: now + 2,
+        callID: "call_1",
+        output: "files",
+      }),
+    )
     const shell = messages.find((m) => m.type === "shell")
     if (shell?.type !== "shell") throw new Error("expected shell")
     expect(shell.output).toBe("files")
@@ -485,24 +611,33 @@ describe("reduceMessageEvent", () => {
   // duplicate `# Shell` record is the bug this locks out).
   it("tool item then shell.started with same callID leaves no shell record", () => {
     const messages: SessionMessage[] = []
-    reduceMessageEvent(messages, ev("evt_1", "session.next.step.started", {
-      sessionID: "ses_1",
-      timestamp: now,
-      agent: "build",
-      model: { id: "m", providerID: "p", variant: "default" },
-    }))
-    reduceMessageEvent(messages, ev("evt_2", "session.next.tool.input.started", {
-      sessionID: "ses_1",
-      timestamp: now + 1,
-      callID: "call_1",
-      name: "bash",
-    }))
-    reduceMessageEvent(messages, ev("evt_3", "session.next.shell.started", {
-      sessionID: "ses_1",
-      timestamp: now + 2,
-      callID: "call_1",
-      command: "ls",
-    }))
+    reduceMessageEvent(
+      messages,
+      ev("evt_1", "session.next.step.started", {
+        sessionID: "ses_1",
+        timestamp: now,
+        agent: "build",
+        model: { id: "m", providerID: "p", variant: "default" },
+      }),
+    )
+    reduceMessageEvent(
+      messages,
+      ev("evt_2", "session.next.tool.input.started", {
+        sessionID: "ses_1",
+        timestamp: now + 1,
+        callID: "call_1",
+        name: "bash",
+      }),
+    )
+    reduceMessageEvent(
+      messages,
+      ev("evt_3", "session.next.shell.started", {
+        sessionID: "ses_1",
+        timestamp: now + 2,
+        callID: "call_1",
+        command: "ls",
+      }),
+    )
     expect(messages.filter((m) => m.type === "shell")).toHaveLength(0)
     const assistant = messages.find((m) => m.type === "assistant")
     if (assistant?.type !== "assistant") throw new Error("expected assistant")
@@ -513,24 +648,33 @@ describe("reduceMessageEvent", () => {
   // not push a second pending tool item.
   it("repeated tool.input.started with same callID yields one tool item", () => {
     const messages: SessionMessage[] = []
-    reduceMessageEvent(messages, ev("evt_1", "session.next.step.started", {
-      sessionID: "ses_1",
-      timestamp: now,
-      agent: "build",
-      model: { id: "m", providerID: "p", variant: "default" },
-    }))
-    reduceMessageEvent(messages, ev("evt_2", "session.next.tool.input.started", {
-      sessionID: "ses_1",
-      timestamp: now + 1,
-      callID: "call_1",
-      name: "bash",
-    }))
-    reduceMessageEvent(messages, ev("evt_3", "session.next.tool.input.started", {
-      sessionID: "ses_1",
-      timestamp: now + 2,
-      callID: "call_1",
-      name: "bash",
-    }))
+    reduceMessageEvent(
+      messages,
+      ev("evt_1", "session.next.step.started", {
+        sessionID: "ses_1",
+        timestamp: now,
+        agent: "build",
+        model: { id: "m", providerID: "p", variant: "default" },
+      }),
+    )
+    reduceMessageEvent(
+      messages,
+      ev("evt_2", "session.next.tool.input.started", {
+        sessionID: "ses_1",
+        timestamp: now + 1,
+        callID: "call_1",
+        name: "bash",
+      }),
+    )
+    reduceMessageEvent(
+      messages,
+      ev("evt_3", "session.next.tool.input.started", {
+        sessionID: "ses_1",
+        timestamp: now + 2,
+        callID: "call_1",
+        name: "bash",
+      }),
+    )
     const assistant = messages.find((m) => m.type === "assistant")
     if (assistant?.type !== "assistant") throw new Error("expected assistant")
     expect(assistant.content.filter((c) => c.type === "tool" && c.id === "call_1")).toHaveLength(1)
@@ -553,19 +697,25 @@ describe("reduceMessageEvent", () => {
         model: { id: "m", providerID: "p", variant: "default" },
       })
     reduceMessageEvent(messages, prompted("evt_1", "first", 0))
-    reduceMessageEvent(messages, ev("evt_2", "session.next.step.started", {
-      sessionID: "ses_1",
-      timestamp: now + 1,
-      agent: "build",
-      model: { id: "m", providerID: "p", variant: "default" },
-    }))
+    reduceMessageEvent(
+      messages,
+      ev("evt_2", "session.next.step.started", {
+        sessionID: "ses_1",
+        timestamp: now + 1,
+        agent: "build",
+        model: { id: "m", providerID: "p", variant: "default" },
+      }),
+    )
     reduceMessageEvent(messages, prompted("evt_3", "second", 2))
-    reduceMessageEvent(messages, ev("evt_4", "session.next.step.started", {
-      sessionID: "ses_1",
-      timestamp: now + 3,
-      agent: "build",
-      model: { id: "m", providerID: "p", variant: "default" },
-    }))
+    reduceMessageEvent(
+      messages,
+      ev("evt_4", "session.next.step.started", {
+        sessionID: "ses_1",
+        timestamp: now + 3,
+        agent: "build",
+        model: { id: "m", providerID: "p", variant: "default" },
+      }),
+    )
     // undo targets evt_3; cleanup emits canonical removals the store can't match
     reduceMessageEvent(messages, ev("evt_x", "message.removed", { sessionID: "ses_1", messageID: "msg_srv" }) as never)
     reduceMessageEvent(

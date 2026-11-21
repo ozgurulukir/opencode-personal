@@ -57,10 +57,7 @@ import { Flag } from "@opencode-ai/core/flag/flag"
 import { useCommandPalette } from "../../context/command-palette"
 import { useBindings, useCommandShortcut, useLeaderActive, useOpencodeKeymap } from "../../keymap"
 import { useTuiConfig } from "../../context/tui-config"
-import {
-  formatEditorContext,
-  formatEditorFileLabel,
-} from "./editor-context"
+import { formatEditorContext, formatEditorFileLabel } from "./editor-context"
 import {
   canMoveHistoryNext,
   canMoveHistoryPrevious,
@@ -418,13 +415,7 @@ export function Prompt(props: PromptProps) {
       "key",
       (ctx) => {
         if (ctx.event.name === "tab") {
-          if (
-            store.mode === "normal" &&
-            !auto()?.visible &&
-            input &&
-            !input.isDestroyed &&
-            input.plainText === ""
-          ) {
+          if (store.mode === "normal" && !auto()?.visible && input && !input.isDestroyed && input.plainText === "") {
             ctx.consume()
             acceptGhost()
           } else {
@@ -1246,22 +1237,24 @@ export function Prompt(props: PromptProps) {
       // promptAsync forks the loop server-side: a TUI disconnect no longer
       // aborts the run, and failures surface as SessionEvent.Error instead of
       // being swallowed here. Payload shape is the V1 PromptInput (parts).
-      sdk.client.v2.session.promptAsync({
-        sessionID,
-        messageID,
-        agent: agent.name,
-        model: selectedModel,
-        variant,
-        parts: [
-          ...editorParts,
-          {
-            id: PartID.ascending(),
-            type: "text",
-            text: inputText,
-          },
-          ...nonTextParts.map(assign),
-        ],
-      }).catch(() => {})
+      sdk.client.v2.session
+        .promptAsync({
+          sessionID,
+          messageID,
+          agent: agent.name,
+          model: selectedModel,
+          variant,
+          parts: [
+            ...editorParts,
+            {
+              id: PartID.ascending(),
+              type: "text",
+              text: inputText,
+            },
+            ...nonTextParts.map(assign),
+          ],
+        })
+        .catch(() => {})
       if (editorParts.length > 0) editor.markSelectionSent()
     }
     history.append({

@@ -13,7 +13,18 @@ import { useFileComponent } from "../context/file"
 import { useI18n } from "../context/i18n"
 import { getDirectory, getFilename } from "@opencode-ai/core/util/path"
 import { checksum } from "@opencode-ai/core/util/encode"
-import { createEffect, createMemo, createSignal, For, Match, onCleanup, Show, Switch, untrack, type JSX } from "solid-js"
+import {
+  createEffect,
+  createMemo,
+  createSignal,
+  For,
+  Match,
+  onCleanup,
+  Show,
+  Switch,
+  untrack,
+  type JSX,
+} from "solid-js"
 import { createStore } from "solid-js/store"
 import { type FileContent, type SnapshotFileDiff, type VcsFileDiff } from "@opencode-ai/sdk/v2"
 import { PreloadMultiFileDiffResult } from "@pierre/diffs/ssr"
@@ -186,9 +197,7 @@ export const SessionReview = (props: SessionReviewProps) => {
   const [items, setItems] = createSignal<Item[]>([])
   createEffect(() => {
     const diffs = list(props.diffs)
-    Promise.all(
-      diffs.map(async (d, i) => ({ ...(await normalize(d)), preloaded: diffs[i].preloaded }))
-    ).then(setItems)
+    Promise.all(diffs.map(async (d, i) => ({ ...(await normalize(d)), preloaded: diffs[i].preloaded }))).then(setItems)
   })
   // ⚡ Bolt Optimization: Avoid .map() array allocations
   const files = createMemo(() => {

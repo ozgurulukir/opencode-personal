@@ -1,10 +1,4 @@
-import {
-  type Info,
-  NearestRoot,
-  spawn,
-  which,
-  log,
-} from "./shared"
+import { type Info, NearestRoot, spawn, which, log } from "./shared"
 
 export const HLS: Info = {
   id: "haskell-language-server",

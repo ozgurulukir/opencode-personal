@@ -29,7 +29,8 @@ export const roots = (store: SessionStore) =>
 
 export const sortedRootSessions = (store: SessionStore, now: number) => roots(store).sort(sortSessions(now))
 
-export const sessionIsWorking = (status: SessionStatus | undefined) => status?.type === "busy" || status?.type === "retry"
+export const sessionIsWorking = (status: SessionStatus | undefined) =>
+  status?.type === "busy" || status?.type === "retry"
 
 export const latestRootSession = (stores: SessionStore[], now: number) => {
   // ⚡ Bolt Optimization: Replace O(N log N) .flatMap().sort()[0] with a single O(N) pass

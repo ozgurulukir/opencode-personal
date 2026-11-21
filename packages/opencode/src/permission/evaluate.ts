@@ -7,10 +7,7 @@ type Rule = {
 }
 
 function ruleMatches(permission: string, pattern: string, rule: Rule) {
-  if (
-    rule.action === "deny" &&
-    (Wildcard.exceedsLimit(rule.permission) || Wildcard.exceedsLimit(rule.pattern))
-  ) {
+  if (rule.action === "deny" && (Wildcard.exceedsLimit(rule.permission) || Wildcard.exceedsLimit(rule.pattern))) {
     return true
   }
   return Wildcard.match(permission, rule.permission) && Wildcard.match(pattern, rule.pattern)

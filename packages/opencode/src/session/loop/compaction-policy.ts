@@ -87,16 +87,14 @@ export function pruneAndCheckTurnCompaction(
     // Prune only for regular finished turns — a summary turn's output IS
     // the compaction, there is nothing to prune underneath it.
     if (input.lastFinished.summary !== true) {
-      const pruned = yield* deps.compaction
-        .prune({ sessionID: input.sessionID })
-        .pipe(
-          Effect.tapError((error) =>
-            slog
-              .warn("compaction prune failed; proceeding with unpruned token counts", { error: String(error) })
-              .pipe(Effect.as(undefined)),
-          ),
-          Effect.catch(() => Effect.succeed(0)),
-        )
+      const pruned = yield* deps.compaction.prune({ sessionID: input.sessionID }).pipe(
+        Effect.tapError((error) =>
+          slog
+            .warn("compaction prune failed; proceeding with unpruned token counts", { error: String(error) })
+            .pipe(Effect.as(undefined)),
+        ),
+        Effect.catch(() => Effect.succeed(0)),
+      )
       if (pruned > 0) {
         input.lastFinished.tokens = CompactionTrigger.adjustTokensAfterPrune(input.lastFinished.tokens, pruned)
       }

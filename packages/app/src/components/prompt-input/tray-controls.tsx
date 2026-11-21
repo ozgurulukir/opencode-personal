@@ -143,9 +143,7 @@ export function TrayControls(props: {
                       style={{ "will-change": "opacity", transform: "translateZ(0)" }}
                     />
                   </Show>
-                  <span class="truncate">
-                    {local.model.current()?.name ?? language.t("dialog.model.select.title")}
-                  </span>
+                  <span class="truncate">{local.model.current()?.name ?? language.t("dialog.model.select.title")}</span>
                   <Icon name="chevron-down" size="small" class="shrink-0" />
                 </ModelSelectorPopover>
               </TooltipKeybind>

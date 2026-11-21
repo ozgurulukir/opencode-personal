@@ -205,10 +205,7 @@ describe("restoreParts", () => {
   test("filters non-mention parts", () => {
     const area = createMockArea("")
     const state: PartManagerState = {
-      parts: [
-        { type: "text", text: "hello" } as any,
-        agentPart("world") as any,
-      ],
+      parts: [{ type: "text", text: "hello" } as any, agentPart("world") as any],
       marks: new Map(),
       type: 1,
     }

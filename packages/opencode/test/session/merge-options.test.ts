@@ -33,10 +33,7 @@ describe("MergeOptions.mergeOptions", () => {
     const model = { temperature: 0.5, topP: 0.9, headers: { "X-Model": "v1" } }
     const agent = { topP: 0.8, stop: ["END"], headers: { "X-Agent": "build" } }
 
-    const result = MergeOptions.mergeOptions(
-      MergeOptions.mergeOptions(base, model),
-      agent,
-    )
+    const result = MergeOptions.mergeOptions(MergeOptions.mergeOptions(base, model), agent)
 
     expect(result).toEqual({
       temperature: 0.5, // overridden by model
