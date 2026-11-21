@@ -932,7 +932,9 @@ export function options(input: {
   }
 
   if (input.model.api.id.includes("gpt-5") && !input.model.api.id.includes("gpt-5-chat")) {
-    if (!input.model.api.id.includes("gpt-5-pro")) {
+    // Pro ids (including versioned ones like gpt-5.1-pro) expose only high-tier
+    // efforts (see variants()), so they get no default effort at all.
+    if (!GPT5_PRO_RE.test(input.model.api.id) && !GPT5_VERSIONED_PRO_RE.test(input.model.api.id)) {
       result["reasoningEffort"] = "medium"
       // Only inject reasoningSummary for providers that support it natively.
       // @ai-sdk/openai-compatible proxies (e.g. LiteLLM) do not understand this

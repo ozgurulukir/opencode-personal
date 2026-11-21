@@ -90,11 +90,17 @@ function stubPromptLayer(opts?: { loopResult?: MessageV2.WithParts; failPrompt?:
       return SessionPrompt.Engine.of({
         prompt: (input: any) =>
           Effect.gen(function* () {
+            // Register the gate synchronously BEFORE the observable prompt
+            // signal — a yield here would let the abort race ahead of the
+            // gate and leave the stub awaiting a gate nobody completes.
+            if (hang.armed) {
+              const gate = Deferred.makeUnsafe<void>()
+              hang.gates.set(input.sessionID, gate)
+            }
             calls.prompt.push(input)
             if (hang.armed) {
-              const gate = yield* Deferred.make<void>()
-              hang.gates.set(input.sessionID, gate)
-              yield* Deferred.await(gate)
+              yield* Deferred.await(hang.gates.get(input.sessionID)!)
+              hang.gates.delete(input.sessionID)
             }
             if (opts?.failPrompt) {
               yield* Effect.die(new Error("simulated prompt failure"))

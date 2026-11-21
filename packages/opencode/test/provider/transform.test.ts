@@ -2439,6 +2439,8 @@ describe("ProviderTransform gpt-5 default effort invariant", () => {
     "gpt-5.2-codex-max",
     "gpt-5-pro",
     "gpt-5-pro-2",
+    "gpt-5.1-pro",
+    "gpt-5.2-pro",
   ]
 
   test("options() default reasoningEffort is always an exposed variant", () => {
