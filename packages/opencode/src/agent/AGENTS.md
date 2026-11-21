@@ -54,9 +54,11 @@ leaves deeper subagents waiting indefinitely.
 
 Subagent sessions are **not** automatically cleaned up. They persist in the database indefinitely, accumulating over time. This is a known limitation (Option C from the subagent fixes plan). The database is SQLite with bounded size, and subagent sessions are small rows, so this is acceptable for typical usage. If cleanup becomes necessary, it can be addressed later with a simple TTL or parent-session-completion hook. Per the wabi-sabi philosophy, we avoid over-engineering a GC system until there is a demonstrated need.
 
-## MAX_SUBAGENT_NESTING_LEVELS naming — depth check is inclusive
+## MAX_SUBAGENT_NESTING_LEVELS semantics — 3 levels allowed
 
-`MAX_SUBAGENT_NESTING_LEVELS = 3` with `depth >= MAX_SUBAGENT_NESTING_LEVELS` allows
-exactly 2 levels of nesting (root → child → grandchild), not 3. The constant name
-uses "levels" rather than "depth" to avoid the off-by-one implication. If the
-intent is to allow 3 actual nesting levels, change the check to `depth > MAX_SUBAGENT_NESTING_LEVELS`.
+`MAX_SUBAGENT_NESTING_LEVELS = 3` with `depth > MAX_SUBAGENT_NESTING_LEVELS` in
+`checkNesting()` allows exactly 3 levels of subagent nesting (chains of up to 3
+sessions — the spawning session plus its ancestors — spawn freely; a 4th
+session in the walk is denied with the "Maximum subagent nesting levels (3)
+exceeded" error). The check was `depth >=` and allowed only 2 levels until it
+was aligned with the constant name (issue #564).

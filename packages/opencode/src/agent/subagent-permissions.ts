@@ -198,9 +198,11 @@ export function resolveParentAgent(input: {
 /**
  * Walk the `parentID` chain from `startID` before a subagent spawn and fail
  * with the byte-identical nesting error once the chain reaches
- * `MAX_SUBAGENT_NESTING_LEVELS`. Verbatim extraction of the iterative walk in
- * V1 (`tool/task.ts`) / V2 (`v2/session.ts`); `get` is injected so each side
- * passes its own lookup adapter.
+ * `MAX_SUBAGENT_NESTING_LEVELS` — exactly 3 levels of subagents are allowed
+ * (chains of 3 ancestor links spawn freely; a 4th link is denied). Verbatim
+ * extraction of the iterative walk in V1 (`tool/task.ts`) / V2
+ * (`v2/session.ts`); `get` is injected so each side passes its own lookup
+ * adapter.
  */
 export function checkNesting(input: {
   startID: SessionID
@@ -211,7 +213,7 @@ export function checkNesting(input: {
   return Effect.gen(function* () {
     for (let depth = 0, currentParentID: SessionID | undefined = input.startID; currentParentID; ) {
       depth++
-      if (depth >= max) {
+      if (depth > max) {
         return yield* Effect.fail(
           new Error(`Maximum subagent nesting levels (${MAX_SUBAGENT_NESTING_LEVELS}) exceeded`),
         )

@@ -58,7 +58,7 @@ async function fetchZaiUsage(credential: UsageCredential): Promise<UsageReport |
   if (!credential.apiKey) return null
 
   const headers: Record<string, string> = {
-    Authorization: credential.apiKey,
+    Authorization: `Bearer ${credential.apiKey}`,
     "Content-Type": "application/json",
   }
 
