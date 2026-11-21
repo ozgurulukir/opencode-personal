@@ -153,8 +153,8 @@ function applyChecks(out: z.ZodTypeAny, checks: SchemaAST.Checks, ast: SchemaAST
     for (const filter of unhandled) {
       const issue = filter.run(value, ast, EMPTY_PARSE_OPTIONS)
       if (!issue) continue
-      const message =
-        issueMessage(issue) ?? ((filter.annotations as { message?: unknown } | undefined)?.message as string | undefined) ?? "Validation failed"
+      const annotated = (filter.annotations as { message?: unknown } | undefined)?.message as string | undefined
+      const message = issueMessage(issue) ?? annotated ?? "Validation failed"
       ctx.addIssue({ code: "custom", message })
     }
   })

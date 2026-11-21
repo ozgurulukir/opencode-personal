@@ -205,7 +205,9 @@ export const layer = Layer.effect(Service)(
       for (const entry of entries) {
         const agg = (entry.data as Record<string, string>)[entry.def.aggregate]
         if (agg == null) {
-          throw new Error(`SyncEvent.runBatch: "${entry.def.aggregate}" required but not found: ${JSON.stringify(entry.data)}`)
+          throw new Error(
+            `SyncEvent.runBatch: "${entry.def.aggregate}" required but not found: ${JSON.stringify(entry.data)}`,
+          )
         }
         if (entry.def.version !== versions.get(entry.def.type)) {
           throw new Error(`SyncEvent.runBatch: running old versions of events is not allowed: ${entry.def.type}`)

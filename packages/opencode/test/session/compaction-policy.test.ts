@@ -123,10 +123,9 @@ describe("session/loop/compaction-policy", () => {
     // Typed failure: the cause has fails and no dies — call sites catch it to
     // end the prompt cleanly instead of dying with a defect. The error
     // message itself is asserted via the published bus event below.
-    expect(Exit.isFailure(exit)).toBe(true)
-    const cause = (exit as any).cause
-    expect(Cause.hasFails(cause)).toBe(true)
-    expect(Cause.hasDies(cause)).toBe(false)
+    if (!Exit.isFailure(exit)) throw new Error("expected a failure exit")
+    expect(Cause.hasFails(exit.cause)).toBe(true)
+    expect(Cause.hasDies(exit.cause)).toBe(false)
 
     expect(publishedError).toBeDefined()
     expect(publishedError.sessionID).toBe("ses_1")
