@@ -7242,6 +7242,16 @@
                 }
               }
             }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundError"
+                }
+              }
+            }
           }
         },
         "description": "Update a session to belong to the current workspace through the sync event system.",
@@ -9409,6 +9419,16 @@
                 }
               }
             }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestError"
+                }
+              }
+            }
           }
         },
         "description": "Update a single part of a message in a v2 session.",
@@ -10810,6 +10830,16 @@
                 }
               }
             }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundError"
+                }
+              }
+            }
           }
         },
         "description": "Remove an existing workspace.",
@@ -10861,6 +10891,16 @@
                       "$ref": "#/components/schemas/VcsApplyError"
                     }
                   ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundError"
                 }
               }
             }
@@ -13809,10 +13849,21 @@
             "type": "string"
           },
           "tools": {
-            "type": "object",
-            "additionalProperties": {
-              "type": "boolean"
-            }
+            "anyOf": [
+              {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "boolean"
+                }
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            ],
+            "description": "@deprecated Use 'permission' field instead"
           },
           "disable": {
             "type": "boolean"
@@ -14624,6 +14675,24 @@
                 "exclusiveMinimum": 0
               },
               "max_bytes": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              }
+            },
+            "additionalProperties": false
+          },
+          "webfetch": {
+            "type": "object",
+            "properties": {
+              "max_response_bytes": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "default_timeout": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "max_timeout": {
                 "type": "integer",
                 "exclusiveMinimum": 0
               }
@@ -17578,6 +17647,13 @@
                 "type": "string"
               },
               "include": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string",
+                "enum": ["ok", "failed"]
+              },
+              "error": {
                 "type": "string"
               }
             },
@@ -20790,6 +20866,13 @@
               },
               "include": {
                 "type": "string"
+              },
+              "status": {
+                "type": "string",
+                "enum": ["ok", "failed"]
+              },
+              "error": {
+                "type": "string"
               }
             },
             "required": ["timestamp", "sessionID", "text"],
@@ -21980,6 +22063,13 @@
             "type": "string"
           },
           "include": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["ok", "failed"]
+          },
+          "error": {
             "type": "string"
           },
           "id": {

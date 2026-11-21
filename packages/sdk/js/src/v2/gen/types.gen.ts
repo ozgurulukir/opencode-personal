@@ -6597,6 +6597,10 @@ export type SyncStealErrors = {
    * Bad request
    */
   400: BadRequestError
+  /**
+   * Not found
+   */
+  404: NotFoundError
 }
 
 export type SyncStealError = SyncStealErrors[keyof SyncStealErrors]
@@ -7440,6 +7444,15 @@ export type V2SessionUpdatePartData = {
   url: "/api/session/{sessionID}/message/{messageID}/part/{partID}"
 }
 
+export type V2SessionUpdatePartErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type V2SessionUpdatePartError = V2SessionUpdatePartErrors[keyof V2SessionUpdatePartErrors]
+
 export type V2SessionUpdatePartResponses = {
   /**
    * Part
@@ -7988,6 +8001,10 @@ export type ExperimentalWorkspaceRemoveErrors = {
    * Bad request
    */
   400: BadRequestError
+  /**
+   * Not found
+   */
+  404: NotFoundError
 }
 
 export type ExperimentalWorkspaceRemoveError =
@@ -8022,6 +8039,10 @@ export type ExperimentalWorkspaceWarpErrors = {
    * WorkspaceWarpError | VcsApplyError
    */
   400: WorkspaceWarpError | VcsApplyError
+  /**
+   * Not found
+   */
+  404: NotFoundError
 }
 
 export type ExperimentalWorkspaceWarpError = ExperimentalWorkspaceWarpErrors[keyof ExperimentalWorkspaceWarpErrors]

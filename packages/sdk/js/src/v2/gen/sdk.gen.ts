@@ -253,6 +253,7 @@ import type {
   V2SessionUnshareErrors,
   V2SessionUnshareResponses,
   V2SessionUpdateErrors,
+  V2SessionUpdatePartErrors,
   V2SessionUpdatePartResponses,
   V2SessionUpdateResponses,
   V2SessionWaitResponses,
@@ -5358,7 +5359,7 @@ export class Session3 extends HeyApiClient {
       part?: Part2
     },
     options?: Options<never, ThrowOnError>,
-  ): RequestResult<V2SessionUpdatePartResponses, unknown, ThrowOnError> {
+  ): RequestResult<V2SessionUpdatePartResponses, V2SessionUpdatePartErrors, ThrowOnError> {
     const params = buildClientParams(
       [parameters],
       [
@@ -5374,7 +5375,11 @@ export class Session3 extends HeyApiClient {
         },
       ],
     )
-    return (options?.client ?? this.client).patch<V2SessionUpdatePartResponses, unknown, ThrowOnError>({
+    return (options?.client ?? this.client).patch<
+      V2SessionUpdatePartResponses,
+      V2SessionUpdatePartErrors,
+      ThrowOnError
+    >({
       url: "/api/session/{sessionID}/message/{messageID}/part/{partID}",
       ...options,
       ...params,
