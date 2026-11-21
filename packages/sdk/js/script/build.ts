@@ -103,6 +103,23 @@ for (const genDir of ["src/v2/gen"] as const) {
   }
 }
 
+// Post-generation patch: type the SSE passthrough yield. The generator emits
+// `yield data as any` because SSE data has no schema at that point, while the
+// stream type is `AsyncGenerator<TData extends Record<string, unknown> ?
+// TData[keyof TData] : TData>` — that conditional type is the honest target.
+{
+  const sseFile = path.join(dir, "src/v2/gen/core/serverSentEvents.gen.ts")
+  const sseText = await Bun.file(sseFile).text()
+  const patchedSse = sseText.replace(
+    `yield data as any`,
+    `yield data as TData extends Record<string, unknown> ? TData[keyof TData] : TData`,
+  )
+  if (patchedSse !== sseText) await Bun.write(sseFile, patchedSse)
+  if (patchedSse.includes("yield data as any")) {
+    throw new Error("Generated SDK SSE code changed; update the TData yield patch")
+  }
+}
+
 await $`bun prettier --write src/v2/gen/client/types.gen.ts`
 
 await $`rm -rf dist`

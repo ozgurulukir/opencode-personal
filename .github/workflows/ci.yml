@@ -63,3 +63,14 @@ jobs:
       - name: App tests (default invocation)
         working-directory: packages/app
         run: bun test
+
+  consistency:
+    # Cheap structural checks that need no full install. github/ is a
+    # standalone action outside the workspace, so SAFE_ATTACHMENT_REGEX is
+    # intentionally duplicated between the CLI and the action — this guard
+    # fails when the two copies drift.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+      - run: bun script/check-github-action.ts
