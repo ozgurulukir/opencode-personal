@@ -9,6 +9,29 @@ import { HttpRouter, HttpServerError, HttpServerRespondable, HttpServerResponse 
 
 const log = Log.create({ service: "server" })
 
+const REDACTED_KEYS = new Set(["cause", "stack", "stacktrace"])
+
+function sanitizeData(value: unknown, seen = new WeakSet<object>()): unknown {
+  if (typeof value !== "object" || value === null) return value
+  if (seen.has(value)) return undefined
+  seen.add(value)
+  try {
+    if (Array.isArray(value)) return value.map((item) => sanitizeData(item, seen))
+    const out: Record<string, unknown> = {}
+    for (const [key, entry] of Object.entries(value)) {
+      if (REDACTED_KEYS.has(key.toLowerCase())) continue
+      out[key] = sanitizeData(entry, seen)
+    }
+    return out
+  } finally {
+    seen.delete(value)
+  }
+}
+
+function sanitizeNamedError(obj: { name: string; data: unknown }) {
+  return { name: obj.name, data: sanitizeData(obj.data) }
+}
+
 // HttpServerResponse.jsonUnsafe serializes with JSON.stringify, which throws
 // on non-serializable values (BigInt, circular refs). Inside this error
 // boundary a throw would replace the structured response with a dropped
@@ -46,7 +69,7 @@ export const errorLayer = HttpRouter.middleware<{ handles: unknown }>()((effect)
           if (error.name.startsWith("Worktree")) return 400
           return 500
         })
-        return Effect.succeed(errorResponse(error.toObject(), status))
+        return Effect.succeed(errorResponse(sanitizeNamedError(error.toObject()), status))
       }
       if (error instanceof Session.BusyError) {
         return Effect.succeed(errorResponse(new NamedError.Unknown({ message: error.message }).toObject(), 400))
