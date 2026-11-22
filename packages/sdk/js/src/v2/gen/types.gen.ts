@@ -114,6 +114,10 @@ export type WellKnownAuth = {
 
 export type Auth = OAuth | ApiAuth | WellKnownAuth
 
+export type EffectHttpApiErrorInternalServerError = {
+  _tag: "InternalServerError"
+}
+
 export type PermissionRequest = {
   id: string
   sessionID: string
@@ -1384,10 +1388,6 @@ export type ConsoleState = {
   consoleManagedProviders: Array<string>
   activeOrgName?: string
   switchableOrgCount: number
-}
-
-export type EffectHttpApiErrorInternalServerError = {
-  _tag: "InternalServerError"
 }
 
 export type ToolListItem = {
@@ -3648,6 +3648,10 @@ export type AuthRemoveErrors = {
    * Bad request
    */
   400: BadRequestError
+  /**
+   * InternalServerError
+   */
+  500: EffectHttpApiErrorInternalServerError
 }
 
 export type AuthRemoveError = AuthRemoveErrors[keyof AuthRemoveErrors]
@@ -3675,6 +3679,10 @@ export type AuthSetErrors = {
    * Bad request
    */
   400: BadRequestError
+  /**
+   * InternalServerError
+   */
+  500: EffectHttpApiErrorInternalServerError
 }
 
 export type AuthSetError = AuthSetErrors[keyof AuthSetErrors]

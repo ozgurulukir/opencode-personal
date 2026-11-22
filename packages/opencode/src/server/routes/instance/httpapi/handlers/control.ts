@@ -16,15 +16,16 @@ export const controlHandlers = HttpApiBuilder.group(RootHttpApi, "control", (han
       params: { providerID: ProviderID }
       payload: Auth.Info
     }) {
-      // The endpoint declares BadRequest: fail typed so a credentials-write
-      // failure returns a structured 400 through the declared channel instead
-      // of dying and relying on the errorLayer's defect heuristics. The write
+      // The endpoint declares BadRequest (schema validation) and InternalServerError
+      // (storage write failure): fail typed with 500 so a credentials-write failure
+      // returns a structured 500 through the declared channel instead of reporting
+      // 400 or dying and relying on the errorLayer's defect heuristics. The write
       // error is logged first — mapError discards it, and the Auth service
       // does not log, so without this a disk-full/permission failure is
       // undiagnosable from the server side.
       yield* auth.set(ctx.params.providerID, ctx.payload).pipe(
         Effect.tapError((error) => Effect.sync(() => Log.Default.error("auth set failed", { error: String(error) }))),
-        Effect.mapError(() => new HttpApiError.BadRequest({})),
+        Effect.mapError(() => new HttpApiError.InternalServerError({})),
       )
       return true
     })
@@ -36,7 +37,7 @@ export const controlHandlers = HttpApiBuilder.group(RootHttpApi, "control", (han
             Log.Default.error("auth remove failed", { providerID: ctx.params.providerID, error: String(error) }),
           ),
         ),
-        Effect.mapError(() => new HttpApiError.BadRequest({})),
+        Effect.mapError(() => new HttpApiError.InternalServerError({})),
       )
       return true
     })

@@ -39,7 +39,7 @@ export const ControlApi = HttpApi.make("control").add(
         params: AuthParams,
         payload: Auth.Info,
         success: described(Schema.Boolean, "Successfully set authentication credentials"),
-        error: HttpApiError.BadRequest,
+        error: [HttpApiError.BadRequest, HttpApiError.InternalServerError],
       }).annotateMerge(
         OpenApi.annotations({
           identifier: "auth.set",
@@ -50,7 +50,7 @@ export const ControlApi = HttpApi.make("control").add(
       HttpApiEndpoint.delete("authRemove", ControlPaths.auth, {
         params: AuthParams,
         success: described(Schema.Boolean, "Successfully removed authentication credentials"),
-        error: HttpApiError.BadRequest,
+        error: [HttpApiError.BadRequest, HttpApiError.InternalServerError],
       }).annotateMerge(
         OpenApi.annotations({
           identifier: "auth.remove",
