@@ -1,9 +1,10 @@
-import { afterAll, describe, expect, mock, test } from "bun:test"
+import { describe, expect, test } from "bun:test"
 import { Effect, Layer } from "effect"
 import path from "path"
 import * as os from "node:os"
 import { mkdtempSync, rmSync } from "node:fs"
 import * as fsNode from "node:fs/promises"
+import { Global } from "@opencode-ai/core/global"
 import { SearchService, type SearchServiceInterface } from "../../src/search/search"
 import { EmbeddingService } from "../../src/search/embedding"
 import { Hash } from "@opencode-ai/core/util/hash"
@@ -16,25 +17,6 @@ import {
   ZVecInitialize,
   ZVecLogLevel,
 } from "@zvec/zvec"
-
-// Module-level variable for mock.module factory (hoisted by Bun, must be at module scope)
-let _testCacheDir = ""
-
-mock.module("@opencode-ai/core/global", () => {
-  const actual = require("@opencode-ai/core/global")
-  return {
-    ...actual,
-    Path: {
-      ...actual.Path,
-      get cache() {
-        return _testCacheDir
-      },
-    },
-  }
-})
-
-// mock.module() persists across test files — restore to prevent leakage (AGENTS.md).
-afterAll(() => mock.restore())
 
 // Characterization: native errors thrown by the raw binding are structurally coded
 // (mirrors @zvec/zvec's isZVecError — `code` is a string starting with "ZVEC_").
@@ -160,14 +142,13 @@ describe("search.zvec", () => {
     expect(resolved.reset).toBeDefined()
   })
 
-  test("ZvecIndex delete and reset methods function correctly via defaultLayer", async () => {
-    const { defaultLayer } = await import("../../src/search/zvec")
+  test("ZvecIndex delete and reset methods function correctly", async () => {
+    const { layer } = await import("../../src/search/zvec")
     const { provideInstance } = await import("../fixture/fixture")
     const { AppFileSystem } = await import("@opencode-ai/core/filesystem")
 
     const dir = await fsNode.mkdtemp(path.join(os.tmpdir(), "opencode-zvec-test-"))
     const cacheDir = await fsNode.mkdtemp(path.join(os.tmpdir(), "opencode-zvec-cache-"))
-    _testCacheDir = cacheDir
 
     try {
       await Effect.gen(function* () {
@@ -209,26 +190,26 @@ describe("search.zvec", () => {
         const exists = yield* fs.existsSafe(indexPath)
         expect(exists).toBe(false)
       }).pipe(
-        Effect.provide(defaultLayer),
+        Effect.provide(layer),
         Effect.provide(AppFileSystem.defaultLayer),
+        Effect.provide(embedderLayer(384)),
+        Effect.provide(Global.layerWith({ cache: cacheDir })),
         provideInstance(dir),
         Effect.runPromise,
       )
     } finally {
-      _testCacheDir = ""
       await fsNode.rm(dir, { recursive: true, force: true }).catch(() => {})
       await fsNode.rm(cacheDir, { recursive: true, force: true }).catch(() => {})
     }
   })
 
   test("ZvecIndex index handles more than 1024 documents by batching", async () => {
-    const { defaultLayer } = await import("../../src/search/zvec")
+    const { layer } = await import("../../src/search/zvec")
     const { provideInstance } = await import("../fixture/fixture")
     const { AppFileSystem } = await import("@opencode-ai/core/filesystem")
 
     const dir = await fsNode.mkdtemp(path.join(os.tmpdir(), "opencode-zvec-batch-test-"))
     const cacheDir = await fsNode.mkdtemp(path.join(os.tmpdir(), "opencode-zvec-batch-cache-"))
-    _testCacheDir = cacheDir
 
     try {
       await Effect.gen(function* () {
@@ -256,26 +237,26 @@ describe("search.zvec", () => {
         const indexPath = path.join(cacheDir, "zvec", Hash.fast(dir))
         expect(yield* fs.existsSafe(indexPath)).toBe(false)
       }).pipe(
-        Effect.provide(defaultLayer),
+        Effect.provide(layer),
         Effect.provide(AppFileSystem.defaultLayer),
+        Effect.provide(embedderLayer(384)),
+        Effect.provide(Global.layerWith({ cache: cacheDir })),
         provideInstance(dir),
         Effect.runPromise,
       )
     } finally {
-      _testCacheDir = ""
       await fsNode.rm(dir, { recursive: true, force: true }).catch(() => {})
       await fsNode.rm(cacheDir, { recursive: true, force: true }).catch(() => {})
     }
   })
 
   test("upsert is idempotent — re-indexing the same chunk id yields a single doc", async () => {
-    const { defaultLayer } = await import("../../src/search/zvec")
+    const { layer } = await import("../../src/search/zvec")
     const { provideInstance } = await import("../fixture/fixture")
     const { AppFileSystem } = await import("@opencode-ai/core/filesystem")
 
     const dir = await fsNode.mkdtemp(path.join(os.tmpdir(), "opencode-zvec-idem-ws-"))
     const cacheDir = await fsNode.mkdtemp(path.join(os.tmpdir(), "opencode-zvec-idem-cache-"))
-    _testCacheDir = cacheDir
 
     try {
       await Effect.gen(function* () {
@@ -293,26 +274,26 @@ describe("search.zvec", () => {
         const results = yield* search.search("query", Array(384).fill(0.3), 10)
         expect(results.filter((r) => r.path === "a.ts")).toHaveLength(1)
       }).pipe(
-        Effect.provide(defaultLayer),
+        Effect.provide(layer),
         Effect.provide(AppFileSystem.defaultLayer),
+        Effect.provide(embedderLayer(384)),
+        Effect.provide(Global.layerWith({ cache: cacheDir })),
         provideInstance(dir),
         Effect.runPromise,
       )
     } finally {
-      _testCacheDir = ""
       await fsNode.rm(dir, { recursive: true, force: true }).catch(() => {})
       await fsNode.rm(cacheDir, { recursive: true, force: true }).catch(() => {})
     }
   })
 
   test("search on a fresh empty index returns []", async () => {
-    const { defaultLayer } = await import("../../src/search/zvec")
+    const { layer } = await import("../../src/search/zvec")
     const { provideInstance } = await import("../fixture/fixture")
     const { AppFileSystem } = await import("@opencode-ai/core/filesystem")
 
     const dir = await fsNode.mkdtemp(path.join(os.tmpdir(), "opencode-zvec-empty-ws-"))
     const cacheDir = await fsNode.mkdtemp(path.join(os.tmpdir(), "opencode-zvec-empty-cache-"))
-    _testCacheDir = cacheDir
 
     try {
       await Effect.gen(function* () {
@@ -320,13 +301,14 @@ describe("search.zvec", () => {
         const results = yield* search.search("query", Array(384).fill(0.1), 5)
         expect(results).toEqual([])
       }).pipe(
-        Effect.provide(defaultLayer),
+        Effect.provide(layer),
         Effect.provide(AppFileSystem.defaultLayer),
+        Effect.provide(embedderLayer(384)),
+        Effect.provide(Global.layerWith({ cache: cacheDir })),
         provideInstance(dir),
         Effect.runPromise,
       )
     } finally {
-      _testCacheDir = ""
       await fsNode.rm(dir, { recursive: true, force: true }).catch(() => {})
       await fsNode.rm(cacheDir, { recursive: true, force: true }).catch(() => {})
     }
@@ -362,13 +344,12 @@ describe("search.zvec", () => {
   })
 
   test("ZvecIndex.open falls back to ZVecOpen when index directory already exists", async () => {
-    const { defaultLayer } = await import("../../src/search/zvec")
+    const { layer } = await import("../../src/search/zvec")
     const { provideInstance } = await import("../fixture/fixture")
     const { AppFileSystem } = await import("@opencode-ai/core/filesystem")
 
     const dir = await fsNode.mkdtemp(path.join(os.tmpdir(), "opencode-zvec-fallback-test-"))
     const cacheDir = await fsNode.mkdtemp(path.join(os.tmpdir(), "opencode-zvec-fallback-cache-"))
-    _testCacheDir = cacheDir
 
     try {
       ZVecInitialize({ logLevel: ZVecLogLevel.ERROR })
@@ -392,13 +373,14 @@ describe("search.zvec", () => {
         expect(results.length).toBe(1)
         expect(results[0].path).toBe("a.ts")
       }).pipe(
-        Effect.provide(defaultLayer),
+        Effect.provide(layer),
         Effect.provide(AppFileSystem.defaultLayer),
+        Effect.provide(embedderLayer(384)),
+        Effect.provide(Global.layerWith({ cache: cacheDir })),
         provideInstance(dir),
         Effect.runPromise,
       )
     } finally {
-      _testCacheDir = ""
       await fsNode.rm(dir, { recursive: true, force: true }).catch(() => {})
       await fsNode.rm(cacheDir, { recursive: true, force: true }).catch(() => {})
     }
@@ -414,7 +396,6 @@ describe("search.zvec", () => {
 
     const dir = await fsNode.mkdtemp(path.join(os.tmpdir(), "opencode-zvec-dim-ws-"))
     const cacheDir = await fsNode.mkdtemp(path.join(os.tmpdir(), "opencode-zvec-dim-cache-"))
-    _testCacheDir = cacheDir
 
     try {
       await Effect.gen(function* () {
@@ -428,11 +409,11 @@ describe("search.zvec", () => {
         Effect.provide(layer),
         Effect.provide(AppFileSystem.defaultLayer),
         Effect.provide(embedderLayer(8)),
+        Effect.provide(Global.layerWith({ cache: cacheDir })),
         provideInstance(dir),
         Effect.runPromise,
       )
     } finally {
-      _testCacheDir = ""
       await fsNode.rm(dir, { recursive: true, force: true }).catch(() => {})
       await fsNode.rm(cacheDir, { recursive: true, force: true }).catch(() => {})
     }
@@ -448,7 +429,6 @@ describe("search.zvec", () => {
 
     const dir = await fsNode.mkdtemp(path.join(os.tmpdir(), "opencode-zvec-mig-ws-"))
     const cacheDir = await fsNode.mkdtemp(path.join(os.tmpdir(), "opencode-zvec-mig-cache-"))
-    _testCacheDir = cacheDir
 
     try {
       const dirHash = Hash.fast(dir)
@@ -483,11 +463,11 @@ describe("search.zvec", () => {
         Effect.provide(layer),
         Effect.provide(AppFileSystem.defaultLayer),
         Effect.provide(embedderLayer(8)),
+        Effect.provide(Global.layerWith({ cache: cacheDir })),
         provideInstance(dir),
         Effect.runPromise,
       )
     } finally {
-      _testCacheDir = ""
       await fsNode.rm(dir, { recursive: true, force: true }).catch(() => {})
       await fsNode.rm(cacheDir, { recursive: true, force: true }).catch(() => {})
     }
@@ -503,7 +483,6 @@ describe("search.zvec", () => {
 
     const dir = await fsNode.mkdtemp(path.join(os.tmpdir(), "opencode-zvec-fts-mig-ws-"))
     const cacheDir = await fsNode.mkdtemp(path.join(os.tmpdir(), "opencode-zvec-fts-mig-cache-"))
-    _testCacheDir = cacheDir
 
     try {
       const dirHash = Hash.fast(dir)
@@ -539,11 +518,11 @@ describe("search.zvec", () => {
         Effect.provide(layer),
         Effect.provide(AppFileSystem.defaultLayer),
         Effect.provide(embedderLayer(8)),
+        Effect.provide(Global.layerWith({ cache: cacheDir })),
         provideInstance(dir),
         Effect.runPromise,
       )
     } finally {
-      _testCacheDir = ""
       await fsNode.rm(dir, { recursive: true, force: true }).catch(() => {})
       await fsNode.rm(cacheDir, { recursive: true, force: true }).catch(() => {})
     }
@@ -558,7 +537,6 @@ describe("search.zvec", () => {
 
     const dir = await fsNode.mkdtemp(path.join(os.tmpdir(), "opencode-zvec-err-ws-"))
     const cacheDir = await fsNode.mkdtemp(path.join(os.tmpdir(), "opencode-zvec-err-cache-"))
-    _testCacheDir = cacheDir
 
     try {
       await Effect.gen(function* () {
@@ -577,11 +555,11 @@ describe("search.zvec", () => {
         Effect.provide(layer),
         Effect.provide(AppFileSystem.defaultLayer),
         Effect.provide(embedderLayer(8)),
+        Effect.provide(Global.layerWith({ cache: cacheDir })),
         provideInstance(dir),
         Effect.runPromise,
       )
     } finally {
-      _testCacheDir = ""
       await fsNode.rm(dir, { recursive: true, force: true }).catch(() => {})
       await fsNode.rm(cacheDir, { recursive: true, force: true }).catch(() => {})
     }
@@ -590,26 +568,26 @@ describe("search.zvec", () => {
   // Regression: deleteSync reports ZVEC_NOT_FOUND per-doc for absent ids — deleting
   // ids that were never indexed (or already removed) must stay a benign no-op.
   test("deleting ids absent from the index is a benign no-op", async () => {
-    const { defaultLayer } = await import("../../src/search/zvec")
+    const { layer } = await import("../../src/search/zvec")
     const { provideInstance } = await import("../fixture/fixture")
     const { AppFileSystem } = await import("@opencode-ai/core/filesystem")
 
     const dir = await fsNode.mkdtemp(path.join(os.tmpdir(), "opencode-zvec-del-ws-"))
     const cacheDir = await fsNode.mkdtemp(path.join(os.tmpdir(), "opencode-zvec-del-cache-"))
-    _testCacheDir = cacheDir
 
     try {
       await Effect.gen(function* () {
         const search = yield* SearchService
         yield* search.delete(["never-existed-1", "never-existed-2"])
       }).pipe(
-        Effect.provide(defaultLayer),
+        Effect.provide(layer),
         Effect.provide(AppFileSystem.defaultLayer),
+        Effect.provide(embedderLayer(384)),
+        Effect.provide(Global.layerWith({ cache: cacheDir })),
         provideInstance(dir),
         Effect.runPromise,
       )
     } finally {
-      _testCacheDir = ""
       await fsNode.rm(dir, { recursive: true, force: true }).catch(() => {})
       await fsNode.rm(cacheDir, { recursive: true, force: true }).catch(() => {})
     }
@@ -626,7 +604,6 @@ describe("search.zvec", () => {
 
     const dir = await fsNode.mkdtemp(path.join(os.tmpdir(), "opencode-zvec-h2-ws-"))
     const cacheDir = await fsNode.mkdtemp(path.join(os.tmpdir(), "opencode-zvec-h2-cache-"))
-    _testCacheDir = cacheDir
 
     let embeddedCount = 0
     const embedder = Layer.succeed(EmbeddingService, {
@@ -647,6 +624,7 @@ describe("search.zvec", () => {
         Effect.provide(layer),
         Effect.provide(AppFileSystem.defaultLayer),
         Effect.provide(embedder),
+        Effect.provide(Global.layerWith({ cache: cacheDir })),
         provideInstance(dir),
         Effect.runPromise,
       )
@@ -659,6 +637,7 @@ describe("search.zvec", () => {
         Effect.provide(layer),
         Effect.provide(AppFileSystem.defaultLayer),
         Effect.provide(embedder),
+        Effect.provide(Global.layerWith({ cache: cacheDir })),
         provideInstance(dir),
         Effect.runPromise,
       )
@@ -684,7 +663,6 @@ describe("search.zvec", () => {
       await runIndexer()
       expect(embeddedCount).toBe(2)
     } finally {
-      _testCacheDir = ""
       await fsNode.rm(dir, { recursive: true, force: true }).catch(() => {})
       await fsNode.rm(cacheDir, { recursive: true, force: true }).catch(() => {})
     }

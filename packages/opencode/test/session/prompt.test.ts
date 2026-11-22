@@ -6,6 +6,7 @@ import { Cause, Effect, Exit, Fiber, Layer } from "effect"
 import path from "path"
 import { fileURLToPath } from "url"
 import { NamedError } from "@opencode-ai/core/util/error"
+import { Global } from "@opencode-ai/core/global"
 import { Agent as AgentSvc } from "../../src/agent/agent"
 import { Bus } from "../../src/bus"
 import { Command } from "../../src/command"
@@ -188,6 +189,7 @@ function makeHttp() {
   const registry = ToolRegistry.layer.pipe(
     Layer.provide(Skill.defaultLayer),
     Layer.provide(FetchHttpClient.layer),
+    Layer.provide(Global.defaultLayer),
     Layer.provide(CrossSpawnSpawner.defaultLayer),
     Layer.provide(Git.defaultLayer),
     Layer.provide(Reference.defaultLayer),

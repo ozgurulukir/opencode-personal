@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { Effect, Layer } from "effect"
 import path from "path"
 import { AppFileSystem } from "@opencode-ai/core/filesystem"
+import { Global } from "@opencode-ai/core/global"
 import { CrossSpawnSpawner } from "@opencode-ai/core/cross-spawn-spawner"
 import { SearchService } from "@/search/search"
 import { EmbeddingService } from "@/search/embedding"
@@ -54,7 +55,12 @@ describe("IndexWorkspace", () => {
       yield* Effect.gen(function* () {
         const runIndexer = yield* IndexWorkspace
         yield* runIndexer
-      }).pipe(Effect.provide(mockSearch), Effect.provide(mockEmbedder), provideInstance(dir))
+      }).pipe(
+        Effect.provide(mockSearch),
+        Effect.provide(mockEmbedder),
+        Effect.provide(Global.layerWith({ cache: path.join(dir, ".cache") })),
+        provideInstance(dir),
+      )
 
       // Assertions
       expect(indexedChunks.length).toBeGreaterThan(0)
@@ -109,7 +115,12 @@ describe("IndexWorkspace", () => {
         Effect.gen(function* () {
           const runIndexer = yield* IndexWorkspace
           yield* runIndexer
-        }).pipe(Effect.provide(mockSearch), Effect.provide(mockEmbedder), provideInstance(dir))
+        }).pipe(
+          Effect.provide(mockSearch),
+          Effect.provide(mockEmbedder),
+          Effect.provide(Global.layerWith({ cache: path.join(dir, ".cache") })),
+          provideInstance(dir),
+        )
 
       // First run: index both files
       yield* run()
