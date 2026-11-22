@@ -47,6 +47,7 @@ import { Todo } from "../session/todo"
 import { LSP } from "@/lsp/lsp"
 import { Instruction } from "../session/instruction"
 import { AppFileSystem } from "@opencode-ai/core/filesystem"
+import { Global } from "@opencode-ai/core/global"
 import { Bus } from "../bus"
 import { Agent } from "../agent/agent"
 import { Git } from "@/git"
@@ -127,6 +128,7 @@ export const layer: Layer.Layer<
   | Truncate.Service
   | SearchService
   | EmbeddingService
+  | Global.Service
 > = Layer.effect(
   Service,
   Effect.gen(function* () {
@@ -420,6 +422,7 @@ export const defaultLayer = Layer.suspend(() =>
       Layer.provide(LSP.defaultLayer),
       Layer.provide(Instruction.defaultLayer),
       Layer.provide(AppFileSystem.defaultLayer),
+      Layer.provide(Global.defaultLayer),
       Layer.provide(Bus.layer),
       Layer.provide(FetchHttpClient.layer),
       Layer.provide(Format.defaultLayer),

@@ -19,6 +19,7 @@ import { Todo } from "../../src/session/todo"
 import { Session } from "@/session/session"
 import { LLM } from "../../src/session/llm"
 import { AppFileSystem } from "@opencode-ai/core/filesystem"
+import { Global } from "@opencode-ai/core/global"
 import { SessionCompaction } from "../../src/session/compaction"
 import { SessionSummary } from "../../src/session/summary"
 import { Instruction } from "../../src/session/instruction"
@@ -124,6 +125,7 @@ function makeHttp() {
   const todo = Todo.layer.pipe(Layer.provideMerge(deps), Layer.provide(SyncEvent.defaultLayer))
   const registry = ToolRegistry.layer.pipe(
     Layer.provide(Skill.defaultLayer),
+    Layer.provide(Global.defaultLayer),
     Layer.provide(FetchHttpClient.layer),
     Layer.provide(CrossSpawnSpawner.defaultLayer),
     Layer.provide(Git.defaultLayer),

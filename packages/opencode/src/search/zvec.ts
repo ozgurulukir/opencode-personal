@@ -468,16 +468,17 @@ export const layer = Layer.effect(
   Effect.gen(function* () {
     const fs = yield* AppFileSystem.Service
     const embedder = yield* EmbeddingService
+    const global = yield* Global.Service
 
     const state = yield* InstanceState.make(
       Effect.fn("SearchService.state")(function* () {
         const directory = yield* InstanceState.directory
         const dirHash = Hash.fast(directory)
-        const indexPath = path.join(Global.Path.cache, "zvec", dirHash)
+        const indexPath = path.join(global.cache, "zvec", dirHash)
         // Ensure the parent cache dir exists, but NOT the index dir itself —
         // ZVecCreateAndOpen must create it fresh (it rejects an already-existing path,
         // and the open() fallback uses ZVecOpen only for re-opening an existing DB).
-        yield* fs.ensureDir(path.join(Global.Path.cache, "zvec")).pipe(Effect.catch(() => Effect.void))
+        yield* fs.ensureDir(path.join(global.cache, "zvec")).pipe(Effect.catch(() => Effect.void))
         const index = new ZvecIndex(indexPath, () => embedder.dimension, fs)
         yield* Effect.addFinalizer(() => index.close())
         return index
@@ -530,4 +531,8 @@ export const layer = Layer.effect(
   }),
 )
 
-export const defaultLayer = layer.pipe(Layer.provide(AppFileSystem.defaultLayer), Layer.provide(embeddingDefaultLayer))
+export const defaultLayer = layer.pipe(
+  Layer.provide(AppFileSystem.defaultLayer),
+  Layer.provide(embeddingDefaultLayer),
+  Layer.provide(Global.defaultLayer),
+)

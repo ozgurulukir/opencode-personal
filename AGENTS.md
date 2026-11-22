@@ -171,7 +171,7 @@ const table = sqliteTable("session", {
 - Tests cannot run from repo root (guard: `do-not-run-tests-from-root`); run from package dirs like `packages/opencode`
 - Package test directories follow `packages/<name>/test/` or `packages/<name>/test/<subpath>/`
 - Exception: `packages/ui` co-locates tests in `src/components/` alongside source. See `packages/ui/AGENTS.md`.
-- `mock.module()` in bun:test persists across test files — always use `afterAll(() => mock.restore())` to prevent leakage.
+- `mock.module()` in bun:test persists across test files and `mock.restore()` does **not** undo module mocks — prefer Effect layer injection (e.g. `Global.layerWith(...)`) over `mock.module()` to prevent cross-file leakage.
 - Test failures may be order-dependent. Some pass in isolation but fail in the full suite due to shared state or global mock leakage. Always run the full test suite after changes.
 
 ## Type Checking

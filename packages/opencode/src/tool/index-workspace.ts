@@ -5,7 +5,7 @@ import { SearchService } from "@/search/search"
 import { EmbeddingService } from "@/search/embedding"
 import { manifestPathFor } from "@/search/manifest"
 import { AppFileSystem } from "@opencode-ai/core/filesystem"
-import { Path as GlobalPath } from "@opencode-ai/core/global"
+import { Global } from "@opencode-ai/core/global"
 import { Hash } from "@opencode-ai/core/util/hash"
 import { InstanceState } from "@/effect/instance-state"
 import { IndexWorkspace } from "@/search/indexer"
@@ -33,6 +33,7 @@ export const IndexWorkspaceTool = Tool.define(
     const search = yield* SearchService
     const embedder = yield* EmbeddingService
     const fs = yield* AppFileSystem.Service
+    const global = yield* Global.Service
     const runIndexer = yield* IndexWorkspace
 
     return {
@@ -48,7 +49,7 @@ export const IndexWorkspaceTool = Tool.define(
           })
 
           const directory = yield* InstanceState.directory
-          const manifestPath = manifestPathFor(path.join(GlobalPath.cache, "zvec", Hash.fast(directory)))
+          const manifestPath = manifestPathFor(path.join(global.cache, "zvec", Hash.fast(directory)))
 
           if (params.force) {
             // reset() owns manifest removal — a surviving manifest would make the

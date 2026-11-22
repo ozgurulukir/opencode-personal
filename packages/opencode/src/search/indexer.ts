@@ -1,7 +1,7 @@
 import { Effect } from "effect"
 import path from "path"
 import { AppFileSystem } from "@opencode-ai/core/filesystem"
-import { Path as GlobalPath } from "@opencode-ai/core/global"
+import { Global } from "@opencode-ai/core/global"
 import { Hash } from "@opencode-ai/core/util/hash"
 import { SearchService } from "./search"
 import { EmbeddingService } from "./embedding"
@@ -51,6 +51,7 @@ export const IndexWorkspace = Effect.gen(function* () {
   const fs = yield* AppFileSystem.Service
   const search = yield* SearchService
   const embedder = yield* EmbeddingService
+  const global = yield* Global.Service
 
   return Effect.gen(function* () {
     const directory = yield* InstanceState.directory
@@ -61,8 +62,8 @@ export const IndexWorkspace = Effect.gen(function* () {
     })
 
     const dirHash = Hash.fast(directory)
-    yield* fs.ensureDir(path.join(GlobalPath.cache, "zvec")).pipe(Effect.catch(() => Effect.void))
-    const manifestPath = manifestPathFor(path.join(GlobalPath.cache, "zvec", dirHash))
+    yield* fs.ensureDir(path.join(global.cache, "zvec")).pipe(Effect.catch(() => Effect.void))
+    const manifestPath = manifestPathFor(path.join(global.cache, "zvec", dirHash))
     // Open before reading the manifest: a dimension migration inside open() wipes
     // the manifest, so a copy read before open() would resurrect stale entries.
     yield* search.open

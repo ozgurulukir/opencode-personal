@@ -13,6 +13,7 @@
  */
 import { expect } from "bun:test"
 import { Effect, Layer } from "effect"
+import { Global } from "@opencode-ai/core/global"
 import { FetchHttpClient } from "effect/unstable/http"
 import fs from "fs/promises"
 import path from "path"
@@ -133,6 +134,7 @@ function makeHttp() {
   const todo = Todo.layer.pipe(Layer.provideMerge(deps), Layer.provide(SyncEvent.defaultLayer))
   const registry = ToolRegistry.layer.pipe(
     Layer.provide(Skill.defaultLayer),
+    Layer.provide(Global.defaultLayer),
     Layer.provide(FetchHttpClient.layer),
     Layer.provide(CrossSpawnSpawner.defaultLayer),
     Layer.provide(Git.defaultLayer),

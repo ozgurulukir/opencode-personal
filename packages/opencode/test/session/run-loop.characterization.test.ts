@@ -22,6 +22,7 @@ import { NodeFileSystem } from "@effect/platform-node"
 import { FetchHttpClient } from "effect/unstable/http"
 import { describe, expect } from "bun:test"
 import { Cause, Effect, Exit, Layer, Stream } from "effect"
+import { Global } from "@opencode-ai/core/global"
 import { Agent as AgentSvc } from "../../src/agent/agent"
 import { Bus } from "../../src/bus"
 import { GlobalBus, type GlobalEvent } from "../../src/bus/global"
@@ -297,6 +298,7 @@ function makeLayer() {
   const todo = Todo.layer.pipe(Layer.provideMerge(deps), Layer.provide(SyncEvent.defaultLayer))
   const registry = ToolRegistry.layer.pipe(
     Layer.provide(Skill.defaultLayer),
+    Layer.provide(Global.defaultLayer),
     Layer.provide(FetchHttpClient.layer),
     Layer.provide(CrossSpawnSpawner.defaultLayer),
     Layer.provide(Git.defaultLayer),
