@@ -1,7 +1,14 @@
-import { afterEach, describe, expect, test } from "bun:test"
+import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { handleNotificationClick, setNavigate } from "./notification-click"
 
+const setURL = (url: string) =>
+  (window as unknown as { happyDOM: { setURL(value: string): void } }).happyDOM.setURL(url)
+
 describe("notification click", () => {
+  beforeEach(() => {
+    setURL("http://localhost:3000/")
+  })
+
   afterEach(() => {
     setNavigate(undefined as unknown as (href: string) => void)
   })
@@ -20,15 +27,20 @@ describe("notification click", () => {
     expect(calls).toEqual([])
   })
 
-  test("falls back to location.assign without registered navigate", () => {
+  test("falls back to location.assign for same-origin paths without registered navigate", () => {
     handleNotificationClick("/abc/session/123")
-    // falls back to window.location.assign — no error thrown
+    expect(window.location.pathname).toBe("/abc/session/123")
   })
 
-  test("refuses absolute and scheme-relative hrefs without registered navigate", () => {
-    const before = window.location.href
-    handleNotificationClick("https://evil.example/session/1")
-    handleNotificationClick("//evil.example/session/1")
-    expect(window.location.href).toBe(before)
+  test("refuses absolute, scheme-relative, and escaped hrefs without registered navigate", () => {
+    for (const href of [
+      "https://evil.example/session/1",
+      "//evil.example/session/1",
+      "/\\evil.example/session/1",
+      "/\t/evil.example/session/1",
+    ]) {
+      handleNotificationClick(href)
+      expect(window.location.pathname).toBe("/")
+    }
   })
 })

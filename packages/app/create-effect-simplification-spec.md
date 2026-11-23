@@ -3,8 +3,9 @@
 Reduce reactive misuse across `packages/app`.
 
 > **Status (2026-11-23):** the counts below are the original baseline. The current
-> tree has 147 `createEffect` calls across 45 files, including 22 in
-> `pages/session.tsx`. Re-baseline before treating this spec as a tracker.
+> tree has 105 `createEffect` call sites (151 references including imports) across
+> 45 files, including 21 call sites in `pages/session.tsx`. Re-baseline before
+> treating this spec as a tracker.
 
 ---
 

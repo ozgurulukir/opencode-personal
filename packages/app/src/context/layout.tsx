@@ -529,11 +529,9 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
         sessionFrame = undefined
         sessionTimer = window.setTimeout(() => {
           sessionTimer = undefined
-          void Promise.all(
-            server.projects.list().map((project) => {
-              return globalSync.project.loadSessions(project.worktree)
-            }),
-          )
+          for (const project of server.projects.list()) {
+            loadSessionsInBackground(globalSync.project, project.worktree)
+          }
         }, 0)
       })
     })
