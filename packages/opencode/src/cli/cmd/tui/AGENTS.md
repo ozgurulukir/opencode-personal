@@ -55,20 +55,26 @@ This file covers TUI-specific patterns for `packages/opencode/src/cli/cmd/tui/`.
 
 **Gate/iteration consistency**: Use single source `props.input.todos` for both gate and iteration. Avoid `<Match when={props.metadata.todos?.length}>` + `<For each={props.input.todos ?? []}>` mismatch.
 
+**Reactivity is load-bearing**: tool input arrives only at `session.next.tool.called`; `tool.input.started` mounts the part with an empty input. A bare `const todos = props.input.todos` (or an IIFE) in the component body captures that empty snapshot and never updates — the block appears only after a remount/restart. Derive through `createMemo` and gate with `Switch`/`Show`, never an early `return` based on the snapshot.
+
 **Pattern**:
 
 ```tsx
-{(() => {
-  const todos = props.input.todos ?? []
-  if (todos.length === 0) {
-    return <InlineTool ...>Updating todos...</InlineTool>
-  }
+function TodoWrite(props: ToolProps<typeof TodoWriteTool>) {
+  const todos = createMemo(() => props.input.todos ?? [])
   return (
-    <BlockTool ...>
-      <For each={todos}>{(todo) => <TodoItem ... />}</For>
-    </BlockTool>
+    <Switch>
+      <Match when={todos().length > 0}>
+        <BlockTool ...>
+          <For each={todos()}>{(todo) => <TodoItem ... />}</For>
+        </BlockTool>
+      </Match>
+      <Match when={true}>
+        <InlineTool ...>Updating todos...</InlineTool>
+      </Match>
+    </Switch>
   )
-})()}
+}
 ```
 
 **Priority badge**: `[H]`/`[M]`/`[L]` before status icon. TUI uses `theme.error/warning/success` colors. See `todo-item.tsx:priorityBadge()`, `todo-item.tsx:priorityColor()`.

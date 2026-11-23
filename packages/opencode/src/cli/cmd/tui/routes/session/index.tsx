@@ -2045,11 +2045,13 @@ function WebFetch(props: ToolProps<typeof WebFetchTool>) {
 }
 
 function WebSearch(props: ToolProps<typeof WebSearchTool>) {
-  const metadata = props.metadata as { numResults?: number; provider?: unknown }
+  // Structured result metadata may land after the pending render, so derive it
+  // reactively instead of snapshotting it once.
+  const metadata = createMemo(() => props.metadata as { numResults?: number; provider?: unknown })
   return (
     <InlineTool icon="◈" pending="Searching web..." complete={props.input.query} part={props.part}>
-      {webSearchProviderLabel(metadata.provider)} "{props.input.query}"{" "}
-      <Show when={metadata.numResults}>({metadata.numResults} results)</Show>
+      {webSearchProviderLabel(metadata().provider)} "{props.input.query}"{" "}
+      <Show when={metadata().numResults}>({metadata().numResults} results)</Show>
     </InlineTool>
   )
 }
@@ -2219,22 +2221,27 @@ function ApplyPatch(props: ToolProps<typeof ApplyPatchTool>) {
 }
 
 function TodoWrite(props: ToolProps<typeof TodoWriteTool>) {
-  const todos = props.input.todos ?? []
-  if (todos.length === 0) {
-    return (
-      <InlineTool icon="⚙" pending="Updating todos..." complete={false} part={props.part}>
-        Updating todos...
-      </InlineTool>
-    )
-  }
+  // `props.input` becomes populated only at tool.called (input.started carries
+  // an empty streaming string), so this must stay reactive — a bare `const`
+  // here captures the pending empty input and never updates until remount.
+  const todos = createMemo(() => props.input.todos ?? [])
   return (
-    <BlockTool title="# Todos" part={props.part}>
-      <box>
-        <For each={todos}>
-          {(todo) => <TodoItem status={todo.status} content={todo.content} priority={todo.priority} />}
-        </For>
-      </box>
-    </BlockTool>
+    <Switch>
+      <Match when={todos().length > 0}>
+        <BlockTool title="# Todos" part={props.part}>
+          <box>
+            <For each={todos()}>
+              {(todo) => <TodoItem status={todo.status} content={todo.content} priority={todo.priority} />}
+            </For>
+          </box>
+        </BlockTool>
+      </Match>
+      <Match when={true}>
+        <InlineTool icon="⚙" pending="Updating todos..." complete={false} part={props.part}>
+          Updating todos...
+        </InlineTool>
+      </Match>
+    </Switch>
   )
 }
 
@@ -2273,12 +2280,15 @@ function Question(props: ToolProps<typeof QuestionTool>) {
 }
 
 function Skill(props: ToolProps<typeof SkillTool>) {
-  const input = props.input as { names?: string[]; name?: string }
-  const names = input.names?.length ? input.names : input.name ? [input.name] : []
-  const label = formatSkillLabel(props.input, names[0])
+  // Same lifecycle as TodoWrite: the names arrive at tool.called, so read them
+  // through a memo rather than snapshotting them in the component body.
+  const names = createMemo(() => {
+    const input = props.input as { names?: string[]; name?: string }
+    return input.names?.length ? input.names : input.name ? [input.name] : []
+  })
   return (
-    <InlineTool icon="→" pending="Loading skill..." complete={names.join(", ")} part={props.part}>
-      {label}
+    <InlineTool icon="→" pending="Loading skill..." complete={names().join(", ")} part={props.part}>
+      {formatSkillLabel(props.input, names()[0])}
     </InlineTool>
   )
 }
