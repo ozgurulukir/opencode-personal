@@ -79,7 +79,16 @@ const notify: Platform["notify"] = async (title, description, href) => {
 }
 
 const openLink: Platform["openLink"] = (url) => {
-  window.open(url, "_blank")
+  // Terminal output and provider responses can carry arbitrary schemes; only
+  // http(s) links may reach the browser.
+  let target: URL
+  try {
+    target = new URL(url)
+  } catch {
+    return
+  }
+  if (target.protocol !== "http:" && target.protocol !== "https:") return
+  window.open(target.href, "_blank", "noopener,noreferrer")
 }
 
 const back: Platform["back"] = () => {

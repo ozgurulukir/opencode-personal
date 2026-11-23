@@ -20,7 +20,7 @@ const sentry =
     : false
 
 export default defineConfig({
-  plugins: [desktopPlugin, sentry] as any,
+  plugins: [desktopPlugin, sentry],
   server: {
     host: "0.0.0.0",
     allowedHosts: true,
