@@ -3,6 +3,7 @@ import { batch, createEffect, createMemo, onCleanup, onMount, type Accessor } fr
 import { createSimpleContext } from "@opencode-ai/ui/context"
 import { makeEventListener } from "@solid-primitives/event-listener"
 import { useGlobalSync } from "./global-sync"
+import { loadSessionsInBackground } from "./global-sync/utils"
 import { useGlobalSDK } from "./global-sdk"
 import { useServer } from "./server"
 import { usePlatform } from "./platform"
@@ -560,9 +561,7 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
           const root = rootFor(directory)
           if (server.projects.list().find((x) => x.worktree === root)) return
           // background bootstrap — failure leaves sessions unloaded; later syncs retry
-          globalSync.project
-            .loadSessions(root)
-            .catch((error) => console.warn("failed to load sessions; later syncs will retry", error))
+          loadSessionsInBackground(globalSync.project, root)
           server.projects.open(root)
         },
         close(directory: string) {

@@ -9,7 +9,7 @@ import { FAKE_DIR, installMockApi, SERVER_MESSAGE_ID, SESSION_ID } from "./mock-
  * Limitations (documented subset — AC 1b):
  * - Transport is mocked via Playwright `page.route` (REST + two-phase SSE).
  * - No real `opencode serve`, no real LLM, no real SQLite/projector path.
- * - Unit suite (~539 tests) remains the server/persistence safety net.
+ * - The Bun unit suite remains the server/persistence safety net.
  *
  * @see https://github.com/ozgurulukir/opencode-personal/issues/381
  */

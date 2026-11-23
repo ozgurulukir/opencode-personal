@@ -15,6 +15,7 @@ import { makeEventListener } from "@solid-primitives/event-listener"
 import { useLocation, useNavigate, useParams } from "@solidjs/router"
 import { useLayout, LocalProject } from "@/context/layout"
 import { useGlobalSync } from "@/context/global-sync"
+import { loadSessionsInBackground } from "@/context/global-sync/utils"
 import { Persist, persisted } from "@/utils/persist"
 import { base64Encode } from "@opencode-ai/core/util/encode"
 import { decode64 } from "@/utils/base64"
@@ -1223,9 +1224,7 @@ export default function Layout(props: ParentProps) {
         for (const directory of next) {
           if (loadedSessionDirs.has(directory)) continue
           // background bootstrap — failure leaves sessions unloaded; later syncs retry
-          globalSync.project
-            .loadSessions(directory)
-            .catch((error) => console.warn("failed to load sessions; later syncs will retry", error))
+          loadSessionsInBackground(globalSync.project, directory)
         }
 
         loadedSessionDirs.clear()

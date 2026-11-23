@@ -3,6 +3,19 @@ export { pathKey as directoryKey, type PathKey as DirectoryKey } from "@/utils/p
 
 export const cmp = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0)
 
+/**
+ * Kicks off a background session load. Failures are logged, not surfaced:
+ * bootstrap is retried by later syncs, so callers must not await this.
+ */
+export function loadSessionsInBackground(
+  project: { loadSessions: (directory: string) => Promise<unknown> },
+  directory: string,
+) {
+  void project.loadSessions(directory).catch((error) => {
+    console.warn("[global-sync] failed to load sessions; later syncs will retry", error)
+  })
+}
+
 function isAgent(input: unknown): input is Agent {
   if (!input || typeof input !== "object") return false
   const item = input as { name?: unknown; mode?: unknown }

@@ -24,4 +24,11 @@ describe("notification click", () => {
     handleNotificationClick("/abc/session/123")
     // falls back to window.location.assign — no error thrown
   })
+
+  test("refuses absolute and scheme-relative hrefs without registered navigate", () => {
+    const before = window.location.href
+    handleNotificationClick("https://evil.example/session/1")
+    handleNotificationClick("//evil.example/session/1")
+    expect(window.location.href).toBe(before)
+  })
 })
