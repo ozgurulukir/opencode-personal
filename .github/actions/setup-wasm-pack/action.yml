@@ -24,6 +24,8 @@ runs:
         echo "c539d91ccab2591a7e975bcf82c82e1911b03335c80aa83d67ad25ed2ad06539  /tmp/wasm-pack.tar.gz" | sha256sum -c -
 
         tar -xzf /tmp/wasm-pack.tar.gz -C /tmp
-        install -m 0755 "/tmp/wasm-pack-v${version}-${target}/wasm-pack" /usr/local/bin/wasm-pack
+        install -d "$HOME/.local/bin"
+        install -m 0755 "/tmp/wasm-pack-v${version}-${target}/wasm-pack" "$HOME/.local/bin/wasm-pack"
         rm -rf /tmp/wasm-pack.tar.gz "/tmp/wasm-pack-v${version}-${target}"
+        echo "$HOME/.local/bin" >> "$GITHUB_PATH"
         wasm-pack --version
