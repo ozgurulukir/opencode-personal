@@ -428,3 +428,182 @@ describe("tool.webfetch", () => {
     })
   })
 })
+
+describe("webfetch HTTP status handling", () => {
+  test("surfaces 404 as an error and cancels the response body", async () => {
+    await WithInstance.provide({
+      directory: projectRoot,
+      fn: async () => {
+        let cancelled = false
+        const body = new ReadableStream<Uint8Array>({
+          start(controller) {
+            controller.enqueue(new TextEncoder().encode("not found"))
+          },
+          cancel() {
+            cancelled = true
+          },
+        })
+        const originalFetch = globalThis.fetch
+        ;(globalThis as any).fetch = async () =>
+          new Response(body, { status: 404, statusText: "Not Found", headers: { "content-type": "text/plain" } })
+        try {
+          await expect(exec({ url: "http://localhost/missing", format: "text" })).rejects.toThrow(
+            "HTTP 404 from http://localhost/missing (Not Found)",
+          )
+          expect(cancelled).toBe(true)
+        } finally {
+          ;(globalThis as any).fetch = originalFetch
+        }
+      },
+    })
+  })
+
+  test("surfaces 500 with its status text", async () => {
+    await WithInstance.provide({
+      directory: projectRoot,
+      fn: async () => {
+        const originalFetch = globalThis.fetch
+        ;(globalThis as any).fetch = async () =>
+          new Response("boom", {
+            status: 500,
+            statusText: "Internal Server Error",
+            headers: { "content-type": "text/plain" },
+          })
+        try {
+          await expect(exec({ url: "http://localhost/broken", format: "text" })).rejects.toThrow(
+            "HTTP 500 from http://localhost/broken (Internal Server Error)",
+          )
+        } finally {
+          ;(globalThis as any).fetch = originalFetch
+        }
+      },
+    })
+  })
+
+  test("omits the status text parenthetical when the server sends none", async () => {
+    await WithInstance.provide({
+      directory: projectRoot,
+      fn: async () => {
+        const originalFetch = globalThis.fetch
+        ;(globalThis as any).fetch = async () =>
+          new Response("bad gateway", { status: 502, headers: { "content-type": "text/plain" } })
+        try {
+          await expect(exec({ url: "http://localhost/bad-gateway", format: "text" })).rejects.toThrow(
+            "HTTP 502 from http://localhost/bad-gateway",
+          )
+        } finally {
+          ;(globalThis as any).fetch = originalFetch
+        }
+      },
+    })
+  })
+
+  test("redacts URL credentials and query strings in error messages", async () => {
+    await WithInstance.provide({
+      directory: projectRoot,
+      fn: async () => {
+        const originalFetch = globalThis.fetch
+        ;(globalThis as any).fetch = async () =>
+          new Response("no", { status: 404, statusText: "Not Found", headers: { "content-type": "text/plain" } })
+        try {
+          await expect(
+            exec({ url: "http://user:secret@localhost/missing?token=abc123", format: "text" }),
+          ).rejects.toThrow("HTTP 404 from http://localhost/missing (Not Found)")
+        } finally {
+          ;(globalThis as any).fetch = originalFetch
+        }
+      },
+    })
+  })
+})
+
+describe("webfetch Accept negotiation", () => {
+  test("requests HTML first for markdown format and converts the response", async () => {
+    await WithInstance.provide({
+      directory: projectRoot,
+      fn: async () => {
+        let accept = ""
+        const originalFetch = globalThis.fetch
+        ;(globalThis as any).fetch = async (_input: RequestInfo | URL, init?: RequestInit) => {
+          accept = (init?.headers as Record<string, string>)?.Accept ?? ""
+          return new Response("<h1>Hello</h1><p>World</p>", {
+            status: 200,
+            headers: { "content-type": "text/html" },
+          })
+        }
+        try {
+          const result = await exec({ url: "http://localhost/page", format: "markdown" })
+          const qvalues = Object.fromEntries(
+            accept.split(",").map((part) => {
+              const [type, ...params] = part.trim().split(";")
+              const q = params.find((value) => value.trim().startsWith("q="))
+              return [type.trim(), q ? Number(q.trim().slice(2)) : 1]
+            }),
+          )
+          expect(qvalues["text/html"]).toBeGreaterThan(qvalues["text/markdown"])
+          expect(qvalues["text/markdown"]).toBeDefined()
+          expect(result.output).toBe("# Hello\n\nWorld")
+        } finally {
+          ;(globalThis as any).fetch = originalFetch
+        }
+      },
+    })
+  })
+
+  test("returns text/markdown responses unchanged", async () => {
+    await WithInstance.provide({
+      directory: projectRoot,
+      fn: async () => {
+        const originalFetch = globalThis.fetch
+        ;(globalThis as any).fetch = async () =>
+          new Response("# Raw markdown", { status: 200, headers: { "content-type": "text/markdown" } })
+        try {
+          const result = await exec({ url: "http://localhost/doc.md", format: "markdown" })
+          expect(result.output).toBe("# Raw markdown")
+        } finally {
+          ;(globalThis as any).fetch = originalFetch
+        }
+      },
+    })
+  })
+
+  test("converts XHTML responses to markdown", async () => {
+    await WithInstance.provide({
+      directory: projectRoot,
+      fn: async () => {
+        const originalFetch = globalThis.fetch
+        ;(globalThis as any).fetch = async () =>
+          new Response("<h1>XHTML</h1><p>Body</p>", {
+            status: 200,
+            headers: { "content-type": "application/xhtml+xml" },
+          })
+        try {
+          const result = await exec({ url: "http://localhost/page.xhtml", format: "markdown" })
+          expect(result.output).toBe("# XHTML\n\nBody")
+        } finally {
+          ;(globalThis as any).fetch = originalFetch
+        }
+      },
+    })
+  })
+
+  test("converts mixed-case text/html responses to markdown", async () => {
+    await WithInstance.provide({
+      directory: projectRoot,
+      fn: async () => {
+        const originalFetch = globalThis.fetch
+        ;(globalThis as any).fetch = async () =>
+          new Response("<h1>Mixed</h1><p>Case</p>", {
+            status: 200,
+            headers: { "content-type": "TEXT/HTML; charset=utf-8" },
+          })
+        try {
+          const result = await exec({ url: "http://localhost/page", format: "markdown" })
+          expect(result.output).toBe("# Mixed\n\nCase")
+        } finally {
+          ;(globalThis as any).fetch = originalFetch
+        }
+      },
+    })
+  })
+})
