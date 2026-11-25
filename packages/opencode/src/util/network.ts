@@ -168,6 +168,57 @@ export async function assertSafeRemoteUrl(url: string, what: string, options?: S
   return parsed
 }
 
+/**
+ * Reads a response body into bytes, cancelling the stream once the cap is
+ * crossed. Chunked responses have no content-length, so the header check alone
+ * cannot bound memory usage.
+ */
+export async function readBoundedBytes(
+  response: Response,
+  maxBytes: number,
+  describeOverflow: (size?: number) => string,
+): Promise<Uint8Array> {
+  const contentLength = response.headers.get("content-length")
+  if (contentLength) {
+    const declared = parseInt(contentLength, 10)
+    if (Number.isFinite(declared) && declared > maxBytes) {
+      throw new Error(describeOverflow(declared))
+    }
+  }
+
+  const reader = response.body && typeof response.body.getReader === "function" ? response.body.getReader() : undefined
+  if (!reader) {
+    const bytes = new Uint8Array(await response.arrayBuffer())
+    if (bytes.byteLength > maxBytes) throw new Error(describeOverflow())
+    return bytes
+  }
+
+  const chunks: Uint8Array[] = []
+  let total = 0
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      total += value.byteLength
+      if (total > maxBytes) {
+        await reader.cancel()
+        throw new Error(describeOverflow())
+      }
+      chunks.push(value)
+    }
+  } finally {
+    reader.releaseLock?.()
+  }
+
+  const out = new Uint8Array(total)
+  let offset = 0
+  for (const chunk of chunks) {
+    out.set(chunk, offset)
+    offset += chunk.byteLength
+  }
+  return out
+}
+
 export async function safeFetchJson<T = unknown>(
   url: string,
   what: string,
@@ -179,44 +230,12 @@ export async function safeFetchJson<T = unknown>(
   }
 
   const maxBytes = options?.maxBytes ?? MAX_REMOTE_CONFIG_BYTES
-  const contentLength = response.headers.get("content-length")
-  if (contentLength) {
-    const size = parseInt(contentLength, 10)
-    if (Number.isFinite(size) && size > maxBytes) {
-      throw new Error(
-        `Response size for ${what} from ${url} (${size} bytes) exceeds maximum allowed size of ${maxBytes} bytes`,
-      )
-    }
-  }
-
-  let text = ""
-  if (response.body && typeof response.body.getReader === "function") {
-    const reader = response.body.getReader()
-    const decoder = new TextDecoder()
-    let bytes = 0
-    try {
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-        bytes += value.byteLength
-        if (bytes > maxBytes) {
-          await reader.cancel()
-          throw new Error(`Response size for ${what} from ${url} exceeds maximum allowed size of ${maxBytes} bytes`)
-        }
-        text += decoder.decode(value, { stream: true })
-      }
-      text += decoder.decode()
-    } finally {
-      reader.releaseLock?.()
-    }
-  } else {
-    text = await response.text()
-    if (Buffer.byteLength(text, "utf-8") > maxBytes) {
-      throw new Error(`Response size for ${what} from ${url} exceeds maximum allowed size of ${maxBytes} bytes`)
-    }
-  }
-
-  return JSON.parse(text) as T
+  const bytes = await readBoundedBytes(response, maxBytes, (size) =>
+    size === undefined
+      ? `Response size for ${what} from ${url} exceeds maximum allowed size of ${maxBytes} bytes`
+      : `Response size for ${what} from ${url} (${size} bytes) exceeds maximum allowed size of ${maxBytes} bytes`,
+  )
+  return JSON.parse(new TextDecoder().decode(bytes)) as T
 }
 
 const MAX_REDIRECTS = 5
