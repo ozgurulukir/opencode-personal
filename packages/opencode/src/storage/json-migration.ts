@@ -42,8 +42,6 @@ export async function run(db: SQLiteBunDatabase<any, any> | NodeSQLiteDatabase<a
   log.info("starting json to sqlite migration", { storageDir })
   const start = performance.now()
 
-  // const db = drizzle({ client: sqlite })
-
   // Optimize SQLite for bulk inserts
   db.run("PRAGMA journal_mode = WAL")
   db.run("PRAGMA synchronous = OFF")

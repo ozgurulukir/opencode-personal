@@ -475,7 +475,6 @@ export const GithubRunCommand = effectCmd({
         const mdMatches = prompt.matchAll(/!?\[.*?\]\((https:\/\/github\.com\/user-attachments\/[^)]+)\)/gi)
         const tagMatches = prompt.matchAll(/<img .*?src="(https:\/\/github\.com\/user-attachments\/[^"]+)" \/>/gi)
         const matches = [...mdMatches, ...tagMatches].sort((a, b) => a.index - b.index)
-        console.log("Images", JSON.stringify(matches, null, 2))
 
         let offset = 0
         for (const m of matches) {
@@ -628,9 +627,9 @@ export const GithubRunCommand = effectCmd({
 
             if (result.info.role === "assistant" && result.info.error) {
               const err = result.info.error
-              console.error("Agent error:", err)
-              if (err.name === "ContextOverflowError") throw new Error(formatPromptTooLargeError(files))
               const message = "message" in err.data ? err.data.message : ""
+              console.error(`Agent error: ${err.name}: ${message}`)
+              if (err.name === "ContextOverflowError") throw new Error(formatPromptTooLargeError(files))
               throw new Error(`${err.name}: ${message}`)
             }
 
@@ -658,9 +657,9 @@ export const GithubRunCommand = effectCmd({
 
             if (summary.info.role === "assistant" && summary.info.error) {
               const err = summary.info.error
-              console.error("Summary agent error:", err)
-              if (err.name === "ContextOverflowError") throw new Error(formatPromptTooLargeError(files))
               const message = "message" in err.data ? err.data.message : ""
+              console.error(`Summary agent error: ${err.name}: ${message}`)
+              if (err.name === "ContextOverflowError") throw new Error(formatPromptTooLargeError(files))
               throw new Error(`${err.name}: ${message}`)
             }
 

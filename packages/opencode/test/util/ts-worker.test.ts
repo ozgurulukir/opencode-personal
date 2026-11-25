@@ -6,7 +6,9 @@ import { WORKER_BUNDLE_VERSION, ensureTreeSitterWorker, workerFilePath, workerNe
 
 describe("util.ts-worker", () => {
   test("workerFilePath is versioned under the data dir", () => {
-    expect(workerFilePath("/tmp/data")).toBe(`/tmp/data/tree-sitter/parser.worker.bundle-${WORKER_BUNDLE_VERSION}.js`)
+    expect(workerFilePath("/tmp/data")).toBe(
+      path.join("/tmp/data", "tree-sitter", `parser.worker.bundle-${WORKER_BUNDLE_VERSION}.js`),
+    )
   })
 
   test("ensureTreeSitterWorker returns early when already overridden", async () => {

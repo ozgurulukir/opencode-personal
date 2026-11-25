@@ -1,38 +1,3 @@
-# Fake secret-looking strings used by HTTP recorder redaction tests.
-afa57acfda894e0ebf3c637dd710310b705c0a2f:packages/http-recorder/test/record-replay.test.ts:generic-api-key:69
-afa57acfda894e0ebf3c637dd710310b705c0a2f:packages/http-recorder/test/record-replay.test.ts:generic-api-key:92
-afa57acfda894e0ebf3c637dd710310b705c0a2f:packages/http-recorder/test/record-replay.test.ts:generic-api-key:146
-afa57acfda894e0ebf3c637dd710310b705c0a2f:packages/http-recorder/test/record-replay.test.ts:gcp-api-key:71
-
-# Synthetic cloud workspace seed keys; demo data, not credentials.
-133ae42c55e88d6fb215516ef9cb3616517c299c:cloud/app/src/routes/workspace/[id].tsx:generic-api-key:115
-133ae42c55e88d6fb215516ef9cb3616517c299c:cloud/app/src/routes/workspace/[id].tsx:generic-api-key:121
-9a330b4f0f5a24a26e859c7a56daeedb397c3c67:cloud/app/src/routes/workspace/[id].tsx:generic-api-key:150
-9a330b4f0f5a24a26e859c7a56daeedb397c3c67:cloud/app/src/routes/workspace/[id].tsx:generic-api-key:157
-9a330b4f0f5a24a26e859c7a56daeedb397c3c67:cloud/app/src/routes/workspace/[id].tsx:generic-api-key:164
-
-# Synthetic E2E context IDs used only by the timeline fixture.
-3cf71808c4c6cef68b57cd04cd02ae5d644582e5:packages/app/e2e/performance/timeline-stability/context-matrix.spec.ts:generic-api-key:136
-
-# Stripe publishable test key in a development command; public test fixture.
-c801127e3f147bdc79c054d13814cfb55c124a0f:packages/console/app/package.json:generic-api-key:9
-eabea7f52d155bf722f50e22665f3368089b7307:packages/console/app/package.json:generic-api-key:9
-eaf18d991576771ccbc3975a6c7a9358b0da8de9:packages/console/app/package.json:generic-api-key:9
-
-# Synthetic API/GCP-looking values used only by HTTP recorder redaction tests.
-c801127e3f147bdc79c054d13814cfb55c124a0f:packages/http-recorder/test/record-replay.test.ts:gcp-api-key:129
-c801127e3f147bdc79c054d13814cfb55c124a0f:packages/http-recorder/test/record-replay.test.ts:generic-api-key:127
-c801127e3f147bdc79c054d13814cfb55c124a0f:packages/http-recorder/test/record-replay.test.ts:generic-api-key:150
-c801127e3f147bdc79c054d13814cfb55c124a0f:packages/http-recorder/test/record-replay.test.ts:generic-api-key:338
-eabea7f52d155bf722f50e22665f3368089b7307:packages/http-recorder/test/record-replay.test.ts:gcp-api-key:129
-eabea7f52d155bf722f50e22665f3368089b7307:packages/http-recorder/test/record-replay.test.ts:generic-api-key:127
-eabea7f52d155bf722f50e22665f3368089b7307:packages/http-recorder/test/record-replay.test.ts:generic-api-key:150
-eabea7f52d155bf722f50e22665f3368089b7307:packages/http-recorder/test/record-replay.test.ts:generic-api-key:338
-5bb7b2344071865886b5a0a1bb19426cc6d753c8:packages/http-recorder/test/record-replay.test.ts:gcp-api-key:122
-5bb7b2344071865886b5a0a1bb19426cc6d753c8:packages/http-recorder/test/record-replay.test.ts:generic-api-key:120
-5bb7b2344071865886b5a0a1bb19426cc6d753c8:packages/http-recorder/test/record-replay.test.ts:generic-api-key:143
-5bb7b2344071865886b5a0a1bb19426cc6d753c8:packages/http-recorder/test/record-replay.test.ts:generic-api-key:309
-
 # Synthetic OpenAI key used only by the search schema test fixture.
 3abbb92d204a810f825132aad7caa141d95ed067:packages/opencode/test/config/search.test.ts:generic-api-key:28
 f54a38a6e47289cc3be8bc156225b7645e4dda73:packages/opencode/test/config/search.test.ts:generic-api-key:28
