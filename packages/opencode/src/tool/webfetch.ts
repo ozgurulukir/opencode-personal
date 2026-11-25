@@ -4,7 +4,7 @@ import * as Tool from "./tool"
 import TurndownService from "turndown"
 import DESCRIPTION from "./webfetch.txt"
 import { isImageAttachment } from "@/util/media"
-import { guardedFetch } from "@/util/network"
+import { guardedFetch, readBoundedBytes } from "@/util/network"
 import { Config, WEBFETCH_DEFAULTS } from "@/config/config"
 
 // Domain defaults (5MB / 30s / 120s) live in WEBFETCH_DEFAULTS so the documented and applied
@@ -121,7 +121,13 @@ export const WebFetchTool = Tool.define(
           // Enforce the byte cap while streaming. arrayBuffer() would buffer the
           // entire body first, which is unbounded for chunked responses that
           // omit content-length.
-          const bytes = yield* Effect.promise(() => readResponseBytes(response, maxResponseBytes))
+          const bytes = yield* Effect.promise(() =>
+            readBoundedBytes(
+              response,
+              maxResponseBytes,
+              () => `Response too large (exceeds ${maxResponseBytes} byte limit)`,
+            ),
+          )
 
           const contentType = response.headers.get("content-type") || ""
           const mime = contentType.split(";")[0]?.trim().toLowerCase() || ""
@@ -175,55 +181,6 @@ export const WebFetchTool = Tool.define(
     }
   }),
 )
-
-/**
- * Reads a response body incrementally and cancels as soon as the byte cap is
- * exceeded. Chunked responses have no content-length, so checking the header
- * alone is not enough to bound memory usage.
- */
-async function readResponseBytes(response: Response, maxBytes: number): Promise<Uint8Array> {
-  const contentLength = response.headers.get("content-length")
-  if (contentLength) {
-    const declared = parseInt(contentLength, 10)
-    if (Number.isFinite(declared) && declared > maxBytes) {
-      throw new Error(`Response too large (exceeds ${maxBytes} byte limit)`)
-    }
-  }
-
-  const reader = response.body?.getReader()
-  if (!reader) {
-    const bytes = new Uint8Array(await response.arrayBuffer())
-    if (bytes.byteLength > maxBytes) {
-      throw new Error(`Response too large (exceeds ${maxBytes} byte limit)`)
-    }
-    return bytes
-  }
-
-  const chunks: Uint8Array[] = []
-  let total = 0
-  try {
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
-      total += value.byteLength
-      if (total > maxBytes) {
-        await reader.cancel()
-        throw new Error(`Response too large (exceeds ${maxBytes} byte limit)`)
-      }
-      chunks.push(value)
-    }
-  } finally {
-    reader.releaseLock?.()
-  }
-
-  const out = new Uint8Array(total)
-  let offset = 0
-  for (const chunk of chunks) {
-    out.set(chunk, offset)
-    offset += chunk.byteLength
-  }
-  return out
-}
 
 async function extractTextFromHTML(html: string) {
   let text = ""

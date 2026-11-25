@@ -130,6 +130,28 @@ describe("network safety", () => {
       }
     })
 
+    test("rejects oversized content-length before reading the body", async () => {
+      const originalFetch = globalThis.fetch
+      try {
+        globalThis.fetch = (async () =>
+          new Response(null, {
+            status: 200,
+            headers: { "content-type": "application/json", "content-length": "200" },
+          })) as any
+
+        await expect(
+          safeFetchJson("http://localhost:1234/data", "test", {
+            allowLocalhost: true,
+            maxBytes: 50,
+          }),
+        ).rejects.toThrow(
+          "Response size for test from http://localhost:1234/data (200 bytes) exceeds maximum allowed size of 50 bytes",
+        )
+      } finally {
+        globalThis.fetch = originalFetch
+      }
+    })
+
     test("parses JSON within size limit", async () => {
       const originalFetch = globalThis.fetch
       try {
