@@ -64,7 +64,9 @@ export const WebFetchTool = Tool.define(
           let acceptHeader = "*/*"
           switch (params.format) {
             case "markdown":
-              acceptHeader = "text/markdown;q=1.0, text/x-markdown;q=0.9, text/plain;q=0.8, text/html;q=0.7, */*;q=0.1"
+              // Prefer HTML: sites that honor text/markdown may serve raw MDX,
+              // which bypasses convertHTMLToMarkdown below and leaks JSX to the model.
+              acceptHeader = "text/html;q=1.0, text/markdown;q=0.9, text/plain;q=0.8, */*;q=0.1"
               break
             case "text":
               acceptHeader = "text/plain;q=1.0, text/markdown;q=0.9, text/html;q=0.8, */*;q=0.1"
@@ -117,6 +119,14 @@ export const WebFetchTool = Tool.define(
                 Effect.timeoutOrElse({ duration: timeout, orElse: () => Effect.die(new Error("Request timed out")) }),
               )
             : first
+
+          if (!response.ok) {
+            // Release the connection instead of leaving an unconsumed error body open.
+            void response.body?.cancel().catch(() => {})
+            throw new Error(
+              `HTTP ${response.status} from ${params.url}${response.statusText ? ` (${response.statusText})` : ""}`,
+            )
+          }
 
           // Enforce the byte cap while streaming. arrayBuffer() would buffer the
           // entire body first, which is unbounded for chunked responses that
