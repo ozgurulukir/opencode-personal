@@ -89,14 +89,19 @@ This repository is a Bun workspace monorepo. Common commands from the repository
 
 ## Repository layout
 
-| Package             | Contents                                                              |
-| ------------------- | --------------------------------------------------------------------- |
-| `packages/opencode` | CLI, terminal interface, server, tools, providers, and agent runtime. |
-| `packages/app`      | Browser application.                                                  |
-| `packages/ui`       | Shared interface components.                                          |
-| `packages/core`     | Shared runtime utilities and primitives.                              |
-| `packages/sdk/js`   | JavaScript/TypeScript SDK.                                            |
-| `packages/web`      | English and Turkish documentation site.                               |
+| Package               | Contents                                                              |
+| --------------------- | --------------------------------------------------------------------- |
+| `packages/opencode`   | CLI, terminal interface, server, tools, providers, and agent runtime. |
+| `packages/app`        | Browser application.                                                  |
+| `packages/ui`         | Shared interface components.                                          |
+| `packages/core`       | Shared runtime utilities and primitives.                              |
+| `packages/sdk/js`     | JavaScript/TypeScript SDK.                                            |
+| `packages/web`        | English and Turkish documentation site.                               |
+| `packages/containers` | Prebuilt CI container images for Linux jobs.                          |
+| `packages/diff-wasm`  | Rust/WASM diff engine used for patch rendering.                       |
+| `packages/plugin`     | Plugin authoring SDK and types.                                       |
+| `packages/script`     | Shared release and versioning scripts.                                |
+| `packages/storybook`  | Storybook configuration for the shared UI components.                 |
 
 ## License
 
