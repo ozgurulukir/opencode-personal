@@ -479,6 +479,42 @@ describe("webfetch HTTP status handling", () => {
       },
     })
   })
+
+  test("omits the status text parenthetical when the server sends none", async () => {
+    await WithInstance.provide({
+      directory: projectRoot,
+      fn: async () => {
+        const originalFetch = globalThis.fetch
+        ;(globalThis as any).fetch = async () =>
+          new Response("bad gateway", { status: 502, headers: { "content-type": "text/plain" } })
+        try {
+          await expect(exec({ url: "http://localhost/bad-gateway", format: "text" })).rejects.toThrow(
+            "HTTP 502 from http://localhost/bad-gateway",
+          )
+        } finally {
+          ;(globalThis as any).fetch = originalFetch
+        }
+      },
+    })
+  })
+
+  test("redacts URL credentials and query strings in error messages", async () => {
+    await WithInstance.provide({
+      directory: projectRoot,
+      fn: async () => {
+        const originalFetch = globalThis.fetch
+        ;(globalThis as any).fetch = async () =>
+          new Response("no", { status: 404, statusText: "Not Found", headers: { "content-type": "text/plain" } })
+        try {
+          await expect(
+            exec({ url: "http://user:secret@localhost/missing?token=abc123", format: "text" }),
+          ).rejects.toThrow("HTTP 404 from http://localhost/missing (Not Found)")
+        } finally {
+          ;(globalThis as any).fetch = originalFetch
+        }
+      },
+    })
+  })
 })
 
 describe("webfetch Accept negotiation", () => {
@@ -497,8 +533,15 @@ describe("webfetch Accept negotiation", () => {
         }
         try {
           const result = await exec({ url: "http://localhost/page", format: "markdown" })
-          expect(accept.startsWith("text/html;q=1.0")).toBe(true)
-          expect(accept).toContain("text/markdown;q=0.9")
+          const qvalues = Object.fromEntries(
+            accept.split(",").map((part) => {
+              const [type, ...params] = part.trim().split(";")
+              const q = params.find((value) => value.trim().startsWith("q="))
+              return [type.trim(), q ? Number(q.trim().slice(2)) : 1]
+            }),
+          )
+          expect(qvalues["text/html"]).toBeGreaterThan(qvalues["text/markdown"])
+          expect(qvalues["text/markdown"]).toBeDefined()
           expect(result.output).toBe("# Hello\n\nWorld")
         } finally {
           ;(globalThis as any).fetch = originalFetch
@@ -517,6 +560,46 @@ describe("webfetch Accept negotiation", () => {
         try {
           const result = await exec({ url: "http://localhost/doc.md", format: "markdown" })
           expect(result.output).toBe("# Raw markdown")
+        } finally {
+          ;(globalThis as any).fetch = originalFetch
+        }
+      },
+    })
+  })
+
+  test("converts XHTML responses to markdown", async () => {
+    await WithInstance.provide({
+      directory: projectRoot,
+      fn: async () => {
+        const originalFetch = globalThis.fetch
+        ;(globalThis as any).fetch = async () =>
+          new Response("<h1>XHTML</h1><p>Body</p>", {
+            status: 200,
+            headers: { "content-type": "application/xhtml+xml" },
+          })
+        try {
+          const result = await exec({ url: "http://localhost/page.xhtml", format: "markdown" })
+          expect(result.output).toBe("# XHTML\n\nBody")
+        } finally {
+          ;(globalThis as any).fetch = originalFetch
+        }
+      },
+    })
+  })
+
+  test("converts mixed-case text/html responses to markdown", async () => {
+    await WithInstance.provide({
+      directory: projectRoot,
+      fn: async () => {
+        const originalFetch = globalThis.fetch
+        ;(globalThis as any).fetch = async () =>
+          new Response("<h1>Mixed</h1><p>Case</p>", {
+            status: 200,
+            headers: { "content-type": "TEXT/HTML; charset=utf-8" },
+          })
+        try {
+          const result = await exec({ url: "http://localhost/page", format: "markdown" })
+          expect(result.output).toBe("# Mixed\n\nCase")
         } finally {
           ;(globalThis as any).fetch = originalFetch
         }

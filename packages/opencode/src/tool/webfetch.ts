@@ -66,7 +66,7 @@ export const WebFetchTool = Tool.define(
             case "markdown":
               // Prefer HTML: sites that honor text/markdown may serve raw MDX,
               // which bypasses convertHTMLToMarkdown below and leaks JSX to the model.
-              acceptHeader = "text/html;q=1.0, text/markdown;q=0.9, text/plain;q=0.8, */*;q=0.1"
+              acceptHeader = "text/html;q=1.0, text/markdown;q=0.9, text/x-markdown;q=0.8, text/plain;q=0.7, */*;q=0.1"
               break
             case "text":
               acceptHeader = "text/plain;q=1.0, text/markdown;q=0.9, text/html;q=0.8, */*;q=0.1"
@@ -124,7 +124,7 @@ export const WebFetchTool = Tool.define(
             // Release the connection instead of leaving an unconsumed error body open.
             void response.body?.cancel().catch(() => {})
             throw new Error(
-              `HTTP ${response.status} from ${params.url}${response.statusText ? ` (${response.statusText})` : ""}`,
+              `HTTP ${response.status} from ${redactURL(params.url)}${response.statusText ? ` (${sanitizeStatusText(response.statusText)})` : ""}`,
             )
           }
 
@@ -164,7 +164,7 @@ export const WebFetchTool = Tool.define(
           // Handle content based on requested format and actual content type
           switch (params.format) {
             case "markdown":
-              if (contentType.includes("text/html")) {
+              if (isHTMLMime(mime)) {
                 const markdown = convertHTMLToMarkdown(content)
                 return {
                   output: markdown,
@@ -175,7 +175,7 @@ export const WebFetchTool = Tool.define(
               return { output: content, title, metadata: {} }
 
             case "text":
-              if (contentType.includes("text/html")) {
+              if (isHTMLMime(mime)) {
                 const text = yield* Effect.promise(() => extractTextFromHTML(content))
                 return { output: text, title, metadata: {} }
               }
@@ -234,6 +234,32 @@ function convertHTMLToMarkdown(html: string): string {
   })
   turndownService.remove(["script", "style", "meta", "link"])
   return turndownService.turndown(html)
+}
+
+// Header values are case-insensitive and HTML can be served as XHTML; both must
+// take the HTML conversion path or raw markup reaches model context.
+function isHTMLMime(mime: string) {
+  return mime === "text/html" || mime === "application/xhtml+xml"
+}
+
+// Error messages are logged and surfaced to the model, so strip credentials and
+// query/hash payloads that may carry tokens before interpolating the URL.
+function redactURL(raw: string) {
+  try {
+    const url = new URL(raw)
+    url.username = ""
+    url.password = ""
+    url.search = ""
+    url.hash = ""
+    return url.toString()
+  } catch {
+    return raw
+  }
+}
+
+// statusText is server-controlled; keep it on one line and bounded in error output.
+function sanitizeStatusText(text: string) {
+  return text.replace(/[\r\n]+/g, " ").slice(0, 200)
 }
 
 function decodeBody(bytes: Uint8Array, contentType: string): string {
