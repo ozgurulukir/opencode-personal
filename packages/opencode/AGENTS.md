@@ -12,18 +12,18 @@ System prompt uses a **shared core + provider delta** structure:
 - `session/prompt/delta-*.txt` — provider-specific additions only (anthropic, beast, codex, default, deepseek, gemini, glm, gpt, kimi, qwen, trinity)
 - `session/system.ts:provider(model)` returns `[PROMPT_CORE, delta]`; `matchDelta(model)` selects the delta by model API ID
 
-**Assembly flow** (`session/llm.ts:118-185`):
+**Assembly flow** (`session/llm.ts:130-199`):
 
-1. `prefix` = core + delta (cacheable, stable across turns for same model; resolved at `llm.ts:123` from `agent.prompt ?? SystemPrompt.provider(model).prefix`)
-2. `suffix` = environment + skills + structured-output hint + user system (dynamic, session-specific; built in `run-loop.ts:310-321`)
-3. Plugin transform hook may mutate `{system}`; an emptied prefix is restored and a mutated prefix is warned (`llm.ts:133-140`)
+1. `prefix` = core + delta (cacheable, stable across turns for same model; resolved at `llm.ts:135` from `agent.prompt ?? SystemPrompt.provider(model).prefix`)
+2. `suffix` = environment + skills + structured-output hint + user system (dynamic, session-specific; built in `run-loop.ts:315-321`)
+3. Plugin transform hook may mutate `{system}`; an emptied prefix is restored and a mutated prefix is warned (`llm.ts:140-152`)
 
 **Known limitations (documented, not bugs to fix here):**
 
 - For `{type:"instructions"}` providers (OpenAI OAuth), `LLM.run` joins prefix+suffix into a single `options.instructions` string (and `workflowModel.systemPrompt` for DWS workflow models), so the cacheable prefix boundary is lost on those paths.
-- `input.agent.prompt` (`llm.ts:123`) overrides the core+delta prefix entirely — it bypasses provider delta tuning and the cacheable prefix.
+- `input.agent.prompt` (`llm.ts:135`) overrides the core+delta prefix entirely — it bypasses provider delta tuning and the cacheable prefix.
 
-**AGENTS.md injection** (`session/loop/run-loop.ts:303-334`):
+**AGENTS.md injection** (`session/loop/run-loop.ts:302-337`):
 
 - `instruction.system()` resolves project/global AGENTS.md/CLAUDE.md and configured local paths on every `runLoop` iteration; local file contents use an mtime-based cache and configured remote URLs use a 60-second cache
 - Content is wrapped in `<instructions source="path">` tags and prepended as a **user message** (not system prompt)
