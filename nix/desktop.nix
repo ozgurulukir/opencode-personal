@@ -75,7 +75,6 @@ rustPlatform.buildRustPackage (finalAttrs: {
     cp ${opencode}/bin/opencode packages/desktop/src-tauri/sidecars/opencode-cli-${stdenv.hostPlatform.rust.rustcTarget}
   '';
 
-  # see publish-tauri job in .github/workflows/publish.yml
   tauriBuildFlags = [
     "--config"
     "tauri.prod.conf.json"
