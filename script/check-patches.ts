@@ -5,10 +5,23 @@
 // in ways that only surface on a clean box — see root AGENTS.md.
 import fs from "node:fs"
 import path from "path"
+import { parse as parseJsonc } from "jsonc-parser"
 
 const root = path.resolve(import.meta.dir, "..")
 const pkg = await Bun.file(path.join(root, "package.json")).json()
 const declared: string[] = Object.keys(pkg.patchedDependencies ?? {})
+// bun.lock is JSONC (trailing commas), so it cannot be read with .json().
+const lock = parseJsonc(await Bun.file(path.join(root, "bun.lock")).text())
+const active: string[] = Object.keys(lock.patchedDependencies ?? {})
+const inactive = declared.filter((key) => !active.includes(key))
+const missingFromRoot = active.filter((key) => !declared.includes(key))
+
+if (inactive.length > 0 || missingFromRoot.length > 0) {
+  console.error("root package.json patchedDependencies and bun.lock are out of sync:")
+  for (const key of inactive) console.error(`  declared but not active in bun.lock: ${key}`)
+  for (const key of missingFromRoot) console.error(`  active in bun.lock but not declared: ${key}`)
+  process.exit(1)
+}
 // bun escapes "/" in patched dependency keys as %2F in the patches/ filename.
 const expected = declared.map((key) => `${key.replaceAll("/", "%2F")}.patch`).sort()
 const files = fs

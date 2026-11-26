@@ -3,10 +3,16 @@
   "globalEnv": ["CI", "OPENCODE_DISABLE_SHARE"],
   "globalPassThroughEnv": ["CI", "OPENCODE_DISABLE_SHARE"],
   "tasks": {
-    "typecheck": {},
+    "typecheck": {
+      "outputs": ["**/*.tsbuildinfo"]
+    },
     "build": {
       "dependsOn": [],
       "outputs": ["dist/**"]
+    },
+    "@opencode-ai/diff-wasm#build": {
+      "dependsOn": [],
+      "outputs": ["pkg/**"]
     },
     "opencode#test": {
       "dependsOn": ["^build"],

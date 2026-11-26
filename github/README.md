@@ -58,6 +58,8 @@ opencode github install
 
 This will walk you through installing the GitHub app, creating the workflow, and setting up secrets.
 
+When building or modifying this action from source, run `bun install` and all `bun run` commands from the monorepo root, since `catalog:` and `workspace:*` specs in `github/package.json` can only be resolved there.
+
 ### Manual Setup
 
 1. Install the GitHub app https://github.com/apps/opencode-agent. Make sure it is installed on the target repository.
