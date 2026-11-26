@@ -143,7 +143,7 @@
         "@ai-sdk/mistral": "3.0.80",
         "@ai-sdk/openai": "3.0.118",
         "@ai-sdk/openai-compatible": "2.0.78",
-        "@ai-sdk/perplexity": "3.0.63",
+        "@ai-sdk/perplexity": "3.1.13",
         "@ai-sdk/provider": "3.0.19",
         "@ai-sdk/provider-utils": "4.0.67",
         "@ai-sdk/togetherai": "2.0.87",
@@ -519,7 +519,7 @@
 
     "@ai-sdk/openai-compatible": ["@ai-sdk/openai-compatible@2.0.78", "", { "dependencies": { "@ai-sdk/provider": "3.0.17", "@ai-sdk/provider-utils": "4.0.54" }, "peerDependencies": { "zod": "^3.25.76 || ^4.1.8" } }, "sha512-fNkZ1NSxFYMGkM+AOpaNA/WMh1lRWKtNDwenRaqdw7PD5YB08Ttzy1v/0MyNCZPlvneipPEewPeFESH6Uhk9Yw=="],
 
-    "@ai-sdk/perplexity": ["@ai-sdk/perplexity@3.0.63", "", { "dependencies": { "@ai-sdk/provider": "3.0.17", "@ai-sdk/provider-utils": "4.0.54" }, "peerDependencies": { "zod": "^3.25.76 || ^4.1.8" } }, "sha512-axy5LZA2rUPn1r2WtCw4c4EABajcwxTUMVZZVDrGd/ujDMDtFQ73vRAWIVHnTH9eECM8jcTnc6qjvVA2PFTs+Q=="],
+    "@ai-sdk/perplexity": ["@ai-sdk/perplexity@3.1.13", "", { "dependencies": { "@ai-sdk/provider": "3.0.19", "@ai-sdk/provider-utils": "4.0.67" }, "peerDependencies": { "zod": "^3.25.76 || ^4.1.8" } }, "sha512-1zNKmMOP2M5C4Wi4dclJZf9Nck6S07CqQPI1znLX9KofbMwKp1a0GL4UUb6O9UQxzgEu0CmuZrBCPtGtMkfnOQ=="],
 
     "@ai-sdk/provider": ["@ai-sdk/provider@3.0.19", "", { "dependencies": { "json-schema": "^0.4.0" } }, "sha512-5lWq7zSfRaU5ylDESn3sDQjgGl2AI1vjZKO/6JY3aFW70ct4zcP1kN+ZUYOuTXr28fVsYbyu2YFhddLdIgQFZQ=="],
 
@@ -3639,10 +3639,6 @@
 
     "@ai-sdk/openai-compatible/@ai-sdk/provider-utils": ["@ai-sdk/provider-utils@4.0.54", "", { "dependencies": { "@ai-sdk/provider": "3.0.17", "@standard-schema/spec": "^1.1.0", "eventsource-parser": "^3.0.8", "undici": "^6.28.0" }, "peerDependencies": { "zod": "^3.25.76 || ^4.1.8" } }, "sha512-piCQO5dnTqW7QSUbMsKg8oNI+u5VtgLnVFkgG6LfckrOyHcHFrIssBVJDg3/CXOdWXIFhVjIr540rzZAdom2TA=="],
 
-    "@ai-sdk/perplexity/@ai-sdk/provider": ["@ai-sdk/provider@3.0.17", "", { "dependencies": { "json-schema": "^0.4.0" } }, "sha512-ijb+g+XxIAmv46hpt73ty83LhQHwwsqA1IwVX6p1MAREyX0zGM9eIrz1m3KlFxTHr8E4k/ao01w6Dlx3UBOihQ=="],
-
-    "@ai-sdk/perplexity/@ai-sdk/provider-utils": ["@ai-sdk/provider-utils@4.0.54", "", { "dependencies": { "@ai-sdk/provider": "3.0.17", "@standard-schema/spec": "^1.1.0", "eventsource-parser": "^3.0.8", "undici": "^6.28.0" }, "peerDependencies": { "zod": "^3.25.76 || ^4.1.8" } }, "sha512-piCQO5dnTqW7QSUbMsKg8oNI+u5VtgLnVFkgG6LfckrOyHcHFrIssBVJDg3/CXOdWXIFhVjIr540rzZAdom2TA=="],
-
     "@ai-sdk/provider-utils/undici": ["undici@6.28.0", "", {}, "sha512-LIY910g9TI13YS95lrMFrs8Rm/u/irgHeTWoKCoteeJ04CUJ92eEfj0rVn+7VKMPBpUPiUoBKfhNyLI23EE/KA=="],
 
     "@ai-sdk/togetherai/@ai-sdk/openai-compatible": ["@ai-sdk/openai-compatible@2.0.81", "", { "dependencies": { "@ai-sdk/provider": "3.0.18", "@ai-sdk/provider-utils": "4.0.57" }, "peerDependencies": { "zod": "^3.25.76 || ^4.1.8" } }, "sha512-L14Jd0lAFKNM42l9TxlpwkNiyMlSvSvGySLc9GN4FB0qOo4/WmYOeLyn/CPhghIr0K4O6vH1y0nChxGljq2ccg=="],
@@ -4198,8 +4194,6 @@
     "@ai-sdk/openai-compatible/@ai-sdk/provider-utils/undici": ["undici@6.28.0", "", {}, "sha512-LIY910g9TI13YS95lrMFrs8Rm/u/irgHeTWoKCoteeJ04CUJ92eEfj0rVn+7VKMPBpUPiUoBKfhNyLI23EE/KA=="],
 
     "@ai-sdk/openai/@ai-sdk/provider-utils/undici": ["undici@6.28.0", "", {}, "sha512-LIY910g9TI13YS95lrMFrs8Rm/u/irgHeTWoKCoteeJ04CUJ92eEfj0rVn+7VKMPBpUPiUoBKfhNyLI23EE/KA=="],
-
-    "@ai-sdk/perplexity/@ai-sdk/provider-utils/undici": ["undici@6.28.0", "", {}, "sha512-LIY910g9TI13YS95lrMFrs8Rm/u/irgHeTWoKCoteeJ04CUJ92eEfj0rVn+7VKMPBpUPiUoBKfhNyLI23EE/KA=="],
 
     "@ai-sdk/togetherai/@ai-sdk/provider-utils/undici": ["undici@6.28.0", "", {}, "sha512-LIY910g9TI13YS95lrMFrs8Rm/u/irgHeTWoKCoteeJ04CUJ92eEfj0rVn+7VKMPBpUPiUoBKfhNyLI23EE/KA=="],
 
