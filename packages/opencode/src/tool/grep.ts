@@ -74,14 +74,33 @@ export const GrepTool = Tool.define(
             kind: info.type === "Directory" ? "directory" : "file",
           })
 
-          const result = yield* rg.search({
-            cwd,
-            pattern: params.pattern,
-            glob: params.include ? [params.include] : undefined,
-            file,
-            signal: ctx.abort,
-          })
-          if (result.items.length === 0) {
+          // Bounded collection: the detail side stops at MATCH_LIMIT rows
+          // (per-file --max-count + total stream cap + early process
+          // termination) while the separate --count pass reports the
+          // true matched-line total, preserving the "Found N matches (showing first M)" /
+          // "X hidden" contract without accumulating every match object.
+          const [result, total] = yield* Effect.all(
+            [
+              rg.search({
+                cwd,
+                pattern: params.pattern,
+                glob: params.include ? [params.include] : undefined,
+                file,
+                cap: MATCH_LIMIT,
+                limit: MATCH_LIMIT,
+                signal: ctx.abort,
+              }),
+              rg.count({
+                cwd,
+                pattern: params.pattern,
+                glob: params.include ? [params.include] : undefined,
+                file,
+                signal: ctx.abort,
+              }),
+            ],
+            { concurrency: "unbounded" },
+          )
+          if (result.items.length === 0 && total === 0) {
             return { title: params.pattern, metadata: { matches: 0, truncated: false }, output: "No files found" }
           }
 
@@ -120,14 +139,16 @@ export const GrepTool = Tool.define(
 
           matches.sort((a, b) => b.mtime - a.mtime)
 
-          const truncated = matches.length > MATCH_LIMIT
+          // `total` is the true matched-line count from the --count pass; the
+          // collected detail rows are capped, so "hidden" is what the cap
+          // dropped, not a fixed MATCH_LIMIT delta.
+          const truncated = total > matches.length
           const final = truncated ? matches.slice(0, MATCH_LIMIT) : matches
           if (final.length === 0) {
             return { title: params.pattern, metadata: { matches: 0, truncated: false }, output: "No files found" }
           }
 
-          const total = matches.length
-          const output = [`Found ${total} matches${truncated ? ` (showing first ${MATCH_LIMIT})` : ""}`]
+          const output = [`Found ${total} matches${truncated ? ` (showing first ${matches.length})` : ""}`]
 
           let current = ""
           for (const match of final) {
@@ -144,7 +165,7 @@ export const GrepTool = Tool.define(
           if (truncated) {
             output.push("")
             output.push(
-              `(Results truncated: showing ${MATCH_LIMIT} of ${total} matches (${total - MATCH_LIMIT} hidden). Consider using a more specific path or pattern.)`,
+              `(Results truncated: showing ${matches.length} of ${total} matches (${total - matches.length} hidden). Consider using a more specific path or pattern.)`,
             )
           }
 

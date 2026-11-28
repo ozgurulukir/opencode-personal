@@ -11,6 +11,7 @@ import { CrossSpawnSpawner } from "@opencode-ai/core/cross-spawn-spawner"
 import { Global } from "@opencode-ai/core/global"
 import * as Log from "@opencode-ai/core/util/log"
 import { sanitizedProcessEnv } from "@opencode-ai/core/util/opencode-process"
+import { readBoundedResponseBytes } from "@/util/network"
 import { which } from "@/util/which"
 import { zod } from "@opencode-ai/core/effect-zod"
 import { NonNegativeInt, withStatics } from "@opencode-ai/core/schema"
@@ -172,6 +173,11 @@ export interface SearchInput {
   cwd: string
   pattern: string
   glob?: string[]
+  // Bounds the collected detail: at most `cap` match rows are accumulated
+  // (per-file --max-count via `limit`, total stream cap, early process
+  // termination). The grep tool pairs this with a separate --count-matches
+  // pass so the reported total stays truthful.
+  cap?: number
   limit?: number
   follow?: boolean
   file?: string[]
@@ -188,6 +194,7 @@ export interface Interface {
   readonly files: (input: FilesInput) => Stream.Stream<string, PlatformError | Error>
   readonly tree: (input: TreeInput) => Effect.Effect<string, PlatformError | Error>
   readonly search: (input: SearchInput) => Effect.Effect<SearchResult, PlatformError | Error>
+  readonly count: (input: SearchInput) => Effect.Effect<number, PlatformError | Error>
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/Ripgrep") {}
@@ -264,6 +271,22 @@ function searchArgs(input: SearchInput) {
     for (const glob of input.glob) args.push(`--glob=${glob}`)
   }
   if (input.limit) args.push(`--max-count=${input.limit}`)
+  args.push("--", input.pattern, ...(input.file ?? ["."]))
+  return args
+}
+
+// Per-file matched-line counts for the true total; no --json, plain
+// "<path>:<count>" lines. --count (matched lines) rather than
+// --count-matches (individual occurrences): the JSON detail side emits one
+// match event per matched line, so the total must count the same unit or
+// "showing first N / hidden" misreports whenever a pattern matches more
+// than once per line.
+function countArgs(input: SearchInput) {
+  const args = ["--no-config", "--count", "--hidden", "--glob=!.git/*", "--no-messages"]
+  if (input.follow) args.push("--follow")
+  if (input.glob) {
+    for (const glob of input.glob) args.push(`--glob=${glob}`)
+  }
   args.push("--", input.pattern, ...(input.file ?? ["."]))
   return args
 }
@@ -357,16 +380,23 @@ export const layer: Layer.Layer<Service, never, AppFileSystem.Service | ChildPro
           log.info("downloading ripgrep", { url })
           yield* fs.ensureDir(Global.Path.bin).pipe(Effect.orDie)
 
+          // Read the body in bounded fashion: fail as soon as the cap is
+          // crossed instead of buffering the entire response first (the
+          // module's stated threat model includes a hostile HTTPS_PROXY, and
+          // chunked responses have no reliable content-length).
           const bytes = yield* HttpClientRequest.get(url).pipe(
             http.execute,
-            Effect.flatMap((response) => response.arrayBuffer),
+            Effect.flatMap((response) =>
+              readBoundedResponseBytes(response, MAX_ARCHIVE_BYTES, (size) =>
+                size === undefined
+                  ? `ripgrep download too large from ${url}`
+                  : `ripgrep download too large (${size} bytes) from ${url}`,
+              ),
+            ),
             Effect.mapError((cause) => (cause instanceof Error ? cause : new Error(String(cause)))),
           )
           if (bytes.byteLength === 0) {
             return yield* Effect.fail(new Error(`failed to download ripgrep from ${url}`))
-          }
-          if (bytes.byteLength > MAX_ARCHIVE_BYTES) {
-            return yield* Effect.fail(new Error(`ripgrep download too large (${bytes.byteLength} bytes) from ${url}`))
           }
           // Verify before extraction: never execute a binary from an archive
           // whose checksum is unpinned or does not match.
@@ -442,22 +472,43 @@ export const layer: Layer.Layer<Service, never, AppFileSystem.Service | ChildPro
           Effect.gen(function* () {
             const handle = yield* spawner.spawn(yield* command(input.cwd, searchArgs(input)))
 
-            const [items, stderr, code] = yield* Effect.all(
+            // The detail side can stop at `cap`: per-file --max-count bounds
+            // each file's contribution and Stream.take stops collection. The
+            // process is then still scanning a hot pattern, so it is
+            // terminated instead of being waited on — the grep tool pairs
+            // this pass with --count-matches for the true total.
+            const cap = input.cap
+            const rowStream = Stream.decodeText(handle.stdout).pipe(
+              Stream.splitLines,
+              Stream.filter((line) => line.length > 0),
+              Stream.mapEffect(parse),
+              Stream.filter((item): item is Match => item.type === "match"),
+              Stream.map((item) => row(item.data)),
+            )
+            const [items, stderr] = yield* Effect.all(
               [
-                Stream.decodeText(handle.stdout).pipe(
-                  Stream.splitLines,
-                  Stream.filter((line) => line.length > 0),
-                  Stream.mapEffect(parse),
-                  Stream.filter((item): item is Match => item.type === "match"),
-                  Stream.map((item) => row(item.data)),
+                (cap !== undefined ? rowStream.pipe(Stream.take(cap)) : rowStream).pipe(
                   Stream.runCollect,
                   Effect.map((chunk) => [...chunk]),
                 ),
                 Stream.mkString(Stream.decodeText(handle.stderr)),
-                handle.exitCode,
               ],
               { concurrency: "unbounded" },
             )
+
+            if (cap !== undefined && items.length >= cap) {
+              // The stream stopped at the cap while rg may still be scanning
+              // and blocked writing into a full stdout pipe. Kill it BEFORE
+              // awaiting exit: waiting first would deadlock on a blocked rg,
+              // and a killed process's exit surfaces as a signal-death
+              // PlatformError, not a classifiable exit code. Truncation is a
+              // normal outcome, not a partial failure.
+              yield* handle.kill().pipe(Effect.ignore)
+              yield* handle.exitCode.pipe(Effect.orElseSucceed(() => 0))
+              return { items, partial: false }
+            }
+
+            const code = yield* handle.exitCode
 
             if (code !== 0 && code !== 1 && code !== 2) {
               return yield* Effect.fail(error(stderr, code))
@@ -476,6 +527,50 @@ export const layer: Layer.Layer<Service, never, AppFileSystem.Service | ChildPro
         )
 
         return yield* raceAbort(program, input.signal)
+      })
+
+      const count: Interface["count"] = Effect.fn("Ripgrep.count")(function* (input: SearchInput) {
+        yield* check(input.cwd)
+
+        return yield* Effect.scoped(
+          Effect.gen(function* () {
+            const handle = yield* spawner.spawn(yield* command(input.cwd, countArgs(input)))
+
+            const [lines, stderr, code] = yield* Effect.all(
+              [
+                Stream.decodeText(handle.stdout).pipe(
+                  Stream.splitLines,
+                  Stream.filter((line) => line.length > 0),
+                  Stream.runCollect,
+                  Effect.map((chunk) => [...chunk]),
+                ),
+                Stream.mkString(Stream.decodeText(handle.stderr)),
+                handle.exitCode,
+              ],
+              { concurrency: "unbounded" },
+            )
+
+            if (code !== 0 && code !== 1 && code !== 2) {
+              return yield* Effect.fail(error(stderr, code))
+            }
+
+            const isRegexError = /regex parse error|invalid regex|error parsing regex/i.test(stderr)
+            if (code === 2 && isRegexError) {
+              return yield* Effect.fail(error(stderr, code))
+            }
+
+            // --count prints "<path>:<count>" per matching file (a bare count
+            // when exactly one file is searched); summing gives the true
+            // matched-line total without accumulating per-match objects.
+            let total = 0
+            for (const line of lines) {
+              const sep = line.lastIndexOf(":")
+              const count = sep === -1 ? Number(line) : Number(line.slice(sep + 1))
+              if (Number.isFinite(count)) total += count
+            }
+            return total
+          }),
+        )
       })
 
       const tree: Interface["tree"] = Effect.fn("Ripgrep.tree")(function* (input: TreeInput) {
@@ -533,7 +628,7 @@ export const layer: Layer.Layer<Service, never, AppFileSystem.Service | ChildPro
         return lines.join("\n")
       })
 
-      return Service.of({ files, tree, search })
+      return Service.of({ files, tree, search, count })
     }),
   )
 
