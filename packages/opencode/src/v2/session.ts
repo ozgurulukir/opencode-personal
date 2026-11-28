@@ -1114,9 +1114,15 @@ export const layer = Layer.effect(
      * unanswered user message (`unansweredTail`): a prompt staged mid-turn is
      * folded into the running loop's next step and answered in-context, while
      * a prompt staged after the loop's final message read was never seen by
-     * the loop and must be re-drained. An unconditional rerun would
-     * double-answer — `runLoop` re-processes the latest user message without a
-     * consumption guard.
+     * the loop and must be re-drained. Skipping the loop on an answered tail
+     * avoids a wasted no-op loop spin on finished turns and, more importantly,
+     * keeps an unrelated staging from auto-resuming an unfinished turn
+     * (aborted or step-failed assistants, pending tool flows).
+     *
+     * The lock guards drains only: an immediate-delivery prompt can still run
+     * the engine loop concurrently with a drain (pre-existing — the engine's
+     * ensureRunning joins concurrent loop requests, engine-level
+     * serialization would be a separate change).
      *
      * Delegates to `SessionPromptEngine.loop`; the V1 service is only a
      * compatibility facade.
@@ -1125,6 +1131,9 @@ export const layer = Layer.effect(
     const runDeferred = (sessionID: SessionID): Effect.Effect<void> =>
       drains.withLock(sessionID, Effect.gen(function* () {
         if (!deferredQueue.has(sessionID)) return
+        // Deleting before the loop is deliberate: a failed loop leaves no
+        // entry behind, and recovery rides on the unanswered-tail check at
+        // the next staging (a no-op on an answered conversation).
         deferredQueue.delete(sessionID)
         const engine = yield* requireV1(promptEngine, "SessionPromptEngine")
         if (!unansweredTail(sessionID)) return

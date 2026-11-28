@@ -57,7 +57,9 @@ function stubPromptLayer(opts?: { loopResult?: MessageV2.WithParts; failPrompt?:
   const hang = { armed: false, gates: new Map<SessionID, Deferred.Deferred<void>>() }
   // When armed, `loop` blocks on a per-session gate until the test completes
   // it — lets a test stage a prompt while a deferred drain's loop is running.
-  const loopGate = { armed: false, gates: new Map<SessionID, Deferred.Deferred<void>>() }
+  // `early` holds the gate before the assistant row is projected instead of
+  // after it, flipping which tail the concurrent staging sees.
+  const loopGate = { armed: false, early: false, gates: new Map<SessionID, Deferred.Deferred<void>>() }
   const loopResult = opts?.loopResult ?? {
     info: {
       id: MessageID.ascending(),
@@ -215,20 +217,46 @@ function stubPromptLayer(opts?: { loopResult?: MessageV2.WithParts; failPrompt?:
           Effect.gen(function* () {
             calls.loop.push(input.sessionID)
             // Mirror the real loop: the assistant message answering the turn
-            // is created when the loop starts, so a prompt staged while this
-            // loop runs (after this point) has an id after the assistant's —
-            // the unanswered-tail check then correctly treats it as unanswered
-            // unless a later step answers it.
+            // is projected into SessionMessageTable from the step events when
+            // the loop starts, so a prompt staged after this point has an id
+            // after the assistant's — the drain's unanswered-tail check then
+            // treats it as unanswered. The gate can hold the loop before or
+            // after the assistant row is projected, letting tests stage a
+            // prompt either before (answered tail → no rerun) or after
+            // (unanswered tail → rerun) the answering assistant exists.
+            if (loopGate.armed && loopGate.early) {
+              loopGate.gates.set(input.sessionID, Deferred.makeUnsafe<void>())
+              yield* Deferred.await(loopGate.gates.get(input.sessionID)!)
+            }
+            const created = Date.now()
+            const ts = DateTime.makeUnsafe(created)
             yield* sync.run(MessageV2.Event.Updated, {
               sessionID: input.sessionID,
               info: {
                 ...loopResult.info,
                 id: MessageID.ascending(),
                 sessionID: input.sessionID,
-                time: { created: Date.now() },
+                time: { created },
               },
             })
-            if (loopGate.armed) {
+            yield* sync.run(SessionEvent.Step.Started.Sync, {
+              sessionID: input.sessionID,
+              timestamp: ts,
+              agent: "build",
+              model: {
+                id: Modelv2.ID.make("test-model"),
+                providerID: Modelv2.ProviderID.make("test"),
+                variant: Modelv2.VariantID.make("default"),
+              },
+            })
+            yield* sync.run(SessionEvent.Step.Ended.Sync, {
+              sessionID: input.sessionID,
+              timestamp: ts,
+              finish: "stop",
+              cost: 0,
+              tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+            })
+            if (loopGate.armed && !loopGate.early) {
               loopGate.gates.set(input.sessionID, Deferred.makeUnsafe<void>())
               yield* Deferred.await(loopGate.gates.get(input.sessionID)!)
             }
@@ -1011,7 +1039,7 @@ describe("v2.session", () => {
           let gated = false
           for (let i = 0; i < 100 && !gated; i++) {
             yield* Effect.sleep(10)
-            gated = loopCallsFor() === 1
+            gated = loopCallsFor() === 1 && promptStub.loopGate.gates.has(info.id)
           }
           expect(gated).toBe(true)
 
@@ -1030,6 +1058,9 @@ describe("v2.session", () => {
           Effect.ensuring(
             Effect.sync(() => {
               promptStub.loopGate.armed = false
+              // Complete any gate a queued drain is parked on so the fiber
+              // finishes instead of hanging until layer teardown.
+              for (const pending of promptStub.loopGate.gates.values()) Deferred.doneUnsafe(pending, Exit.void)
               promptStub.loopGate.gates.clear()
             }),
           ),
@@ -1038,6 +1069,53 @@ describe("v2.session", () => {
       // Both turns are answered; nothing re-runs the loop afterwards.
       yield* Effect.sleep(50)
       expect(loopCallsFor()).toBe(2)
+    }),
+  )
+
+  it.instance("a prompt staged mid-turn and answered in-context is not re-drained", () =>
+    Effect.gen(function* () {
+      const session = yield* SessionV2.Service
+      const info = yield* session.create({ agent: "build" })
+      const loopCallsFor = () => promptStub.calls.loop.filter((id) => id === info.id).length
+
+      // Hold the first drain's loop BEFORE its assistant row is projected:
+      // the second prompt stages while gated, so the assistant projected at
+      // release gets an id after the staged message — exactly the in-context
+      // continuation outcome. The queued drain must see an answered tail and
+      // NOT rerun the loop (an unconditional rerun would spin another turn on
+      // an already-addressed conversation).
+      yield*
+        Effect.gen(function* () {
+          promptStub.loopGate.early = true
+          promptStub.loopGate.armed = true
+          yield* session.prompt({ sessionID: info.id, prompt: { text: "first" }, delivery: "deferred" })
+
+          let gated = false
+          for (let i = 0; i < 100 && !gated; i++) {
+            yield* Effect.sleep(10)
+            gated = loopCallsFor() === 1 && promptStub.loopGate.gates.has(info.id)
+          }
+          expect(gated).toBe(true)
+
+          yield* session.prompt({ sessionID: info.id, prompt: { text: "second" }, delivery: "deferred" })
+
+          const gate = promptStub.loopGate.gates.get(info.id)!
+          Deferred.doneUnsafe(gate, Exit.void)
+        }).pipe(
+          Effect.ensuring(
+            Effect.sync(() => {
+              promptStub.loopGate.armed = false
+              promptStub.loopGate.early = false
+              for (const pending of promptStub.loopGate.gates.values()) Deferred.doneUnsafe(pending, Exit.void)
+              promptStub.loopGate.gates.clear()
+            }),
+          ),
+        )
+
+      // Exactly one loop run: the queued drain saw the answered tail and
+      // skipped. Nothing re-runs afterwards either.
+      yield* Effect.sleep(50)
+      expect(loopCallsFor()).toBe(1)
     }),
   )
 
