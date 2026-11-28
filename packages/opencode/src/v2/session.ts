@@ -36,6 +36,7 @@ import { SessionRevert } from "@/session/revert"
 import { Command } from "@/command"
 import * as Log from "@opencode-ai/core/util/log"
 import { EffectBridge } from "@/effect/bridge"
+import { LockRegistry } from "@/tool/lock"
 
 const log = Log.create({ service: "v2.session" })
 
@@ -353,6 +354,18 @@ export const layer = Layer.effect(
         user: decoded.findLast((m): m is SessionMessage.User => m.type === "user"),
         assistant: decoded.findLast((m): m is SessionMessage.Assistant => m.type === "assistant"),
       }
+    }
+
+    // A deferred-staged user message is answered by a running loop only if it
+    // was persisted before that loop's final message read: the loop folds
+    // mid-turn user messages into the next step (wrapMessageContinuation) and
+    // the assistant message answering them gets an id after theirs. A prompt
+    // staged after that read leaves the conversation ending with the staged
+    // user message — nothing answers it. MessageID is monotonic, so an id
+    // comparison against the latest assistant message is the discriminator.
+    const unansweredTail = (sessionID: SessionID) => {
+      const { user, assistant } = latestMessages(sessionID)
+      return !!user && (!assistant || user.id > assistant.id)
     }
 
     function fromRows(rows: (typeof SessionTable.$inferSelect)[]): Info[] {
@@ -683,9 +696,12 @@ export const layer = Layer.effect(
           // so the run survives request completion (the promptAsync HTTP
           // handler relies on this). Forked AFTER the read-back so the
           // response is deterministic — the drain cannot interleave before
-          // the caller's result is built. The queue guard makes concurrent
-          // drains idempotent; a message staged while the loop is busy is
-          // consumed by the running loop's continuation check.
+          // the caller's result is built. Concurrent drains for one session
+          // serialize on a per-session semaphore and re-check the unanswered
+          // tail after the running drain finishes: a prompt staged mid-turn
+          // is answered in-context by the running loop's continuation wrap,
+          // while a prompt staged after the loop's final message read was
+          // never seen by that loop and gets re-drained here.
           yield* runDeferred(input.sessionID).pipe(
             Effect.catchCause((cause) =>
               Effect.logError("deferred prompt drain failed", { sessionID: input.sessionID, cause }),
@@ -1089,19 +1105,31 @@ export const layer = Layer.effect(
     /**
      * Drain deferred-delivery prompts for a session by running the shared loop.
      * Exposed via an extended service so tests/callers can trigger deferred
-     * processing. The layer-scoped worker invokes this after deferred staging.
+     * processing. Each deferred staging forks its own drain; concurrent drains
+     * for one session serialize on a per-session semaphore instead of
+     * early-returning, so a prompt staged while a drain is running always gets
+     * a re-check after that drain finishes.
+     *
+     * The drain only runs the loop when the conversation ends with an
+     * unanswered user message (`unansweredTail`): a prompt staged mid-turn is
+     * folded into the running loop's next step and answered in-context, while
+     * a prompt staged after the loop's final message read was never seen by
+     * the loop and must be re-drained. An unconditional rerun would
+     * double-answer — `runLoop` re-processes the latest user message without a
+     * consumption guard.
+     *
      * Delegates to `SessionPromptEngine.loop`; the V1 service is only a
      * compatibility facade.
      */
-    const drainingDeferred = new Set<SessionID>()
+    const drains = new LockRegistry()
     const runDeferred = (sessionID: SessionID): Effect.Effect<void> =>
-      Effect.gen(function* () {
-        if (!deferredQueue.has(sessionID) || drainingDeferred.has(sessionID)) return
-        drainingDeferred.add(sessionID)
-        const engine = yield* requireV1(promptEngine, "SessionPromptEngine")
-        yield* engine.loop({ sessionID })
+      drains.withLock(sessionID, Effect.gen(function* () {
+        if (!deferredQueue.has(sessionID)) return
         deferredQueue.delete(sessionID)
-      }).pipe(Effect.ensuring(Effect.sync(() => drainingDeferred.delete(sessionID))))
+        const engine = yield* requireV1(promptEngine, "SessionPromptEngine")
+        if (!unansweredTail(sessionID)) return
+        yield* engine.loop({ sessionID })
+      }))
 
     return Service.of(Object.assign(result, { runDeferred }))
   }),
