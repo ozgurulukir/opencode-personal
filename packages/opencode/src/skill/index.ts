@@ -262,7 +262,6 @@ const add = Effect.fnUntraced(function* (state: State, match: string, bus: Bus.I
     allowedTools: parsed.success ? parsed.data["allowed-tools"] : undefined,
     warnings: warnings.length > 0 ? warnings : undefined,
   }
-  yield* bus.publish(Event.Loaded, { name: skillName, location: match })
 })
 
 const scan = Effect.fnUntraced(function* (
@@ -356,10 +355,18 @@ const discoverSkills = Effect.fnUntraced(function* (
 })
 
 const loadSkills = Effect.fnUntraced(function* (state: State, discovered: DiscoveryState, bus: Bus.Interface) {
-  yield* Effect.forEach(discovered.matches, (match) => add(state, match, bus), {
-    concurrency: "unbounded",
-    discard: true,
-  })
+  // Sequential registration in scan order: the last scanned copy of a name
+  // wins deterministically (project/config roots scan after global ones, so
+  // the encoded project-over-global precedence holds). Concurrent registration
+  // made the survivor depend on parse-completion timing, and every copy
+  // published its own loaded event.
+  yield* Effect.forEach(discovered.matches, (match) => add(state, match, bus), { discard: true })
+
+  // One loaded event per surviving skill, not per discovered copy.
+  for (const skill of Object.values(state.skills)) {
+    if (skill.location === "<built-in>") continue
+    yield* bus.publish(Event.Loaded, { name: skill.name, location: skill.location })
+  }
 
   log.info("init", { count: Object.keys(state.skills).length })
 })
