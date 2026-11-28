@@ -259,11 +259,19 @@ export const __exportTestFetchFn = (options: any, model: any, customFetch: any, 
         // Deliberately throw so the catch block falls through to unmodified pass-through
         if (!body || typeof body !== "object") throw new Error("Body is not an object")
       } catch {
-        // Malformed JSON — pass through unmodified. cleanup() first: the
-        // early return bypasses the try/finally below, which would leak the
-        // AbortSignal listeners attached by combineSignals.
-        cleanup()
-        return fetchFn(input, { ...opts, timeout: false })
+        // Malformed JSON — pass through unmodified. The combined signal must
+        // stay live for the passthrough fetch: cleanup() here would detach
+        // the user abort and the HTTP timeout before the request even starts,
+        // leaving it uncancelable (`timeout: false` below). Defer cleanup
+        // until the body settles, mirroring the happy path.
+        let res: Response
+        try {
+          res = await fetchFn(input, { ...opts, timeout: false })
+        } catch (err) {
+          cleanup()
+          throw err
+        }
+        return withCleanupOnBodyDone(res, cleanup)
       }
       const keepIds = body.store === true
       if (!keepIds && Array.isArray(body.input)) {
@@ -1099,6 +1107,10 @@ export function toPublicInfo(provider: Info): Info {
   if (safe.models) {
     for (const model of Object.values(safe.models)) {
       if (model.options && typeof model.options === "object") redactSecretOptions(model.options as Record<string, any>)
+      // Model-level headers are outbound-only plumbing (merged into request
+      // init); they must not leak auth material through the public projection
+      // any more than provider-level options.headers do.
+      if (model.headers && typeof model.headers === "object") redactSecretOptions(model.headers as Record<string, any>)
     }
   }
   return safe

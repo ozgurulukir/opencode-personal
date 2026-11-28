@@ -1,5 +1,5 @@
 import type { UsageAmount, UsageCredential, UsageLimit, UsageProvider, UsageReport, UsageWindow } from "./types"
-import { buildUsageStatus } from "./types"
+import { buildUsageStatus, USAGE_FETCH_TIMEOUT_MS } from "./types"
 
 const CHATGPT_USAGE_URL = "https://chatgpt.com/backend-api/wham/usage"
 
@@ -125,7 +125,10 @@ async function fetchOpenAIUsage(credential: UsageCredential): Promise<UsageRepor
     ...(credential.accountId ? { "ChatGPT-Account-Id": credential.accountId } : {}),
   }
 
-  const response = await fetch(CHATGPT_USAGE_URL, { headers })
+  const response = await fetch(CHATGPT_USAGE_URL, {
+    headers,
+    signal: AbortSignal.timeout(USAGE_FETCH_TIMEOUT_MS),
+  })
   if (!response.ok) return null
   return parseOpenAIUsage(await response.json(), credential)
 }

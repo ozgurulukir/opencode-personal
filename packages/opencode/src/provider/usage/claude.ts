@@ -1,4 +1,5 @@
 import type { UsageProvider, UsageReport, UsageLimit, UsageWindow, UsageCredential } from "./types"
+import { USAGE_FETCH_TIMEOUT_MS } from "./types"
 import { buildUsageAmount, buildUsageStatus } from "./types"
 import * as Log from "@opencode-ai/core/util/log"
 
@@ -78,7 +79,10 @@ async function fetchClaudeUsage(credential: UsageCredential): Promise<UsageRepor
     authorization: `Bearer ${credential.accessToken}`,
   }
 
-  const response = await fetch(ANTHROPIC_USAGE_URL, { headers })
+  const response = await fetch(ANTHROPIC_USAGE_URL, {
+    headers,
+    signal: AbortSignal.timeout(USAGE_FETCH_TIMEOUT_MS),
+  })
   if (!response.ok) return null
 
   const payload = (await response.json()) as ClaudeUsageResponse
@@ -130,7 +134,10 @@ async function fetchClaudeUsage(credential: UsageCredential): Promise<UsageRepor
   let email = credential.email
   if (!accountId || !email) {
     try {
-      const profileResp = await fetch(ANTHROPIC_PROFILE_URL, { headers })
+      const profileResp = await fetch(ANTHROPIC_PROFILE_URL, {
+        headers,
+        signal: AbortSignal.timeout(USAGE_FETCH_TIMEOUT_MS),
+      })
       if (profileResp.ok) {
         const profile = (await profileResp.json()) as {
           uuid?: string

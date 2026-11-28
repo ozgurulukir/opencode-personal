@@ -1,4 +1,5 @@
 import type { UsageProvider, UsageReport, UsageLimit, UsageWindow, UsageCredential } from "./types"
+import { USAGE_FETCH_TIMEOUT_MS } from "./types"
 import { buildUsageAmount, buildUsageStatus } from "./types"
 import * as Log from "@opencode-ai/core/util/log"
 
@@ -64,7 +65,10 @@ async function fetchZaiUsage(credential: UsageCredential): Promise<UsageReport |
 
   let payload: ZaiQuotaResponse | null = null
   try {
-    const resp = await fetch(`${ZAI_BASE_URL}${QUOTA_PATH}`, { headers })
+    const resp = await fetch(`${ZAI_BASE_URL}${QUOTA_PATH}`, {
+      headers,
+      signal: AbortSignal.timeout(USAGE_FETCH_TIMEOUT_MS),
+    })
     if (!resp.ok) return null
     payload = (await resp.json()) as ZaiQuotaResponse
   } catch {
@@ -138,7 +142,10 @@ async function fetchZaiUsage(credential: UsageCredential): Promise<UsageReport |
   const start = new Date(now.getTime() - SEVEN_DAYS_MS)
   const modelUrl = `${ZAI_BASE_URL}${MODEL_USAGE_PATH}?startTime=${encodeURIComponent(formatDate(start))}&endTime=${encodeURIComponent(formatDate(now))}`
   try {
-    const resp = await fetch(modelUrl, { headers })
+    const resp = await fetch(modelUrl, {
+      headers,
+      signal: AbortSignal.timeout(USAGE_FETCH_TIMEOUT_MS),
+    })
     if (resp.ok) {
       report.metadata!.modelUsage = await resp.json()
     }
