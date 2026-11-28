@@ -129,8 +129,10 @@ void mock.module("@modelcontextprotocol/sdk/client/index.js", () => ({
     transport: any
     onclose: (() => void) | null = null
     // Rejects for in-flight requests, invoked by the transport close chain —
-    // mirrors the real SDK's Protocol._onclose (reject pending with
-    // ConnectionClosed, clear the transport, then call client.onclose).
+    // mirrors the real SDK's Protocol._onclose (abort in-flight request
+    // handlers, clear the transport, invoke client.onclose, then reject
+    // pending response handlers with ConnectionClosed; all synchronous, so
+    // the observable order here matches).
     pendingRejects: Array<(error: Error) => void> = []
 
     constructor(_opts: any) {
@@ -200,6 +202,12 @@ void mock.module("@modelcontextprotocol/sdk/client/index.js", () => ({
 
     async close() {
       if (this._state) this._state.closed = true
+      // Route through the transport close chain like the real SDK's
+      // Protocol.close() does, so the disconnect-triggered synchronous
+      // onclose path is exercised.
+      const chain = this.transport?.onclose as (() => void) | undefined
+      this.transport = undefined
+      chain?.()
     }
   },
 }))

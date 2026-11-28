@@ -175,6 +175,12 @@ describe("waitForOAuthCallback", () => {
 })
 
 describe("startOAuthServer", () => {
+  afterEach(() => {
+    // A failing assertion mid-test must not leave the listener (or a blocker)
+    // bound to the fixed port for the rest of the file.
+    stopOAuthServer()
+  })
+
   test("concurrent starts share one callback server and stop remains live", async () => {
     // Defensive: a leftover listener from a crashed prior run would break the
     // fixed-port listen below.
@@ -209,6 +215,7 @@ describe("startOAuthServer", () => {
     // start must recover.
     const { createServer } = await import("node:http")
     const blocker = createServer(() => {})
+    blocker.on("error", () => {})
     await new Promise<void>((resolve) => blocker.listen(OAUTH_PORT, resolve))
 
     await expect(startOAuthServer()).rejects.toThrow()
