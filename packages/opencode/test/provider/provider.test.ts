@@ -3153,6 +3153,44 @@ test("toPublicInfo strips nested headers/credentials and header-style api keys",
   expect(result.options.nested).toEqual({ safe: "keep-me" })
 })
 
+test("toPublicInfo strips secret-bearing model-level headers but keeps safe ones", () => {
+  // Fake fixture values assembled at runtime so no credential literal exists.
+  const fakeModelToken = ["Bearer", "model-tok"].join(" ")
+  const fakeModelKey = ["sk", "model", "hdr"].join("-")
+  const provider = {
+    id: ProviderID.make("model-headers"),
+    name: "Model Headers Provider",
+    source: "config" as const,
+    env: [],
+    options: {},
+    models: {
+      "model-a": {
+        id: "model-a",
+        name: "Model A",
+        release_date: "2026-01-01",
+        attachment: false,
+        reasoning: false,
+        temperature: false,
+        tool_call: false,
+        knowledge: undefined,
+        cost: { input: 0, output: 0, cache_read: 0, cache_write: 0 },
+        options: {},
+        headers: {
+          Authorization: fakeModelToken,
+          "x-api-key": fakeModelKey,
+          "X-Custom-Safe": "keep-me",
+        },
+      },
+    },
+  } as unknown as Provider.Info
+  const result = Provider.toPublicInfo(provider)
+  const serialized = JSON.stringify(result)
+  for (const secret of [fakeModelToken, fakeModelKey]) {
+    expect(serialized).not.toContain(secret)
+  }
+  expect(result.models["model-a"].headers).toEqual({ "X-Custom-Safe": "keep-me" })
+})
+
 test("rewriteMaxOutputTokens > composes over an existing auth fetch wrapper", async () => {
   const mockAuthFetch = mock((url: RequestInfo | URL, init?: RequestInit) => {
     return Promise.resolve(new Response("ok"))

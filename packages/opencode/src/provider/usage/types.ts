@@ -1,5 +1,13 @@
 /** Provider-side usage/quota types. Ported from oh-my-pi's packages/ai/src/usage.ts. */
 
+/**
+ * Per-fetch timeout for usage API calls. A stalled connection must never hold
+ * the /usage dialog open indefinitely: every outbound fetch self-cancels after
+ * this long even when the server keeps the connection alive without
+ * responding.
+ */
+export const USAGE_FETCH_TIMEOUT_MS = 10_000
+
 export type UsageUnit = "percent" | "tokens" | "requests" | "usd" | "unknown"
 
 export type UsageStatus = "ok" | "warning" | "exhausted" | "unknown"

@@ -1,7 +1,7 @@
 import * as Log from "@opencode-ai/core/util/log"
 import { safeCatch } from "@/util/error"
 import { isRecord } from "@/util/record"
-import { buildUsageStatus } from "./types"
+import { buildUsageStatus, USAGE_FETCH_TIMEOUT_MS } from "./types"
 import type { UsageProvider, UsageReport, UsageLimit, UsageCredential } from "./types"
 
 const CLINE_BASE_URL = "https://api.cline.bot"
@@ -165,7 +165,10 @@ async function fetchClineUsage(credential: UsageCredential): Promise<UsageReport
     authorization: `Bearer ${credential.apiKey}`,
   }
 
-  const meResponse = await fetch(`${CLINE_BASE_URL}${USER_ME_PATH}`, { headers })
+  const meResponse = await fetch(`${CLINE_BASE_URL}${USER_ME_PATH}`, {
+    headers,
+    signal: AbortSignal.timeout(USAGE_FETCH_TIMEOUT_MS),
+  })
   if (!meResponse.ok) {
     log.warn("cline usage: /users/me request was rejected", { status: meResponse.status })
     return null
@@ -175,6 +178,7 @@ async function fetchClineUsage(credential: UsageCredential): Promise<UsageReport
 
   const balanceResponse = await fetch(`${CLINE_BASE_URL}${USER_BALANCE_PATH}/${encodeURIComponent(user.id)}/balance`, {
     headers,
+    signal: AbortSignal.timeout(USAGE_FETCH_TIMEOUT_MS),
   })
   if (!balanceResponse.ok) return null
   const balance = parseBalanceLimit(await balanceResponse.json())
@@ -183,7 +187,10 @@ async function fetchClineUsage(credential: UsageCredential): Promise<UsageReport
   const limits: UsageLimit[] = [balance]
 
   try {
-    const usageLimitsResponse = await fetch(`${CLINE_BASE_URL}${USER_USAGE_LIMITS_PATH}`, { headers })
+    const usageLimitsResponse = await fetch(`${CLINE_BASE_URL}${USER_USAGE_LIMITS_PATH}`, {
+      headers,
+      signal: AbortSignal.timeout(USAGE_FETCH_TIMEOUT_MS),
+    })
     if (usageLimitsResponse.ok) {
       limits.push(
         ...parsePlanUsageLimits(await usageLimitsResponse.json()).map((item): UsageLimit => ({
@@ -209,7 +216,10 @@ async function fetchClineUsage(credential: UsageCredential): Promise<UsageReport
   }
 
   try {
-    const planResponse = await fetch(`${CLINE_BASE_URL}${USER_PLAN_PATH}`, { headers })
+    const planResponse = await fetch(`${CLINE_BASE_URL}${USER_PLAN_PATH}`, {
+      headers,
+      signal: AbortSignal.timeout(USAGE_FETCH_TIMEOUT_MS),
+    })
     if (planResponse.ok) {
       const plan = parseUserPlan(await planResponse.json())
       if (plan) {

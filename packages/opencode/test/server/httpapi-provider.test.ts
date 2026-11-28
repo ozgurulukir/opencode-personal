@@ -293,6 +293,69 @@ describe("provider HttpApi", () => {
     }),
   )
 
+  it.live("redacts model-level auth headers from both public provider payloads", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem
+      const path = yield* Path.Path
+      const dir = yield* fs.makeTempDirectoryScoped({ prefix: "opencode-test-" })
+      // Fake fixture values assembled at runtime so no credential literal exists.
+      const fakeToken = ["Bearer", "hdr-endpoint-tok"].join(" ")
+
+      yield* fs.writeFileString(
+        path.join(dir, "opencode.json"),
+        JSON.stringify({
+          $schema: "https://opencode.ai/config.json",
+          formatter: false,
+          lsp: false,
+          provider: {
+            "hdr-redact-provider": {
+              name: "HDR Redact Provider",
+              npm: "@ai-sdk/openai-compatible",
+              env: [] as string[],
+              options: { apiKey: ["not", "a", "real", "key"].join("-") },
+              models: {
+                model: {
+                  name: "Model",
+                  tool_call: true,
+                  limit: { context: 4000, output: 1000 },
+                  headers: {
+                    Authorization: fakeToken,
+                    "X-Custom-Safe": "keep-me",
+                  },
+                },
+              },
+            },
+          },
+        }),
+      )
+
+      const headers = { "x-opencode-directory": dir }
+      const providerResponse = yield* Effect.promise(() => Promise.resolve(app().request("/provider", { headers })))
+      const configResponse = yield* Effect.promise(() =>
+        Promise.resolve(app().request("/config/providers", { headers })),
+      )
+
+      expect(providerResponse.status).toBe(200)
+      expect(configResponse.status).toBe(200)
+
+      const providerBody = yield* Effect.promise(() => providerResponse.json())
+      const configBody = yield* Effect.promise(() => configResponse.json())
+      const providerAll = providerByID(providerBody, "all", "hdr-redact-provider")
+      const providerConfig = providerByID(configBody, "providers", "hdr-redact-provider")
+      expect(providerAll).toBeDefined()
+      expect(providerConfig).toBeDefined()
+
+      const serialized = JSON.stringify([providerBody, configBody])
+      expect(serialized).not.toContain(fakeToken)
+      for (const entry of [providerAll, providerConfig]) {
+        const model = isRecord(entry) && isRecord(entry.models) ? entry.models["model"] : undefined
+        expect(isRecord(model) && isRecord(model.headers) ? model.headers : undefined).toEqual({
+          "X-Custom-Safe": "keep-me",
+        })
+      }
+    }),
+  )
+
   it.live("keeps provider.models hook input mutations out of provider state", () =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem

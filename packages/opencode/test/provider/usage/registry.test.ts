@@ -57,3 +57,35 @@ test("ignores unknown, unsupported, and empty credentials without requesting usa
   ).toEqual([])
   expect(calls).toEqual([])
 })
+
+test("bounds hanging usage fetches with a per-fetch timeout signal", async () => {
+  const observed: AbortSignal[] = []
+  globalThis.fetch = Object.assign(
+    async (input: Parameters<typeof fetch>[0], init?: RequestInit) => {
+      observed.push(init?.signal!)
+      // Mimic real fetch semantics: reject only when the signal fires, hang
+      // otherwise — a stalled connection the timeout must rescue.
+      return new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => reject(init.signal!.reason))
+      })
+    },
+    { preconnect: realFetch.preconnect.bind(realFetch) },
+  )
+  // Cap the effective timeout at 50ms so the test does not wait the real 10s.
+  const realAbortTimeout = AbortSignal.timeout.bind(AbortSignal)
+  AbortSignal.timeout = ((ms: number) => realAbortTimeout(Math.min(ms, 50))) as typeof AbortSignal.timeout
+  let reports
+  try {
+    reports = await fetchUsageReports({
+      "zai-coding-plan": { type: "wellknown", key: "k", token: "tok" },
+      anthropic: { type: "oauth", access: "tok", refresh: "r", expires: 0 },
+    })
+  } finally {
+    AbortSignal.timeout = realAbortTimeout
+  }
+  expect(observed.length).toBe(2)
+  for (const signal of observed) expect(signal).toBeInstanceOf(AbortSignal)
+  // Both fetches were cancelled by their timeout signals, so the registry
+  // degrades to an empty report list instead of hanging.
+  expect(reports).toEqual([])
+})

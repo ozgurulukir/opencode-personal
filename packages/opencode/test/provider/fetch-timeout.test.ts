@@ -114,6 +114,65 @@ describe("__exportTestFetchFn abort lifetime", () => {
     expect(observed?.aborted).toBe(true)
   })
 
+  test("mid-flight user abort cancels the malformed-JSON passthrough fetch", async () => {
+    let observed: AbortSignal | undefined
+    const customFetch = mock(async (_input: any, init?: any) => {
+      observed = init?.signal
+      return new Response(
+        new ReadableStream<Uint8Array>({
+          pull() {
+            // Stall forever: never enqueue, never close.
+            return new Promise<void>(() => {})
+          },
+        }),
+        { headers: { "content-type": "application/json" } },
+      )
+    }) as any
+
+    const external = new AbortController()
+    // @ai-sdk/openai + POST + non-JSON body triggers the passthrough branch.
+    const fetchFn = __exportTestFetchFn({ timeout: 25000 }, { api: { npm: "@ai-sdk/openai" } }, customFetch, false)
+    const res = await fetchFn("https://example.com", {
+      method: "POST",
+      body: new TextEncoder().encode("binary-not-json"),
+      signal: external.signal,
+    })
+    expect(res).toBeDefined()
+    await Bun.sleep(10)
+    external.abort()
+    await Bun.sleep(20)
+    expect(observed?.aborted).toBe(true)
+  })
+
+  test("HTTP timeout cancels the malformed-JSON passthrough fetch", async () => {
+    let observed: AbortSignal | undefined
+    const customFetch = mock(async (_input: any, init?: any) => {
+      observed = init?.signal
+      return new Response(
+        new ReadableStream<Uint8Array>({
+          pull() {
+            // Stall forever: never enqueue, never close.
+            return new Promise<void>(() => {})
+          },
+        }),
+        { headers: { "content-type": "application/json" } },
+      )
+    }) as any
+
+    // An external signal must be present so two signals combine; a lone
+    // timeout signal aborts by itself regardless of cleanup.
+    const external = new AbortController()
+    const fetchFn = __exportTestFetchFn({ timeout: 40 }, { api: { npm: "@ai-sdk/openai" } }, customFetch, false)
+    const res = await fetchFn("https://example.com", {
+      method: "POST",
+      body: new TextEncoder().encode("binary-not-json"),
+      signal: external.signal,
+    })
+    expect(res).toBeDefined()
+    await Bun.sleep(80)
+    expect(observed?.aborted).toBe(true)
+  })
+
   test("body chunks pass through intact", async () => {
     const customFetch = mock(
       async () =>
