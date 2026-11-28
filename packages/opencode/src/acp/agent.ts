@@ -585,7 +585,7 @@ export class Agent implements ACPAgent {
       // so sessions beyond the newest 100 were silently unreachable.
       // Continuation pages pass only the server cursor: it embeds the page-1
       // filters (roots/directory), and the route rejects a cursor combined
-      // with filter params.
+      // with mismatching routing params.
       const sessions: Array<{ id: string; directory: string; title: string; time: { updated: number } }> = []
       let fetchCursor: string | undefined
       // Defensive page bound: a misbehaving server that keeps returning a
@@ -602,7 +602,6 @@ export class Agent implements ACPAgent {
           )
           .then((x) => x.data)
         const items = res?.items ?? []
-        if (pages <= 3) console.log("PAGE", pages, "items", items.length, "first", items[0]?.id, "lastId", items.at(-1)?.id)
         sessions.push(...items)
         fetchCursor = res?.cursor?.next
         if (!fetchCursor || items.length === 0) break
