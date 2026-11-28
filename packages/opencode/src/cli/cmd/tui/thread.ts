@@ -135,6 +135,7 @@ export const TuiThreadCommand = cmd({
         process.chdir(next)
       } catch {
         UI.error("Failed to change directory to " + next)
+        process.exitCode = 1
         return
       }
       const cwd = Filesystem.resolve(process.cwd())
@@ -258,7 +259,11 @@ export const TuiThreadCommand = cmd({
     } finally {
       unguard?.()
     }
-    process.exit(0)
+    // Honor the recorded exit code: startup failure paths above set
+    // process.exitCode = 1 and return here, and an explicit exit(0) would
+    // override it (attach.ts lets the loop drain instead; this wrapper needs
+    // the explicit exit to tear down the worker).
+    process.exit(process.exitCode ?? 0)
   },
 })
 // scratch

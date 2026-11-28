@@ -40,6 +40,22 @@ import {
   revertClearDropBoundary,
 } from "@tui/routes/session/revert-boundary.shared"
 
+// Merge a fetched session-list snapshot with the live store rows. Fetched
+// rows win for ids present in both; store-only rows survive — a session
+// inserted by a `session.created` event in the startup window exists in the
+// store before the list resolves and must not be dropped by the bootstrap
+// reconcile (patchSession skips entries missing from the store, so a
+// wholesale replace could never self-heal). Output is sorted by id, the
+// order the store's Binary.search lookups expect.
+export function mergeSessionLists(fetched: Session[], known: Session[]): Session[] {
+  const merged = new Map(known.map((session) => [session.id, session]))
+  for (const session of fetched) merged.set(session.id, session)
+  return merged
+    .values()
+    .toArray()
+    .toSorted((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+}
+
 export const { use: useSync, provider: SyncProvider } = createSimpleContext({
   name: "Sync",
   init: () => {
@@ -132,6 +148,17 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
           draft.splice(match.index, 0, info)
         }),
       )
+    }
+
+    // Merge the fetched snapshot with the live store instead of replacing it:
+    // the event subscription starts before the session list resolves, so a
+    // session inserted by `session.created` in the startup window exists in
+    // the store but can be absent from the server-side snapshot. Wholesale
+    // replace dropped it, and patchSession skips entries missing from the
+    // store, so it never self-healed. Fetched rows win for ids present in
+    // both; store-only rows (event-inserted) survive.
+    function mergeSessions(fetched: Session[]): Session[] {
+      return mergeSessionLists(fetched, store.session)
     }
 
     function patchSession(sessionID: string, info: Partial<Session>) {
@@ -448,7 +475,7 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
               setStore("console_state", reconcile(consoleState))
               setStore("agent", reconcile(agents))
               setStore("config", reconcile(config))
-              if (sessions !== undefined) setStore("session", reconcile(sessions))
+              if (sessions !== undefined) setStore("session", reconcile(mergeSessions(sessions)))
             })
           })
         })
@@ -456,7 +483,11 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
           if (store.status !== "complete") setStore("status", "partial")
           // non-blocking
           void Promise.all([
-            ...(args.continue ? [] : [sessionListPromise.then((sessions) => setStore("session", reconcile(sessions)))]),
+            ...(
+              args.continue
+                ? []
+                : [sessionListPromise.then((sessions) => setStore("session", reconcile(mergeSessions(sessions))))]
+            ),
             consoleStatePromise.then((consoleState) => setStore("console_state", reconcile(consoleState))),
             sdk.client.command.list({ workspace }).then((x) => setStore("command", reconcile(x.data ?? []))),
             sdk.client.lsp.status({ workspace }).then((x) => setStore("lsp", reconcile(x.data ?? []))),
