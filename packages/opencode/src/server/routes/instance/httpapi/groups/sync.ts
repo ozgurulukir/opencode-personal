@@ -2,6 +2,7 @@ import { NonNegativeInt } from "@opencode-ai/core/schema"
 import { SessionID } from "@/session/schema"
 import { Schema } from "effect"
 import { HttpApi, HttpApiEndpoint, HttpApiError, HttpApiGroup, OpenApi } from "effect/unstable/httpapi"
+import { ApiBadRequestError, ApiNotFoundError } from "../errors"
 import { Authorization } from "../middleware/authorization"
 import { InstanceContextMiddleware } from "../middleware/instance-context"
 import { WorkspaceRoutingMiddleware, WorkspaceRoutingQuery } from "../middleware/workspace-routing"
@@ -59,7 +60,12 @@ export const SyncApi = HttpApi.make("sync")
           query: WorkspaceRoutingQuery,
           payload: ReplayPayload,
           success: described(ReplayResponse, "Replayed sync events"),
-          error: HttpApiError.BadRequest,
+          // Keeping the built-in BadRequest first is load-bearing: the public
+          // spec rewrite (normalizeLegacyErrorResponses) maps the built-in's
+          // 400 ref to the legacy `BadRequestError` component the SDK types
+          // use — dropping it would flip the SDK error shape to the custom
+          // component.
+          error: [HttpApiError.BadRequest, ApiBadRequestError],
         }).annotateMerge(
           OpenApi.annotations({
             identifier: "sync.replay",
@@ -71,7 +77,10 @@ export const SyncApi = HttpApi.make("sync")
           query: WorkspaceRoutingQuery,
           payload: SessionPayload,
           success: described(SessionPayload, "Session stolen into workspace"),
-          error: [HttpApiError.BadRequest, HttpApiError.NotFound],
+          // NotFound is the custom ApiNotFoundError (not the built-in): the
+          // built-in would pair with it in a oneOf that the public-spec
+          // rewrite cannot normalize, degrading the SDK's 404 type.
+          error: [HttpApiError.BadRequest, ApiBadRequestError, ApiNotFoundError],
         }).annotateMerge(
           OpenApi.annotations({
             identifier: "sync.steal",

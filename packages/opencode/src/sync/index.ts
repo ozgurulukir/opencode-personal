@@ -88,12 +88,24 @@ export interface Interface {
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/SyncEvent") {}
 
+// Signals an expected, client-caused validation failure (unknown event type,
+// sequence mismatch, cross-aggregate batch) thrown inside Effect generators.
+// HTTP handlers use `instanceof` to map these to a declared 400 while letting
+// infrastructure faults keep their sanitized 500; do not rename or replace
+// with a plain Error.
+export class ValidationError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = "SyncValidationError"
+  }
+}
+
 export const layer = Layer.effect(Service)(
   Effect.gen(function* () {
     const replay: Interface["replay"] = Effect.fn("SyncEvent.replay")(function* (event, options) {
       const def = registry.get(event.type)
       if (!def) {
-        throw new Error(`Unknown event type: ${event.type}`)
+        throw new ValidationError(`Unknown event type: ${event.type}`)
       }
 
       const publish = !!options?.publish
@@ -125,7 +137,7 @@ export const layer = Layer.effect(Service)(
 
           const expected = latest + 1
           if (event.seq !== expected) {
-            throw new Error(
+            throw new ValidationError(
               `Sequence mismatch for aggregate "${event.aggregateID}": expected ${expected}, got ${event.seq}`,
             )
           }
@@ -142,13 +154,13 @@ export const layer = Layer.effect(Service)(
       const source = events[0]?.aggregateID
       if (!source) return undefined
       if (events.some((item) => item.aggregateID !== source)) {
-        throw new Error("Replay events must belong to the same session")
+        throw new ValidationError("Replay events must belong to the same session")
       }
       const start = events[0].seq
       for (const [i, item] of events.entries()) {
         const seq = start + i
         if (item.seq !== seq) {
-          throw new Error(`Replay sequence mismatch at index ${i}: expected ${seq}, got ${item.seq}`)
+          throw new ValidationError(`Replay sequence mismatch at index ${i}: expected ${seq}, got ${item.seq}`)
         }
       }
       for (const item of events) {
@@ -494,17 +506,27 @@ export function claim(aggregateID: string, ownerID: string) {
   )
 }
 
+// Declares the GlobalBus wire shape, which is the nested sync envelope from
+// `process()` below (`{ type: "sync", syncEvent: { type, id, seq, ... } }`).
+// The SSE handler stringifies raw GlobalBus events with no runtime encode
+// step, so the envelope fields must mirror the emitter — this feeds the
+// `/global/event` OpenAPI schema and the generated SDK types. (`data`
+// reuses `def.schema` as before; raw DateTime instances can still reach the
+// wire encoded as ISO strings on the live path — pre-existing, see
+// `encodeDateTimes` for the storage-side handling.)
 export function effectPayloads() {
   return registry
     .entries()
     .map(([type, def]) =>
       EffectSchema.Struct({
         type: EffectSchema.Literal("sync"),
-        name: EffectSchema.Literal(type),
-        id: EffectSchema.String,
-        seq: EffectSchema.Finite,
-        aggregateID: EffectSchema.Literal(def.aggregate),
-        data: def.schema,
+        syncEvent: EffectSchema.Struct({
+          type: EffectSchema.Literal(type),
+          id: EffectSchema.String,
+          seq: EffectSchema.Finite,
+          aggregateID: EffectSchema.String,
+          data: def.schema,
+        }),
       }).annotate({ identifier: `SyncEvent.${type}` }),
     )
     .toArray()

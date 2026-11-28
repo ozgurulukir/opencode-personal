@@ -7,13 +7,23 @@ import { SyncEvent } from "@/sync"
 import { EventTable } from "@/sync/event.sql"
 import { and, asc, eq, inArray, lte, not, or } from "drizzle-orm"
 import { Effect, Scope } from "effect"
-import { HttpApiBuilder, HttpApiError } from "effect/unstable/httpapi"
+import { HttpApiBuilder } from "effect/unstable/httpapi"
 import { InstanceHttpApi } from "../api"
+import { badRequest, notFound } from "../errors"
 import { HistoryPayload, ReplayPayload, SessionPayload } from "../groups/sync"
 import * as Log from "@opencode-ai/core/util/log"
 import { errorData } from "@/util/error"
 
 const log = Log.create({ service: "server.sync" })
+
+// Mirrors the schema-error middleware's reason cap: validation messages echo
+// client-supplied event data (aggregate ids, seq values), so the 400 body must
+// stay bounded instead of mirroring an entire payload.
+const REJECTION_LIMIT = 1024
+function truncateRejection(reason: string) {
+  const message = reason.length <= REJECTION_LIMIT ? reason : reason.slice(0, REJECTION_LIMIT)
+  return `Replay rejected: ${message}`
+}
 
 export const syncHandlers = HttpApiBuilder.group(InstanceHttpApi, "sync", (handlers) =>
   Effect.gen(function* () {
@@ -47,7 +57,20 @@ export const syncHandlers = HttpApiBuilder.group(InstanceHttpApi, "sync", (handl
         last: events.at(-1)?.seq,
         directory: ctx.payload.directory,
       })
-      yield* sync.replayAll(events)
+      // SyncEvent.replay/replayAll signal client-caused validation failures
+      // (sequence mismatch, cross-aggregate batch, unknown event type) with a
+      // typed SyncEvent.ValidationError, which surfaces as a defect; the route
+      // declares a 400 error, so map exactly that class to the declared error
+      // body and re-raise anything else (infra faults keep the sanitized 500).
+      // The message echoes client-supplied data, so cap it like the
+      // schema-error middleware does.
+      yield* sync.replayAll(events).pipe(
+        Effect.catchDefect((defect) =>
+          defect instanceof SyncEvent.ValidationError
+            ? Effect.fail(badRequest(truncateRejection(defect.message)))
+            : Effect.die(defect),
+        ),
+      )
       log.info("sync replay complete", {
         sessionID: source,
         events: events.length,
@@ -60,7 +83,7 @@ export const syncHandlers = HttpApiBuilder.group(InstanceHttpApi, "sync", (handl
     const steal = Effect.fn("SyncHttpApi.steal")(function* (ctx: { payload: typeof SessionPayload.Type }) {
       const instance = yield* InstanceState.context
       const workspaceID = yield* InstanceState.workspaceID
-      if (!workspaceID) throw new Error("Cannot steal session without workspace context")
+      if (!workspaceID) return yield* badRequest("Cannot steal session without workspace context")
 
       const sessionRow = Database.use((db) =>
         db
@@ -70,7 +93,7 @@ export const syncHandlers = HttpApiBuilder.group(InstanceHttpApi, "sync", (handl
           .get(),
       )
       if (!sessionRow || sessionRow.projectID !== instance.project.id) {
-        return yield* new HttpApiError.NotFound({})
+        return yield* notFound(`Session not found: ${ctx.payload.sessionID}`)
       }
 
       yield* sync.run(Session.Event.Updated, {
