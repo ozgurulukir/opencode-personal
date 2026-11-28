@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { Effect, Layer, ManagedRuntime } from "effect"
+import { Deferred, Effect, Exit, Fiber, Layer, ManagedRuntime } from "effect"
 import path from "path"
 import fs from "fs/promises"
 import { WriteTool } from "../../src/tool/write"
+import { EditTool } from "../../src/tool/edit"
 import { Instance } from "../../src/project/instance"
 import { LSP } from "@/lsp/lsp"
 import { AppFileSystem } from "@opencode-ai/core/filesystem"
@@ -62,6 +63,59 @@ const run = Effect.fn("WriteToolTest.run")(function* (
 })
 
 describe("tool.write", () => {
+  describe("concurrent mutation", () => {
+    it.instance("concurrent edit+write serialize instead of losing a write", () =>
+      Effect.gen(function* () {
+        const test = yield* TestInstance
+        const filepath = path.join(test.directory, "concurrent.txt")
+        yield* Effect.promise(() => fs.writeFile(filepath, "aaa\nbbb\nccc\n"))
+
+        // edit: gate at the permission ask so the concurrent write runs while
+        // edit is mid-span. edit reads BEFORE the ask; write completes while
+        // edit waits; edit's write happens after release. Without the shared
+        // lock, edit's stale read derives its write and silently discards the
+        // write tool's change.
+        const entered = Deferred.makeUnsafe<void>()
+        const release = Deferred.makeUnsafe<void>()
+        const editCtx = {
+          ...ctx,
+          ask: () =>
+            Effect.gen(function* () {
+              Deferred.doneUnsafe(entered, Exit.void)
+              yield* Deferred.await(release)
+            }),
+        }
+
+        const editTool = yield* (yield* EditTool).init()
+        const editFiber = yield* editTool
+          .execute({ filePath: filepath, oldString: "bbb", newString: "BBB" }, editCtx as Tool.Context)
+          .pipe(Effect.forkChild)
+
+        // Wait until edit is parked at the ask gate (it has read the file and
+        // not yet written).
+        yield* Deferred.await(entered)
+
+        // Start the write while edit holds the shared lock, then give the
+        // child fiber a beat to schedule: on the locked code the write parks
+        // on the lock until edit's span finishes and then reads the post-edit
+        // file; on the unlocked code the write completes mid-span and edit's
+        // stale-read write afterwards clobbers it. The final content must be
+        // the write tool's either way.
+        const writeFiber = yield* run({ filePath: filepath, content: "aaa\nBBB\nccc\nWITH-WRITE\n" }).pipe(
+          Effect.forkChild,
+        )
+        yield* Effect.sleep(100)
+
+        Deferred.doneUnsafe(release, Exit.void)
+        yield* Fiber.join(editFiber)
+        yield* Fiber.join(writeFiber)
+
+        const content = yield* Effect.promise(() => fs.readFile(filepath, "utf-8"))
+        expect(content).toBe("aaa\nBBB\nccc\nWITH-WRITE\n")
+      }),
+    )
+  })
+
   describe("new file creation", () => {
     it.instance("writes content to new file", () =>
       Effect.gen(function* () {

@@ -138,6 +138,12 @@ function parseAddFileContent(lines: string[], startIdx: number): { content: stri
   while (i < lines.length && !lines[i].startsWith("***")) {
     if (lines[i].startsWith("+")) {
       content += lines[i].substring(1) + "\n"
+    } else if (lines[i].trim() !== "") {
+      // Only `+`-prefixed lines are content and blank lines are tolerated
+      // (LLMs emit them as separators). Anything else — e.g. file text pasted
+      // without prefixes — used to be silently dropped, producing an empty or
+      // truncated file reported as success.
+      throw new Error(`Malformed patch line in add body: ${lines[i]}`)
     }
     i++
   }
