@@ -11,6 +11,7 @@ import {
   BREAKER_LIMIT,
   BREAKER_MESSAGE,
   isCurrentTurnContinue,
+  isCurrentTurnReplay,
   shouldCompactAfterTurn,
 } from "../../src/session/compaction-trigger"
 
@@ -249,6 +250,71 @@ describe("CompactionTrigger.isCurrentTurnContinue", () => {
 
   test("false when the user message is missing from the list", () => {
     expect(isCurrentTurnContinue([turn("msg_1", [plainPart])], "msg_9" as MessageID)).toBe(false)
+  })
+})
+
+describe("CompactionTrigger.isCurrentTurnReplay", () => {
+  const replayPart = { type: "text", text: "huge prompt", metadata: { compaction_replay: true } }
+  const continuePart = { type: "text", text: "Continue", metadata: { compaction_continue: true } }
+  const plainPart = { type: "text", text: "hello" }
+
+  test("true when the turn's user message carries compaction_replay metadata", () => {
+    const msgs = [turn("msg_1", [plainPart]), turn("msg_2", [replayPart])]
+    expect(isCurrentTurnReplay(msgs, "msg_2" as MessageID)).toBe(true)
+  })
+
+  test("false for a regular user turn and for a continue turn", () => {
+    const msgs = [turn("msg_1", [plainPart]), turn("msg_2", [continuePart])]
+    expect(isCurrentTurnReplay(msgs, "msg_2" as MessageID)).toBe(false)
+  })
+
+  test("false when the user message is missing from the list", () => {
+    expect(isCurrentTurnReplay([turn("msg_1", [replayPart])], "msg_9" as MessageID)).toBe(false)
+  })
+
+  test("a replay turn is not a continue turn", () => {
+    const msgs = [turn("msg_1", [replayPart])]
+    expect(isCurrentTurnContinue(msgs, "msg_1" as MessageID)).toBe(false)
+  })
+})
+
+describe("CompactionTrigger overflow replay vs the circuit breaker", () => {
+  // The run loop's reset condition: the counter resets only for turns that
+  // are neither a continue nor an overflow replay.
+  const resets = (msgs: MessageV2.WithParts[], userID: MessageID) =>
+    !isCurrentTurnContinue(msgs, userID) && !isCurrentTurnReplay(msgs, userID)
+
+  const replayPart = { type: "text", text: "huge prompt", metadata: { compaction_replay: true } }
+  const plainPart = { type: "text", text: "hello" }
+
+  test("two consecutive overflow-replay cycles keep the counter alive and trip the breaker", () => {
+    let counter = 0
+    // Cycle 1: the regular user turn overflows → auto-compaction task runs →
+    // counter increments → compaction replays the user prompt.
+    counter = 1
+    const replay1 = turn("msg_2", [replayPart])
+    if (resets([replay1], "msg_2" as MessageID)) counter = 0
+    expect(counter).toBe(1)
+    // The replayed turn overflows again → another auto-compaction → counter
+    // increments → compaction replays a second time.
+    counter = 2
+    const replay2 = turn("msg_3", [replayPart])
+    if (resets([replay2], "msg_3" as MessageID)) counter = 0
+    expect(counter).toBe(2)
+    // The next overflow attempt must now trip the breaker instead of
+    // looping forever.
+    expect(breakerTripped(counter)).toBe(true)
+  })
+
+  test("without the replay marker the counter resets and the breaker never trips", () => {
+    // Documents the failure mode the marker prevents: an unmarked replayed
+    // turn looks like a regular turn, the counter resets every cycle, and the
+    // breaker stays at 0↔1 forever.
+    let counter = 1
+    const unmarked = turn("msg_2", [plainPart])
+    if (resets([unmarked], "msg_2" as MessageID)) counter = 0
+    expect(counter).toBe(0)
+    expect(breakerTripped(counter)).toBe(false)
   })
 })
 
