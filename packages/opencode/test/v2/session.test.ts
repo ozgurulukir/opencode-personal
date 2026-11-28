@@ -55,6 +55,11 @@ function stubPromptLayer(opts?: { loopResult?: MessageV2.WithParts; failPrompt?:
   // completes it — lets the abort test prove the abort actually stops the
   // subagent instead of racing its fast-completing stub.
   const hang = { armed: false, gates: new Map<SessionID, Deferred.Deferred<void>>() }
+  // When armed, `loop` blocks on a per-session gate until the test completes
+  // it — lets a test stage a prompt while a deferred drain's loop is running.
+  // `early` holds the gate before the assistant row is projected instead of
+  // after it, flipping which tail the concurrent staging sees.
+  const loopGate = { armed: false, early: false, gates: new Map<SessionID, Deferred.Deferred<void>>() }
   const loopResult = opts?.loopResult ?? {
     info: {
       id: MessageID.ascending(),
@@ -115,8 +120,11 @@ function stubPromptLayer(opts?: { loopResult?: MessageV2.WithParts; failPrompt?:
             const ts = DateTime.makeUnsafe(created)
             const legacyMessageID = input.messageID ?? MessageID.ascending()
             calls.legacyMessageIDs.push(legacyMessageID)
+            // Deferred staging (noReply) persists only the user message — the
+            // real V1 engine does not produce an assistant message until the
+            // loop runs, and the drain's unanswered-tail check relies on that.
             const legacyAssistantInfo =
-              loopResult.info.role === "assistant"
+              !input.noReply && loopResult.info.role === "assistant"
                 ? {
                     ...loopResult.info,
                     id: MessageID.ascending(),
@@ -162,34 +170,39 @@ function stubPromptLayer(opts?: { loopResult?: MessageV2.WithParts; failPrompt?:
             // Emit assistant message events so the V2 projector creates an
             // assistant message with text content. This mirrors what the real
             // V1 prompt loop does and lets the V2 `subagent()` method find an
-            // assistant message to post back as a synthetic message.
-            yield* sync.run(SessionEvent.Step.Started.Sync, {
-              sessionID: input.sessionID,
-              timestamp: ts,
-              legacyMessageID: legacyAssistantInfo?.id,
-              agent: input.agent ?? "general",
-              model: {
-                id: Modelv2.ID.make("test-model"),
-                providerID: Modelv2.ProviderID.make("test"),
-                variant: Modelv2.VariantID.make("default"),
-              },
-            })
-            yield* sync.run(SessionEvent.Text.Started.Sync, {
-              sessionID: input.sessionID,
-              timestamp: ts,
-            })
-            yield* sync.run(SessionEvent.Text.Ended.Sync, {
-              sessionID: input.sessionID,
-              timestamp: ts,
-              text: "stub result",
-            })
-            yield* sync.run(SessionEvent.Step.Ended.Sync, {
-              sessionID: input.sessionID,
-              timestamp: ts,
-              finish: "stop",
-              cost: 0,
-              tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
-            })
+            // assistant message to post back as a synthetic message. Deferred
+            // staging (noReply) skips these: the real engine produces no
+            // assistant message until the loop runs, and the drain's
+            // unanswered-tail check relies on that.
+            if (!input.noReply) {
+              yield* sync.run(SessionEvent.Step.Started.Sync, {
+                sessionID: input.sessionID,
+                timestamp: ts,
+                legacyMessageID: legacyAssistantInfo?.id,
+                agent: input.agent ?? "general",
+                model: {
+                  id: Modelv2.ID.make("test-model"),
+                  providerID: Modelv2.ProviderID.make("test"),
+                  variant: Modelv2.VariantID.make("default"),
+                },
+              })
+              yield* sync.run(SessionEvent.Text.Started.Sync, {
+                sessionID: input.sessionID,
+                timestamp: ts,
+              })
+              yield* sync.run(SessionEvent.Text.Ended.Sync, {
+                sessionID: input.sessionID,
+                timestamp: ts,
+                text: "stub result",
+              })
+              yield* sync.run(SessionEvent.Step.Ended.Sync, {
+                sessionID: input.sessionID,
+                timestamp: ts,
+                finish: "stop",
+                cost: 0,
+                tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+              })
+            }
             return {
               info: {
                 id: legacyMessageID,
@@ -203,6 +216,50 @@ function stubPromptLayer(opts?: { loopResult?: MessageV2.WithParts; failPrompt?:
         loop: (input: { sessionID: SessionID }) =>
           Effect.gen(function* () {
             calls.loop.push(input.sessionID)
+            // Mirror the real loop: the assistant message answering the turn
+            // is projected into SessionMessageTable from the step events when
+            // the loop starts, so a prompt staged after this point has an id
+            // after the assistant's — the drain's unanswered-tail check then
+            // treats it as unanswered. The gate can hold the loop before or
+            // after the assistant row is projected, letting tests stage a
+            // prompt either before (answered tail → no rerun) or after
+            // (unanswered tail → rerun) the answering assistant exists.
+            if (loopGate.armed && loopGate.early) {
+              loopGate.gates.set(input.sessionID, Deferred.makeUnsafe<void>())
+              yield* Deferred.await(loopGate.gates.get(input.sessionID)!)
+            }
+            const created = Date.now()
+            const ts = DateTime.makeUnsafe(created)
+            yield* sync.run(MessageV2.Event.Updated, {
+              sessionID: input.sessionID,
+              info: {
+                ...loopResult.info,
+                id: MessageID.ascending(),
+                sessionID: input.sessionID,
+                time: { created },
+              },
+            })
+            yield* sync.run(SessionEvent.Step.Started.Sync, {
+              sessionID: input.sessionID,
+              timestamp: ts,
+              agent: "build",
+              model: {
+                id: Modelv2.ID.make("test-model"),
+                providerID: Modelv2.ProviderID.make("test"),
+                variant: Modelv2.VariantID.make("default"),
+              },
+            })
+            yield* sync.run(SessionEvent.Step.Ended.Sync, {
+              sessionID: input.sessionID,
+              timestamp: ts,
+              finish: "stop",
+              cost: 0,
+              tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+            })
+            if (loopGate.armed && !loopGate.early) {
+              loopGate.gates.set(input.sessionID, Deferred.makeUnsafe<void>())
+              yield* Deferred.await(loopGate.gates.get(input.sessionID)!)
+            }
             return loopResult
           }),
         shell: (input: any) =>
@@ -223,7 +280,13 @@ function stubPromptLayer(opts?: { loopResult?: MessageV2.WithParts; failPrompt?:
       })
     }),
   )
-  return { layer, calls, armHang: () => (hang.armed = true), disarmHang: () => (hang.armed = false) }
+  return {
+    layer,
+    calls,
+    armHang: () => (hang.armed = true),
+    disarmHang: () => (hang.armed = false),
+    loopGate,
+  }
 }
 
 /** A stub V1 SessionCompaction that records create calls. */
@@ -952,6 +1015,107 @@ describe("v2.session", () => {
         drained = promptStub.calls.loop.includes(info.id)
       }
       expect(drained).toBe(true)
+    }),
+  )
+
+  it.instance("prompt staged while a drain is running is answered, not dropped", () =>
+    Effect.gen(function* () {
+      const session = yield* SessionV2.Service
+      const info = yield* session.create({ agent: "build" })
+      const loopCallsFor = () => promptStub.calls.loop.filter((id) => id === info.id).length
+
+      // Regression coverage for the dropped-prompt window: hold the first
+      // drain's loop open, stage a second prompt while it runs (the second
+      // drain fiber queues behind the running one), then release. The second
+      // drain must re-check the unanswered tail and run the loop instead of
+      // returning early, and the tail must not trigger further loop runs once
+      // both turns are answered.
+      yield*
+        Effect.gen(function* () {
+          promptStub.loopGate.armed = true
+          yield* session.prompt({ sessionID: info.id, prompt: { text: "first" }, delivery: "deferred" })
+
+          // Wait until the first drain's loop is inside the gate.
+          let gated = false
+          for (let i = 0; i < 100 && !gated; i++) {
+            yield* Effect.sleep(10)
+            gated = loopCallsFor() === 1 && promptStub.loopGate.gates.has(info.id)
+          }
+          expect(gated).toBe(true)
+
+          yield* session.prompt({ sessionID: info.id, prompt: { text: "second" }, delivery: "deferred" })
+
+          const gate = promptStub.loopGate.gates.get(info.id)!
+          Deferred.doneUnsafe(gate, Exit.void)
+
+          let drained = false
+          for (let i = 0; i < 200 && !drained; i++) {
+            yield* Effect.sleep(10)
+            drained = loopCallsFor() >= 2
+          }
+          expect(drained).toBe(true)
+        }).pipe(
+          Effect.ensuring(
+            Effect.sync(() => {
+              promptStub.loopGate.armed = false
+              // Complete any gate a queued drain is parked on so the fiber
+              // finishes instead of hanging until layer teardown.
+              for (const pending of promptStub.loopGate.gates.values()) Deferred.doneUnsafe(pending, Exit.void)
+              promptStub.loopGate.gates.clear()
+            }),
+          ),
+        )
+
+      // Both turns are answered; nothing re-runs the loop afterwards.
+      yield* Effect.sleep(50)
+      expect(loopCallsFor()).toBe(2)
+    }),
+  )
+
+  it.instance("a prompt staged mid-turn and answered in-context is not re-drained", () =>
+    Effect.gen(function* () {
+      const session = yield* SessionV2.Service
+      const info = yield* session.create({ agent: "build" })
+      const loopCallsFor = () => promptStub.calls.loop.filter((id) => id === info.id).length
+
+      // Hold the first drain's loop BEFORE its assistant row is projected:
+      // the second prompt stages while gated, so the assistant projected at
+      // release gets an id after the staged message — exactly the in-context
+      // continuation outcome. The queued drain must see an answered tail and
+      // NOT rerun the loop (an unconditional rerun would spin another turn on
+      // an already-addressed conversation).
+      yield*
+        Effect.gen(function* () {
+          promptStub.loopGate.early = true
+          promptStub.loopGate.armed = true
+          yield* session.prompt({ sessionID: info.id, prompt: { text: "first" }, delivery: "deferred" })
+
+          let gated = false
+          for (let i = 0; i < 100 && !gated; i++) {
+            yield* Effect.sleep(10)
+            gated = loopCallsFor() === 1 && promptStub.loopGate.gates.has(info.id)
+          }
+          expect(gated).toBe(true)
+
+          yield* session.prompt({ sessionID: info.id, prompt: { text: "second" }, delivery: "deferred" })
+
+          const gate = promptStub.loopGate.gates.get(info.id)!
+          Deferred.doneUnsafe(gate, Exit.void)
+        }).pipe(
+          Effect.ensuring(
+            Effect.sync(() => {
+              promptStub.loopGate.armed = false
+              promptStub.loopGate.early = false
+              for (const pending of promptStub.loopGate.gates.values()) Deferred.doneUnsafe(pending, Exit.void)
+              promptStub.loopGate.gates.clear()
+            }),
+          ),
+        )
+
+      // Exactly one loop run: the queued drain saw the answered tail and
+      // skipped. Nothing re-runs afterwards either.
+      yield* Effect.sleep(50)
+      expect(loopCallsFor()).toBe(1)
     }),
   )
 
