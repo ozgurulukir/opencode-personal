@@ -85,10 +85,12 @@ export const layer = Layer.effect(
     // interleave and the last whole-file write silently drops the other
     // server's entry.
     const locked = Effect.fn("McpAuth.locked")(function* (mutate: Effect.Effect<void>) {
-      yield* Effect.scoped(Effect.gen(function* () {
-        yield* Flock.effect(filepath)
-        yield* mutate
-      }))
+      yield* Effect.scoped(
+        Effect.gen(function* () {
+          yield* Flock.effect(filepath)
+          yield* mutate
+        }),
+      )
     })
 
     const all = Effect.fn("McpAuth.all")(function* () {

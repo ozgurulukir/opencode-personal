@@ -99,11 +99,9 @@ describe("Auth", () => {
         // Unbounded concurrent whole-file read-modify-write: without the
         // per-file flock, the last writer wins and silently drops the other
         // writers' entries.
-        yield* Effect.forEach(
-          keys,
-          (key) => auth.set(key, { type: "api", key: `sk-${key}` }),
-          { concurrency: "unbounded" },
-        )
+        yield* Effect.forEach(keys, (key) => auth.set(key, { type: "api", key: `sk-${key}` }), {
+          concurrency: "unbounded",
+        })
 
         const data = yield* auth.all()
         for (const key of keys) {
@@ -138,6 +136,7 @@ describe("Auth", () => {
         const data = yield* auth.all()
         for (const key of keep) {
           const entry = data[key]
+          expect(entry?.type).toBe("api")
           if (entry?.type === "api") expect(entry.key.endsWith("-updated")).toBe(true)
         }
         expect(data["gone-a"]).toBeUndefined()

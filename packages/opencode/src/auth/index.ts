@@ -94,6 +94,9 @@ export const layer = Layer.effect(
     // Serialize the whole-file read-modify-write across concurrent writers
     // (CLI login vs server-side OAuth refresh): unlocked writers interleave
     // and the last whole-file write silently drops the other writer's entry.
+    // A live-but-stuck flock holder can time acquisition out after 5 minutes
+    // as an untyped defect (not the AuthError below); crashed holders
+    // self-heal via the stale takeover instead.
     const set = Effect.fn("Auth.set")(function* (key: string, info: Info) {
       const norm = key.replace(/\/+$/, "")
       yield* Effect.scoped(

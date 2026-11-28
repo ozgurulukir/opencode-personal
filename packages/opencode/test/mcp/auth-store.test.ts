@@ -22,11 +22,9 @@ test("parallel mcp auth mutations for different servers do not lose entries", as
       // and silently drops the other servers' entries.
       await run(
         McpAuth.Service.use((auth) =>
-          Effect.forEach(
-            servers,
-            (name) => auth.updateTokens(name, { accessToken: `token-${name}` }),
-            { concurrency: "unbounded" },
-          ),
+          Effect.forEach(servers, (name) => auth.updateTokens(name, { accessToken: `token-${name}` }), {
+            concurrency: "unbounded",
+          }),
         ),
       )
 
