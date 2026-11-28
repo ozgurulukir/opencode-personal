@@ -571,21 +571,51 @@ export class Agent implements ACPAgent {
       }
       const limit = 100
 
-      const sessions = await this.sdk.v2.session
-        .list(
-          {
-            directory: params.cwd ?? undefined,
-            roots: true,
-            limit: 100,
-          },
-          { throwOnError: true },
-        )
-        .then((x) => x.data?.items ?? [])
-
       // Use one comparator for both the sort and the cursor filter. localeCompare
       // and the JS `<` operator disagree on mixed-case base62 ids, so mixing
       // them duplicates or drops sessions at page boundaries.
       const compareID = (a: string, b: string) => a.localeCompare(b)
+
+      // Fetch server pages (consuming the server's opaque cursor) until the
+      // rows that survive the client-cursor filter can fill the requested
+      // page plus the look-ahead row that decides whether a next cursor
+      // exists, or the server reports exhaustion. The adapter previously
+      // fetched only the first server page and compared the filtered row
+      // count against the fetch limit — a condition that could never fire —
+      // so sessions beyond the newest 100 were silently unreachable.
+      // Continuation pages pass only the server cursor: it embeds the page-1
+      // filters (roots/directory), and the route rejects a cursor combined
+      // with filter params.
+      const sessions: Array<{ id: string; directory: string; title: string; time: { updated: number } }> = []
+      let fetchCursor: string | undefined
+      // Defensive page bound: a misbehaving server that keeps returning a
+      // next cursor must not hang the adapter.
+      let pages = 0
+      for (;;) {
+        if (++pages > 1000) throw RequestError.internalError("Session listing did not terminate")
+        const res = await this.sdk.v2.session
+          .list(
+            fetchCursor
+              ? { limit, cursor: fetchCursor }
+              : { directory: params.cwd ?? undefined, roots: true, limit },
+            { throwOnError: true },
+          )
+          .then((x) => x.data)
+        const items = res?.items ?? []
+        if (pages <= 3) console.log("PAGE", pages, "items", items.length, "first", items[0]?.id, "lastId", items.at(-1)?.id)
+        sessions.push(...items)
+        fetchCursor = res?.cursor?.next
+        if (!fetchCursor || items.length === 0) break
+        const passing = cursor
+          ? sessions.filter(
+              (s) =>
+                s.time.updated < cursor.updated ||
+                (s.time.updated === cursor.updated && compareID(s.id, cursor.id) < 0),
+            ).length
+          : sessions.length
+        if (passing > limit) break
+      }
+
       const sorted = sessions.toSorted((a, b) => b.time.updated - a.time.updated || compareID(b.id, a.id))
       const filtered = cursor
         ? sorted.filter(

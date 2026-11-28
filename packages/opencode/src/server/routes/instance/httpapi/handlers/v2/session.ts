@@ -14,7 +14,7 @@ import { SessionShare } from "@/share/session"
 import { NotFoundError as StorageNotFoundError } from "@/storage/storage"
 import { SessionV2 } from "@/v2/session"
 import { NamedError } from "@opencode-ai/core/util/error"
-import { Cause, Effect, Schema } from "effect"
+import { Cause, DateTime, Effect, Schema } from "effect"
 import { HttpApiBuilder, HttpApiError, HttpApiSchema } from "effect/unstable/httpapi"
 import { InstanceHttpApi } from "../../api"
 import { notFound } from "../../errors"
@@ -80,7 +80,17 @@ const sessionCursor = {
     filters: Pick<SessionCursor, "directory" | "path" | "workspaceID" | "roots" | "scope" | "start" | "search">,
   ) {
     return Buffer.from(
-      JSON.stringify({ id: session.id, time: session.time.created, order, direction, ...filters }),
+      JSON.stringify({
+        id: session.id,
+        // The schema's encoded form (epoch millis): the raw DateTime instance
+        // JSON-serializes to an ISO string that this cursor's own decode
+        // (Schema.Finite) cannot parse, so every continuation request failed
+        // with a 400.
+        time: DateTime.toEpochMillis(session.time.created),
+        order,
+        direction,
+        ...filters,
+      }),
     ).toString("base64url")
   },
   decode(input: string) {
@@ -112,15 +122,30 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "v2.session
           })
           if (hasCursorRoutingMismatch(ctx.query, decoded)) return yield* new HttpApiError.BadRequest({})
           const order = decoded?.order ?? ctx.query.order ?? "desc"
-          const filters = decoded ?? {
-            directory: ctx.query.directory,
-            path: ctx.query.path,
-            workspaceID: ctx.query.workspace ? WorkspaceID.make(ctx.query.workspace) : undefined,
-            roots: ctx.query.roots,
-            scope: ctx.query.scope,
-            start: ctx.query.start,
-            search: ctx.query.search,
-          }
+          // Only the filter fields — never the raw decoded cursor. The cursor
+          // object also carries id/time/order/direction, and encode() spreads
+          // filters after the row values, so passing the cursor verbatim made
+          // every continuation page's next cursor echo the incoming one (an
+          // infinite pagination cycle for any consumer following cursors).
+          const filters = decoded
+            ? {
+                directory: decoded.directory,
+                path: decoded.path,
+                workspaceID: decoded.workspaceID,
+                roots: decoded.roots,
+                scope: decoded.scope,
+                start: decoded.start,
+                search: decoded.search,
+              }
+            : {
+                directory: ctx.query.directory,
+                path: ctx.query.path,
+                workspaceID: ctx.query.workspace ? WorkspaceID.make(ctx.query.workspace) : undefined,
+                roots: ctx.query.roots,
+                scope: ctx.query.scope,
+                start: ctx.query.start,
+                search: ctx.query.search,
+              }
           const sessions = yield* session.list({
             limit: ctx.query.limit ?? DefaultSessionsLimit,
             order,
