@@ -16,7 +16,7 @@ import { Format } from "../format"
 import * as Bom from "@/util/bom"
 import { Todo } from "../session/todo"
 import { projectContainmentError, resolvePath } from "./file-path"
-import { LockRegistry } from "./lock"
+import { fileLocks } from "./lock"
 
 export const Parameters = Schema.Struct({
   patchText: Schema.String.annotate({ description: "The full patch text that describes all changes to be made" }),
@@ -49,7 +49,7 @@ export const ApplyPatchTool = Tool.define<
     const format = yield* Format.Service
     const bus = yield* Bus.Service
     const todo = yield* Todo.Service
-    const editLocks = new LockRegistry() // Per-instance: cross-instance edits are not serialized.
+    const editLocks = fileLocks // Shared registry: cross-tool serialization on the same path.
 
     // Acquire every per-path lock in a stable (sorted) order so multi-file patches
     // and moves never deadlock against each other. A move locks both endpoints.
@@ -85,6 +85,39 @@ export const ApplyPatchTool = Tool.define<
 
       const instance = yield* InstanceState.context
 
+      // Cross-hunk same-path validation: hunks are validated and applied
+      // independently, and every hunk derives its content from the same disk
+      // snapshot at validation time, so contradictory combinations
+      // (add+delete, delete+add) or repeated same-path hunks silently clobber
+      // each other. Fail any path touched by more than one hunk — a move
+      // hunk legitimately touches both endpoints, so a single hunk's own
+      // source→dest pair is exempt.
+      const conflicts = new Map<number, string>()
+      {
+        const touchpoints = new Map<string, number[]>()
+        for (const [index, hunk] of hunks.entries()) {
+          const targets = new Set([path.resolve(instance.directory, hunk.path)])
+          // Moves are update hunks with move_path — the hunk legitimately
+          // touches both endpoints (and a self-move collapses to one target).
+          if (hunk.type === "update" && hunk.move_path) targets.add(path.resolve(instance.directory, hunk.move_path))
+          for (const target of targets) {
+            const list = touchpoints.get(target) ?? []
+            list.push(index)
+            touchpoints.set(target, list)
+          }
+        }
+        for (const [target, indices] of touchpoints) {
+          if (indices.length <= 1) continue
+          const error = `Patch touches ${path.relative(
+            instance.directory,
+            target,
+          )} in ${indices.length} hunks (${indices
+            .map((index) => hunks[index].type)
+            .join(", ")}); contradictory or repeated same-path hunks clobber each other — split them into separate patches`
+          for (const index of indices) conflicts.set(index, error)
+        }
+      }
+
       // Validate file paths and check permissions
       const fileChanges: Array<{
         filePath: string
@@ -103,7 +136,15 @@ export const ApplyPatchTool = Tool.define<
 
       const failedHunks: Array<{ path: string; error: string }> = []
 
-      for (const hunk of hunks) {
+      for (const [hunkIndex, hunk] of hunks.entries()) {
+        const conflict = conflicts.get(hunkIndex)
+        if (conflict) {
+          failedHunks.push({
+            path: hunk.path,
+            error: conflict,
+          })
+          continue
+        }
         const filePath = resolvePath(path.resolve(instance.directory, hunk.path))
         const containedError = projectContainmentError(filePath, instance.directory)
         if (containedError) {

@@ -16,7 +16,7 @@ import * as Bom from "@/util/bom"
 import { replace, trimDiff } from "./edit.replacer"
 import { Todo } from "../session/todo"
 import { resolvePath, projectContainmentError } from "./file-path"
-import { LockRegistry } from "./lock"
+import { fileLocks } from "./lock"
 
 function normalizeLineEndings(text: string): string {
   return text.replaceAll("\r\n", "\n")
@@ -54,8 +54,7 @@ export const EditTool = Tool.define<
     const format = yield* Format.Service
     const bus = yield* Bus.Service
     const todo = yield* Todo.Service
-    const editLocks = new LockRegistry() // Per-instance: cross-instance edits are not serialized.
-
+    const editLocks = fileLocks // Shared registry: cross-tool serialization on the same path.
     return {
       description: DESCRIPTION,
       parameters: Parameters,

@@ -91,5 +91,19 @@ describe("Patch namespace", () => {
 
       expect(() => Patch.parsePatch(invalidPatch)).toThrow("Invalid patch format")
     })
+
+    test("should throw error for unprefixed lines in an Add File body", () => {
+      const patch = "*** Begin Patch\n*** Add File: new.txt\ncreated without prefix\n*** End Patch"
+
+      expect(() => Patch.parsePatch(patch)).toThrow("Malformed patch line in add body")
+    })
+
+    test("should tolerate blank lines inside an Add File body", () => {
+      const patch = "*** Begin Patch\n*** Add File: new.txt\n+first\n\n+second\n*** End Patch"
+
+      const result = Patch.parsePatch(patch)
+      expect(result.hunks).toHaveLength(1)
+      expect(result.hunks[0]).toMatchObject({ type: "add", path: "new.txt", contents: "first\nsecond" })
+    })
   })
 })

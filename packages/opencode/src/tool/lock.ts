@@ -44,3 +44,11 @@ export class LockRegistry {
     )
   }
 }
+
+// One registry shared across the file-mutating tools (edit, write,
+// apply_patch) so a concurrent pair on the same path serializes its
+// read→ask→write spans instead of silently losing one write: the AI SDK runs
+// one step's tool calls concurrently and subagents run in parallel, and each
+// tool derives its content from its own read. Module-level on purpose — the
+// lock must be shared across tool instances, not per-instance.
+export const fileLocks = new LockRegistry()

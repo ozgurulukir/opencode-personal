@@ -418,6 +418,47 @@ describe("tool.apply_patch freeform", () => {
     })
   })
 
+  test("rejects contradictory same-path hunks", async () => {
+    await using fixture = await tmpdir()
+    const { ctx } = makeCtx()
+
+    await WithInstance.provide({
+      directory: fixture.path,
+      fn: async () => {
+        const patchText =
+          "*** Begin Patch\n*** Add File: conflict.txt\n+created\n*** Delete File: conflict.txt\n*** End Patch"
+
+        const result = await execute({ patchText }, ctx)
+        expect(result.metadata.failedHunks.length).toBe(2)
+        expect(result.metadata.failedHunks[0].error).toContain("conflict.txt")
+        expect(result.metadata.failedHunks[0].error).toContain("add, delete")
+        expect(result.metadata.failedHunks[0].error).toContain("2 hunks")
+        // Neither hunk applied: the file must not exist.
+        await expect(fs.readFile(path.join(fixture.path, "conflict.txt"), "utf-8")).rejects.toThrow()
+      },
+    })
+  })
+
+  test("allows a move hunk's own source and destination paths", async () => {
+    await using fixture = await tmpdir()
+    const { ctx } = makeCtx()
+
+    await WithInstance.provide({
+      directory: fixture.path,
+      fn: async () => {
+        const source = path.join(fixture.path, "source.txt")
+        await fs.writeFile(source, "from\n", "utf-8")
+
+        const patchText =
+          "*** Begin Patch\n*** Update File: source.txt\n*** Move to: renamed.txt\n@@\n-from\n+to\n*** End Patch"
+
+        await execute({ patchText }, ctx)
+        await expect(fs.readFile(source, "utf-8")).rejects.toThrow()
+        expect(await fs.readFile(path.join(fixture.path, "renamed.txt"), "utf-8")).toBe("to\n")
+      },
+    })
+  })
+
   test("rejects update when target file is missing", async () => {
     await using fixture = await tmpdir()
     const { ctx } = makeCtx()

@@ -16,6 +16,7 @@ import { assertExternalDirectoryEffect } from "./external-directory"
 import * as Bom from "@/util/bom"
 import { Todo } from "../session/todo"
 import { resolvePath, projectContainmentError } from "./file-path"
+import { fileLocks } from "./lock"
 
 const MAX_PROJECT_DIAGNOSTICS_FILES = 5
 
@@ -55,72 +56,82 @@ export const WriteTool = Tool.define<
           }
           yield* assertExternalDirectoryEffect(ctx, resolvedFilepath)
 
-          const exists = yield* fs.existsSafe(resolvedFilepath)
-          const source = exists ? yield* Bom.readFile(fs, resolvedFilepath) : { bom: false, text: "" }
-          const next = Bom.split(params.content)
-          const desiredBom = source.bom || next.bom
-          const contentOld = source.text
-          const contentNew = next.text
+          // Serialize the whole read→ask→write span like edit does: the AI SDK
+          // runs one step's tool calls concurrently and subagents run in
+          // parallel, so an unlocked span interleaves with a concurrent
+          // edit/write on the same path and the stale read's write silently
+          // discards the other writer's change.
+          return yield* fileLocks.withLock(
+            resolvedFilepath,
+            Effect.gen(function* () {
+              const exists = yield* fs.existsSafe(resolvedFilepath)
+              const source = exists ? yield* Bom.readFile(fs, resolvedFilepath) : { bom: false, text: "" }
+              const next = Bom.split(params.content)
+              const desiredBom = source.bom || next.bom
+              const contentOld = source.text
+              const contentNew = next.text
 
-          const diff = trimDiff(
-            (yield* Effect.tryPromise({
-              try: () => createTwoFilesPatch(resolvedFilepath, resolvedFilepath, contentOld, contentNew),
-              catch: (error) =>
-                new Error(
-                  `createTwoFilesPatch failed for ${resolvedFilepath}: ${error instanceof Error ? error.message : String(error)}`,
-                ),
-            })) as string,
+              const diff = trimDiff(
+                (yield* Effect.tryPromise({
+                  try: () => createTwoFilesPatch(resolvedFilepath, resolvedFilepath, contentOld, contentNew),
+                  catch: (error) =>
+                    new Error(
+                      `createTwoFilesPatch failed for ${resolvedFilepath}: ${error instanceof Error ? error.message : String(error)}`,
+                    ),
+                })) as string,
+              )
+              const relPath = path.relative(instance.worktree, resolvedFilepath)
+              yield* ctx.ask({
+                permission: "edit",
+                patterns: [relPath],
+                always: [relPath],
+                metadata: {
+                  filepath: resolvedFilepath,
+                  diff,
+                },
+              })
+
+              yield* fs.writeWithDirs(resolvedFilepath, Bom.join(contentNew, desiredBom))
+              if (yield* format.file(resolvedFilepath)) {
+                yield* Bom.syncFile(fs, resolvedFilepath, desiredBom)
+              }
+              yield* bus.publish(File.Event.Edited, { file: resolvedFilepath })
+              yield* bus.publish(FileWatcher.Event.Updated, {
+                file: resolvedFilepath,
+                event: exists ? "change" : "add",
+              })
+
+              yield* todo.autoclose(ctx.sessionID, [{ filePath: resolvedFilepath, diff }])
+
+              let output = "Wrote file successfully."
+              yield* lsp.touchFile(resolvedFilepath, "document")
+              const diagnostics = yield* lsp.diagnostics()
+              const normalizedFilepath = AppFileSystem.normalizePath(resolvedFilepath)
+              let projectDiagnosticsCount = 0
+              for (const [file, issues] of Object.entries(diagnostics)) {
+                const current = file === normalizedFilepath
+                if (!current && projectDiagnosticsCount >= MAX_PROJECT_DIAGNOSTICS_FILES) continue
+                const block = LSP.Diagnostic.report(current ? resolvedFilepath : file, issues)
+                if (!block) continue
+                if (current) {
+                  output += `\n\nLSP errors detected in this file, please fix:\n${block}`
+                  continue
+                }
+                projectDiagnosticsCount++
+                output += `\n\nLSP errors detected in other files:\n${block}`
+              }
+
+              return {
+                title: path.relative(instance.worktree, resolvedFilepath),
+                metadata: {
+                  diagnostics,
+                  filepath: resolvedFilepath,
+                  exists: exists,
+                },
+                output,
+              }
+            }),
           )
-          const relPath = path.relative(instance.worktree, resolvedFilepath)
-          yield* ctx.ask({
-            permission: "edit",
-            patterns: [relPath],
-            always: [relPath],
-            metadata: {
-              filepath: resolvedFilepath,
-              diff,
-            },
-          })
-
-          yield* fs.writeWithDirs(resolvedFilepath, Bom.join(contentNew, desiredBom))
-          if (yield* format.file(resolvedFilepath)) {
-            yield* Bom.syncFile(fs, resolvedFilepath, desiredBom)
-          }
-          yield* bus.publish(File.Event.Edited, { file: resolvedFilepath })
-          yield* bus.publish(FileWatcher.Event.Updated, {
-            file: resolvedFilepath,
-            event: exists ? "change" : "add",
-          })
-
-          yield* todo.autoclose(ctx.sessionID, [{ filePath: resolvedFilepath, diff }])
-
-          let output = "Wrote file successfully."
-          yield* lsp.touchFile(resolvedFilepath, "document")
-          const diagnostics = yield* lsp.diagnostics()
-          const normalizedFilepath = AppFileSystem.normalizePath(resolvedFilepath)
-          let projectDiagnosticsCount = 0
-          for (const [file, issues] of Object.entries(diagnostics)) {
-            const current = file === normalizedFilepath
-            if (!current && projectDiagnosticsCount >= MAX_PROJECT_DIAGNOSTICS_FILES) continue
-            const block = LSP.Diagnostic.report(current ? resolvedFilepath : file, issues)
-            if (!block) continue
-            if (current) {
-              output += `\n\nLSP errors detected in this file, please fix:\n${block}`
-              continue
-            }
-            projectDiagnosticsCount++
-            output += `\n\nLSP errors detected in other files:\n${block}`
-          }
-
-          return {
-            title: path.relative(instance.worktree, resolvedFilepath),
-            metadata: {
-              diagnostics,
-              filepath: resolvedFilepath,
-              exists: exists,
-            },
-            output,
-          }
         }).pipe(Effect.orDie),
     }
   }),
