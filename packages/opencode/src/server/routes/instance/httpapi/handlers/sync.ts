@@ -9,12 +9,21 @@ import { and, asc, eq, inArray, lte, not, or } from "drizzle-orm"
 import { Effect, Scope } from "effect"
 import { HttpApiBuilder, HttpApiError } from "effect/unstable/httpapi"
 import { InstanceHttpApi } from "../api"
-import { badRequest } from "../errors"
+import { badRequest, notFound } from "../errors"
 import { HistoryPayload, ReplayPayload, SessionPayload } from "../groups/sync"
 import * as Log from "@opencode-ai/core/util/log"
 import { errorData } from "@/util/error"
 
 const log = Log.create({ service: "server.sync" })
+
+// Mirrors the schema-error middleware's reason cap: validation messages echo
+// client-supplied event data (aggregate ids, seq values), so the 400 body must
+// stay bounded instead of mirroring an entire payload.
+const REJECTION_LIMIT = 1024
+function truncateRejection(reason: string) {
+  const message = reason.length <= REJECTION_LIMIT ? reason : reason.slice(0, REJECTION_LIMIT)
+  return `Replay rejected: ${message}`
+}
 
 export const syncHandlers = HttpApiBuilder.group(InstanceHttpApi, "sync", (handlers) =>
   Effect.gen(function* () {
@@ -48,19 +57,18 @@ export const syncHandlers = HttpApiBuilder.group(InstanceHttpApi, "sync", (handl
         last: events.at(-1)?.seq,
         directory: ctx.payload.directory,
       })
-      // SyncEvent.replay/replayAll signal validation failures (sequence
-      // mismatch, cross-aggregate batch, unknown event type) by throwing,
-      // which surfaces as a defect; the route declares a 400 error, so
-      // surface those as the declared error body instead of a sanitized 500.
+      // SyncEvent.replay/replayAll signal client-caused validation failures
+      // (sequence mismatch, cross-aggregate batch, unknown event type) with a
+      // typed SyncEvent.ValidationError, which surfaces as a defect; the route
+      // declares a 400 error, so map exactly that class to the declared error
+      // body and re-raise anything else (infra faults keep the sanitized 500).
+      // The message echoes client-supplied data, so cap it like the
+      // schema-error middleware does.
       yield* sync.replayAll(events).pipe(
         Effect.catchDefect((defect) =>
-          Effect.fail(
-            badRequest(
-              defect instanceof Error && defect.message
-                ? `Replay rejected: ${defect.message}`
-                : "Replay rejected",
-            ),
-          ),
+          defect instanceof SyncEvent.ValidationError
+            ? Effect.fail(badRequest(truncateRejection(defect.message)))
+            : Effect.die(defect),
         ),
       )
       log.info("sync replay complete", {
@@ -85,7 +93,7 @@ export const syncHandlers = HttpApiBuilder.group(InstanceHttpApi, "sync", (handl
           .get(),
       )
       if (!sessionRow || sessionRow.projectID !== instance.project.id) {
-        return yield* new HttpApiError.NotFound({})
+        return yield* notFound(`Session not found: ${ctx.payload.sessionID}`)
       }
 
       yield* sync.run(Session.Event.Updated, {

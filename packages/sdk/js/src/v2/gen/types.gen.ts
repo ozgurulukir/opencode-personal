@@ -2487,43 +2487,43 @@ export type SyncEventSessionUpdated = {
     data: {
       sessionID: string
       info: {
-        id?: string
-        slug?: string
-        projectID?: string
-        workspaceID?: string
-        directory?: string
-        path?: string
-        parentID?: string
+        id?: string | null
+        slug?: string | null
+        projectID?: string | null
+        workspaceID?: string | null
+        directory?: string | null
+        path?: string | null
+        parentID?: string | null
         summary?: {
           additions: number
           deletions: number
           files: number
           diffs?: Array<SnapshotFileDiff>
-        }
+        } | null
         share?: {
-          url?: string
+          url?: string | null
         }
-        title?: string
-        agent?: string
+        title?: string | null
+        agent?: string | null
         model?: {
           id: string
           providerID: string
           variant?: string
-        }
-        version?: string
+        } | null
+        version?: string | null
         time?: {
-          created?: number
-          updated?: number
-          compacting?: number
-          archived?: number
+          created?: number | null
+          updated?: number | null
+          compacting?: number | null
+          archived?: number | null
         }
-        permission?: PermissionRuleset
+        permission?: PermissionRuleset | null
         revert?: {
           messageID: string | string
           partID?: string
           snapshot?: string
           diff?: string
-        }
+        } | null
       }
     }
   }
@@ -6697,7 +6697,7 @@ export type SyncStealErrors = {
    */
   400: BadRequestError
   /**
-   * Not found
+   * NotFoundError
    */
   404: NotFoundError
 }

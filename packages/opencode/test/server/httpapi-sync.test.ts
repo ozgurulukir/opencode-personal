@@ -231,6 +231,63 @@ describe("sync HttpApi", () => {
     expect(typeof body.data?.message).toBe("string")
   })
 
+  test("returns declared 400 for a stale single-event replay", async () => {
+    Flag.OPENCODE_EXPERIMENTAL_WORKSPACES = true
+    await using tmp = await tmpdir({ git: true, config: { formatter: false, lsp: false } })
+    const headers = { "x-opencode-directory": tmp.path, "content-type": "application/json" }
+    const session = await WithInstance.provide({
+      directory: tmp.path,
+      fn: async () => runSession(Session.Service.use((svc) => svc.create({ title: "stale" }))),
+    })
+
+    const response = await app().request(SyncPaths.replay, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        directory: tmp.path,
+        events: [
+          {
+            id: EventID.ascending(),
+            aggregateID: session.id,
+            seq: nextSeq(session.id) + 10,
+            type: "session.next.synthetic.1",
+            data: { sessionID: session.id, timestamp: "2024-01-02T03:04:05.000Z", text: "stale" },
+          },
+        ],
+      }),
+    })
+    expect(response.status).toBe(400)
+    const body = (await response.json()) as { name?: string; data?: { message?: string } }
+    expect(body.name).toBe("BadRequest")
+    expect(body.data?.message).toContain("Sequence mismatch")
+  })
+
+  test("returns declared 400 for an unknown event type", async () => {
+    await using tmp = await tmpdir({ git: true, config: { formatter: false, lsp: false } })
+    const headers = { "x-opencode-directory": tmp.path, "content-type": "application/json" }
+
+    const response = await app().request(SyncPaths.replay, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        directory: tmp.path,
+        events: [
+          {
+            id: EventID.ascending(),
+            aggregateID: "session",
+            seq: 0,
+            type: "no.such.event.1",
+            data: {},
+          },
+        ],
+      }),
+    })
+    expect(response.status).toBe(400)
+    const body = (await response.json()) as { name?: string; data?: { message?: string } }
+    expect(body.name).toBe("BadRequest")
+    expect(body.data?.message).toContain("Unknown event type")
+  })
+
   test("returns declared 400 for steal without workspace context", async () => {
     await using tmp = await tmpdir({ git: true, config: { formatter: false, lsp: false } })
     const headers = { "x-opencode-directory": tmp.path, "content-type": "application/json" }

@@ -274,8 +274,14 @@ function applyLegacySchemaOverrides(spec: OpenApiSpec) {
   const model = schemas.ProviderConfig?.properties?.models?.additionalProperties
   const variants = typeof model === "object" ? model.properties?.variants?.additionalProperties : undefined
   if (variants && typeof variants === "object") variants.additionalProperties = {}
-  const syncInfo = schemas.SyncEventSessionUpdated?.properties?.data?.properties?.info
+  // The sync envelope nests the event under `syncEvent` (see SyncEvent.effectPayloads);
+  // the info payload lives at syncEvent.properties.data.properties.info.
+  const syncInfo = schemas.SyncEventSessionUpdated?.properties?.syncEvent?.properties?.data?.properties?.info
   if (syncInfo?.properties) makePropertiesNullable(syncInfo.properties)
+  else if (schemas.SyncEventSessionUpdated)
+    log.warn("legacy SyncEventSessionUpdated override did not resolve; nullability may drift", {
+      keys: Object.keys(schemas.SyncEventSessionUpdated.properties ?? {}),
+    })
 }
 
 function normalizeComponentDescriptions(spec: OpenApiSpec) {
