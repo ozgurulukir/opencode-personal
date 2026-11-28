@@ -95,12 +95,16 @@ describe("tool.write", () => {
         // not yet written).
         yield* Deferred.await(entered)
 
-        // Start the write while edit holds the shared lock: it queues until
-        // edit's span finishes, then reads the post-edit file and overwrites
-        // wholesale — the serialized result keeps the write tool's content.
+        // Start the write while edit holds the shared lock, then give the
+        // child fiber a beat to schedule: on the locked code the write parks
+        // on the lock until edit's span finishes and then reads the post-edit
+        // file; on the unlocked code the write completes mid-span and edit's
+        // stale-read write afterwards clobbers it. The final content must be
+        // the write tool's either way.
         const writeFiber = yield* run({ filePath: filepath, content: "aaa\nBBB\nccc\nWITH-WRITE\n" }).pipe(
           Effect.forkChild,
         )
+        yield* Effect.sleep(100)
 
         Deferred.doneUnsafe(release, Exit.void)
         yield* Fiber.join(editFiber)
