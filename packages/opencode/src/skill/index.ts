@@ -235,7 +235,10 @@ const add = Effect.fnUntraced(function* (state: State, match: string, bus: Bus.I
   }
   // Checked against the resolved name: the unsafe-name fallback can land on a
   // name already taken, and that collision must warn like a direct duplicate.
-  const existing = state.skills[skillName]
+  // Object.hasOwn like the other registry reads: a bare lookup on the first
+  // registration of a skill named toString/constructor resolves the inherited
+  // prototype member and logs a spurious duplicate warning.
+  const existing = Object.hasOwn(state.skills, skillName) ? state.skills[skillName] : undefined
   if (existing) {
     if (existing.location !== "<built-in>") {
       log.warn("duplicate skill name", {

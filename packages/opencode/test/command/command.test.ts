@@ -12,7 +12,7 @@ const it = testEffect(Layer.mergeAll(Command.defaultLayer, node))
 describe("command", () => {
   it.live("get resolves prototype keys to undefined", () =>
     provideTmpdirInstance(
-      (dir) =>
+      () =>
         Effect.gen(function* () {
           const command = yield* Command.Service
           // A bare store lookup would resolve the inherited members and crash
