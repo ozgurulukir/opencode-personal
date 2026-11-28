@@ -1119,10 +1119,9 @@ export const layer = Layer.effect(
      * keeps an unrelated staging from auto-resuming an unfinished turn
      * (aborted or step-failed assistants, pending tool flows).
      *
-     * The lock guards drains only: an immediate-delivery prompt can still run
-     * the engine loop concurrently with a drain (pre-existing — the engine's
-     * ensureRunning joins concurrent loop requests, engine-level
-     * serialization would be a separate change).
+     * The lock guards drains only: an immediate-delivery prompt's caller
+     * proceeds concurrently and joins the in-flight loop run
+     * (Runner.ensureRunning), so its message is folded into the running turn.
      *
      * Delegates to `SessionPromptEngine.loop`; the V1 service is only a
      * compatibility facade.
