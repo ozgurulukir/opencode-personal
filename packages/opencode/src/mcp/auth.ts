@@ -3,6 +3,7 @@ import z from "zod"
 import { Global } from "@opencode-ai/core/global"
 import { Effect, Layer, Context } from "effect"
 import { AppFileSystem } from "@opencode-ai/core/filesystem"
+import { Flock } from "@opencode-ai/core/util/flock"
 import * as Log from "@opencode-ai/core/util/log"
 
 const log = Log.create({ service: "mcp.auth" })
@@ -63,14 +64,32 @@ export const layer = Layer.effect(
     // boundary. The interface deliberately stays data-level — widening the
     // error channel would ripple through every update* flow; the defect is the
     // raw fs error, so the HTTP errorLayer renders it as an internal-error
-    // response rather than a structured NamedError one.
+    // response rather than a structured NamedError one. The write goes through
+    // a sibling temp file + rename so concurrent readers never observe a
+    // truncated file and a crash cannot leave partial JSON.
     const writeOrDie = (mcpName: string, data: Record<string, Entry>) =>
-      fs.writeJson(filepath, data, 0o600).pipe(
+      Effect.gen(function* () {
+        const tmp = `${filepath}.tmp`
+        yield* fs.writeJson(tmp, data, 0o600)
+        yield* fs.rename(tmp, filepath)
+      }).pipe(
         Effect.tapError((error) =>
           Effect.sync(() => log.error("failed to write mcp-auth.json", { mcpName, error: String(error) })),
         ),
         Effect.orDie,
       )
+
+    // Serialize the whole-file read-modify-write under a cross-process flock:
+    // MCP state init connects all servers with unbounded concurrency and the
+    // OAuth dance persists clientInfo/tokens mid-connect, so unlocked writers
+    // interleave and the last whole-file write silently drops the other
+    // server's entry.
+    const locked = Effect.fn("McpAuth.locked")(function* (mutate: Effect.Effect<void>) {
+      yield* Effect.scoped(Effect.gen(function* () {
+        yield* Flock.effect(filepath)
+        yield* mutate
+      }))
+    })
 
     const all = Effect.fn("McpAuth.all")(function* () {
       return yield* fs.readJson(filepath).pipe(
@@ -93,31 +112,51 @@ export const layer = Layer.effect(
     })
 
     const set = Effect.fn("McpAuth.set")(function* (mcpName: string, entry: Entry, serverUrl?: string) {
-      const data = yield* all()
-      if (serverUrl) entry.serverUrl = serverUrl
-      yield* writeOrDie(mcpName, { ...data, [mcpName]: entry })
+      yield* locked(
+        Effect.gen(function* () {
+          const data = yield* all()
+          if (serverUrl) entry.serverUrl = serverUrl
+          data[mcpName] = entry
+          yield* writeOrDie(mcpName, data)
+        }),
+      )
     })
 
     const remove = Effect.fn("McpAuth.remove")(function* (mcpName: string) {
-      const data = yield* all()
-      delete data[mcpName]
-      yield* writeOrDie(mcpName, data)
+      yield* locked(
+        Effect.gen(function* () {
+          const data = yield* all()
+          delete data[mcpName]
+          yield* writeOrDie(mcpName, data)
+        }),
+      )
     })
 
     const updateField = <K extends keyof Entry>(field: K, spanName: string) =>
       Effect.fn(`McpAuth.${spanName}`)(function* (mcpName: string, value: NonNullable<Entry[K]>, serverUrl?: string) {
-        const entry = (yield* get(mcpName)) ?? {}
-        entry[field] = value
-        yield* set(mcpName, entry, serverUrl)
+        yield* locked(
+          Effect.gen(function* () {
+            const data = yield* all()
+            const entry = data[mcpName] ?? {}
+            entry[field] = value
+            if (serverUrl) entry.serverUrl = serverUrl
+            data[mcpName] = entry
+            yield* writeOrDie(mcpName, data)
+          }),
+        )
       })
 
     const clearField = <K extends keyof Entry>(field: K, spanName: string) =>
       Effect.fn(`McpAuth.${spanName}`)(function* (mcpName: string) {
-        const entry = yield* get(mcpName)
-        if (entry) {
-          delete entry[field]
-          yield* set(mcpName, entry)
-        }
+        yield* locked(
+          Effect.gen(function* () {
+            const data = yield* all()
+            const entry = data[mcpName]
+            if (!entry) return
+            delete entry[field]
+            yield* writeOrDie(mcpName, data)
+          }),
+        )
       })
 
     const updateTokens = updateField("tokens", "updateTokens")
