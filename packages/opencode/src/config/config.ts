@@ -19,7 +19,7 @@ import { isRecord } from "@/util/record"
 import type { ConsoleState } from "./console-state"
 import { AppFileSystem } from "@opencode-ai/core/filesystem"
 import { InstanceState } from "@/effect/instance-state"
-import { Context, Duration, Effect, Exit, Fiber, Layer, Option, Schema } from "effect"
+import { Cause, Context, Duration, Effect, Exit, Fiber, Layer, Option, Schema } from "effect"
 import { EffectFlock } from "@opencode-ai/core/util/effect-flock"
 import { containsPath } from "../project/instance-context"
 import { zod } from "@opencode-ai/core/effect-zod"
@@ -698,57 +698,71 @@ export const layer = Layer.effect(
         ])
         for (const [key, value] of Object.entries(auth)) {
           if (value.type === "wellknown") {
-            const url = key.replace(/\/+$/, "")
-            yield* Effect.promise(() =>
-              assertSafeRemoteUrl(url, "well-known auth provider URL", { allowLocalhost: true }),
+            // One broken well-known provider (offline host, SSRF check failure,
+            // malformed remote payload) must not fail the whole config load:
+            // catch everything (Effect.promise throws surface as defects, not
+            // typed failures) and skip the failing entry.
+            const exit = yield* Effect.exit(
+              Effect.gen(function* () {
+                const url = key.replace(/\/+$/, "")
+                yield* Effect.promise(() =>
+                  assertSafeRemoteUrl(url, "well-known auth provider URL", { allowLocalhost: true }),
+                )
+                if (/^[A-Z_][A-Z0-9_]*$/.test(value.key) && !UNSAFE_ENV_KEYS.has(value.key)) {
+                  process.env[value.key] = value.token
+                } else {
+                  log.warn("ignoring unsafe well-known env key", { key: value.key })
+                }
+                log.debug("fetching remote config", { url: `${url}/.well-known/opencode` })
+                const wellknown = (yield* Effect.promise(() =>
+                  safeFetchJson<Record<string, unknown>>(
+                    `${url}/.well-known/opencode`,
+                    "well-known auth provider metadata",
+                    {
+                      allowLocalhost: true,
+                    },
+                  ),
+                )) as {
+                  config?: Record<string, unknown>
+                  remote_config?: unknown
+                }
+                const remote = yield* Effect.promise(() =>
+                  substituteWellKnownRemoteConfig({
+                    value: wellknown.remote_config,
+                    dir: url,
+                    source: `${url}/.well-known/opencode`,
+                  }),
+                )
+                const fetchedConfig = remote
+                  ? ((yield* Effect.promise(async () => {
+                      log.debug("fetching remote config", { url: remote.url })
+                      const data = await safeFetchJson<unknown>(remote.url, "well-known remote_config.url", {
+                        headers: remote.headers,
+                        allowLocalhost: true,
+                      })
+                      return isRecord(data) && isRecord(data.config) ? data.config : data
+                    })) as Record<string, unknown>)
+                  : {}
+                const remoteConfig = mergeConfig(wellknown.config ?? {}, fetchedConfig as Info)
+                if (!remoteConfig.$schema)
+                  remoteConfig.$schema = "https://ozgurulukir.github.io/opencode-personal/config.json"
+                const source = `${url}/.well-known/opencode`
+                const next = yield* loadConfig(JSON.stringify(remoteConfig), {
+                  dir: path.dirname(source),
+                  source,
+                  // Remote-sourced config must not let its body read local files.
+                  allowFile: false,
+                })
+                yield* merge(source, next, "global")
+                log.debug("loaded remote config from well-known", { url })
+              }).pipe(Effect.withSpan("Config.loadWellKnownConfig")),
             )
-            if (/^[A-Z_][A-Z0-9_]*$/.test(value.key) && !UNSAFE_ENV_KEYS.has(value.key)) {
-              process.env[value.key] = value.token
-            } else {
-              log.warn("ignoring unsafe well-known env key", { key: value.key })
+            if (Exit.isFailure(exit)) {
+              log.warn("failed to load well-known provider config, skipping", {
+                url: key,
+                error: String(Cause.squash(exit.cause)),
+              })
             }
-            log.debug("fetching remote config", { url: `${url}/.well-known/opencode` })
-            const wellknown = (yield* Effect.promise(() =>
-              safeFetchJson<Record<string, unknown>>(
-                `${url}/.well-known/opencode`,
-                "well-known auth provider metadata",
-                {
-                  allowLocalhost: true,
-                },
-              ),
-            )) as {
-              config?: Record<string, unknown>
-              remote_config?: unknown
-            }
-            const remote = yield* Effect.promise(() =>
-              substituteWellKnownRemoteConfig({
-                value: wellknown.remote_config,
-                dir: url,
-                source: `${url}/.well-known/opencode`,
-              }),
-            )
-            const fetchedConfig = remote
-              ? ((yield* Effect.promise(async () => {
-                  log.debug("fetching remote config", { url: remote.url })
-                  const data = await safeFetchJson<unknown>(remote.url, "well-known remote_config.url", {
-                    headers: remote.headers,
-                    allowLocalhost: true,
-                  })
-                  return isRecord(data) && isRecord(data.config) ? data.config : data
-                })) as Record<string, unknown>)
-              : {}
-            const remoteConfig = mergeConfig(wellknown.config ?? {}, fetchedConfig as Info)
-            if (!remoteConfig.$schema)
-              remoteConfig.$schema = "https://ozgurulukir.github.io/opencode-personal/config.json"
-            const source = `${url}/.well-known/opencode`
-            const next = yield* loadConfig(JSON.stringify(remoteConfig), {
-              dir: path.dirname(source),
-              source,
-              // Remote-sourced config is untrusted: never let its body read local files.
-              allowFile: false,
-            })
-            yield* merge(source, next, "global")
-            log.debug("loaded remote config from well-known", { url })
           }
         }
 
@@ -905,7 +919,19 @@ export const layer = Layer.effect(
         }
 
         if (Flag.OPENCODE_PERMISSION) {
-          result.permission = mergeDeep(result.permission ?? {}, JSON.parse(Flag.OPENCODE_PERMISSION))
+          let envPermission: unknown
+          try {
+            envPermission = JSON.parse(Flag.OPENCODE_PERMISSION)
+          } catch (error) {
+            log.warn("ignoring malformed OPENCODE_PERMISSION env var: not valid JSON", {
+              error: String(error),
+            })
+          }
+          if (isRecord(envPermission)) {
+            result.permission = mergeDeep(result.permission ?? {}, envPermission as NonNullable<Info["permission"]>)
+          } else if (envPermission !== undefined) {
+            log.warn("ignoring OPENCODE_PERMISSION env var: not a JSON object")
+          }
         }
 
         if (result.tools) {
@@ -969,6 +995,19 @@ export const layer = Layer.effect(
       yield* InstanceState.invalidate(state)
     })
 
+    // Write via tmp+rename so a crash mid-write cannot leave a truncated config
+    // file behind (same shape as the legacy TOML migration's write path). A
+    // failed rename is best-effort cleaned up so no .tmp residue remains.
+    const writeFileAtomic = Effect.fn("Config.writeFileAtomic")(function* (file: string, content: string) {
+      const tmp = `${file}.tmp`
+      yield* fs.writeFileString(tmp, content).pipe(Effect.orDie)
+      const renamed = yield* Effect.exit(fs.rename(tmp, file))
+      if (Exit.isFailure(renamed)) {
+        yield* Effect.exit(fs.remove(tmp))
+        return yield* Effect.die(Cause.squash(renamed.cause))
+      }
+    })
+
     // Shared write path for update/updateGlobal: read → normalize empty file → merge → serialize → changed-detect → write → invalidate.
     // Empty files are treated as "{}" — otherwise "" feeds ConfigParse.jsonc and crashes on undefined.
     const writeConfigFile = Effect.fn("Config.writeConfigFile")(function* (
@@ -989,13 +1028,13 @@ export const layer = Layer.effect(
         }
         const serialized = JSON.stringify(merged, null, 2)
         changed = serialized !== before
-        if (changed) yield* fs.writeFileString(file, serialized).pipe(Effect.orDie)
+        if (changed) yield* writeFileAtomic(file, serialized)
         next = merged
       } else {
         const updated = patchJsonc(before, patch)
         next = ConfigParse.effectSchema(Info, ConfigParse.jsonc(updated, file), file)
         changed = updated !== before
-        if (changed) yield* fs.writeFileString(file, updated).pipe(Effect.orDie)
+        if (changed) yield* writeFileAtomic(file, updated)
       }
 
       if (changed) yield* invalidate()
