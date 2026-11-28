@@ -1218,21 +1218,31 @@ export function Prompt(props: PromptProps) {
         })
       setStore("mode", "normal")
     } else if (slash && sync.data.command.some((x) => x.name === slash.name)) {
-      void sdk.client.v2.session.command({
-        sessionID,
-        command: slash.name,
-        arguments: slash.args,
-        agent: agent.name,
-        model: `${selectedModel.providerID}/${selectedModel.modelID}`,
-        messageID,
-        variant,
-        parts: nonTextParts
-          .filter((x) => x.type === "file")
-          .map((x) => ({
-            id: PartID.ascending(),
-            ...x,
-          })),
-      })
+      void sdk.client.v2.session
+        .command({
+          sessionID,
+          command: slash.name,
+          arguments: slash.args,
+          agent: agent.name,
+          model: `${selectedModel.providerID}/${selectedModel.modelID}`,
+          messageID,
+          variant,
+          parts: nonTextParts
+            .filter((x) => x.type === "file")
+            .map((x) => ({
+              id: PartID.ascending(),
+              ...x,
+            })),
+        })
+        .then((res) => {
+          if (!res.error) return
+          Log.Default.error("Command failed:", { error: res.error })
+          toast.show({
+            title: "Command failed",
+            message: errorMessage(res.error),
+            variant: "error",
+          })
+        })
     } else {
       // promptAsync forks the loop server-side: a TUI disconnect no longer
       // aborts the run, and failures surface as SessionEvent.Error instead of
