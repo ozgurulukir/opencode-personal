@@ -35,7 +35,9 @@ Examples:
     process.exit(1)
   }
 
-  const opencode = await createOpencode({ port: 0 })
+  // The workflow installs the fork as `opencode-personal` (install.sh COMMAND);
+  // the SDK launcher defaults to bare `opencode`, which would not resolve here.
+  const opencode = await createOpencode({ port: 0, command: "opencode-personal" })
 
   try {
     const parts: Array<{ type: "text"; text: string } | { type: "file"; url: string; filename: string; mime: string }> =

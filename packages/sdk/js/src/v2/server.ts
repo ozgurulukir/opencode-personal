@@ -8,6 +8,8 @@ export type ServerOptions = {
   signal?: AbortSignal
   timeout?: number
   config?: Config
+  /** Binary to launch (default "opencode"); forks can override, e.g. "opencode-personal". */
+  command?: string
 }
 
 export type TuiOptions = {
@@ -32,7 +34,7 @@ export async function createOpencodeServer(options?: ServerOptions) {
   const args = [`serve`, `--hostname=${options.hostname}`, `--port=${options.port}`]
   if (options.config?.logLevel) args.push(`--log-level=${options.config.logLevel}`)
 
-  const proc = launch(`opencode`, args, {
+  const proc = launch(options.command ?? `opencode`, args, {
     env: {
       ...process.env,
       OPENCODE_CONFIG_CONTENT: JSON.stringify(options.config ?? {}),

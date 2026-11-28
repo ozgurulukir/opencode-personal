@@ -232,7 +232,10 @@ function createOpencode() {
   const host = "127.0.0.1"
   const port = 4096
   const url = `http://${host}:${port}`
-  const proc = spawn(`opencode`, [`serve`, `--hostname=${host}`, `--port=${port}`])
+  // The action installs the fork under the opencode-personal command name
+  // (install.sh COMMAND); bare `opencode` would pick up an unrelated upstream
+  // install or fail outright.
+  const proc = spawn(`opencode-personal`, [`serve`, `--hostname=${host}`, `--port=${port}`])
   const client = createOpencodeClient({ baseUrl: url })
 
   return {
@@ -342,7 +345,9 @@ function useEnvMock() {
 }
 
 function useEnvGithubToken() {
-  return process.env["TOKEN"]
+  // action.yml maps the `use_github_token` input to USE_GITHUB_TOKEN (see the
+  // env block of the composite run step); TOKEN was never populated.
+  return process.env["USE_GITHUB_TOKEN"]
 }
 
 function isMock() {
@@ -562,10 +567,11 @@ async function subscribeSessionEvents() {
 
               if (part.type === "tool" && part.state.status === "completed") {
                 const [tool, color] = TOOL[part.tool] ?? [part.tool, "\x1b[34m\x1b[1m"]
-                const title =
-                  part.state.title || Object.keys(part.state.input).length > 0
-                    ? JSON.stringify(part.state.input)
-                    : "Unknown"
+                // Parenthesized deliberately: without them `title || len > 0`
+                // groups as `(title || len > 0)` and stringify would fire on a
+                // bare title instead of the input JSON.
+                const input = part.state.input ?? {}
+                const title = part.state.title || (Object.keys(input).length > 0 ? JSON.stringify(input) : "Unknown")
                 console.log()
                 console.log(`${color}|`, `\x1b[0m\x1b[2m ${tool.padEnd(7, " ")}`, "", `\x1b[0m${title}`)
               }
