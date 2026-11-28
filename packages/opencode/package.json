@@ -138,7 +138,7 @@
     "effect": "catalog:",
     "fuzzysort": "4.0.2",
     "gitlab-ai-provider": "6.23.1",
-    "glob": "14.0.2",
+    "glob": "14.0.6",
     "google-auth-library": "10.9.1",
     "gray-matter": "4.0.3",
     "ignore": "7.0.10",
