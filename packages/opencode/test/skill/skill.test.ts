@@ -901,6 +901,56 @@ describe("skill.fmt", () => {
 })
 
 describe("skill duplicates", () => {
+  it.live("same-named project skill wins over the global copy deterministically", () =>
+    provideTmpdirInstance(
+      (dir) =>
+        Effect.gen(function* () {
+          const home = path.join(dir, "home")
+          yield* Effect.promise(() => fs.mkdir(path.join(home, ".claude", "skills", "precedence"), { recursive: true }))
+          yield* Effect.promise(() =>
+            Bun.write(
+              path.join(home, ".claude", "skills", "precedence", "SKILL.md"),
+              `---
+name: precedence
+description: Global copy.
+---
+
+# Global
+`,
+            ),
+          )
+          yield* Effect.promise(() =>
+            Bun.write(
+              path.join(dir, ".opencode", "skill", "precedence", "SKILL.md"),
+              `---
+name: precedence
+description: Project copy.
+---
+
+# Project
+`,
+            ),
+          )
+
+          // Global/external roots scan before project roots, so the project
+          // copy must be the deterministic survivor regardless of which file
+          // the OS parses first.
+          yield* withHome(
+            home,
+            Effect.gen(function* () {
+              const skill = yield* Skill.Service
+              const list = yield* skill.all()
+              const item = list.find((x) => x.name === "precedence")
+              expect(item).toBeDefined()
+              expect(item!.description).toBe("Project copy.")
+              expect(item!.location).toContain(path.join(".opencode", "skill"))
+            }),
+          )
+        }),
+      { git: true },
+    ),
+  )
+
   it.live("keeps single entry when duplicate names exist", () =>
     provideTmpdirInstance(
       (dir) =>

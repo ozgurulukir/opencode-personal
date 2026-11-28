@@ -62,6 +62,8 @@ export const Default = {
 } as const
 
 export interface Interface {
+  // undefined for unknown names (including prototype keys like "constructor"
+  // or "toString" — get() uses Object.hasOwn so those no longer resolve).
   readonly get: (name: string) => Effect.Effect<Info | undefined>
   readonly list: () => Effect.Effect<Info[]>
 }
@@ -145,7 +147,9 @@ export const layer = Layer.effect(
       }
 
       for (const item of yield* skill.all()) {
-        if (commands[item.name]) continue
+        // Object.hasOwn: a truthy check would resolve inherited prototype
+        // members, silently skipping a skill named toString/constructor.
+        if (Object.hasOwn(commands, item.name)) continue
         commands[item.name] = {
           name: item.name,
           description: item.description,
@@ -166,7 +170,9 @@ export const layer = Layer.effect(
 
     const get = Effect.fn("Command.get")(function* (name: string) {
       const s = yield* InstanceState.get(state)
-      return s.commands[name]
+      // Object.hasOwn so prototype keys ("toString", "constructor") resolve to
+      // undefined instead of the inherited member — mirrors agent.ts/skill.
+      return Object.hasOwn(s.commands, name) ? s.commands[name] : undefined
     })
 
     const list = Effect.fn("Command.list")(function* () {
