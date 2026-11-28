@@ -169,7 +169,6 @@ export const GrepTool = Tool.define(
             )
           }
 
-
           if (result.partial) {
             output.push("")
             output.push("(Some paths were inaccessible and skipped)")

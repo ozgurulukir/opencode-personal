@@ -269,6 +269,8 @@ describe("tool.grep", () => {
       const result = yield* grep.execute({ pattern: "match", path: test.directory }, ctx)
       expect(result.metadata.truncated).toBe(true)
       expect(result.metadata.matches).toBe(3000)
+      // Truncation at the cap must not surface the partial-failure hint.
+      expect(result.output).not.toContain("inaccessible")
     }),
   )
 
