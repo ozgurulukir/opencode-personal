@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import path from "path"
+import fs from "fs"
+import os from "os"
 import { Shell } from "../../src/shell/shell"
 import { Filesystem } from "@/util/filesystem"
 import { which } from "../../src/util/which"
@@ -96,4 +98,79 @@ describe("shell", () => {
       })
     })
   }
+})
+
+describe("bash args round-trip", () => {
+  // Skipped where bash is unavailable (e.g. Windows without Git Bash).
+  const bash = process.platform === "win32" ? undefined : which("bash") || "/bin/bash"
+
+  const run = async (command: string, cwd?: string) => {
+    if (!bash) return { stdout: "", code: 0 }
+    const args = Shell.args(bash, command, cwd ?? process.cwd())
+    const proc = Bun.spawn([bash, ...args], { stdout: "pipe", stderr: "pipe" })
+    const stdout = await new Response(proc.stdout).text()
+    const code = await proc.exited
+    return { stdout, code }
+  }
+
+  test("passes newline-separated commands through verbatim", async () => {
+    if (!bash) return
+    const { stdout, code } = await run("echo one\necho two")
+    expect(code).toBe(0)
+    expect(stdout).toBe("one\ntwo\n")
+  })
+
+  test("preserves tabs and carriage returns through printf escapes", async () => {
+    if (!bash) return
+    const { stdout, code } = await run("printf 'a\\tb\\rc'")
+    expect(code).toBe(0)
+    expect(stdout).toBe("a\tb\rc")
+  })
+
+  test("keeps dollar expansions inside single quotes literal", async () => {
+    if (!bash) return
+    const { stdout, code } = await run("echo 'costs $5 and ${HOME} literal'")
+    expect(code).toBe(0)
+    expect(stdout).toBe("costs $5 and ${HOME} literal\n")
+  })
+
+  test("expands variables exactly once at eval time", async () => {
+    if (!bash) return
+    const { stdout, code } = await run("V='two  words'; echo \"$V\"")
+    expect(code).toBe(0)
+    expect(stdout).toBe("two  words\n")
+  })
+
+  test("handles escaped double quotes", async () => {
+    if (!bash) return
+    const { stdout, code } = await run('echo "a \\"quoted\\" word"')
+    expect(code).toBe(0)
+    expect(stdout).toBe('a "quoted" word\n')
+  })
+
+  test("executes backtick command substitution at eval time", async () => {
+    if (!bash) return
+    const { stdout, code } = await run("v=`echo hi`; echo \"$v\"")
+    expect(code).toBe(0)
+    expect(stdout).toBe("hi\n")
+  })
+
+  test("preserves control characters through printf escapes", async () => {
+    if (!bash) return
+    const { stdout, code } = await run("printf 'a\\001b'")
+    expect(code).toBe(0)
+    expect(stdout).toBe("a\x01b")
+  })
+
+  test("runs in the cwd passed as the first positional", async () => {
+    if (!bash) return
+    const dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "shell-args-")))
+    try {
+      const { stdout, code } = await run("pwd", dir)
+      expect(code).toBe(0)
+      expect(stdout.trim()).toBe(dir)
+    } finally {
+      fs.rmdirSync(dir)
+    }
+  })
 })
