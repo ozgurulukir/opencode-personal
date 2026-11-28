@@ -59,12 +59,17 @@ class MockStdioTransport {
   stderr: null = null
   pid = 12345
   onclose: (() => void) | null = null
+  onmessage: ((message: unknown) => void) | null = null
+  onerror: ((error: Error) => void) | null = null
   // oxlint-disable-next-line no-useless-constructor
   constructor(_opts: any) {}
   async start() {
     if (connectShouldHang) return new Promise<void>(() => {}) // never resolves
     if (connectShouldFail) throw new Error(connectError)
   }
+  // Swallow requests so they stay pending (no response ever arrives) — lets
+  // the pending-call test exercise the close-time rejection path.
+  async send(_message: unknown) {}
   async close() {
     transportCloseCount++
   }
@@ -122,13 +127,27 @@ void mock.module("@modelcontextprotocol/sdk/client/index.js", () => ({
   Client: class MockClient {
     _state!: MockClientState
     transport: any
+    onclose: (() => void) | null = null
+    // Rejects for in-flight requests, invoked by the transport close chain —
+    // mirrors the real SDK's Protocol._onclose (reject pending with
+    // ConnectionClosed, clear the transport, then call client.onclose).
+    pendingRejects: Array<(error: Error) => void> = []
 
     constructor(_opts: any) {
       clientCreateCount++
     }
 
-    async connect(transport: { start: () => Promise<void> }) {
+    async connect(transport: { start: () => Promise<void>; onclose?: unknown }) {
       this.transport = transport
+      // Mirror the real SDK: Protocol.connect chains the transport's onclose
+      // into the protocol cleanup before invoking client.onclose.
+      transport.onclose = () => {
+        const rejects = this.pendingRejects
+        this.pendingRejects = []
+        for (const reject of rejects) reject(new Error("Connection closed"))
+        this.transport = undefined
+        this.onclose?.()
+      }
       await transport.start()
       // After successful connect, bind to the last-created client name
       this._state = getOrCreateClientState(lastCreatedClientName)
@@ -154,6 +173,15 @@ void mock.module("@modelcontextprotocol/sdk/client/index.js", () => ({
       if (this._state) this._state.requestCalls++
       if (request.method === "tools/list") return schema.parse({ tools: this._state?.tools ?? [] })
       throw new Error(`unsupported request: ${request.method}`)
+    }
+
+    // In-flight request: no response ever arrives, so the promise stays
+    // pending until the transport closes (which rejects it with
+    // ConnectionClosed, like the real Protocol._onclose).
+    callTool(_request: unknown) {
+      return new Promise((_, reject) => {
+        this.pendingRejects.push(reject)
+      })
     }
 
     async listPrompts() {
@@ -1033,6 +1061,53 @@ test(
         expect(clients["reconnect-race-server"]).toBeUndefined()
         expect((yield* mcp.status())["reconnect-race-server"]?.status).toBe("disabled")
         expect(clientCreateCount).toBe(afterClose)
+      }),
+  ),
+)
+
+// ========================================================================
+// Test: pending requests fail promptly with ConnectionClosed on transport
+// close (the SDK's Protocol._onclose cleanup, which the old
+// transport.onclose replacement skipped)
+// ========================================================================
+
+test(
+  "pending callTool rejects promptly when the transport closes",
+  withInstance(
+    {
+      "pending-close-server": {
+        type: "local",
+        command: ["echo", "test"],
+      },
+    },
+    (mcp) =>
+      Effect.gen(function* () {
+        const client = (yield* mcp.clients())["pending-close-server"] as any
+        expect(client).toBeDefined()
+
+        // The mock transport swallows send(), so the request stays pending
+        // with no response in flight.
+        const pending = client
+          .callTool({ name: "slow_tool", arguments: {} })
+          .then(
+            () => "resolved" as const,
+            (error: unknown) => (error instanceof Error ? error.message : String(error)),
+          )
+
+        // Let the request get sent before closing.
+        yield* Effect.sleep("50 millis")
+
+        // Simulate a real transport close: the SDK's Protocol.connect chained
+        // handler (which routes through _onclose cleanup and client.onclose).
+        client.transport.onclose()
+
+        const outcome = yield* Effect.promise(() => pending)
+        expect(outcome).toContain("Connection closed")
+
+        // The SDK cleaned up its own state: the transport reference is unset
+        // and the reconnect fired via the client-level hook.
+        expect(client.transport).toBeUndefined()
+        expect((yield* mcp.status())["pending-close-server"]?.status).toBe("failed")
       }),
   ),
 )

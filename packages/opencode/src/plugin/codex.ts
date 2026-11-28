@@ -13,7 +13,7 @@ const log = Log.create({ service: "plugin.codex" })
 const CLIENT_ID = "app_EMoamEEZ73f0CkXaXp7hrann"
 const ISSUER = "https://auth.openai.com"
 const CODEX_API_ENDPOINT = "https://chatgpt.com/backend-api/codex/responses"
-const OAUTH_PORT = 1455
+export const OAUTH_PORT = 1455
 const OAUTH_POLLING_SAFETY_MARGIN_MS = 3000
 const ALLOWED_MODELS = new Set([
   "gpt-5.5",
@@ -261,11 +261,31 @@ interface PendingOAuth {
 let oauthServer: ReturnType<typeof createServer> | undefined
 let pendingOAuth: PendingOAuth | undefined
 
-async function startOAuthServer(): Promise<{ port: number; redirectUri: string }> {
+// In-flight creation of the callback server: concurrent authorize() calls
+// reuse the same listen() instead of racing it. Without this, the loser's
+// EADDRINUSE catch cleared the module reference AFTER the winner assigned it,
+// so stopOAuthServer() no-op'd, the listener leaked, and browser logins kept
+// failing until process restart.
+let oauthServerStart: Promise<void> | undefined
+
+export async function startOAuthServer(): Promise<{ port: number; redirectUri: string }> {
   if (oauthServer) {
     return { port: OAUTH_PORT, redirectUri: `http://localhost:${OAUTH_PORT}/auth/callback` }
   }
+  if (!oauthServerStart) {
+    oauthServerStart = createAndListen().catch((error) => {
+      // Only this creation can have failed — the shared promise means no other
+      // start raced us — so clearing the reference is safe and lets a retry
+      // re-create the server.
+      oauthServerStart = undefined
+      throw error
+    })
+  }
+  await oauthServerStart
+  return { port: OAUTH_PORT, redirectUri: `http://localhost:${OAUTH_PORT}/auth/callback` }
+}
 
+async function createAndListen(): Promise<void> {
   const server = createServer((req, res) => {
     const url = new URL(req.url || "/", `http://localhost:${OAUTH_PORT}`)
 
@@ -338,17 +358,18 @@ async function startOAuthServer(): Promise<{ port: number; redirectUri: string }
   })
 
   oauthServer = server
-
-  return { port: OAUTH_PORT, redirectUri: `http://localhost:${OAUTH_PORT}/auth/callback` }
 }
 
-function stopOAuthServer() {
+export function stopOAuthServer() {
   if (oauthServer) {
     oauthServer.close(() => {
       log.info("codex oauth server stopped")
     })
     oauthServer = undefined
   }
+  // A resolved in-flight promise must not short-circuit the next start after
+  // the server was deliberately stopped.
+  oauthServerStart = undefined
 }
 
 export function waitForOAuthCallback(pkce: PkceCodes, state: string): Promise<TokenResponse> {

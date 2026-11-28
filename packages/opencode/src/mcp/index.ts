@@ -665,61 +665,66 @@ export const layer = Layer.effect(
         await bridge.promise(Effect.promise(() => Bus.publish(ToolsChanged, { server: name })))
       })
 
-      // Auto-reconnect on transport close
-      if (client.transport) {
-        client.transport.onclose = () => {
-          log.info("mcp transport closed, scheduling reconnect", { server: name })
-          if (s.clients[name] !== client) return
-          s.status[name] = { status: "failed", error: "Transport closed" }
-          delete s.clients[name]
-          delete s.defs[name]
+      // Auto-reconnect on transport close. Registered on the CLIENT, not the
+      // transport: the SDK's Protocol.connect chains the transport's
+      // pre-existing onclose into its own _onclose, which rejects pending
+      // requests with ConnectionClosed, aborts in-flight request handlers,
+      // clears the stale transport reference, and only then invokes
+      // client.onclose. Replacing transport.onclose broke that chain — pending
+      // calls hung until their own per-request timeout and the client kept
+      // stale transport state.
+      client.onclose = () => {
+        log.info("mcp transport closed, scheduling reconnect", { server: name })
+        if (s.clients[name] !== client) return
+        s.status[name] = { status: "failed", error: "Transport closed" }
+        delete s.clients[name]
+        delete s.defs[name]
 
-          // Live guard against resurrecting a server that was disconnected or
-          // manually reconnected. A closure (not an inline check) so it reads the
-          // current state on every call — TS narrowing of `s.status[name]` must
-          // not carry across the awaits below, where disconnect() may mutate it.
-          const resurrected = () => Boolean(s.clients[name]) || s.status[name]?.status === "disabled"
+        // Live guard against resurrecting a server that was disconnected or
+        // manually reconnected. A closure (not an inline check) so it reads the
+        // current state on every call — TS narrowing of `s.status[name]` must
+        // not carry across the awaits below, where disconnect() may mutate it.
+        const resurrected = () => Boolean(s.clients[name]) || s.status[name]?.status === "disabled"
 
-          // Schedule reconnect with exponential backoff
-          const reconnect = (attempt: number) => {
-            const delay = Math.min(1000 * Math.pow(2, attempt), 30_000)
-            const existing = s.reconnects.get(name)
-            if (existing) clearTimeout(existing)
-            const timer = setTimeout(async () => {
-              s.reconnects.delete(name)
-              if (resurrected()) return
-              log.info("attempting mcp reconnect", { server: name, attempt })
-              const mcpConfig = await bridge.promise(getMcpConfig(name))
-              if (!mcpConfig) {
-                log.warn("mcp config not found for reconnect", { server: name })
-                return
-              }
-              const result = await bridge.promise(create(name, mcpConfig).pipe(Effect.catch(() => Effect.void)))
-              if (!result?.mcpClient) {
-                log.warn("mcp reconnect failed, retrying", { server: name, attempt })
-                reconnect(attempt + 1)
-                return
-              }
-              // Re-check after the async connect: disconnect() may have run while
-              // create() was in flight (this timer already removed itself from
-              // s.reconnects, so the clearTimeout in disconnect() cannot stop us).
-              if (resurrected()) {
-                await result.mcpClient.close().catch(() => {})
-                return
-              }
-              s.status[name] = result.status
-              s.clients[name] = result.mcpClient
-              s.defs[name] = result.defs!
-              watch(s, name, result.mcpClient, bridge, mcpConfig.timeout)
-              await bridge.promise(
-                Effect.promise(() => Bus.publish(StatusChanged, { server: name, status: result.status })),
-              )
-              log.info("mcp reconnected", { server: name })
-            }, delay)
-            s.reconnects.set(name, timer)
-          }
-          reconnect(0)
+        // Schedule reconnect with exponential backoff
+        const reconnect = (attempt: number) => {
+          const delay = Math.min(1000 * Math.pow(2, attempt), 30_000)
+          const existing = s.reconnects.get(name)
+          if (existing) clearTimeout(existing)
+          const timer = setTimeout(async () => {
+            s.reconnects.delete(name)
+            if (resurrected()) return
+            log.info("attempting mcp reconnect", { server: name, attempt })
+            const mcpConfig = await bridge.promise(getMcpConfig(name))
+            if (!mcpConfig) {
+              log.warn("mcp config not found for reconnect", { server: name })
+              return
+            }
+            const result = await bridge.promise(create(name, mcpConfig).pipe(Effect.catch(() => Effect.void)))
+            if (!result?.mcpClient) {
+              log.warn("mcp reconnect failed, retrying", { server: name, attempt })
+              reconnect(attempt + 1)
+              return
+            }
+            // Re-check after the async connect: disconnect() may have run while
+            // create() was in flight (this timer already removed itself from
+            // s.reconnects, so the clearTimeout in disconnect() cannot stop us).
+            if (resurrected()) {
+              await result.mcpClient.close().catch(() => {})
+              return
+            }
+            s.status[name] = result.status
+            s.clients[name] = result.mcpClient
+            s.defs[name] = result.defs!
+            watch(s, name, result.mcpClient, bridge, mcpConfig.timeout)
+            await bridge.promise(
+              Effect.promise(() => Bus.publish(StatusChanged, { server: name, status: result.status })),
+            )
+            log.info("mcp reconnected", { server: name })
+          }, delay)
+          s.reconnects.set(name, timer)
         }
+        reconnect(0)
       }
     }
 
