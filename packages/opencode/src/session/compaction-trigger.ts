@@ -51,6 +51,37 @@ export function isCurrentTurnContinue(msgs: MessageV2.WithParts[], userID: Messa
 }
 
 /**
+ * Marker metadata the overflow replay writes on the user text parts it
+ * re-posts after a failed auto-compaction. Structural, mirroring
+ * COMPACTION_CONTINUE_METADATA: the writer (compaction.ts) and the reader
+ * (the guard below) share this one constant so they cannot drift apart.
+ */
+export const COMPACTION_REPLAY_METADATA = Object.freeze({ compaction_replay: true })
+
+/**
+ * Whether a part is the overflow-replay marker a failed auto-compaction
+ * writes on the user text parts it re-posts. Kept structural so both
+ * server-side guards and SDK-shaped consumers can reuse it.
+ */
+export function isCompactionReplayPart(p: { type: string; metadata?: { compaction_replay?: boolean } }): boolean {
+  return p.type === "text" && p.metadata?.compaction_replay === true
+}
+
+/**
+ * Whether the current turn is the replayed user message an overflow-failed
+ * auto-compaction re-posts. Unlike a continue turn, a replay turn may still
+ * trigger another auto-compaction (it usually overflows again — that is what
+ * feeds the breaker) — but the run loop must NOT reset the
+ * consecutive-auto-compactions counter for it, or the breaker can never trip
+ * and a still-overflowing session loops forever: compaction → replay →
+ * overflow → compaction with the counter oscillating 0↔1.
+ */
+export function isCurrentTurnReplay(msgs: MessageV2.WithParts[], userID: MessageID): boolean {
+  const userMsg = msgs.findLast((m) => m.info.id === userID)
+  return userMsg?.parts.some(isCompactionReplayPart) ?? false
+}
+
+/**
  * Auto-compaction decision for a finished assistant turn. Summary turns
  * never trigger (their output IS the compaction), continue turns are guarded
  * against re-triggering, and the budget math itself (auto gate, reserved

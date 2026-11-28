@@ -177,8 +177,12 @@ export const runLoop: (deps: RunLoopDeps, sessionID: SessionID) => Effect.Effect
       }
 
       const isCurrentTurnContinue = CompactionTrigger.isCurrentTurnContinue(msgs, lastUser.id)
+      // An overflow-replay turn is not a continue turn (it may still trigger
+      // another auto-compaction and feed the breaker), but it must not reset
+      // the counter either — see CompactionTrigger.isCurrentTurnReplay.
+      const isCurrentTurnReplay = CompactionTrigger.isCurrentTurnReplay(msgs, lastUser.id)
 
-      if (!isCurrentTurnContinue && tasks.length === 0) {
+      if (!isCurrentTurnContinue && !isCurrentTurnReplay && tasks.length === 0) {
         consecutiveAutoCompactions = 0
       }
 

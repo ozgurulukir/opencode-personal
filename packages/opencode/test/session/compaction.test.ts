@@ -2268,6 +2268,40 @@ describe("session.compaction.process", () => {
   )
 
   itCompaction.instance(
+    "overflow replay marks the replayed text parts as compaction_replay (#611)",
+    () => {
+      const stub = llm()
+      stub.push(reply("summary"))
+      return Effect.gen(function* () {
+        const ssn = yield* SessionNs.Service
+        const session = yield* ssn.create({})
+        yield* createUserMessage(session.id, "first prompt")
+        yield* createUserMessage(session.id, "huge prompt: " + "w".repeat(3000))
+        yield* createCompactionMarker(session.id)
+        const msgs = yield* ssn.messages({ sessionID: session.id })
+        const parent = msgs.at(-1)?.info.id
+
+        yield* SessionCompaction.use.process({ parentID: parent!, messages: msgs, sessionID: session.id, auto: true })
+
+        const allMsgs = yield* ssn.messages({ sessionID: session.id })
+        const replayed = allMsgs.find(
+          (m) =>
+            m.info.id > parent! &&
+            m.info.role === "user" &&
+            m.parts.some((p) => p.type === "text" && p.text?.includes("huge prompt")),
+        )
+        expect(replayed).toBeTruthy()
+        expect(replayed!.parts.some(CompactionTrigger.isCompactionReplayPart)).toBe(true)
+        // The replay turn must not count as a continue turn: it may still
+        // trigger another auto-compaction and feed the breaker.
+        expect(CompactionTrigger.isCurrentTurnContinue(allMsgs, replayed!.info.id as MessageID)).toBe(false)
+        expect(CompactionTrigger.isCurrentTurnReplay(allMsgs, replayed!.info.id as MessageID)).toBe(true)
+      }).pipe(withCompaction({ llm: stub.layer, config: cfg({ tail_turns: 1, preserve_recent_tokens: 50 }) }))
+    },
+    { git: true },
+  )
+
+  itCompaction.instance(
     "passes maxOutputTokens and previousSummary to compaction processor (#336)",
     () => {
       let capturedMaxOutputTokens: number | undefined

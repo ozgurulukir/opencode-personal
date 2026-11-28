@@ -590,10 +590,22 @@ export const layer: Layer.Layer<
               if (part.type === "compaction") continue
               const replayPart =
                 part.type === "file" && MessageV2.isMedia(part.mime)
-                  ? { type: "text" as const, text: `[Attached ${part.mime}: ${part.filename ?? "file"}]` }
+                  ? { type: "text" as const, text: `[Attached ${part.mime}: ${part.filename ?? "file"}]`, metadata: {} }
                   : part
               replayParts.push({
                 ...replayPart,
+                // Mark text parts as overflow-replay so the run loop keeps the
+                // consecutive-auto-compactions counter alive for the replayed
+                // turn (see CompactionTrigger.isCurrentTurnReplay) — otherwise
+                // the breaker can never trip and the session loops forever.
+                ...(replayPart.type === "text"
+                  ? {
+                      metadata: {
+                        ...(replayPart.metadata ?? {}),
+                        ...CompactionTrigger.COMPACTION_REPLAY_METADATA,
+                      },
+                    }
+                  : {}),
                 id: PartID.ascending(),
                 messageID: replayMsg.id,
                 sessionID: input.sessionID,
