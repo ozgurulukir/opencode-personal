@@ -89,4 +89,59 @@ describe("Auth", () => {
       }),
     ),
   )
+
+  it.live("parallel set() for different keys does not lose entries", () =>
+    provideTmpdirInstance(() =>
+      Effect.gen(function* () {
+        const auth = yield* Auth.Service
+        const keys = ["alpha", "beta", "gamma", "delta", "epsilon", "zeta", "eta", "theta"]
+
+        // Unbounded concurrent whole-file read-modify-write: without the
+        // per-file flock, the last writer wins and silently drops the other
+        // writers' entries.
+        yield* Effect.forEach(keys, (key) => auth.set(key, { type: "api", key: `sk-${key}` }), {
+          concurrency: "unbounded",
+        })
+
+        const data = yield* auth.all()
+        for (const key of keys) {
+          const entry = data[key]
+          expect(entry?.type).toBe("api")
+          if (entry?.type === "api") expect(entry.key).toBe(`sk-${key}`)
+        }
+      }),
+    ),
+  )
+
+  it.live("parallel remove() and set() interleave without losing entries", () =>
+    provideTmpdirInstance(() =>
+      Effect.gen(function* () {
+        const auth = yield* Auth.Service
+        const keep = ["keep-a", "keep-b", "keep-c", "keep-d"]
+
+        // Seed all entries first, then race removals of half the keys against
+        // sets of the others; the flock must serialize each read-modify-write.
+        for (const key of [...keep, "gone-a", "gone-b"]) {
+          yield* auth.set(key, { type: "api", key: `sk-${key}` })
+        }
+
+        yield* Effect.all(
+          [
+            ...["gone-a", "gone-b"].map((key) => auth.remove(key)),
+            ...keep.map((key) => auth.set(key, { type: "api", key: `sk-${key}-updated` })),
+          ],
+          { concurrency: "unbounded", discard: true },
+        )
+
+        const data = yield* auth.all()
+        for (const key of keep) {
+          const entry = data[key]
+          expect(entry?.type).toBe("api")
+          if (entry?.type === "api") expect(entry.key.endsWith("-updated")).toBe(true)
+        }
+        expect(data["gone-a"]).toBeUndefined()
+        expect(data["gone-b"]).toBeUndefined()
+      }),
+    ),
+  )
 })
