@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import dns from "node:dns"
+import { Effect, Stream } from "effect"
 import { assertSafeRemoteUrl, guardedFetch, isLoopbackHostname, isPrivateIP, safeFetchJson } from "@/util/network"
 
 describe("network safety", () => {
@@ -251,6 +252,28 @@ describe("network safety", () => {
 
     test("rejects plain http for non-loopback targets without allowHttp", async () => {
       await expect(guardedFetch("http://example.com/x", "test")).rejects.toThrow("must use https://")
+    })
+  })
+
+  describe("readBoundedResponseBytes", () => {
+    const bounded = async (chunks: Uint8Array[], max: number) => {
+      const { readBoundedResponseBytes } = await import("@/util/network")
+      const response = { stream: Stream.fromIterable(chunks) }
+      return Effect.runPromise(
+        readBoundedResponseBytes(response, max, (size) => `overflow at ${size ?? "unknown"}`) as Effect.Effect<
+          Uint8Array,
+          Error
+        >,
+      )
+    }
+
+    test("accumulates under the cap", async () => {
+      const bytes = await bounded([new Uint8Array([1, 2]), new Uint8Array([3])], 100)
+      expect([...bytes]).toEqual([1, 2, 3])
+    })
+
+    test("fails at the cap without buffering the rest", async () => {
+      await expect(bounded([new Uint8Array(90), new Uint8Array(90)], 100)).rejects.toThrow("overflow at 180")
     })
   })
 })

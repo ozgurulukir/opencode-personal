@@ -211,6 +211,31 @@ describe("tool.grep", () => {
     }),
   )
 
+  it.instance("caps detail collection while keeping the true total across files", () =>
+    Effect.gen(function* () {
+      const test = yield* TestInstance
+      for (const name of ["cap-a.txt", "cap-b.txt"]) {
+        const lines = Array.from({ length: 80 }, (_, i) => `match line ${i}`).join("\n")
+        yield* Effect.promise(() => Bun.write(path.join(test.directory, name), lines))
+      }
+      const info = yield* GrepTool
+      const grep = yield* info.init()
+      const result = yield* grep.execute(
+        {
+          pattern: "match",
+          path: test.directory,
+        },
+        ctx,
+      )
+      // 160 true matches from the count pass; the detail side collects at
+      // most the 100-row cap.
+      expect(result.metadata.matches).toBe(160)
+      expect(result.metadata.truncated).toBe(true)
+      expect(result.output).toContain("showing first 100")
+      expect(result.output).toContain("60 hidden")
+    }),
+  )
+
   it.instance("groups output by file path", () =>
     Effect.gen(function* () {
       const test = yield* TestInstance

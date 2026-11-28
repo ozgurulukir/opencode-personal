@@ -919,6 +919,7 @@ describe("file/index Filesystem patterns", () => {
           },
           tree: () => Effect.succeed(""),
           search: () => Effect.succeed({ items: [], partial: false }),
+          count: () => Effect.succeed(0),
         }),
       )
       const fileLayer = File.layer.pipe(

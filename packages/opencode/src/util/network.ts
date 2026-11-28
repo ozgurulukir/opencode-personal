@@ -1,4 +1,6 @@
 import dns from "node:dns"
+import { Effect, Stream } from "effect"
+
 
 export function online() {
   const nav = globalThis.navigator
@@ -348,3 +350,39 @@ export async function guardedFetch(
     target = await validateFetchTarget(next.toString(), what, options)
   }
 }
+
+// Effect-HttpClient counterpart of readBoundedBytes: accumulate the response
+// stream until the cap, failing as soon as it is crossed. Chunked responses
+// have no reliable content-length, so buffering (arrayBuffer/text) first would
+// let a hostile proxy stream unbounded data into memory.
+export const readBoundedResponseBytes = (
+  response: { readonly stream: Stream.Stream<Uint8Array, unknown> },
+  maxBytes: number,
+  describeOverflow: (size?: number) => string,
+) =>
+  Effect.gen(function* () {
+    const chunks: Uint8Array[] = []
+    let total = 0
+    yield* response.stream
+      .pipe(
+        Stream.mapEffect((chunk: Uint8Array) =>
+          Effect.suspend(() => {
+            total += chunk.byteLength
+            if (total > maxBytes) return Effect.fail(new Error(describeOverflow(total)))
+            chunks.push(chunk)
+            return Effect.void
+          }),
+        ),
+        Stream.runDrain,
+      )
+      .pipe(
+        Effect.mapError((error) => new Error(error instanceof Error ? error.message : String(error))),
+      )
+    const out = new Uint8Array(total)
+    let offset = 0
+    for (const chunk of chunks) {
+      out.set(chunk, offset)
+      offset += chunk.byteLength
+    }
+    return out
+  })

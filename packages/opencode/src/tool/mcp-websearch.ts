@@ -1,5 +1,10 @@
 import { Duration, Effect, Schema } from "effect"
 import { HttpClient, HttpClientRequest } from "effect/unstable/http"
+import { readBoundedResponseBytes } from "@/util/network"
+
+// Upper bound for a JSON-RPC response body; the parsed result is truncated
+// downstream by the tool-output truncation anyway.
+const MAX_RESPONSE_BYTES = 5 * 1024 * 1024
 
 export const EXA_URL = process.env.EXA_API_KEY
   ? `https://mcp.exa.ai/mcp?exaApiKey=${encodeURIComponent(process.env.EXA_API_KEY)}`
@@ -96,6 +101,14 @@ export const call = <F extends Schema.Struct.Fields>(
       .pipe(
         Effect.timeoutOrElse({ duration: timeout, orElse: () => Effect.die(new Error(`${tool} request timed out`)) }),
       )
-    const body = yield* response.text
+    // Read the JSON-RPC body in bounded fashion instead of buffering the whole
+    // response: chunked responses have no reliable content-length, so a
+    // hostile proxy could stream unbounded data into memory before parsing.
+    const bytes = yield* readBoundedResponseBytes(response, MAX_RESPONSE_BYTES, (size) =>
+      size === undefined
+        ? `${tool} response too large`
+        : `${tool} response too large (${size} bytes)`,
+    )
+    const body = new TextDecoder().decode(bytes)
     return yield* parseResponse(body)
   })
