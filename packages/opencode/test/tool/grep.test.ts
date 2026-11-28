@@ -236,6 +236,42 @@ describe("tool.grep", () => {
     }),
   )
 
+  it.instance("counts matched lines, not occurrences, so total matches displayed rows", () =>
+    Effect.gen(function* () {
+      const test = yield* TestInstance
+      // 2 matched lines, 5 individual occurrences: the total must count the
+      // same unit as the JSON detail side (one match event per matched line)
+      // or "matches/hidden" misreports.
+      yield* Effect.promise(() => Bun.write(path.join(test.directory, "multi.txt"), "needle needle\nneedle needle needle\nplain\n"))
+      const info = yield* GrepTool
+      const grep = yield* info.init()
+      const result = yield* grep.execute({ pattern: "needle", path: test.directory }, ctx)
+      expect(result.metadata.matches).toBe(2)
+      expect(result.metadata.truncated).toBe(false)
+      expect(result.output).toContain("Found 2 matches")
+    }),
+  )
+
+  it.instance("kills a still-scanning rg at the cap instead of deadlocking on a full pipe", () =>
+    Effect.gen(function* () {
+      const test = yield* TestInstance
+      // Enough files that rg is still producing JSON past the cap when the
+      // stream stops: its output exceeds the OS pipe buffer, so the old
+      // wait-for-exit-then-kill order deadlocked on a blocked writer.
+      const files = Array.from({ length: 3000 }, (_, i) => `bulk-${i}.txt`)
+      yield* Effect.forEach(
+        files,
+        (name) => Effect.promise(() => Bun.write(path.join(test.directory, name), "match me\n")),
+        { concurrency: "unbounded", discard: true },
+      )
+      const info = yield* GrepTool
+      const grep = yield* info.init()
+      const result = yield* grep.execute({ pattern: "match", path: test.directory }, ctx)
+      expect(result.metadata.truncated).toBe(true)
+      expect(result.metadata.matches).toBe(3000)
+    }),
+  )
+
   it.instance("groups output by file path", () =>
     Effect.gen(function* () {
       const test = yield* TestInstance

@@ -275,10 +275,14 @@ function searchArgs(input: SearchInput) {
   return args
 }
 
-// Per-file match counts for the true total; no --json, plain "<path>:<count>"
-// lines.
+// Per-file matched-line counts for the true total; no --json, plain
+// "<path>:<count>" lines. --count (matched lines) rather than
+// --count-matches (individual occurrences): the JSON detail side emits one
+// match event per matched line, so the total must count the same unit or
+// "showing first N / hidden" misreports whenever a pattern matches more
+// than once per line.
 function countArgs(input: SearchInput) {
-  const args = ["--no-config", "--count-matches", "--hidden", "--glob=!.git/*", "--no-messages"]
+  const args = ["--no-config", "--count", "--hidden", "--glob=!.git/*", "--no-messages"]
   if (input.follow) args.push("--follow")
   if (input.glob) {
     for (const glob of input.glob) args.push(`--glob=${glob}`)
@@ -492,14 +496,19 @@ export const layer: Layer.Layer<Service, never, AppFileSystem.Service | ChildPro
               { concurrency: "unbounded" },
             )
 
-            let code: number = yield* handle.exitCode
             if (cap !== undefined && items.length >= cap) {
-              // The stream stopped at the cap while the process may still be
-              // scanning; terminate it. An already-exited process makes the
-              // kill attempt fail harmlessly.
+              // The stream stopped at the cap while rg may still be scanning
+              // and blocked writing into a full stdout pipe. Kill it BEFORE
+              // awaiting exit: waiting first would deadlock on a blocked rg,
+              // and a killed process's exit surfaces as a signal-death
+              // PlatformError, not a classifiable exit code. Truncation is a
+              // normal outcome, not a partial failure.
               yield* handle.kill().pipe(Effect.ignore)
-              code = yield* handle.exitCode
+              yield* handle.exitCode.pipe(Effect.orElseSucceed(() => 0))
+              return { items, partial: false }
             }
+
+            const code = yield* handle.exitCode
 
             if (code !== 0 && code !== 1 && code !== 2) {
               return yield* Effect.fail(error(stderr, code))
@@ -550,10 +559,9 @@ export const layer: Layer.Layer<Service, never, AppFileSystem.Service | ChildPro
               return yield* Effect.fail(error(stderr, code))
             }
 
-            // --count-matches prints "<path>:<count>" per file with at least
-            // one match (a bare count when exactly one file is searched);
-            // summing gives the true total without accumulating per-match
-            // objects.
+            // --count prints "<path>:<count>" per matching file (a bare count
+            // when exactly one file is searched); summing gives the true
+            // matched-line total without accumulating per-match objects.
             let total = 0
             for (const line of lines) {
               const sep = line.lastIndexOf(":")

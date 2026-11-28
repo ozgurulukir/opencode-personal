@@ -76,8 +76,8 @@ export const GrepTool = Tool.define(
 
           // Bounded collection: the detail side stops at MATCH_LIMIT rows
           // (per-file --max-count + total stream cap + early process
-          // termination) while the separate --count-matches pass reports the
-          // true total, preserving the "Found N matches (showing first M)" /
+          // termination) while the separate --count pass reports the
+          // true matched-line total, preserving the "Found N matches (showing first M)" /
           // "X hidden" contract without accumulating every match object.
           const [result, total] = yield* Effect.all(
             [
@@ -139,7 +139,7 @@ export const GrepTool = Tool.define(
 
           matches.sort((a, b) => b.mtime - a.mtime)
 
-          // `total` is the true count from the --count-matches pass; the
+          // `total` is the true matched-line count from the --count pass; the
           // collected detail rows are capped, so "hidden" is what the cap
           // dropped, not a fixed MATCH_LIMIT delta.
           const truncated = total > matches.length
@@ -148,7 +148,7 @@ export const GrepTool = Tool.define(
             return { title: params.pattern, metadata: { matches: 0, truncated: false }, output: "No files found" }
           }
 
-          const output = [`Found ${total} matches${truncated ? ` (showing first ${MATCH_LIMIT})` : ""}`]
+          const output = [`Found ${total} matches${truncated ? ` (showing first ${matches.length})` : ""}`]
 
           let current = ""
           for (const match of final) {
@@ -168,6 +168,7 @@ export const GrepTool = Tool.define(
               `(Results truncated: showing ${matches.length} of ${total} matches (${total - matches.length} hidden). Consider using a more specific path or pattern.)`,
             )
           }
+
 
           if (result.partial) {
             output.push("")
