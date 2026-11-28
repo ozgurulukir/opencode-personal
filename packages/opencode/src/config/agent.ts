@@ -1,6 +1,6 @@
 export * as ConfigAgent from "./agent"
 
-import { Exit, Schema, SchemaGetter } from "effect"
+import { Cause, Exit, Schema, SchemaGetter } from "effect"
 import { Bus } from "@/bus"
 import { zod } from "@opencode-ai/core/effect-zod"
 import { PositiveInt, withStatics } from "@opencode-ai/core/schema"
@@ -10,7 +10,6 @@ import { Glob } from "@opencode-ai/core/util/glob"
 import { configEntryNameFromPath } from "./entry-name"
 import * as ConfigMarkdown from "./markdown"
 import { ConfigModelID } from "./model-id"
-import { ConfigParse } from "./parse"
 import { ConfigPermission } from "./permission"
 import { toolsToPermissions } from "@/permission/tools"
 
@@ -142,7 +141,15 @@ export async function load(dir: string) {
       ...md.data,
       prompt: md.content.trim(),
     }
-    result[config.name] = ConfigParse.effectSchema(Info, config, item)
+    // One schema-invalid agent file must not fail the whole config load
+    // (failures here die the instance state and get cached): decode per-file
+    // and skip invalid entries, mirroring the frontmatter-error path above.
+    const parsed = Schema.decodeUnknownExit(Info)(config, { errors: "all", propertyOrder: "original" })
+    if (Exit.isSuccess(parsed)) {
+      result[config.name] = parsed.value
+      continue
+    }
+    log.error("failed to load agent", { agent: item, err: Cause.squash(parsed.cause) })
   }
   return result
 }

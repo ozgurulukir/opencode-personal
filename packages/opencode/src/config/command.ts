@@ -8,7 +8,6 @@ import { Bus } from "@/bus"
 import { zod } from "@opencode-ai/core/effect-zod"
 import { withStatics } from "@opencode-ai/core/schema"
 import { configEntryNameFromPath } from "./entry-name"
-import { InvalidError } from "./error"
 import * as ConfigMarkdown from "./markdown"
 import { ConfigModelID } from "./model-id"
 
@@ -56,7 +55,10 @@ export async function load(dir: string) {
       result[config.name] = parsed.data
       continue
     }
-    throw new InvalidError({ path: item, issues: parsed.error.issues }, { cause: parsed.error })
+    // One schema-invalid command file must not fail the whole config load:
+    // log the issue and skip the file, mirroring the frontmatter-error path
+    // above.
+    log.error("failed to load command", { command: item, err: parsed.error })
   }
   return result
 }
