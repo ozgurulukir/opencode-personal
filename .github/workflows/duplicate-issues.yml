@@ -35,7 +35,7 @@ jobs:
               "webfetch": "deny"
             }
         run: |
-          opencode run -m opencode/claude-sonnet-4-6 "A new issue has been created:
+          opencode-personal run -m opencode/claude-sonnet-4-6 "A new issue has been created:
 
           Issue number: ${{ github.event.issue.number }}
 
@@ -75,8 +75,6 @@ jobs:
           3. Related functionality or components
           4. Similar feature requests
 
-          Additionally, if the issue mentions keybinds, keyboard shortcuts, or key bindings, note the pinned keybinds issue #4997.
-
           ---
 
           POSTING YOUR COMMENT:
@@ -89,15 +87,13 @@ jobs:
 
           If duplicates were found, include a section about potential duplicates with links.
 
-          If the issue mentions keybinds/keyboard shortcuts, include a note about #4997.
-
-          If the issue IS compliant AND no duplicates were found AND no keybind reference, do NOT comment at all.
+          If the issue IS compliant AND no duplicates were found, do NOT comment at all.
 
           Use this format for the comment:
 
           [If not compliant:]
           <!-- issue-compliance -->
-          This issue doesn't fully meet our [contributing guidelines](../blob/dev/CONTRIBUTING.md).
+          This issue doesn't fully meet our [contributing guidelines](../blob/main/CONTRIBUTING.md).
 
           **What needs to be fixed:**
           - [specific reasons]
@@ -108,9 +104,6 @@ jobs:
           ---
           This issue might be a duplicate of existing issues. Please check:
           - #[issue_number]: [brief description of similarity]
-
-          [If keybind-related, add:]
-          For keybind-related issues, please also check our pinned keybinds documentation: #4997
 
           [End with if not compliant:]
           If you believe this was flagged incorrectly, please let a maintainer know.
@@ -147,7 +140,7 @@ jobs:
               "webfetch": "deny"
             }
         run: |
-          opencode run -m opencode/claude-sonnet-4-6 "Issue #${{ github.event.issue.number }} was previously flagged as non-compliant and has been edited.
+          opencode-personal run -m opencode/claude-sonnet-4-6 "Issue #${{ github.event.issue.number }} was previously flagged as non-compliant and has been edited.
 
           Lookup this issue with gh issue view ${{ github.event.issue.number }}.
 
