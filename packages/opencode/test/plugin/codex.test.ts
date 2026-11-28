@@ -4,6 +4,9 @@ import {
   extractAccountIdFromClaims,
   extractAccountId,
   waitForOAuthCallback,
+  startOAuthServer,
+  stopOAuthServer,
+  OAUTH_PORT,
   type IdTokenClaims,
 } from "../../src/plugin/codex"
 
@@ -168,5 +171,58 @@ describe("waitForOAuthCallback", () => {
 
     const hung = new Promise<never>((_, reject) => setTimeout(() => reject(new Error("second OAuth flow hung")), 50))
     expect(await Promise.race([secondOutcome, hung])).toBe("OAuth callback timeout - authorization took too long")
+  })
+})
+
+describe("startOAuthServer", () => {
+  afterEach(() => {
+    // A failing assertion mid-test must not leave the listener (or a blocker)
+    // bound to the fixed port for the rest of the file.
+    stopOAuthServer()
+  })
+
+  test("concurrent starts share one callback server and stop remains live", async () => {
+    // Defensive: a leftover listener from a crashed prior run would break the
+    // fixed-port listen below.
+    stopOAuthServer()
+
+    // Two near-simultaneous authorize() calls both reach startOAuthServer.
+    // Without the shared in-flight promise, the loser's EADDRINUSE catch
+    // cleared the module reference after the winner assigned it, so
+    // stopOAuthServer() no-op'd and the listener leaked until restart.
+    const [first, second] = await Promise.all([startOAuthServer(), startOAuthServer()])
+    expect(second.port).toBe(first.port)
+    expect(second.redirectUri).toBe(first.redirectUri)
+
+    // The server is actually listening.
+    const probe = await fetch(`http://localhost:${first.port}/nonexistent`)
+    expect(probe.status).toBe(404)
+
+    // stopOAuthServer must actually stop it (the clobber bug made it a no-op).
+    stopOAuthServer()
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    let stopped = false
+    try {
+      await fetch(`http://localhost:${first.port}/nonexistent`)
+    } catch {
+      stopped = true
+    }
+    expect(stopped).toBe(true)
+  })
+
+  test("a failed listen does not poison the next start", async () => {
+    // Occupy the fixed callback port to force our listen to fail; the next
+    // start must recover.
+    const { createServer } = await import("node:http")
+    const blocker = createServer(() => {})
+    blocker.on("error", () => {})
+    await new Promise<void>((resolve) => blocker.listen(OAUTH_PORT, resolve))
+
+    await expect(startOAuthServer()).rejects.toThrow()
+    stopOAuthServer()
+    await new Promise<void>((resolve) => blocker.close(() => resolve()))
+    await startOAuthServer() // must recover on retry
+    stopOAuthServer()
+    await new Promise<void>((resolve) => setTimeout(resolve, 50))
   })
 })
