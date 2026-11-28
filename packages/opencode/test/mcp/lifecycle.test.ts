@@ -202,12 +202,6 @@ void mock.module("@modelcontextprotocol/sdk/client/index.js", () => ({
 
     async close() {
       if (this._state) this._state.closed = true
-      // Route through the transport close chain like the real SDK's
-      // Protocol.close() does, so the disconnect-triggered synchronous
-      // onclose path is exercised.
-      const chain = this.transport?.onclose as (() => void) | undefined
-      this.transport = undefined
-      chain?.()
     }
   },
 }))
