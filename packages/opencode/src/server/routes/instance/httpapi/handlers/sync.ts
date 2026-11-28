@@ -9,6 +9,7 @@ import { and, asc, eq, inArray, lte, not, or } from "drizzle-orm"
 import { Effect, Scope } from "effect"
 import { HttpApiBuilder, HttpApiError } from "effect/unstable/httpapi"
 import { InstanceHttpApi } from "../api"
+import { badRequest } from "../errors"
 import { HistoryPayload, ReplayPayload, SessionPayload } from "../groups/sync"
 import * as Log from "@opencode-ai/core/util/log"
 import { errorData } from "@/util/error"
@@ -47,7 +48,21 @@ export const syncHandlers = HttpApiBuilder.group(InstanceHttpApi, "sync", (handl
         last: events.at(-1)?.seq,
         directory: ctx.payload.directory,
       })
-      yield* sync.replayAll(events)
+      // SyncEvent.replay/replayAll signal validation failures (sequence
+      // mismatch, cross-aggregate batch, unknown event type) by throwing,
+      // which surfaces as a defect; the route declares a 400 error, so
+      // surface those as the declared error body instead of a sanitized 500.
+      yield* sync.replayAll(events).pipe(
+        Effect.catchDefect((defect) =>
+          Effect.fail(
+            badRequest(
+              defect instanceof Error && defect.message
+                ? `Replay rejected: ${defect.message}`
+                : "Replay rejected",
+            ),
+          ),
+        ),
+      )
       log.info("sync replay complete", {
         sessionID: source,
         events: events.length,
@@ -60,7 +75,7 @@ export const syncHandlers = HttpApiBuilder.group(InstanceHttpApi, "sync", (handl
     const steal = Effect.fn("SyncHttpApi.steal")(function* (ctx: { payload: typeof SessionPayload.Type }) {
       const instance = yield* InstanceState.context
       const workspaceID = yield* InstanceState.workspaceID
-      if (!workspaceID) throw new Error("Cannot steal session without workspace context")
+      if (!workspaceID) return yield* badRequest("Cannot steal session without workspace context")
 
       const sessionRow = Database.use((db) =>
         db

@@ -208,6 +208,40 @@ describe("SyncEvent", () => {
         }),
       ),
     )
+    it.live(
+      "emits the declared sync envelope to GlobalBus",
+      provideTmpdirInstance(() =>
+        Effect.gen(function* () {
+          const { Created } = setup()
+          const emitted: Array<Record<string, unknown>> = []
+          const listener = (event: { payload: Record<string, unknown> }) => {
+            if (event.payload.type === "sync") emitted.push(event.payload)
+          }
+          GlobalBus.on("event", listener)
+          try {
+            yield* SyncEvent.use.run(Created, { id: "evt_1", name: "declared" })
+          } finally {
+            GlobalBus.off("event", listener)
+          }
+          expect(emitted).toHaveLength(1)
+
+          // The SSE handler stringifies raw GlobalBus events with no runtime
+          // encode step, so the declared payload schema (which feeds the
+          // /global/event OpenAPI schema and the generated SDK types) must
+          // mirror this envelope shape exactly.
+          expect(emitted[0]).toMatchObject({
+            type: "sync",
+            syncEvent: {
+              type: "item.created.1",
+              id: expect.any(String),
+              seq: 0,
+              aggregateID: "evt_1",
+              data: { id: "evt_1", name: "declared" },
+            },
+          })
+        }),
+      ),
+    )
   })
 
   describe("replay", () => {

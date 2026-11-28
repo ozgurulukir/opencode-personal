@@ -494,17 +494,24 @@ export function claim(aggregateID: string, ownerID: string) {
   )
 }
 
+// Declares the GlobalBus wire shape, which is the nested sync envelope from
+// `process()` below (`{ type: "sync", syncEvent: { type, id, seq, ... } }`).
+// The SSE handler stringifies raw GlobalBus events with no runtime encode
+// step, so this declaration must mirror the emitter — it feeds the
+// `/global/event` OpenAPI schema and the generated SDK types.
 export function effectPayloads() {
   return registry
     .entries()
     .map(([type, def]) =>
       EffectSchema.Struct({
         type: EffectSchema.Literal("sync"),
-        name: EffectSchema.Literal(type),
-        id: EffectSchema.String,
-        seq: EffectSchema.Finite,
-        aggregateID: EffectSchema.Literal(def.aggregate),
-        data: def.schema,
+        syncEvent: EffectSchema.Struct({
+          type: EffectSchema.Literal(type),
+          id: EffectSchema.String,
+          seq: EffectSchema.Finite,
+          aggregateID: EffectSchema.String,
+          data: def.schema,
+        }),
       }).annotate({ identifier: `SyncEvent.${type}` }),
     )
     .toArray()

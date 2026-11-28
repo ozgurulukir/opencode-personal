@@ -12,7 +12,7 @@ import { EventSequenceTable } from "@/sync/event.sql"
 import { SessionEvent } from "@/v2/session-event"
 import { Modelv2 } from "@/v2/model"
 import { SessionMessageTable } from "@/session/session.sql"
-import type { SessionID } from "@/session/schema"
+import { SessionID } from "@/session/schema"
 import { Database, eq } from "@/storage/db"
 import * as Log from "@opencode-ai/core/util/log"
 import { resetDatabase } from "../fixture/db"
@@ -185,6 +185,65 @@ describe("sync HttpApi", () => {
     const body = (await response.json()) as Record<string, unknown>
     expect(body.name).toBe("BadRequest")
     expect((body.data as Record<string, unknown> | undefined)?.message).toBeTruthy()
+  })
+
+  test("returns declared 400 for non-contiguous replay batches", async () => {
+    await using tmp = await tmpdir({ git: true, config: { formatter: false, lsp: false } })
+    const headers = { "x-opencode-directory": tmp.path, "content-type": "application/json" }
+    const event = (n: number) => ({
+      id: EventID.ascending(),
+      aggregateID: "session",
+      seq: n,
+      type: "session.next.synthetic.1",
+      data: { sessionID: "session", timestamp: "2024-01-02T03:04:05.000Z", text: "gap" },
+    })
+
+    const response = await app().request(SyncPaths.replay, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ directory: tmp.path, events: [event(0), event(2)] }),
+    })
+    expect(response.status).toBe(400)
+    const body = (await response.json()) as { name?: string; data?: { message?: string } }
+    expect(body.name).toBe("BadRequest")
+    expect(typeof body.data?.message).toBe("string")
+  })
+
+  test("returns declared 400 for cross-aggregate replay batches", async () => {
+    await using tmp = await tmpdir({ git: true, config: { formatter: false, lsp: false } })
+    const headers = { "x-opencode-directory": tmp.path, "content-type": "application/json" }
+    const event = (aggregateID: string, seq: number) => ({
+      id: EventID.ascending(),
+      aggregateID,
+      seq,
+      type: "session.next.synthetic.1",
+      data: { sessionID: "session", timestamp: "2024-01-02T03:04:05.000Z", text: "mixed" },
+    })
+
+    const response = await app().request(SyncPaths.replay, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ directory: tmp.path, events: [event("session", 0), event("other", 1)] }),
+    })
+    expect(response.status).toBe(400)
+    const body = (await response.json()) as { name?: string; data?: { message?: string } }
+    expect(body.name).toBe("BadRequest")
+    expect(typeof body.data?.message).toBe("string")
+  })
+
+  test("returns declared 400 for steal without workspace context", async () => {
+    await using tmp = await tmpdir({ git: true, config: { formatter: false, lsp: false } })
+    const headers = { "x-opencode-directory": tmp.path, "content-type": "application/json" }
+
+    const response = await app().request(SyncPaths.steal, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ sessionID: SessionID.make("ses_missing") }),
+    })
+    expect(response.status).toBe(400)
+    const body = (await response.json()) as { name?: string; data?: { message?: string } }
+    expect(body.name).toBe("BadRequest")
+    expect(typeof body.data?.message).toBe("string")
   })
 })
 
